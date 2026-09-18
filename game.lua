@@ -5177,7 +5177,7 @@ function game_keypressed(key, textinput)
 						volume = volume + 0.1
 						love.audio.setVolume( volume )
 						soundenabled = true
-						playsound(coinsound)
+						playsound(beepsound)
 					end
 				elseif pausemenuselected == #pausemenuoptions + 1 then
 					currentshaderi1 = currentshaderi1 + 1
@@ -5208,7 +5208,7 @@ function game_keypressed(key, textinput)
 					if volume == 0 then
 						soundenabled = false
 					end
-					playsound(coinsound)
+					playsound(beepsound)
 				elseif pausemenuselected == #pausemenuoptions + 1 then
 					currentshaderi1 = currentshaderi1 - 1
 					if currentshaderi1 < 1 then

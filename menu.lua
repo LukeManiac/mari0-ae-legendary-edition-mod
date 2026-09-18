@@ -2604,7 +2604,7 @@ function menu_keypressed(key, unicode)
 							volume = 1
 						end
 						love.audio.setVolume( volume )
-						playsound(coinsound)
+						playsound(beepsound)
 						soundenabled = true
 					end
 				elseif optionsselection == 10 then
@@ -2741,7 +2741,7 @@ function menu_keypressed(key, unicode)
 							soundenabled = false
 						end
 						love.audio.setVolume( volume )
-						playsound(coinsound)
+						playsound(beepsound)
 					end
 				elseif optionsselection == 10 then
 					vsync = not vsync

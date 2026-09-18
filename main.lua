@@ -984,6 +984,7 @@ function love.load()
 	bulletbillsound = newsound("bulletbill")
 	introsound = newsound("intro")
 	dialogsound = newsound("dialog")
+	beepsound = newsound("beep")
 	iciclesound = newsound("icicle")
 	thwompsound = newsound("thwomp")
 	boomerangsound = newsound("boomerang")
@@ -1056,14 +1057,14 @@ function love.load()
 	updatesoundlist = function()
 		soundlist = {jumpsound, jumpbigsound, stompsound, shotsound, errorsound, blockhitsound, blockbreaksound, coinsound, pipesound, boomsound, mushroomappearsound, mushroomeatsound, shrinksound, deathsound, gameoversound,
 					turretshotsound, oneupsound, levelendsound, castleendsound, scoreringsound, intermissionsound, firesound, fireballsound, meltsound, freezesound, iceballsound, iceballhitsound, iceblockbreaksound, bridgebreaksound, bowserfallsound, vinesound, swimsound, rainboomsound, 
-					portal1opensound, portal2opensound, portalentersound, portalfizzlesound, lowtimesound, pausesound, introsound, dialogsound, bulletbillsound, iciclesound, thwompsound, boomerangsound, raccoonswingsound,
+					portal1opensound, portal2opensound, portalentersound, portalfizzlesound, lowtimesound, pausesound, introsound, dialogsound, beepsound, bulletbillsound, iciclesound, thwompsound, boomerangsound, raccoonswingsound,
 					raccoonplanesound, skidsound, jumptinysound, pbuttonsound, windsound, suitsound, magicsound, koopalingendsound, bowserendsound, dooropensound, doorclosesound, keysound, keyopensound, weirdmushroomsound, jumpskinnysound,
 					energybouncesound, shufflesound, grabsound, throwsound, collectable1sound, collectable2sound, collectable3sound, collectable4sound, collectable5sound, collectable6sound, collectable7sound, 
 					collectable8sound, collectable9sound, collectable10sound, switchsound, iciclefallsound, helmetsound, helmetspikesound, helmethitsound, helmetremovesound, drybonesshellsound, propellersound, clearpipesound, megamushroomsound, stompbigsound, thwompbigsound,
 					superballeatsound, superballsound, capeflysound, mushroombigeatsound, bumperhitsound, bumperjumpsound, cannonfastsound, powblocksound, checkpointsound, groundpoundsound, glados1sound, glados2sound}
 		soundliststring = {"jump", "jumpbig", "stomp", "shot", "error", "blockhit", "blockbreak", "coin", "pipe", "boom", "mushroomappear", "mushroomeat", "shrink", "death", "gameover",
 			"turretshot", "oneup", "levelend", "castleend", "scorering", "intermission", "fire", "fireball", "melt", "freeze", "iceball", "iceballhit", "iceblockbreak", "bridgebreak", "bowserfall", "vine", "swim", "rainboom",
-			"portal1open", "portal2open", "portalenter", "portalfizzle", "lowtime", "pause", "intro", "dialog", "bulletbill", "icicle", "thwomp", "boomerang", "raccoonswing",
+			"portal1open", "portal2open", "portalenter", "portalfizzle", "lowtime", "pause", "intro", "dialog", "beep", "bulletbill", "icicle", "thwomp", "boomerang", "raccoonswing",
 			"raccoonplane", "skid", "jumptiny", "pbutton", "wind", "suit", "magic", "koopalingend", "bowserend", "dooropen", "doorclose", "key", "keyopen", "weirdmushroom", "jumpskinny",
 			"energybounce", "shuffle", "grab", "throw", "collectable1","collectable2","collectable3","collectable4","collectable5","collectable6","collectable7","collectable8", "collectable9", "collectable10",
 			"switch", "iciclefall", "helmet", "helmetspike", "helmethit", "helmetremove", "drybonesshell", "propeller", "clearpipe", "megamushroom", "stompbig", "thwompbig", "superballeat", "superball", "capefly", "mushroombigeat", "bumperhit",
