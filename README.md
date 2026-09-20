@@ -35,6 +35,7 @@ The project expands Mari0 AE with new gameplay systems, playable characters, ene
 
 * [About](#about)
 * [What's New](#whats-new)
+* [Changelog](#changelog)
 * [Requirements](#requirements)
 * [Installation](#installation)
 
@@ -136,6 +137,19 @@ Legendary Edition introduces changes throughout the game rather than concentrati
 Vertical camera seeking has also been reduced to help prevent the player from being left off-screen when attempting to camera-seek vertically.
 
 **The rest of the Lua files have also been tweaked and improved**, meaning the changes are not limited to the systems listed above.
+
+---
+
+# Changelog
+
+All notable releases and updates to **Legendary Edition** are documented here.
+
+## v1.0.1
+
+### 🐛 Bug Fixes
+
+* Fixed a crash that could occur when a **Koopa Troopa** side-hit a block.
+* Improved the handling of Koopa Troopa interactions with blocks to prevent the game from crashing during side-hit collisions.
 
 ---
 
