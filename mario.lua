@@ -6854,7 +6854,14 @@ function hitblock(x, y, t, v)
 	end
 	
 	local r = map[x][y]
-	if hitsound and onscreenobj(t) then
+
+	if type(t) == "table" and t.__baseclass then
+		tonscreen = onscreenobj(t)
+	else
+		tonscreen = true
+	end
+
+	if hitsound and tonscreen then
 		playsound(blockhitsound)
 	end
 

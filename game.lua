@@ -8700,6 +8700,10 @@ function onscreen(x, y, w, h)
 end
 
 function onscreenobj(t, xoff, yoff)
+	if not t.__baseclass then
+		return 
+	end
+
 	if xoff == nil then xoff = 0 end
 	if yoff == nil then yoff = 0 end
 	return onscreen(t.x - xoff, t.y - yoff, t.width + xoff*2, t.height + yoff*2)
