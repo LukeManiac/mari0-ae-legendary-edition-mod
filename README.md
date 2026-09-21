@@ -144,6 +144,17 @@ Vertical camera seeking has also been reduced to help prevent the player from be
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.0.2
+
+### ✨ Improvements
+
+* Added more loading messages to expand the loading presentation.
+* Animation number debugging now requires pressing **LShift+0**.
+
+### 🐛 Bug Fixes
+
+* Removed the annoying ass `"pipe not found"` spam that could repeatedly appear during character debugging.
+
 ## v1.0.1
 
 ### 🐛 Bug Fixes
