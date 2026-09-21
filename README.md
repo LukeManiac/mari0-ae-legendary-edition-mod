@@ -151,7 +151,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Added more loading messages to expand the loading presentation.
 * Animation number debugging now requires pressing **LShift+0**.
 
-### 🐛 Bug Fixes
+### ❌ Removals
 
 * Removed the annoying ass `"pipe not found"` spam that could repeatedly appear during character debugging.
 
