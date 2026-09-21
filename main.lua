@@ -2045,7 +2045,7 @@ function love.keypressed(key, scancode, isrepeat, textinput)
 		return
 	end
 	
-	if key == "0" and HITBOXDEBUG then
+	if key == "0" and love.keyboard.isDown("lshift") then
 		HITBOXDEBUGANIMS = not HITBOXDEBUGANIMS
 	elseif key == "f9" then
 		showplayercoords = not showplayercoords
