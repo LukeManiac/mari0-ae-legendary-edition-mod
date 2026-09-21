@@ -7912,7 +7912,6 @@ function mario:pipetravel()
 			p.scissor["down"] = {x-4, y, 5, 4}
 			p.scissor["left"] = {x-1-4, y-4, 4, 5}
 			p.scissor["right"] = {x, y-4, 4, 5}
-			print("pipe not found ", x, y)
 		end
 		if (x and y and inmap(x,y) and (map[x][y][1] and tilequads[map[x][y][1]] and not tilequads[map[x][y][1]]:getproperty("collision", x,y))) then
 			--just teleport

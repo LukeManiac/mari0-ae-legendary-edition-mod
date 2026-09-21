@@ -338,7 +338,22 @@ function love.load()
 					"if you have a heart attack, attack it", "if you have dementia, forget it", "if you're depressed, be happy", "if you have anxiety, calm down",
 					"if you're a villain, be a hero", "if you're broke, print money", "if you're dumb, become smart", "if you're dead, just respawn", "if you're drowning, drink the water",
 					"if you're deaf, just hear", "if you're in a wheelchair, walk", "already messed up, next year be my year fr", "du bist gut genug", "do u know dawae", "rahhhhhhhh",
-					"sdiybt", "my mom is kinda homeless", "can gta 6 come out already", "new year same me"}
+					"sdiybt", "my mom is kinda homeless", "can gta 6 come out already", "new year same me", "bro is not cooking", "chat is this real", "we got a situation", "who let bro cook",
+					"let him cook", "bro thinks he's him", "ain't no way bro", "what is bro yapping about", "bro has negative aura", "massive skill issue", "uninstall bro", "it's joever",
+					"we are so back", "never been more back", "bro fell off", "bro did not fall off", "absolute cinema", "peak fiction", "straight outta the trenches", "lock in bro",
+					"wake up babe new meme dropped", "the voices are getting louder", "bro is onto something", "what am i looking at", "nah this is crazy", "ain't nobody gonna know",
+					"who invited bro", "bro was not invited", "blud really thought", "bro forgot the assignment", "you had one job", "mission failed successfully", "task failed successfully",
+					"bro is fighting demons", "bro is fighting for his life", "caught in 4k", "caught lacking", "caught in ultra hd", "this cannot be serious", "we're cooked", "it's so over",
+					"we're back baby", "bro got that dawg in him", "zero aura", "negative aura", "infinite aura", "aura farming", "bro is farming aura", "certified yapper",
+					"professional yapper", "yap city", "welcome to yapville", "bro needs to stop yapping", "let bro speak", "bro cannot catch a break", "skill issue honestly",
+					"sounds like a you problem", "that's crazy gang", "crazy work", "diabolical work", "what a plot twist", "bro spawned in", "bro just spawned", "bro got the aux", "pass the aux",
+					"who gave bro the aux", "turn that up", "this song is fire", "straight heat", "absolute banger", "bro peaked", "this is cinema", "we got lore", "there's lore behind this",
+					"the lore goes crazy", "new lore just dropped", "bro has backstory", "bro unlocked a new dialogue option", "dialogue option unavailable", "bro got patched",
+					"bro needs an update", "bro got nerfed", "bro got buffed", "that's a crazy buff", "what patch notes are these", "bro found the secret ending", "bro chose violence",
+					"bro woke up and chose violence", "not the npc behaviour", "bro is an npc", "main character moment", "side character behaviour", "plot armour goes crazy",
+					"gg frickin ez", "hey it's me it's verity", "john pork is calling", "sheldon lee cooper you dawg", "watchin netflix and tiki takis", "ngl ima take a nap lmk",
+					"i can't do nathan", "insert bark fart here", "adrian", "enrique", "digi digi hey", "totoya haha", "suiii", "cristiano ronaldo sewey", "dada put me on that misery",
+					"lesbian space princess is dogwater"}
 						
 	loadingtext = loadingtexts[math.random(#loadingtexts)]
 	
@@ -2040,10 +2055,6 @@ function love.keypressed(key, scancode, isrepeat, textinput)
 			androidHIDE = not androidHIDE
 		else
 			HITBOXDEBUG = not HITBOXDEBUG
-
-			if not HITBOXDEBUG then
-				HITBOXDEBUGANIMS = false
-			end
 		end
 	elseif key == "f11" then
 		showfps = not showfps
@@ -3301,7 +3312,7 @@ function loadnitpicks()
 		CenterCamera = t.centercamera
 		_3DMODE = t.render3d
 		HITBOXDEBUG = t.viewhitboxes
-		HITBOXDEBUGANIMS = t.viewanimationnumbers and HITBOXDEBUG
+		HITBOXDEBUGANIMS = t.viewanimationnumbers
 		if t.pcversion then
 			android = false
 			androidsafe = true
@@ -3342,8 +3353,8 @@ function disablecheats()
 	goombaattack = false
 	sonicrainboom = false
 	playercollisions = false
-	infinitetime = true
-	infinitelives = true
+	infinitetime = false
+	infinitelives = false
 	darkmode = false
 end
 

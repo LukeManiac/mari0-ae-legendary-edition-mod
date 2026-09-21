@@ -764,8 +764,8 @@ playercollisions = false
 scalefactor = 5
 gelcannondelay = 0.05
 gelcannonspeed = 30
-infinitetime = true
-infinitelives = true
+infinitetime = false
+infinitelives = false
 
 pausemenuoptions = {"resume", "save game", "volume", "quit to", "quit to"}
 pausemenuoptions2 = {"", "", "", "menu", "desktop"}
