@@ -2411,25 +2411,25 @@ function game_draw()
 				love.graphics.rectangle("line", math.floor((w.x-xscroll)*16*scale)+.5, math.floor((w.y-yscroll-.5)*16*scale)+.5, w.width*16*scale-1, w.height*16*scale-1)
 			end
 			love.graphics.setLineWidth(lw)
+		end
 
-			--animation numbers
-			if HITBOXDEBUGANIMS then
-				love.graphics.setColor(255, 255, 255)
-				local x, y, max = 14, 24, 0
-				for i, n in pairs(animationnumbers) do
-					local text = i .. ": " .. n
-					if #text > max then
-						max = #text
-					end
-					local properprintfunc = properprintF
-					if hudoutline then
-						properprintfunc = properprintFbackground
-					end
-					properprintfunc(text, x*scale, y*scale)
-					y = y + 10
-					if y >= (height*16)-10 then
-						x, y = x + 8*(max+1), 24
-					end
+		--animation numbers
+		if HITBOXDEBUGANIMS then
+			love.graphics.setColor(255, 255, 255)
+			local x, y, max = 14, 24, 0
+			for i, n in pairs(animationnumbers) do
+				local text = i .. ": " .. n
+				if #text > max then
+					max = #text
+				end
+				local properprintfunc = properprintF
+				if hudoutline then
+					properprintfunc = properprintFbackground
+				end
+				properprintfunc(text, x*scale, y*scale)
+				y = y + 10
+				if y >= (height*16)-10 then
+					x, y = x + 8*(max+1), 24
 				end
 			end
 		end
