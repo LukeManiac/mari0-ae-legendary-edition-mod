@@ -149,7 +149,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 ### ✨ Improvements
 
 * Added more loading messages to expand the loading presentation.
-* Animation number debugging now requires pressing **F8**.
+* Animation number debugging now requires pressing **LCtrl+0**.
 
 ### ❌ Removals
 
