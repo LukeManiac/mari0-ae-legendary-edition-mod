@@ -13,6 +13,7 @@
 	"loading menu...": "loading menu...",
 	"loading editor...": "loading editor...",
 	"loading game...": "loading game...",
+	"loading save data...": "loading save data...",
 
 "^_Settings":"",
 	"^_Controls":"",
@@ -136,6 +137,7 @@
 	"game over": "game over",
 	"returning to menu...": "returning to menu...",
 	"returning to editor...": "returning to editor...",
+	"saving game...": "saving game...",
 
 "^_Pause":"",
 	"": "",

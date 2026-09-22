@@ -144,6 +144,14 @@ Vertical camera seeking has also been reduced to help prevent the player from be
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.0.3
+
+### ✨ Improvements
+
+* Added a loading overlay that is displayed while save data is being loaded.
+* Added a saving overlay that is displayed while game data is being saved.
+* Improved the visual presentation and feedback during save-data operations.
+
 ## v1.0.2
 
 ### ✨ Improvements

@@ -103,6 +103,7 @@ function game_load(suspended, deletesuspend)
 	
 	objects = nil
 	if suspended == true then
+		renderoverlay("loading save data...", menu_draw)
 		continuegame()
 		loadmappacksettings("suspended")
 		updatemappacksettings("suspended")
@@ -5115,6 +5116,7 @@ function game_keypressed(key, textinput)
 				if dcplaying then
 					suspendprompt = false
 				elseif pausemenuselected2 == 1 then
+					renderoverlay("saving game...")
 					stopmusic()
 					love.audio.stop()
 					suspendgame()
