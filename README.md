@@ -144,6 +144,12 @@ Vertical camera seeking has also been reduced to help prevent the player from be
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.0.4
+
+### ✨ Improvements
+
+* Improved Yoshi's walk cycle animation, thanks to WilliamFrog.
+
 ## v1.0.3
 
 ### ✨ Improvements
