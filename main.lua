@@ -3428,10 +3428,15 @@ function deepcopy(orig)
     return copy
 end
 
+function get_mouse_pos()
+	local mousex, mousey = love.mouse.getPosition()
+	local mousex = math.floor(mousex / scale)
+	local mousey = math.floor(mousey / scale)
+	return mousex, mousey
+end
+
 function mouseinrect(x, y, w, h)
-	mousex, mousey = love.mouse.getPosition()
-	mousex = math.floor(mousex / scale)
-	mousey = math.floor(mousey / scale)
+	local mousex, mousey = get_mouse_pos()
 	return mousex >= x and mousex <= x + w and mousey >= y and mousey <= y + h
 end
 

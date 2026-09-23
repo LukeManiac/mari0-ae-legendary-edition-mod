@@ -2971,6 +2971,7 @@ function menu_mousereleased(x, y, button)
 					notice.new("Creator disabled the editor.", notice.white, 2)
 					return false
 				end
+				renderoverlay("loading editor...", menu_draw)
 				editormode = true
 				players = 1
 				playertype = "portal"

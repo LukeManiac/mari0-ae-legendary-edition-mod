@@ -144,6 +144,12 @@ Vertical camera seeking has also been reduced to help prevent the player from be
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.0.5
+
+### ✨ Improvements
+
+* Fixed an issue where the overlay wouldn't render when using your mouse.
+
 ## v1.0.4
 
 ### ✨ Improvements

@@ -9031,11 +9031,7 @@ function mario:shoed(shoe, initial, drop) --get in shoe (type, make sound?, drop
 			self.cloudtimer = false
 		elseif self.shoe == "yoshi" then
 			if self.yoshi then
-				local panic = true
-				if self.animation ~= "invincible" then
-					panic = false
-				end
-				self.yoshi:ride(false, panic)
+				self.yoshi:ride(false, self.animation == "invincible")
 				self.yoshi = false
 			end
 		elseif drop then
