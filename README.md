@@ -8,29 +8,6 @@ The project expands Mari0 AE with new gameplay systems, playable characters, ene
 
 ---
 
-## ✨ Highlights
-
-* 🌀 Expanded portal gameplay
-* 🍄 Multiple playable characters
-* 👾 Expanded enemies and enemy behaviour
-* 🧱 Expanded **Course Maker**
-* 🧪 Gel gameplay and related mechanics
-* 💧 Additional gameplay mechanics and effects
-* 🔫 Additional weapons and projectiles
-* 💥 New power-ups and gameplay elements
-* 🎯 Daily Challenge support
-* 🎮 Controller and joystick support
-* 🖼️ New and improved graphics
-* ✨ New shaders and visual effects
-* 🔊 New and improved sounds
-* 🌍 Additional languages and translations
-* 📢 Expanded loading notifications and presentation
-* ⚙️ Gameplay, physics and quality-of-life improvements
-* 🚀 Changes throughout the game's Lua source
-* 🔧 Additional tweaks across individual gameplay systems
-
----
-
 # 📖 Contents
 
 * [About](#about)
@@ -38,23 +15,19 @@ The project expands Mari0 AE with new gameplay systems, playable characters, ene
 * [Changelog](#changelog)
 * [Requirements](#requirements)
 * [Installation](#installation)
-
   * [Using the Installer](#using-the-installer)
   * [Installing from Source](#installing-from-source)
   * [Installation Locations](#installation-locations)
+
 * [Project Layout](#project-layout)
 * [Features](#features)
-
   * [Gameplay](#gameplay)
   * [Characters](#characters)
   * [Enemies](#enemies)
   * [Portals and Physics](#portals-and-physics)
   * [Course Maker](#course-maker)
-  * [Daily Challenge](#daily-challenge)
-  * [Visuals and Shaders](#visuals-and-shaders)
-  * [Audio](#audio)
-  * [Languages](#languages)
   * [Loading and Presentation](#loading-and-presentation)
+
 * [Gameplay Improvements](#gameplay-improvements)
 * [Configuration](#configuration)
 * [Development](#development)
@@ -81,59 +54,51 @@ The project covers a broad range of Mari0 AE systems, including:
 * Player movement and physics
 * Characters
 * Enemies
-* Portals
-* Weapons and projectiles
 * Power-ups
-* Gel mechanics
 * Course Maker
-* Daily Challenges
-* Camera behaviour
 * Menus
 * Loading presentation
 * Shaders
 * Audio
 * Languages
-* Controller input
-* Individual gameplay objects and systems
 
 ---
 
 # What's New?
 
-Legendary Edition introduces changes throughout the game rather than concentrating everything into a single feature.
-
-### Gameplay
-
-* Expanded player and character behaviour
-* Additional gameplay mechanics
-* Expanded enemy behaviour
-* Additional power-ups
-* Additional weapons and projectiles
-* Portal gameplay improvements
-* Gel-related gameplay
-* Camera behaviour adjustments
-* Physics and movement refinements
-* Additional Course Maker functionality
-
-### Presentation
-
-* New loading messages
-* New loading sounds
-* Additional loading notifications
-* New shaders
-* Additional visual effects
-* Improved graphical presentation
-* Additional audio content
-* Additional languages and translations
-
-### Systems
-
-* Controller and joystick support
-* Daily Challenge functionality
-* Expanded configuration options
-* Additional gameplay objects
-* Changes throughout the Lua source
-* Improvements to individual game systems
+* 🧭 Toggleable player coordinate display with F9 and `showplayercoords`
+* 🐛 In-game hitbox debugging outside the editor
+* 📢 Loading overlays for specific game operations
+* ⚡ Removed the intentional one-second pre-intro loading delay
+* ✨ Change shaders while playing
+* 🦖 Improved Yoshi walk animation, thanks to WilliamFrog
+* 🎞️ Improved animation number display with `LCtrl+0` and `viewanimationnumbers`
+* 🗂️ Optional removal of the mappack's `editor` folder previews with `noeditorpreviews`
+* 🧹 Removed obsolete nitpicks including `FamilyFriendly` and `fourbythree`
+* ⏸️ Custom pause menu animations
+* 🔊 Optimised sound loading with the new `newsound` function
+* 🎵 New and improved sound effects
+  * `intro.ogg`
+  * `key.ogg`
+  * `keyopen.ogg`
+  * `oneup.ogg`
+  * `fireball.ogg`
+  * `raccoonswing.ogg`
+  * `boomerang.ogg`
+  * `freeze.ogg`
+  * `iceball.ogg`
+  * `iceballhit.ogg`
+  * `iceblockbreak.ogg`
+  * `melt.ogg`
+  * `helmet.ogg`
+  * `helmetspike.ogg`
+  * `helmetremove.ogg`
+  * `magic.ogg`
+  * `raccoonplane.ogg`
+  * `dialog.ogg`
+  * `beep.ogg`
+  * `drybonesshell.ogg`
+  * `error.ogg`
 
 Vertical camera seeking has also been reduced to help prevent the player from being left off-screen when attempting to camera-seek vertically.
 
@@ -337,64 +302,6 @@ Changes cover areas such as:
 
 ---
 
-## Characters
-
-Legendary Edition supports multiple playable characters and includes additional character-related content.
-
-Character systems can affect:
-
-* Movement
-* Physics
-* Animation
-* Abilities
-* Power-ups
-* Sprites
-* Character-specific behaviour
-* Character configuration
-
-Character and font-related resources are also included within the project.
-
----
-
-## Enemies
-
-Enemy systems have been expanded with additional behaviour and content.
-
-The project contains a variety of enemy-related systems and assets, including:
-
-* Standard enemies
-* Turrets
-* Banzai Bills
-* Dry Beetles
-* Ninji
-* Splunkin
-* Bowser-related content
-* Additional enemy behaviours
-
-Enemy systems are handled through both the main enemy code and specialised Lua files.
-
----
-
-## Portals and Physics
-
-Portals remain one of the central mechanics of Mari0 AE, and Legendary Edition expands the systems surrounding them.
-
-Changes include:
-
-* Portal interactions
-* Portal timing
-* Portal movement
-* Character movement through portals
-* Physics interactions
-* Gel interactions
-* Collision behaviour
-* Camera behaviour
-* Portal-related visual effects
-
-Additional portal assets and visual variations are included in the project.
-
----
-
 ## Course Maker
 
 Legendary Edition expands the **Course Maker** with additional objects, systems and options.
@@ -413,73 +320,6 @@ Legendary Edition expands the **Course Maker** with additional objects, systems 
 The Course Maker continues to build upon Mari0 AE's existing course-building framework.
 
 This allows custom courses to make use of additional gameplay systems introduced by Legendary Edition.
-
----
-
-## Daily Challenge
-
-Legendary Edition includes support for **Daily Challenges**.
-
-Daily Challenge functionality is handled through dedicated Lua systems, including:
-
-```
-dailychallenge.lua
-dailychallengenew.lua
-```
-
-These systems integrate Daily Challenge functionality into the wider game structure.
-
----
-
-## Visuals and Shaders
-
-Legendary Edition includes additional graphical content and visual effects.
-
-The project contains a dedicated:
-
-```
-graphics/
-```
-
-directory for graphical resources and:
-
-```
-shaders/
-```
-
-for shader-based effects.
-
-Visual changes can include:
-
-* New sprites
-* Character graphics
-* Portal graphics
-* Environmental graphics
-* Animated effects
-* Shader effects
-* Additional visual variations
-* Improved presentation of gameplay elements
-
----
-
-## Audio
-
-The project contains a dedicated:
-
-```
-sounds/
-```
-
-directory for audio resources.
-
-Audio additions include:
-
-* New sound effects
-* Loading sounds
-* Gameplay sounds
-* Additional effects
-
-Loading sounds are also used alongside the expanded loading presentation.
 
 ---
 
