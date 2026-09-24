@@ -144,6 +144,15 @@ Vertical camera seeking has also been reduced to help prevent the player from be
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.0.6
+
+### 🧩 New Features
+
+* Added the `nocustomenemybg` attribute for custom enemies.
+* Custom enemies using `nocustomenemybg` no longer display the red fill rectangle behind them.
+* This can be useful for custom enemies that work like, or use, a built-in entity.
+* The feature only applies to custom enemies. It does not affect built-in enemies, as the functionality is handled within the `game.lua` condition checking `tablecontains(customenemies, tilenumber)`.
+
 ## v1.0.5
 
 ### ✨ Improvements

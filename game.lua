@@ -9183,8 +9183,10 @@ function drawmaptiles(drawtype, xscroll, yscroll)
 							offsetx = .5
 						end
 						
-						love.graphics.setColor(255, 0, 0, alpha)
-						love.graphics.rectangle("fill", math.floor((x-1-xoff+offsetx)*16*scale), math.floor(((y-1-yoff)*16-8)*scale), 16*scale, 16*scale)
+						if not v.nocustomenemybg then
+							love.graphics.setColor(255, 0, 0, alpha)
+							love.graphics.rectangle("fill", math.floor((x-1-xoff+offsetx)*16*scale), math.floor(((y-1-yoff)*16-8)*scale), 16*scale, 16*scale)
+						end
 						love.graphics.setColor(255, 255, 255, alpha)
 						if v.showicononeditor and v.icongraphic then
 							love.graphics.draw(v.icongraphic, math.floor((x-1-xoff+offsetx)*16*scale), ((y-1-yoff)*16-8)*scale, 0, scale, scale)
