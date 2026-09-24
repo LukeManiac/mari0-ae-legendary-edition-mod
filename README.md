@@ -63,6 +63,7 @@ The project expands Mari0 AE with new gameplay systems, playable characters, ene
 * [Credits](#credits)
 * [Licensing](#licensing)
 * [Contributing](#contributing)
+* [AI Policy](#ai-policy)
 * [Disclaimer](#disclaimer)
 
 ---
@@ -476,32 +477,9 @@ Audio additions include:
 * New sound effects
 * Loading sounds
 * Gameplay sounds
-* Character-related sounds
-* Power-up sounds
-* Environmental sounds
 * Additional effects
 
 Loading sounds are also used alongside the expanded loading presentation.
-
----
-
-## Languages
-
-Legendary Edition includes additional language support and translations.
-
-Language resources are stored in:
-
-```
-languages/
-```
-
-The project includes contributions for languages such as:
-
-* Esperanto
-* Portuguese-Brazilian
-* Russian
-
-Additional translations may be added as the project develops.
 
 ---
 
@@ -519,104 +497,6 @@ The loading experience can include:
 * Resource-related messages
 
 These changes provide more information during the loading process and give the game's startup and loading stages additional presentation.
-
----
-
-# Gameplay Improvements
-
-Legendary Edition contains changes across many different parts of Mari0 AE.
-
-These include:
-
-### Player
-
-* Movement
-* Physics
-* Air control
-* Friction
-* Ice physics
-* Character behaviour
-* Power-up interactions
-
-### Enemies
-
-* Enemy behaviour
-* Enemy movement
-* Enemy interactions
-* Enemy-specific mechanics
-* Additional enemy content
-
-### Portals
-
-* Portal interactions
-* Portal timing
-* Portal physics
-* Portal movement
-* Portal visual effects
-
-### World
-
-* Moving tiles
-* Water systems
-* Pipes
-* Tubes
-* Environmental objects
-* Collision systems
-
-### Camera
-
-* Horizontal camera behaviour
-* Vertical camera seeking
-* Camera boundaries
-* Player visibility during camera movement
-
-### Interface
-
-* Menus
-* Loading presentation
-* Notifications
-* Controller input
-* Language support
-
-### Course Maker
-
-* Additional objects
-* Additional gameplay systems
-* Object behaviour
-* Configuration options
-* Custom-course functionality
-
-Not every individual change is listed in this README. **Many of the Lua files throughout the project contain smaller gameplay, presentation, physics and quality-of-life changes.**
-
----
-
-# Configuration
-
-Many gameplay and physics values can be configured through the Lua source.
-
-The main configuration file is:
-
-```
-variables.lua
-```
-
-It contains values relating to systems such as:
-
-* Player movement
-* Friction
-* Air control
-* Ice physics
-* Portal timing
-* Gel behaviour
-* Projectile lifetimes
-* Controller settings
-* Character settings
-* Scoring
-* Power-ups
-* Physics
-* Gameplay behaviour
-
-Some systems use values from multiple Lua files, so advanced customisation may require examining the related gameplay systems as well.
 
 ---
 
@@ -655,13 +535,6 @@ When making changes, preserve the existing directory structure so that assets an
 | `variables.lua`         | Configurable gameplay and physics variables      |
 | `dailychallenge.lua`    | Daily Challenge functionality                    |
 | `dailychallengenew.lua` | Additional Daily Challenge functionality         |
-| `camerastop.lua`        | Camera-related systems                           |
-| `clearpipe.lua`         | Clear pipe systems                               |
-| `energylauncher.lua`    | Energy launcher systems                          |
-| `geldispenser.lua`      | Gel dispenser systems                            |
-| `risingwater.lua`       | Rising water systems                             |
-| `tilemoving.lua`        | Moving tile systems                              |
-| `box.lua`               | Box-related gameplay systems                     |
 | `intro.lua`             | Introductory presentation and loading systems    |
 
 The project also contains many additional Lua files for specialised objects and mechanics.
@@ -758,6 +631,46 @@ When contributing:
 7. Keep Lua systems organised around their relevant gameplay functionality.
 
 ---
+
+# AI Policy
+
+Legendary Edition is not against the use of AI. AI tools are allowed for light, supportive tasks, such as:
+
+* Suggestions
+* Idea development
+* Creativity assistance
+* Brainstorming
+* Other small, supportive tasks
+
+## Custom Enemies and AI
+
+When it comes to **custom enemies**, majority of AI models are not capable for this category.
+
+Most AI models usually write their own `customtimer` functions for custom enemies instead of using the game's existing `customtimer` code. This leads to compatibility issues and behaviour that does not match the game logic.
+
+Because of this, AI-generated custom enemies are expected to be practically impossible in this project.
+
+AI can potentially produce a correct `customtimer` code for a custom enemy. Despite this, an exceptional result requires excessive time and effort:
+
+* Your prompt requires loads of references.
+* Responses may need to be regenerated whenever a flaw is found.
+* Every result still needs to be checked carefully so that it goes with the game logic.
+
+In most cases, writing the custom enemy yourself is more reliable.
+
+### General Rule
+
+AI may assist with ideas, suggestions, and other small tasks, but **custom enemy code should be written and maintained by a human**.
+
+Human-made custom enemies may still contain errors. Finding and fixing those errors is part of the development process; this helps ensure that each custom enemy works properly with the game's handling logic.
+
+## About AI Detection
+
+Even supposing that the game had a good AI detector, it still would not be completely reliable. Majority of AI detectors return random or inconsistent values, so their results should not be treated as proof of anything.
+
+---
+
+**In short:** AI can be a helpful assistant for small things, but it is not exactly capable of making custom enemies for this project.
 
 # Disclaimer
 
