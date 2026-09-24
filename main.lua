@@ -1306,6 +1306,14 @@ function lovedraw()
 		properprintfast(love.timer.getFPS(), 2*scale, 2*scale)
 	end
 
+	if ShowBattery then
+		drawbattery()
+	end
+
+	if ShowTime then
+		drawtime()
+	end
+
 	if jsonerrorwindow.opened then
 		jsonerrorwindow:draw()
 	end
@@ -2047,8 +2055,12 @@ function love.keypressed(key, scancode, isrepeat, textinput)
 	
 	if key == "0" and love.keyboard.isDown("lctrl") then
 		HITBOXDEBUGANIMS = not HITBOXDEBUGANIMS
+	elseif key == "f7" then
+		ShowTime = not ShowTime
+	elseif key == "f8" then
+		ShowBattery = not ShowBattery
 	elseif key == "f9" then
-		showplayercoords = not showplayercoords
+		ShowPlayerCoords = not ShowPlayerCoords
 	elseif key == "f10" then
 		if android then
 			--hide ui
@@ -2874,6 +2886,103 @@ function properlerp(start, stop, step)
     return start + (stop - start) * step
 end
 
+function rgb_to_hsv(colour)
+    local r = colour[1] / 255
+    local g = colour[2] / 255
+    local b = colour[3] / 255
+
+    local max = math.max(r, g, b)
+    local min = math.min(r, g, b)
+    local delta = max - min
+
+    local h = 0
+    local s = 0
+    local v = max
+
+    if max ~= 0 then
+        s = delta / max
+    end
+
+    if delta ~= 0 then
+        if max == r then
+            h = (g - b) / delta
+        elseif max == g then
+            h = 2 + (b - r) / delta
+        else
+            h = 4 + (r - g) / delta
+        end
+
+        h = h / 6
+
+        if h < 0 then
+            h = h + 1
+        end
+    end
+
+    return {h, s, v}
+end
+
+function hsv_to_rgb(hsv)
+    local h = hsv[1]
+    local s = hsv[2]
+    local v = hsv[3]
+
+    local i = math.floor(h * 6)
+    local f = h * 6 - i
+
+    local p = v * (1 - s)
+    local q = v * (1 - f * s)
+    local t = v * (1 - (1 - f) * s)
+
+    local r, g, b
+
+    i = i % 6
+
+    if i == 0 then
+        r, g, b = v, t, p
+    elseif i == 1 then
+        r, g, b = q, v, p
+    elseif i == 2 then
+        r, g, b = p, v, t
+    elseif i == 3 then
+        r, g, b = p, q, v
+    elseif i == 4 then
+        r, g, b = t, p, v
+    elseif i == 5 then
+        r, g, b = v, p, q
+    end
+
+    return {
+        r * 255,
+        g * 255,
+        b * 255
+    }
+end
+
+function hsv_lerp(colour1, colour2, step)
+    local hsv1 = rgb_to_hsv(colour1)
+    local hsv2 = rgb_to_hsv(colour2)
+
+    -- Take the shortest path around the hue circle.
+    local hue_diff = hsv2[1] - hsv1[1]
+
+    if hue_diff > 0.5 then
+        hsv1[1] = hsv1[1] + 1
+    elseif hue_diff < -0.5 then
+        hsv2[1] = hsv2[1] + 1
+    end
+
+    local hsv = {
+        properlerp(hsv1[1], hsv2[1], step),
+        properlerp(hsv1[2], hsv2[2], step),
+        properlerp(hsv1[3], hsv2[3], step)
+    }
+
+    hsv[1] = hsv[1] % 1
+
+    return hsv_to_rgb(hsv)
+end
+
 function zeroonetoxy(input, value0, value1)
 	value0 = value0 or 0
     value1 = value1 or 1
@@ -3297,9 +3406,9 @@ function loadnitpicks()
 		end
 		CustomPortalColors = t.customportalcolors
 		UseButtonCappy = t.usebuttoncappy
-		if t.showplayercoords then
-			showplayercoords = t.showplayercoords
-		end
+		ShowPlayerCoords = t.showplayercoords
+		ShowTime = t.showtime
+		ShowBattery = t.showbattery
 		if t.showfps then
 			showfps = t.showfps
 		end
@@ -3478,4 +3587,98 @@ function newsound(soundname, soundtype, soundloop, soundvolume)
 	sound:setVolume(soundvolume or 1)
 
     return sound
+end
+
+function drawbattery()
+	local batterycolor = {0, 255, 0}
+	local state, percent = love.system.getPowerInfo()
+
+	local function gettext()
+		if percent then
+			return ("Battery: %d%%"):format(percent)
+		end
+
+		if state == "nobattery" then
+			return "Battery: AC power"
+		end
+
+		return "Battery: unavailable"
+	end
+
+	local function getcolor()
+		if percent <= 50 then
+			return hsv_lerp(
+				{255, 0, 0},
+				{255, 255, 0},
+				percent / 50
+			)
+		else
+			return hsv_lerp(
+				{255, 255, 0},
+				{0, 255, 0},
+				(percent - 50) / 50
+			)
+		end
+	end
+
+	if state ~= "nobattery" then
+		local batterycolor = getcolor()
+	end
+
+	local batterytext = gettext()
+	love.graphics.setColor(getcolor())
+	properprintFbackground(batterytext, 8*scale, 212*scale)
+end
+
+function drawtime()
+	local sky_colors = {
+		{35, 45, 100},     -- 00:00  Deep blue
+		{70, 80, 160},     -- 03:00  Indigo
+		{240, 170, 120},   -- 06:00  Warm dawn
+		{100, 190, 235},   -- 09:00  Light blue
+		{60, 180, 220},    -- 12:00  Cyan blue
+		{90, 150, 220},    -- 15:00  Afternoon blue
+		{235, 125, 75},    -- 18:00  Orange sunset
+		{100, 55, 130},    -- 21:00  Purple dusk
+	}
+
+	local function getcolor()
+		local time = os.date("*t")
+
+		-- Convert the current time into hours as a decimal.
+		local hours = time.hour
+			+ time.min / 60
+			+ time.sec / 3600
+
+		-- Convert 0-24 hours into a position from 0-8.
+		local position = hours / 3
+
+		-- The two colours we're interpolating between.
+		local index1 = math.floor(position) + 1
+		local index2 = index1 + 1
+
+		-- Wrap around at midnight.
+		if index2 > #sky_colors then
+			index2 = 1
+		end
+
+		-- Fraction between the two colours.
+		local step = position - math.floor(position)
+
+		return hsv_lerp(
+			sky_colors[index1],
+			sky_colors[index2],
+			step
+		)
+	end
+
+	local time = ("Time: %s"):format(os.date("%H:%M:%S"))
+	love.graphics.setColor(getcolor())
+	texty = 212
+
+	if ShowBattery then
+		texty = 204
+	end
+
+	properprintFbackground(time, 8*scale, texty*scale)
 end

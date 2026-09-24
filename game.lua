@@ -2574,7 +2574,7 @@ function game_draw()
 			w:draw()
 		end
 
-		if showplayercoords then
+		if ShowPlayerCoords then
 			for i = 1, players do
 				v = objects["player"][i]
 

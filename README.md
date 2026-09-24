@@ -110,6 +110,13 @@ Vertical camera seeking has also been reduced to help prevent the player from be
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.0.7
+
+### 🧩 New Features
+
+* Added the `showtime` nitpick, which displays the current time. It can be toggled with **F7**.
+* Added the `showbattery` nitpick, which displays the battery status. It can be toggled with **F8**.
+
 ## v1.0.6
 
 ### 🧩 New Features
