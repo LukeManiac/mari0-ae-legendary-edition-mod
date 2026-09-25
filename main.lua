@@ -180,7 +180,7 @@ hardloadhttps()
 
 local debugconsole = false --debug
 if debugconsole then debuginputon = true; debuginput = "print()"; print("DEBUG ON") end
-local debugGraph,fpsGraph,memGraph,drawGraph
+local debugGraph,fpsGraph,memGraph,msperfGraph,drawGraph
 local debugGraphs = false
 
 VERSION = 13.2001
@@ -1135,7 +1135,8 @@ function love.load()
 		debugGraph = require "libs.debugGraph"
 		fpsGraph = debugGraph:new('fps', 0, 0)
 		memGraph = debugGraph:new('mem', 0, 30)
-		drawGraph = debugGraph:new('custom', 0, 60)
+		msperfGraph = debugGraph:new('custom', 0, 60)
+		drawGraph = debugGraph:new('custom', 0, 90)
 	end
 
 	--Set Language
@@ -1222,6 +1223,7 @@ function love.update(dt)
 		--Update the graphs
 		fpsGraph:update(dt)
 		memGraph:update(dt)
+		msperfGraph:update(dt, msperfGraph.fps)
 		drawGraph:update(dt, drawGraph.drawcalls)
 	end
 
@@ -1269,10 +1271,13 @@ function love.draw()
 		love.graphics.setColor(255,255,255)
 		local stats = love.graphics.getStats()
 		love.graphics.setLineWidth(2)
+		msperfGraph.label = "Frame time: " .. mini_if(love.timer.getFPS() > 0, math.floor(1000 / love.timer.getFPS() + 0.5), math.huge) .. "ms"
+		msperfGraph.fps = stats.fps
 		drawGraph.label = "Drawcalls: " .. stats.drawcalls
 		drawGraph.drawcalls = stats.drawcalls
 		fpsGraph:draw()
 		memGraph:draw()
+		msperfGraph:draw()
 		drawGraph:draw()
 	end
 end

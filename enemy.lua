@@ -2573,10 +2573,53 @@ function enemy:customtimeraction(action, arg, arg2)
 			self.quad = self.quadgroup[arg]
 		elseif LoveConsole and action == "print" then --only for advanced users!
 			if self[arg] then
-				print(self[arg])
+				printarg = self[arg]
 			else
-				print(arg)
+				printarg = arg
 			end
+
+			local function serialise(value)
+				local valueType = type(value)
+
+				if valueType ~= "table" then
+					return tostring(value)
+				end
+
+				-- Check whether the table is a list
+				local isList = true
+				local count = 0
+
+				for key, _ in pairs(value) do
+					count = count + 1
+
+					if type(key) ~= "number" or key < 1 or key % 1 ~= 0 then
+						isList = false
+						break
+					end
+				end
+
+				if isList then
+					-- List
+					local result = {}
+
+					for i = 1, count do
+						table.insert(result, serialise(value[i]))
+					end
+
+					return "[" .. table.concat(result, ",") .. "]"
+				else
+					-- Dictionary
+					local result = {}
+
+					for key, val in pairs(value) do
+						table.insert(result, serialise(key) .. ":" .. serialise(val))
+					end
+
+					return "{" .. table.concat(result, ",") .. "}"
+				end
+			end
+
+			print(serialise(printarg))
 		elseif string.sub(action, 0, 3) == "set" then
 			self[string.sub(action, 4, string.len(action))] = arg
 		end
