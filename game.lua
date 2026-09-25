@@ -9175,15 +9175,16 @@ function drawmaptiles(drawtype, xscroll, yscroll)
 						
 						local mx, my = getMouseTile(love.mouse.getX(), love.mouse.getY()+8*scale)
 						local alpha = 150
-						if cox == mx and coy == my then
-							alpha = 255
-						end
 						local offsetx = 0
 						if t["argument"] and t["argument"] == "o" then --offset
 							offsetx = .5
 						end
 						
 						if not v.nocustomenemybg then
+							if cox == mx and coy == my then
+								alpha = 255
+							end
+
 							love.graphics.setColor(255, 0, 0, alpha)
 							love.graphics.rectangle("fill", math.floor((x-1-xoff+offsetx)*16*scale), math.floor(((y-1-yoff)*16-8)*scale), 16*scale, 16*scale)
 						end
