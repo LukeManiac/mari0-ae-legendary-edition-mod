@@ -592,7 +592,7 @@ function enemy:update(dt)
 		self.justspawned = nil
 	end
 
-	--Funnels and fuck
+	--Funnels and frickers
 	if self.funnel and not self.infunnel then
 		self:enteredfunnel(true)
 	end

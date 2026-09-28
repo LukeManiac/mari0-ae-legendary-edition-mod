@@ -110,6 +110,22 @@ Vertical camera seeking has also been reduced to help prevent the player from be
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.1
+
+### 🧩 New Features
+
+* You can now set a numerical value for the player's walking animation.
+
+### ✨ Improvements
+
+* Changed the invincibility blinking animation so it is partially akin to the animation in the **New Super Mario Bros.** series.
+* Quick testing from the Course Maker plays the last half of the invincibility animation.
+* Compressed the logic for handling dropdowns.
+
+### ❌ Removals
+
+* Purged the rarely used `clamp()` function.
+
 ## v1.0.8
 
 ### 🐛 Bug Fixes

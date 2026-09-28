@@ -2828,23 +2828,6 @@ function properprintbackground(s, x, y, include, color, size)
 	end
 end
 
-function clamp(value, minval, maxval)
-    if type(minval) == "table" then
-        local options = minval
-        minval = options.minval or 0
-        maxval = options.maxval or 1
-    else
-        minval = minval or 0
-        maxval = maxval or 1
-    end
-
-    if minval > maxval then
-        minval, maxval = maxval, minval
-    end
-
-    return math.max(minval, math.min(value, maxval))
-end
-
 function mini_if(condition, trueval, falseval)
 	if trueval == nil then trueval = true end
 	if falseval == nil then falseval = false end
@@ -2995,7 +2978,7 @@ function zeroonetoxy(input, value0, value1)
     if type(input) == "boolean" then
         input = mini_if(input, 0, 1)
     elseif type(input) == "number" then
-        input = clamp(input)
+        input = math.max(0, math.min(input, 1))
     end
 
 	return properlerp(value0, value1, input)
@@ -3154,7 +3137,7 @@ function motion_curve(t, curve, curve_in, curve_out, clamp_input, clamp_output)
     clamp_output = clamp_output or false
 
     if clamp_input then
-        t = clamp(t)
+        t = math.max(0, math.min(t, 1))
     end
 
     if t == 0 or t == 1 then
@@ -3188,7 +3171,7 @@ function motion_curve(t, curve, curve_in, curve_out, clamp_input, clamp_output)
     end
 
     if clamp_output then
-        out = clamp(out)
+        out = math.max(0, math.min(out, 1))
     end
 
     return out

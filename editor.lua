@@ -3212,9 +3212,9 @@ function editor_draw()
 				
 				for i, v in pairs(animationguilines) do
 					for k, w in pairs(v) do
-						for anotherletter, fuck in pairs(w.elements) do
-							if fuck.gui and not fuck.gui.priority then
-								fuck.gui:draw()
+						for anotherletter, whatpurpose in pairs(w.elements) do
+							if whatpurpose.gui and not whatpurpose.gui.priority then
+								whatpurpose.gui:draw()
 							end
 						end
 					end
@@ -3237,9 +3237,9 @@ function editor_draw()
 			if editorstate == "animations" and editormenuopen and not changemapwidthmenu then
 				for i, v in pairs(animationguilines) do
 					for k, w in pairs(v) do
-						for anotherletter, fuck in pairs(w.elements) do
-							if fuck.gui and fuck.gui.priority then
-								fuck.gui:draw()
+						for anotherletter, whatpurpose in pairs(w.elements) do
+							if whatpurpose.gui and whatpurpose.gui.priority then
+								whatpurpose.gui:draw()
 							end
 						end
 					end
@@ -7626,7 +7626,7 @@ function test_level(x, y)
 		p.x = x
 		p.y = y
 		p.invincible = true
-		p.animationtimer = 2.4
+		p.animationtimer = 1
 		p.animation = "invincible"
 		p.controlsenabled = true
 		p.active = true

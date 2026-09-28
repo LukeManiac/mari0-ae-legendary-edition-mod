@@ -406,7 +406,7 @@ angrysunfalltime = 0.1
 fireballspeed = 15
 fireballbrospeed = 10 -- 2/3
 fireballjumpforce = 10
-maxfireballs = 4
+maxfireballs = 2
 fireanimationtime = 0.11
 iceballspeed = 7
 iceballbrospeed = 5 -- 2/3 ish
@@ -671,8 +671,7 @@ growtime = 0.9
 shrinktime = 0.9
 growframedelay = 0.08
 shrinkframedelay = 0.08
-invicibleblinktime = 0.02
-invincibletime = 3.2
+invincibletime = 2
 
 blinktime = 0.5
 
@@ -865,8 +864,7 @@ powerupslistidsrc = shallowcopy(powerupslistids)
 for i, v in pairs(powerupslistidsrc) do
 	v = v:gsub("-", "n")
 end
-powerupslist = {"small", "big", "fire", "hammer", "frog", "raccoon", "ice", "mega", "tanooki",
-	"cape", "bunny", "skinny", "superball", "blueshell", "boomerang", "huge", "tiny"}
+powerupslist = {"small", "big", "fire", "hammer", "frog", "raccoon", "ice", "mega", "tanooki", "cape", "bunny", "skinny", "superball", "blueshell", "boomerang", "huge", "tiny"}
 
 onlysaveiflevelmodified = true
 

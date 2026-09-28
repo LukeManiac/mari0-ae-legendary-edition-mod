@@ -203,10 +203,10 @@ function game_update(dt)
 	--------
 	
 	--pausemenu
-	pausemenuopentimer = clamp(pausemenuopentimer + (dt * zeroonetoxy(pausemenuopen, 1, -1)), {maxval=pausemenuopenduration})
-	menuprompttimer = clamp(menuprompttimer + (dt * zeroonetoxy(menuprompt, 1, -1)), {maxval=menupromptduration})
-	desktopprompttimer = clamp(desktopprompttimer + (dt * zeroonetoxy(desktopprompt, 1, -1)), {maxval=desktoppromptduration})
-	suspendprompttimer = clamp(suspendprompttimer + (dt * zeroonetoxy(suspendprompt, 1, -1)), {maxval=suspendpromptduration})
+	pausemenuopentimer = math.max(0, math.min(pausemenuopentimer + (dt * zeroonetoxy(pausemenuopen)), pausemenuopenduration))
+	menuprompttimer = math.max(0, math.min(menuprompttimer + (dt * zeroonetoxy(menuprompt)), menupromptduration))
+	desktopprompttimer = math.max(0, math.min(desktopprompttimer + (dt * zeroonetoxy(desktopprompt)), desktoppromptduration))
+	suspendprompttimer = math.max(0, math.min(suspendprompttimer + (dt * zeroonetoxy(suspendprompt)), suspendpromptduration))
 
 	if pausemenuopen and not (SERVER or CLIENT) then
 		--joystick navigation
@@ -4126,7 +4126,7 @@ function startlevel(level, reason)
 		table.insert(splitscreen[1], i)
 	end
 	checkpointi = 0
-	mazesfuck = true
+	mazeinvolved = true
 	mazestarts = {}
 	mazeends = {}
 	mazesolved = {}
@@ -5850,7 +5850,7 @@ function getTile(x, y, portalable, portalcheck, facing, ignoregrates, dir) --ret
 		end
 	end
 	
-	--bonusstage thing for keeping it from fucking up by allowing portals to be shot next to the vine in 4-2_2 for example
+	--bonusstage thing for keeping it from screwing up by allowing portals to be shot next to the vine in 4-2_2 for example
 	if bonusstage then
 		if y == mapheight and (x == 4 or x == 6) then
 			if portalcheck then
@@ -6682,12 +6682,12 @@ function loadentity(t, x, y, r, id)
 		if not tablecontains(mazestarts, x) then
 			table.insert(mazestarts, x)
 		end
-		mazesfuck = true
+		mazeinvolved = true
 	elseif t == "mazeend" then
 		if not tablecontains(mazeends, x) then
 			table.insert(mazeends, x)
 		end
-		mazesfuck = true
+		mazeinvolved = true
 	elseif t == "ceilblocker" then
 		table.insert(objects["ceilblocker"], ceilblocker:new(x))
 	elseif t == "geltop" then
@@ -9010,7 +9010,7 @@ function tilemap(x, y)
 	--  3  5  8
 	--  6  9 13
 	--Central polygonal numbers (the Lazy Caterer's sequence)
-	if editormode or mazesfuck then
+	if editormode or mazeinvolved then
 		--return ((x*(x -3+(2*y) ))/2) + ((y*(y-1))/2) + 1
 		return (x*(x+2*y-3) + y*(y-1))*.5 --simplified
 	else

@@ -565,7 +565,7 @@ function mario:update(dt)
 		raccoonplanesound:stop() --stops raccoon flying sound
 	end
 	
-	--falling state fuck
+	--falling state
 	if (not self.falling) and (not self.jumping) then
 		self.landed = true
 	end
@@ -1771,13 +1771,7 @@ function mario:update(dt)
 			end
 		end
 		
-		local invis = math.ceil(math.fmod(self.animationtimer, invicibleblinktime*2)/invicibleblinktime)
-		
-		if invis == 1 then
-			self.drawable = true
-		else
-			self.drawable = false
-		end
+		self.drawable = true
 		
 		if self.animationtimer - dt < shrinktime and self.animationtimer > shrinktime then
 			self.animationstate = self.animationmisc
@@ -1798,13 +1792,8 @@ function mario:update(dt)
 	elseif self.animation == "invincible" then
 		self.animationtimer = self.animationtimer + dt
 		
-		local invis = math.ceil(math.fmod(self.animationtimer, invicibleblinktime*2)/invicibleblinktime)
-		
-		if invis == 1 then
-			self.drawable = true
-		else
-			self.drawable = false
-		end
+		local invis = math.mod(self.animationtimer, 1) * (((math.min(self.animationtimer, 1) * 9) + 1) * invincibletime)
+		self.drawable = math.floor(math.mod(invis, 2)) == 0
 		
 		if self.animationtimer - dt < invincibletime and self.animationtimer > invincibletime then
 			self.animation = false

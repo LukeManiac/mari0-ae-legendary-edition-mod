@@ -19,7 +19,7 @@ function intro_update(dt)
 	allowskip = true
 	if introprogress < introduration+blackafterintro then
 		introprogress = introprogress + dt
-		introscaletimer = clamp(introscaletimer + dt, {maxval=introscaleduration})
+		introscaletimer = math.max(0, math.min(introscaletimer + dt, introscaleduration))
 
 		if introprogress > introduration+blackafterintro then
 			introprogress = introduration+blackafterintro

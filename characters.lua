@@ -634,7 +634,7 @@ function setcustomplayer(i, pn, initial) --name, player number, initial (don't c
 			if (not initial) or (mariocolors[pn] and #mariocolors[pn] < #characters.data[i].defaultcolors[pn]) then
 				--this doesn't work correctly
 				--for some reason the number of mario colors is always 4
-				--i dont fuckin know
+				--i dont heckin know
 				--print(initial, #mariocolors[pn], #characters.data[i].defaultcolors[pn])
 				if #characters.data[i].defaultcolors[pn] >= #characters.data[i].colorables then
 					for j = 1, #characters.data[i].colorables do
