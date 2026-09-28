@@ -203,10 +203,10 @@ function game_update(dt)
 	--------
 	
 	--pausemenu
-	pausemenuopentimer = math.max(0, math.min(pausemenuopentimer + (dt * zeroonetoxy(pausemenuopen)), pausemenuopenduration))
-	menuprompttimer = math.max(0, math.min(menuprompttimer + (dt * zeroonetoxy(menuprompt)), menupromptduration))
-	desktopprompttimer = math.max(0, math.min(desktopprompttimer + (dt * zeroonetoxy(desktopprompt)), desktoppromptduration))
-	suspendprompttimer = math.max(0, math.min(suspendprompttimer + (dt * zeroonetoxy(suspendprompt)), suspendpromptduration))
+	pausemenuopentimer = math.max(0, math.min(pausemenuopentimer + (dt * mini_if(pausemenuopen, -1, 1)), pausemenuopenduration))
+	menuprompttimer = math.max(0, math.min(menuprompttimer + (dt * mini_if(menuprompt, -1, 1)), menupromptduration))
+	desktopprompttimer = math.max(0, math.min(desktopprompttimer + (dt * mini_if(desktopprompt, -1, 1)), desktoppromptduration))
+	suspendprompttimer = math.max(0, math.min(suspendprompttimer + (dt * mini_if(suspendprompt, -1, 1)), suspendpromptduration))
 
 	if pausemenuopen and not (SERVER or CLIENT) then
 		--joystick navigation

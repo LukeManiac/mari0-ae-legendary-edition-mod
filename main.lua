@@ -2971,19 +2971,6 @@ function hsv_lerp(colour1, colour2, step)
     return hsv_to_rgb(hsv)
 end
 
-function zeroonetoxy(input, value0, value1)
-	value0 = value0 or 0
-    value1 = value1 or 1
-
-    if type(input) == "boolean" then
-        input = mini_if(input, 0, 1)
-    elseif type(input) == "number" then
-        input = math.max(0, math.min(input, 1))
-    end
-
-	return properlerp(value0, value1, input)
-end
-
 local motion_curves = {
     sine = function(t)
         return 1 - math.cos((t * math.pi) / 2)
