@@ -1053,9 +1053,9 @@ function menu_draw()
 			love.graphics.setColor(255, 255, 255)
 			if onlinedlc then
 				if not onlineassetlist[onlinemappackselection].downloadable then
-					renderoverlay("opening link...", nil, true)
+					renderoverlay("opening link...")
 				else
-					renderoverlay("downloading asset...", nil, true)
+					renderoverlay("downloading asset...")
 				end
 			else
 				properprint("loading mappacks...", ((width*16)/2-(string.len("loading mappacks...")*8/2))*scale, (224/2-4)*scale)
@@ -2185,7 +2185,7 @@ function menu_keypressed(key, unicode)
 					selectworldcursor = target
 				end
 			elseif (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
-				renderoverlay("loading game...", menu_draw)
+				renderoverlay("loading game...")
 				selectworldopen = false
 				game_load(selectworldcursor, true)
 			elseif key == "escape" then
@@ -2222,7 +2222,7 @@ function menu_keypressed(key, unicode)
 					languagemenu_open()
 					return false
 				end
-				renderoverlay("loading editor...", menu_draw)
+				renderoverlay("loading editor...")
 				editormode = true
 				players = 1
 				playertype = "portal"
@@ -2363,7 +2363,7 @@ function menu_keypressed(key, unicode)
 				mappacklistthreadchannelin:push({"stop"})
 			end
 
-			renderoverlay("loading mappack...", nil, true)
+			renderoverlay("loading mappack...")
 			mappack = mappacklist[mappackselection]
 			--load background					
 	
@@ -2971,7 +2971,7 @@ function menu_mousereleased(x, y, button)
 					notice.new("Creator disabled the editor.", notice.white, 2)
 					return false
 				end
-				renderoverlay("loading editor...", menu_draw)
+				renderoverlay("loading editor...")
 				editormode = true
 				players = 1
 				playertype = "portal"
@@ -3229,7 +3229,7 @@ end
 
 function selectworld()
 	if not reachedworlds[mappack] then
-		renderoverlay("loading game...", menu_draw)
+		renderoverlay("loading game...")
 		game_load(nil, true)
 	end
 	
@@ -3242,7 +3242,7 @@ function selectworld()
 	end
 	
 	if noworlds then
-		renderoverlay("loading game...", menu_draw)
+		renderoverlay("loading game...")
 		game_load(nil, true)
 		return
 	end

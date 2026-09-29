@@ -103,7 +103,7 @@ function game_load(suspended, deletesuspend)
 	
 	objects = nil
 	if suspended == true then
-		renderoverlay("loading save data...", menu_draw)
+		renderoverlay("loading save data...")
 		continuegame()
 		loadmappacksettings("suspended")
 		updatemappacksettings("suspended")
@@ -8361,7 +8361,7 @@ function endgame()
 	end
 	love.audio.stop()
 	love.graphics.clear(0, 0, 0)
-	renderoverlay("returning to menu...", nil, true)
+	renderoverlay("returning to menu...")
 	if pressbtosteve then
 		playertype = "minecraft"
 		playertypei = 2
@@ -9419,15 +9419,8 @@ function centerprintscreen(text)
 	centerprint(text, winwidth/scale/2, winheight/scale/2, getCanvasSize())
 end
 
-function renderoverlay(text, drawfunc, nodraw)
-	if drawfunc == nil then drawfunc = game_draw end
-	if nodraw == nil then nodraw = false end
-
-	if not nodraw then
-		drawfunc()
-		love.draw()
-	end
-
+function renderoverlay(text)
+	love.draw()
 	love.graphics.setColor(0, 0, 0, 127)
 	love.graphics.rectangle("fill", 0, 0, winwidth, winheight)
 	love.graphics.setColor(255, 255, 255, 255)

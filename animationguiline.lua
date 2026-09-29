@@ -1974,16 +1974,17 @@ function animationguiline:init(tabl, t2)
 	self.t = tabl
 	self.type = t2
 	
-	local x = 0
 	self.elements = {}
 	self.elements[1] = {}
+	local x = 0
 	local start = 1
-	for i = 1, #animationstrings[self.type] do
-		if animationlist[self.t[1]] and animationlist[self.t[1]].nicename == animationstrings[self.type][i] then
+	local animnames = animationstrings[self.type]
+	for i = 1, #animnames do
+		if animationlist[self.t[1]] and animationlist[self.t[1]].nicename == animnames[i] then
 			start = i
 		end
 	end
-	local firstwidth = 22--#animationstrings[self.type][start]
+	local animdropwidth = getlongeststring(animnames)--#animnames[start]
 	
 	self.deletebutton = guielement:new("button", 0, 0, "x", function() self:delete() end, nil, nil, nil, 8, 0.1)
 	self.deletebutton.textcolor = {200, 0, 0}
@@ -1994,12 +1995,12 @@ function animationguiline:init(tabl, t2)
 	self.upbutton = guielement:new("button", 0, 0, "↑", function() self:moveup() end, nil, nil, nil, 8, 0.1)
 	self.upbutton.textcolor = {255, 255, 255}
 	
-	self.elements[1].gui = guielement:new("dropdown", 0, 0, firstwidth, function(val) self:changemainthing(val) end, start, unpack(animationstrings[self.type]))
-	self.elements[1].width = 14+firstwidth*8
+	self.elements[1].gui = guielement:new("dropdown", 0, 0, animdropwidth, function(val) self:changemainthing(val) end, start, unpack(animnames))
+	self.elements[1].width = animdropwidth*8+14
 	
 	if not self.t[1] then
 		for i, v in pairs(animationlist) do
-			if v.nicename == animationstrings[self.type][1] then
+			if v.nicename == animnames[1] then
 				self.t[1] = i
 				break
 			end
@@ -2008,7 +2009,7 @@ function animationguiline:init(tabl, t2)
 	
 	local tid = 1
 	if animationlist[self.t[1] ] then
-		for i, v in ipairs(animationlist[self.t[1] ].entries) do
+		for i, v in ipairs(animationlist[self.t[1]].entries) do
 			local temp = {}
 			
 			if v.t == "text" then
@@ -2121,17 +2122,13 @@ function animationguiline:init(tabl, t2)
 				if args and type(args) == "table" then
 					local j = #self.elements+1
 					local starti = 1
-					local dropwidth = 0
+					local dropwidth = getlongeststring(mini_if(displayargs == nil, args, displayargs))
 					for j, k in pairs(args) do
 						if self.t[tid] == k then
 							starti = j
 						end
 					end
 
-					for _, str in ipairs(args or displayargs) do
-						dropwidth = math.max(dropwidth, #str)
-					end
-					
 					temp.gui = guielement:new("dropdown", 0, 0, dropwidth, function(val) self:submenuchange(val, j) end, starti, unpack(args))
 					temp.gui.displayentries = displayargs
 					temp.width = dropwidth*8+14

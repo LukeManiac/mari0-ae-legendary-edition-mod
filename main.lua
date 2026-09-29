@@ -3564,6 +3564,16 @@ function newsound(soundname, soundtype, soundloop, soundvolume)
     return sound
 end
 
+function getlongeststring(t)
+	local value = 0
+
+	for _, v in ipairs(t) do
+		value = math.max(value, #tostring(v))
+	end
+
+	return value
+end
+
 function drawbattery()
 	local batterycolor = {0, 255, 0}
 	local state, percent = love.system.getPowerInfo()

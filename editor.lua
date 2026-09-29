@@ -407,11 +407,12 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	for i, v in ipairs(animations) do
 		table.insert(args, string.sub(v.name, 1, -6))
 	end
-	guielements["animationselectdrop"] = guielement:new("dropdown", 15, 20, 15, selectanimation, 1, unpack(args))
 	guielements["animationnewbutton"] = guielement:new("button", 3, 20, "+", createnewanimation, nil)
-	guielements["animationsavebutton"] = guielement:new("button", 150, 19, TEXT["save"], saveanimation, 1)
-	guielements["animationdelbutton"] = guielement:new("button", guielements["animationsavebutton"].x+guielements["animationsavebutton"].width+8, 19, "x", removeanimation, 1)
-	guielements["animationnameinput"] = guielement:new("input", 282, 20, 14, function() animationsaveas = guielements["animationnameinput"].value; guielements["animationnameinput"].inputting = false end, "", 20, nil, nil, 0)
+	guielements["animationsavebutton"] = guielement:new("button", 16, 20, TEXT["save"], saveanimation, nil)
+	guielements["animationdelbutton"] = guielement:new("button", guielements["animationsavebutton"].x+guielements["animationsavebutton"].width+5, 20, "x", removeanimation, nil)
+	guielements["animationnameinput"] = guielement:new("input", 282, 20, 14, function() animationsaveas = guielements["animationnameinput"].value; guielements["animationnameinput"].inputting = false end, "", math.huge, nil, nil, 0)
+	guielements["animationselectdrop"] = guielement:new("dropdown", guielements["animationdelbutton"].x+guielements["animationdelbutton"].width+5, 20, 2, selectanimation, nil, unpack(args))
+	guielements["animationselectdrop"].width = math.min((guielements["animationnameinput"].x-guielements["animationselectdrop"].x-15)/8, getlongeststring(args))
 	if animations[currentanimation] then
 		guielements["animationnameinput"].value = string.sub(animations[currentanimation].name, 1, -6)
 		guielements["animationnameinput"]:updatePos()
@@ -3719,7 +3720,7 @@ function changeendingtextcolor(var)
 end
 
 function returntomenu()
-	renderoverlay("returning to menu...", editor_draw)
+	renderoverlay("returning to menu...")
 	menu_load()
 end
 
@@ -3871,7 +3872,8 @@ function updateanimationdropdown()
 		table.insert(args, string.sub(v.name, 1, -6))
 	end
 	
-	guielements["animationselectdrop"] = guielement:new("dropdown", 15, 20, 15, selectanimation, currentanimation, unpack(args))
+	guielements["animationselectdrop"] = guielement:new("dropdown", guielements["animationdelbutton"].x+guielements["animationdelbutton"].width+5, 20, 2, selectanimation, nil, unpack(args))
+	guielements["animationselectdrop"].width = math.min((guielements["animationnameinput"].x-guielements["animationselectdrop"].x-15)/8, getlongeststring(args))
 end
 	
 function deleteanimationguiline(t, tabl)
@@ -4652,7 +4654,7 @@ function mapnumberclick(i, j, k)
 		actualsublevel = k
 		checkpointx = nil
 		editorloadopen = true
-		renderoverlay("loading level...", editor_draw)
+		renderoverlay("loading level...")
 		if k ~= 0 then
 			startlevel(k)
 		else
@@ -7599,7 +7601,7 @@ function test_level(x, y)
 		savelevel()
 	end
 
-	renderoverlay("testing level...", editor_draw)
+	renderoverlay("testing level...")
 	editorclose()
 	editormode = false
 	testlevel = true

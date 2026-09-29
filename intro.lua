@@ -77,6 +77,6 @@ function intro_finish()
 		return
 	end
 	introsound:stop()
-	renderoverlay("loading menu...", nil, true)
+	renderoverlay("loading menu...")
 	menu_load()
 end
