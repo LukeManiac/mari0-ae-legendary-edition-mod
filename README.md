@@ -110,82 +110,42 @@ Vertical camera seeking has also been reduced to help prevent the player from be
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
-## v1.1
+## v1.0.0
 
 ### 🧩 New Features
 
 * You can now set a numerical value for the player's walking animation.
-* You can open `nofunallowed` mappacks by opening editor while holding **LCtrl+LShift**
+* You can open `nofunallowed` mappacks by opening the editor while holding **LCtrl+LShift**.
+* Added the `showtime` nitpick, which displays the current time. It can be toggled with **F7**.
+* Added the `showbattery` nitpick, which displays the battery status. It can be toggled with **F8**.
+* Added the `nocustomenemybg` attribute for custom enemies.
+* Custom enemies using `nocustomenemybg` no longer display the red fill rectangle behind them.
+* This can be useful for custom enemies that work like, or use, a built-in entity.
+* The feature only applies to custom enemies. It does not affect built-in enemies, as the functionality is handled within the `game.lua` condition checking `tablecontains(customenemies, tilenumber)`.
 
 ### ✨ Improvements
 
 * Changed the invincibility blinking animation so it is partially akin to the animation in the **New Super Mario Bros.** series.
 * Quick testing from the Course Maker plays the last half of the invincibility animation.
 * Compressed the logic for handling dropdowns.
-
-### ❌ Removals
-
-* Purged the rarely used `clamp()` function.
-
-## v1.0.8
+* Fixed an issue where the overlay wouldn't render when using your mouse.
+* Improved Yoshi's walk cycle animation, thanks to WilliamFrog.
+* Added a loading overlay that is displayed while save data is being loaded.
+* Added a saving overlay that is displayed while game data is being saved.
+* Improved the visual presentation and feedback during save-data operations.
+* Added more loading messages to expand the loading presentation.
+* Animation number debugging now requires pressing **LCtrl+0**.
+* Improved the handling of Koopa Troopa interactions with blocks to prevent the game from crashing during side-hit collisions.
 
 ### 🐛 Bug Fixes
 
 * Fixed an issue with `nocustomenemybg` so that custom enemies are treated exactly like built-in entities in the editor, which causes the alpha to not set to 255 when hovered on.
-
-## v1.0.7
-
-### 🧩 New Features
-
-* Added the `showtime` nitpick, which displays the current time. It can be toggled with **F7**.
-* Added the `showbattery` nitpick, which displays the battery status. It can be toggled with **F8**.
-
-## v1.0.6
-
-### 🧩 New Features
-
-* Added the `nocustomenemybg` attribute for custom enemies.
-* Custom enemies using `nocustomenemybg` no longer display the red fill rectangle behind them.
-* This can be useful for custom enemies that work like, or use, a built-in entity.
-* The feature only applies to custom enemies. It does not affect built-in enemies, as the functionality is handled within the `game.lua` condition checking `tablecontains(customenemies, tilenumber)`.
-
-## v1.0.5
-
-### ✨ Improvements
-
-* Fixed an issue where the overlay wouldn't render when using your mouse.
-
-## v1.0.4
-
-### ✨ Improvements
-
-* Improved Yoshi's walk cycle animation, thanks to WilliamFrog.
-
-## v1.0.3
-
-### ✨ Improvements
-
-* Added a loading overlay that is displayed while save data is being loaded.
-* Added a saving overlay that is displayed while game data is being saved.
-* Improved the visual presentation and feedback during save-data operations.
-
-## v1.0.2
-
-### ✨ Improvements
-
-* Added more loading messages to expand the loading presentation.
-* Animation number debugging now requires pressing **LCtrl+0**.
+* Fixed a crash that could occur when a **Koopa Troopa** side-hit a block.
 
 ### ❌ Removals
 
+* Purged the rarely used `clamp()` function.
 * Removed the annoying ass `"pipe not found"` spam that could repeatedly appear during character debugging.
-
-## v1.0.1
-
-### 🐛 Bug Fixes
-
-* Fixed a crash that could occur when a **Koopa Troopa** side-hit a block.
-* Improved the handling of Koopa Troopa interactions with blocks to prevent the game from crashing during side-hit collisions.
 
 ---
 
