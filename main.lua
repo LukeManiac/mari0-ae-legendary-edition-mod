@@ -355,7 +355,7 @@ function love.load()
 					"i can't do nathan", "insert bark fart here", "adrian", "enrique", "digi digi hey", "totoya haha", "suiii", "cristiano ronaldo sewey", "dada put me on that misery",
 					"lesbian space princess is dogwater"}
 						
-	loadingtext = loadingtexts[math.random(#loadingtexts)]
+	loadingtext = randomitem(loadingtexts)
 	
 	--require ALL the files!
 	require "shaders"
@@ -3572,6 +3572,122 @@ function getlongeststring(t)
 	end
 
 	return value
+end
+
+function serialise(value)
+	local valueType = type(value)
+	local stack_overflow_strings = {
+		"Object serialisation failed due to stack overflow.",
+		"Object serialisation stopped due to stack overflow.",
+		"Stack overflow occurred during object serialisation.",
+		"Object serialisation reached the stack limit.",
+		"Object serialisation exceeded the stack limit.",
+		"Object serialisation could not continue due to stack overflow.",
+		"Object serialisation was interrupted by a stack overflow.",
+		"Object serialisation failed after reaching the stack limit.",
+		"The stack limit was reached during object serialisation.",
+		"The stack overflow limit was reached during object serialisation.",
+		"Object serialisation encountered a stack overflow.",
+		"Object serialisation terminated due to stack overflow.",
+		"Object serialisation could not be completed due to stack overflow.",
+		"Object serialisation exceeded the available stack space.",
+		"Object serialisation stopped after reaching the stack limit.",
+		"A stack overflow occurred while serialising the object.",
+		"The object could not be serialised due to stack overflow.",
+		"The object serialisation process reached the stack limit.",
+		"The object could not be fully serialised due to stack overflow.",
+		"Serialisation failed because the stack limit was reached.",
+		"Serialisation stopped because the stack limit was reached.",
+		"The stack overflow prevented object serialisation from completing.",
+		"Object serialisation was unable to continue after a stack overflow.",
+		"The object could not be serialised because of a stack overflow.",
+		"Object serialisation failed after exceeding the stack limit."
+	}
+
+	if valueType ~= "table" then
+		return tostring(value)
+	end
+
+	-- Check whether the table is a list
+	local isList = true
+	local count = 0
+	local stack_overflow = false
+
+	for key, _ in pairs(value) do
+		count = count + 1
+
+		if type(key) ~= "number" or key < 1 or key % 1 ~= 0 then
+			isList = false
+			break
+		end
+	end
+
+	if isList then
+		-- List
+		local result = {}
+
+		for i = 1, count do
+			local success, serialised = pcall(serialise, value[i])
+
+			if not success then
+				stack_overflow = true
+				break
+			end
+
+			table.insert(result, serialised)
+		end
+
+		output = "[" .. table.concat(result, ",") .. "]"
+	else
+		-- Dictionary
+		local result = {}
+
+		for key, val in pairs(value) do
+			local successKey, serialisedKey = pcall(serialise, key)
+
+			if not successKey then
+				stack_overflow = true
+				break
+			end
+
+			local successValue, serialisedValue = pcall(serialise, val)
+
+			if not successValue then
+				stack_overflow = true
+				break
+			end
+
+			table.insert(result, serialisedKey .. ":" .. serialisedValue)
+		end
+
+		output = "{" .. table.concat(result, ",") .. "}"
+	end
+
+	if stack_overflow then
+		stack_overflow_string = randomitem(stack_overflow_strings)
+		output = output .. "\n\n" .. stack_overflow_string
+		notice.new(stack_overflow_string, notice.white, 3)
+	end
+
+	return output
+end
+
+function randomitem(t)
+	return t[math.random(#t)]
+end
+
+function print(...)
+	local args = {...}
+
+	for i, value in ipairs(args) do
+		io.write(serialise(value))
+
+		if i < #args then
+			io.write("\t")
+		end
+	end
+
+	io.write("\n")
 end
 
 function drawbattery()

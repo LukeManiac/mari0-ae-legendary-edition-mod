@@ -233,7 +233,7 @@ function enemy:init(x, y, t, a, properties)
 	
 	--Decide on a random movement if it's random..
 	if self.movementrandoms then
-		self.movement = self.movementrandoms[math.random(#self.movementrandoms)]
+		self.movement = randomitem(self.movementrandoms)
 	end
 	
 	self.x = x-.5-self.width/2+(self.spawnoffsetx or 0)
@@ -453,7 +453,7 @@ function enemy:init(x, y, t, a, properties)
 	end
 	
 	if self.lifetimerandoms then
-		self.lifetime = self.lifetimerandoms[math.random(#self.lifetimerandoms)]
+		self.lifetime = randomitem(self.lifetimerandoms)
 	end
 	if self.lifetime and self.lifetime >= 0 then
 		self.lifetimer = self.lifetime
@@ -469,14 +469,14 @@ function enemy:init(x, y, t, a, properties)
 	
 	if self.spawnsenemy then
 		self.spawnenemytimer = 0
-		self.spawnenemydelay = self.spawnenemydelays[math.random(#self.spawnenemydelays)]
+		self.spawnenemydelay = randomitem(self.spawnenemydelays)
 	end
 
 	if self.bounces and (self.bouncedelay or self.bouncedelays) then
 		self.bouncetimer = 0
 		if self.bouncedelays then
 			if self.bouncedelaysrandoms then
-				self.bouncedelay = self.bouncedelays[math.random(#self.bouncedelays)]
+				self.bouncedelay = randomitem(self.bouncedelaysrandoms)
 			else
 				self.bouncetimerstage = 1
 				self.bouncedelay = self.bouncedelays[self.bouncetimerstage]
@@ -812,11 +812,11 @@ function enemy:update(dt)
 			self.spawnenemytimer = self.spawnenemytimer + dt
 			while self.spawnenemytimer >= self.spawnenemydelay and self.spawnallow and (not self.spawnmax or self:getspawnedenemies() < self.spawnmax) do
 				if self.spawnsenemyrandoms then
-					self.spawnsenemy = self.spawnsenemyrandoms[math.random(#self.spawnsenemyrandoms)]
+					self.spawnsenemy = randomitem(self.spawnsenemyrandoms)
 				end
 				self:spawnenemy(self.spawnsenemy)
 				self.spawnenemytimer = 0
-				self.spawnenemydelay = self.spawnenemydelays[math.random(#self.spawnenemydelays)]
+				self.spawnenemydelay = randomitem(self.spawnenemydelays)
 				self.throwanimationstate = 0
 				if self.animationtype == "frames" then
 					self.quad = self.quadgroup[self.quadi + self.throwanimationstate]
@@ -840,7 +840,7 @@ function enemy:update(dt)
 				if self.bouncetimerstage and not self.bounceforcerandom then
 					force = self.bounceforce[self.bouncetimerstage]
 				else
-					force = self.bounceforce[math.random(#self.bounceforce)]
+					force = randomitem(self.bounceforce)
 				end
 			end
 			self.speedy = -(force or 10)
@@ -852,7 +852,7 @@ function enemy:update(dt)
 				end
 				self.bouncedelay = self.bouncedelays[self.bouncetimerstage]
 			elseif self.bouncedelaysrandoms then
-				self.bouncedelay = self.bouncedelays[math.random(#self.bouncedelays)]
+				self.bouncedelay = randomitem(self.bouncedelays)
 			end
 		end
 	end
@@ -2486,7 +2486,7 @@ function enemy:customtimeraction(action, arg, arg2)
 			if type(arg) == "number" then
 				self[p] = math.random()*arg
 			else
-				self[p] = arg[math.random(#arg)]
+				self[p] = randomitem(arg)
 			end
 		elseif a == "abs" then
 			self[p] = math.abs(self[p])
@@ -2542,7 +2542,7 @@ function enemy:customtimeraction(action, arg, arg2)
 			self:playsound(arg)
 		elseif action == "spawnenemy" then
 			if self.spawnsenemyrandoms then
-				self.spawnsenemy = self.spawnsenemyrandoms[math.random(#self.spawnsenemyrandoms)]
+				self.spawnsenemy = randomitem(self.spawnsenemyrandoms)
 			end
 			self:spawnenemy(self.spawnsenemy)
 		elseif action == "trackreverse" then
@@ -2573,53 +2573,10 @@ function enemy:customtimeraction(action, arg, arg2)
 			self.quad = self.quadgroup[arg]
 		elseif LoveConsole and action == "print" then --only for advanced users!
 			if self[arg] then
-				printarg = self[arg]
+				print(self[arg])
 			else
-				printarg = arg
+				print(arg)
 			end
-
-			local function serialise(value)
-				local valueType = type(value)
-
-				if valueType ~= "table" then
-					return tostring(value)
-				end
-
-				-- Check whether the table is a list
-				local isList = true
-				local count = 0
-
-				for key, _ in pairs(value) do
-					count = count + 1
-
-					if type(key) ~= "number" or key < 1 or key % 1 ~= 0 then
-						isList = false
-						break
-					end
-				end
-
-				if isList then
-					-- List
-					local result = {}
-
-					for i = 1, count do
-						table.insert(result, serialise(value[i]))
-					end
-
-					return "[" .. table.concat(result, ",") .. "]"
-				else
-					-- Dictionary
-					local result = {}
-
-					for key, val in pairs(value) do
-						table.insert(result, serialise(key) .. ":" .. serialise(val))
-					end
-
-					return "{" .. table.concat(result, ",") .. "}"
-				end
-			end
-
-			print(serialise(printarg))
 		elseif string.sub(action, 0, 3) == "set" then
 			self[string.sub(action, 4, string.len(action))] = arg
 		end
@@ -3692,7 +3649,7 @@ function enemy:transform(t, returntransform, death)
 	local yoffset = self.transformsoffsety or 0
 
 	if self.transformsintorandoms then
-		self.transformsinto = self.transformsintorandoms[math.random(#self.transformsintorandoms)]
+		self.transformsinto = randomitem(self.transformsintorandoms)
 		t = self.transformsinto
 	end
 

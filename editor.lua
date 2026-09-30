@@ -4649,12 +4649,12 @@ function mapnumberclick(i, j, k)
 			guielements["savebutton2"].func()
 		end
 
+		renderoverlay("loading level...")
 		marioworld = i
 		mariolevel = j
 		actualsublevel = k
 		checkpointx = nil
 		editorloadopen = true
-		renderoverlay("loading level...")
 		if k ~= 0 then
 			startlevel(k)
 		else

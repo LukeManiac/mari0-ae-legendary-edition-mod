@@ -84,9 +84,9 @@ function menu_load()
 	
 	--tips
 	if TEXT["menutips"] then
-		currentmenutip = TEXT["menutips"][math.random(#TEXT["menutips"])]
+		currentmenutip = randomitem(TEXT["menutips"])
 	else
-		currentmenutip = menutips[math.random(#menutips)]
+		currentmenutip = randomitem(menutips)
 	end
 	menutipoffset = -1280--(-width*16)
 	
@@ -351,9 +351,9 @@ function menu_update(dt)
 		while menutipoffset > currentmenutip:len()*8 do
 			menutipoffset = menutipoffset - (utf8.len(currentmenutip)*8) - (width*16)*2
 			if TEXT["menutips"] then
-				currentmenutip = TEXT["menutips"][math.random(#TEXT["menutips"])]
+				currentmenutip = randomitem(TEXT["menutips"])
 			else
-				currentmenutip = menutips[math.random(#menutips)]
+				currentmenutip = randomitem(menutips)
 			end
 		end
 	end
@@ -564,7 +564,7 @@ function menu_draw()
 			properprintfunc(TEXT["player game"], (143-(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8)+16)*scale, 138*scale)
 			
 			properprintfunc(players, (143-(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8))*scale, 138*scale)
-			if i == 9 then if (mouseonselecthold and mouseonselect == 2) or nofunallowed then love.graphics.setColor(188, 188, 188) else love.graphics.setColor(255, 255, 255) end end
+			if i == 9 then if (mouseonselecthold and mouseonselect == 2) then love.graphics.setColor(188, 188, 188) else love.graphics.setColor(255, 255, 255) end end
 			properprintfunc(TEXT["level editor"], (143-(math.ceil(utf8.len(TEXT["level editor"])/2)*8))*scale, 154*scale)
 			
 			if i == 9 then if mouseonselecthold and mouseonselect == 3 then love.graphics.setColor(188, 188, 188) else love.graphics.setColor(255, 255, 255) end end
@@ -1046,17 +1046,8 @@ function menu_draw()
 		properprint("daily challenge", 105*scale, 6*scale)
 		
 		if downloadingmappack then
-			love.graphics.setColor(0, 0, 0, 100)
-			love.graphics.rectangle("fill", 0, 0, width*16*scale, 224*scale)
-			love.graphics.setColor(0, 0, 0, 230)
-			love.graphics.rectangle("fill", ((width*16)/2-100)*scale, (224/2-15)*scale, 200*scale, 30*scale)
-			love.graphics.setColor(255, 255, 255)
 			if onlinedlc then
-				if not onlineassetlist[onlinemappackselection].downloadable then
-					renderoverlay("opening link...")
-				else
-					renderoverlay("downloading asset...")
-				end
+				renderoverlay(mini_if(onlineassetlist[onlinemappackselection].downloadable, "downloading asset", "opening link") .. "...")
 			else
 				properprint("loading mappacks...", ((width*16)/2-(string.len("loading mappacks...")*8/2))*scale, (224/2-4)*scale)
 			end
@@ -2209,20 +2200,26 @@ function menu_keypressed(key, unicode)
 			end
 		elseif (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
 			if selection == 0 then
+				renderoverlay("loading save data...")
 				game_load(true)
 			elseif selection == 1 then
 				newgame()
 			elseif selection == 2 then
 				if nofunallowed then
-					notice.new("Creator disabled the editor.", notice.white, 2)
-					return false
+					if love.keyboard.isDown("lctrl") and love.keyboard.isDown("lshift") then
+						renderoverlay("loading editor...")
+					else
+						notice.new("Creator disabled the editor.", notice.white, 2)
+						return false
+					end
+				else
+					renderoverlay("loading editor...")
 				end
 				if not CurrentLanguage then
 					languagemenuopen = true
 					languagemenu_open()
 					return false
 				end
-				renderoverlay("loading editor...")
 				editormode = true
 				players = 1
 				playertype = "portal"
@@ -2963,15 +2960,21 @@ function menu_mousereleased(x, y, button)
 	if gamestate == "menu" then
 		if mouseonselect and mouseonselecthold then
 			if mouseonselect == 0 then
+				renderoverlay("loading save data...")
 				game_load(true)
 			elseif mouseonselect == 1 then
 				newgame()
 			elseif mouseonselect == 2 then
 				if nofunallowed then
-					notice.new("Creator disabled the editor.", notice.white, 2)
-					return false
+					if love.keyboard.isDown("lctrl") and love.keyboard.isDown("lshift") then
+						renderoverlay("loading editor...")
+					else
+						notice.new("Creator disabled the editor.", notice.white, 2)
+						return false
+					end
+				else
+					renderoverlay("loading editor...")
 				end
-				renderoverlay("loading editor...")
 				editormode = true
 				players = 1
 				playertype = "portal"

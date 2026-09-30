@@ -103,7 +103,6 @@ function game_load(suspended, deletesuspend)
 	
 	objects = nil
 	if suspended == true then
-		renderoverlay("loading save data...")
 		continuegame()
 		loadmappacksettings("suspended")
 		updatemappacksettings("suspended")
@@ -5379,13 +5378,13 @@ function pausegame(playpause)
 end
 
 function stoptestinglevel()
+	renderoverlay("returning to editor...")
 	marioworld = testlevelworld
 	mariolevel = testlevellevel
 	testlevel = false
 	player_position = {objects["player"][1].x, objects["player"][1].y, xscroll, yscroll}
 	stopmusic()
 	love.audio.stop()
-	renderoverlay("returning to editor...")
 	editormode = true
 	if mariosublevel ~= 0 then
 		startlevel(mariosublevel)
@@ -8355,13 +8354,12 @@ function getclosestplayer(x)
 end
 
 function endgame()
+	renderoverlay("returning to menu...")
 	if testlevel then
 		stoptestinglevel()
 		return
 	end
 	love.audio.stop()
-	love.graphics.clear(0, 0, 0)
-	renderoverlay("returning to menu...")
 	if pressbtosteve then
 		playertype = "minecraft"
 		playertypei = 2
@@ -9424,7 +9422,13 @@ function renderoverlay(text)
 	love.graphics.setColor(0, 0, 0, 127)
 	love.graphics.rectangle("fill", 0, 0, winwidth, winheight)
 	love.graphics.setColor(255, 255, 255, 255)
-	centerprintscreen(TEXT[text:lower()])
+
+	if TEXT[text:lower()] then
+		centerprintscreen(TEXT[text])
+	else
+		centerprintscreen(text)
+	end
+
 	love.graphics.present()
 end
 

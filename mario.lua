@@ -336,7 +336,7 @@ function mario:init(x, y, i, animation, size, t, properties)
 	self.light  = 3.5
 	
 	self.bubbletimer = 0
-	self.bubbletime = bubblestime[math.random(#bubblestime)]
+	self.bubbletime = randomitem(bubblestime)
 	
 	if self.water then
 		self.gravity = self.characterdata.uwgravity
@@ -3284,7 +3284,7 @@ function mario:underwatermovement(dt)
 	self.bubbletimer = self.bubbletimer + dt
 	while self.bubbletimer > self.bubbletime do
 		self.bubbletimer = self.bubbletimer - self.bubbletime
-		self.bubbletime = bubblestime[math.random(#bubblestime)]
+		self.bubbletime = randomitem(bubblestime)
 		table.insert(bubbles, bubble:new(self.x+8/12, self.y+2/12))
 	end
 	

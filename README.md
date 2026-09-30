@@ -115,6 +115,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 ### 🧩 New Features
 
 * You can now set a numerical value for the player's walking animation.
+* You can open `nofunallowed` mappacks by opening editor while holding **LCtrl+LShift**
 
 ### ✨ Improvements
 
