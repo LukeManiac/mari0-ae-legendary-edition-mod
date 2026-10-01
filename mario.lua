@@ -1298,10 +1298,16 @@ function mario:update(dt)
 			local v = (1-((self.animationtimer-pipeupdelay)/pipeanimationtime))
 			self.y = self.animationy-1-self.height + v*dist
 			self.drawable = true
+
+			if not self.pipeexited then
+				playsound(pipesound)
+				self.pipeexited = true
+			end
 		else
 			self.y = self.animationy-1-self.height
 			
 			if self.animationtimer >= pipeanimationtime then
+				self.pipeexited = true
 				self.active = true
 				self.controlsenabled = true
 				self.animation = nil
@@ -1323,10 +1329,16 @@ function mario:update(dt)
 			local v = (1-((self.animationtimer-pipeupdelay)/pipeanimationtime))
 			self.y = self.animationy - v*dist
 			self.drawable = true
+
+			if not self.pipeexited then
+				playsound(pipesound)
+				self.pipeexited = true
+			end
 		else
 			self.y = self.animationy
 			
 			if self.animationtimer >= pipeanimationtime then
+				self.pipeexited = true
 				self.active = true
 				self.controlsenabled = true
 				self.animation = nil
@@ -1349,6 +1361,11 @@ function mario:update(dt)
 			local v = (1-((self.animationtimer-pipeupdelay)/pipeanimationtime))
 			self.x = self.animationx - v*dist
 			self.drawable = true
+
+			if not self.pipeexited then
+				playsound(pipesound)
+				self.pipeexited = true
+			end
 			
 			--Run animation
 			if self.animationstate == "running" then
@@ -1358,6 +1375,7 @@ function mario:update(dt)
 			self.x = self.animationx
 			
 			if self.animationtimer >= pipeanimationtime then
+				self.pipeexited = true
 				self.active = true
 				self.controlsenabled = true
 				self.animation = nil
@@ -1380,6 +1398,11 @@ function mario:update(dt)
 			local v = (1-((self.animationtimer-pipeupdelay)/pipeanimationtime))
 			self.x = self.animationx-1-self.width + v*dist
 			self.drawable = true
+
+			if not self.pipeexited then
+				playsound(pipesound)
+				self.pipeexited = true
+			end
 			
 			--Run animation
 			if self.animationstate == "running" then
@@ -1389,6 +1412,7 @@ function mario:update(dt)
 			self.x = self.animationx-1-self.width
 			
 			if self.animationtimer >= pipeanimationtime then
+				self.pipeexited = true
 				self.active = true
 				self.controlsenabled = true
 				self.animation = nil

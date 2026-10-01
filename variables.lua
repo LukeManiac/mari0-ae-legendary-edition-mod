@@ -124,7 +124,7 @@ capejumpforce = 22
 headforce = 2 --how fast mario will be sent back down when hitting a block with his head
 --bounceforce = 12 --when jumping on an enemy, speedy will be set to this to make mario bounce (negative)
 bounceheight = 14/16 --when jumping on enemy, the height that mario will fly up
-bounceheightmaker = 20/16 --mario maker height
+bounceheightmaker = 1.25 --mario maker height
 bounceheighthigh = 34/16 --bounce higher when holding key in mario maker physics
 smbbounceheight = bounceheight
 smb2jbounceheight = 2 --2-4.5?
@@ -216,8 +216,8 @@ yoshijumpforce = 14
 yoshijumpforceadd = 1.9
 yoshipanicspeed = 6
 yoshitoungespeed = 15
-yoshitoungemaxwidth = 2.5
-yoshitoungeheight = 12/16
+yoshitoungemaxwidth = 10
+yoshitoungeheight = 0.75
 yoshiswallowtime = 0.3
 
 --yoshiwalkoffsets = {1, 2, 0}
@@ -385,7 +385,7 @@ lakitorespawn = 16
 lakitospace = 4
 lakitodistancetime = 1.5
 lakitohidetime = 0.5
-lakitopassivex = 18-4/16 --from the flag (or axe (or right end of map))
+lakitopassivex = 17.75 --from the flag (or axe (or right end of map))
 lakitopassivespeed = 3
 
 -- loiters between 4 blocks behind and 4 blocks ahead of you (total 9 blocks he goes above)
@@ -399,7 +399,7 @@ angrysunrespawn = 16
 angrysunspace = 4
 angrysundistancetime = 1.5
 angrysunhidetime = 1.0
-angrysunpassivex = 18-4/16 --from the flag (or axe (or right end of map))
+angrysunpassivex = 17.75 --from the flag (or axe (or right end of map))
 angrysunpassivespeed = 5
 angrysunfalltime = 0.1
 
@@ -444,7 +444,7 @@ seekrange = 2.5
 blockbouncetime = 0.2
 blockbounceheight = 0.4
 coinblocktime = 0.3
-coinblockdelay = 0.5/30
+coinblockdelay = 1/60
 
 portaldotstimer = 0 --this is changed in game.lua for some reason
 
@@ -582,8 +582,8 @@ blockdebrisanimationtime = 0.1
 blockdebrisgravity = 60
 
 castlefireangleadd = 11.25
-castlefiredelay = 3.4/(360/castlefireangleadd) --the number in front of the bracket is how long a full turn takes
-castlefirefastdelay = (3.4/(360/castlefireangleadd))*(3/4)
+castlefiredelay = 17*castlefireangleadd/1800 --the number in front of the bracket is how long a full turn takes
+castlefirefastdelay = 17*castlefireangleadd/2400
 castlefireanimationdelay = 0.07
 
 chainchompspeed = 2
@@ -638,11 +638,11 @@ plantfirespeed = 4
 downfireplantintime = 5
 
 --skewer
-skewerstartlength = 48/16
-skewerminlength = 16/16
+skewerstartlength = 3
+skewerminlength = 1
 skewermaxlength = 60
-skewerspeed = 240/16
-skewerretractspeed = 80/16
+skewerspeed = 15
+skewerretractspeed = 5
 skewertime = 3
 
 vinespeed = 2.13
@@ -658,12 +658,12 @@ vineanimationstop = 1.75
 vineanimationdropdelay = 0.5
 
 --animationstuff
-pipeanimationtime = 0.6
+pipeanimationtime = 0.5
 pipeanimationdelay = 1
-pipeanimationdistancedown = 32/16
-pipeanimationdistanceright = 16/16
+pipeanimationdistancedown = 2
+pipeanimationdistanceright = 1
 pipeanimationrunspeed = 3
-pipeupdelay = 1
+pipeupdelay = 0.5
 
 pipespawndelay = 3
 
@@ -684,7 +684,7 @@ sublevelscreentime = 0.2
 flagclimbframedelay = 0.07
 scoredelay = 2
 flagdescendtime = 0.9
-flagydistance = 7+10/16
+flagydistance = 7.625
 flaganimationdelay = 0.6
 scoresubtractspeed = 1/60
 castleflagstarty = 1.5

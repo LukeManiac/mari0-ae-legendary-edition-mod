@@ -3382,6 +3382,7 @@ function loadnitpicks()
 		CustomPortalColors = t.customportalcolors
 		UseButtonCappy = t.usebuttoncappy
 		ShowPlayerCoords = t.showplayercoords
+		NoEnemyCustomBgAtAll = t.alwaysnocustomenemybg
 		ShowTime = t.showtime
 		ShowBattery = t.showbattery
 		if t.showfps then

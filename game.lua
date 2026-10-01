@@ -9178,7 +9178,7 @@ function drawmaptiles(drawtype, xscroll, yscroll)
 							offsetx = .5
 						end
 						
-						if not v.nocustomenemybg then
+						if not (v.nocustomenemybg or NoEnemyCustomBgAtAll) then
 							if cox == mx and coy == my then
 								alpha = 255
 							end
@@ -9413,22 +9413,20 @@ function centerprint(text, x, y, scalemult)
 	end
 end
 
-function centerprintscreen(text)
-	centerprint(text, winwidth/scale/2, winheight/scale/2, getCanvasSize())
-end
-
 function renderoverlay(text)
-	love.draw()
+	love.graphics.present()
 	love.graphics.setColor(0, 0, 0, 127)
 	love.graphics.rectangle("fill", 0, 0, winwidth, winheight)
 	love.graphics.setColor(255, 255, 255, 255)
+	local overlaytext
 
 	if TEXT[text:lower()] then
-		centerprintscreen(TEXT[text])
+		overlaytext = TEXT[text]
 	else
-		centerprintscreen(text)
+		overlaytext = text
 	end
 
+	centerprint(overlaytext, winwidth/scale/2, winheight/scale/2, getCanvasSize())
 	love.graphics.present()
 end
 
