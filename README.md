@@ -18,16 +18,14 @@ The project expands Mari0 AE with new gameplay systems, playable characters, ene
 * [Installation](#installation)
   * [Option 1: Using the .exe File](#option-1-using-the-exe-file)
   * [Option 2: Using the .love File](#option-2-using-the-love-file)
-  * [Installation Locations](#installation-locations)
 
 * [Features](#features)
   * [Gameplay](#gameplay)
   * [Course Maker](#course-maker)
   * [Loading and Presentation](#loading-and-presentation)
 
-* [Development](#development)
+* [Development Environment](#development-environment)
 * [Credits](#credits)
-* [Licensing](#licensing)
 * [Contributing](#contributing)
 * [AI Policy](#ai-policy)
 * [Disclaimer](#disclaimer)
@@ -39,8 +37,6 @@ The project expands Mari0 AE with new gameplay systems, playable characters, ene
 Legendary Edition is designed as an expanded version of Mari0 AE, building upon its existing gameplay and systems while introducing additional content and refinements.
 
 The project is primarily written in **Lua** and uses **LÖVE 11.5**.
-
-Rather than relying on a conventional compiled build system, the repository contains the Lua source code and game assets directly.
 
 The project covers a broad range of Mari0 AE systems, including:
 
@@ -211,15 +207,7 @@ These changes provide more information during the loading process and give the g
 
 ---
 
-# Development
-
-Legendary Edition is primarily written in **Lua** and uses **LÖVE 11.5** as its framework.
-
-The repository contains the game's Lua source code and assets directly.
-
-There is no conventional compiled build system required for the source itself. The project is structured around the source files and resources used by the LÖVE game.
-
-## Development Environment
+# Development Environment
 
 Recommended development environment:
 
@@ -262,22 +250,6 @@ Legendary Edition contains work from many contributors to the Mari0 and Mari0 AE
 * **WilliamFr0g** and **Kant** — GitHub contributions
 
 See the comments in `main.lua` for the in-source credit notice.
-
----
-
-# Licensing
-
-This repository includes a custom **MARI0 AE MOD LICENSE** in [`LICENSE`](LICENSE).
-
-Please read the included licence for the complete terms regarding:
-
-* Redistribution
-* Modified versions
-* Attribution
-* Included material
-* Other applicable conditions
-
-Third-party artwork, audio, characters, trademarks and other material remain the property of their respective rights holders.
 
 ---
 
@@ -403,8 +375,6 @@ Legendary Edition is designed as an expanded version of Mari0 AE, building upon 
 
 The project is primarily written in **Lua** and uses **LÖVE 11.5**.
 
-Rather than relying on a conventional compiled build system, the repository contains the Lua source code and game assets directly.
-
 The project covers a broad range of Mari0 AE systems, including:
 
 * Player movement and physics
@@ -528,110 +498,6 @@ A clean Mari0 AE v13.2 installation is recommended as the base for Legendary Edi
 
 ---
 
-# Installation
-
-There are two primary ways to install Legendary Edition.
-
-## Using the Installer
-
-The easiest method is to download the **Legendary Edition installer** from the project's **Releases** page.
-
-1. Open the repository's **Releases** page.
-2. Download the installer for your platform.
-3. Run the installer.
-4. Follow the installation instructions.
-5. Launch the game.
-
-The installer is intended to provide a straightforward installation without requiring you to manually place the individual source files.
-
-## Installing from Source
-
-Advanced users can also install Legendary Edition directly from the source repository instead of using the `.exe` or `.love` file.
-
-1. Download the repository source code.
-2. Extract the downloaded files.
-3. Locate your Mari0 data directory for your operating system.
-4. Place the Legendary Edition files inside the `mari0` directory.
-5. Preserve the repository's directory structure.
-6. Launch Mari0 AE through **LÖVE 11.5**.
-
-### Installation Locations
-
-#### Windows
-
-```
-C:/Users/<YOUR_USERNAME>/AppData/Roaming/mari0
-```
-
-#### macOS
-
-```
-Users/<YOUR_USERNAME>/Library/Application Support/mari0
-```
-
-#### Linux
-
-```
-home/<YOUR_USERNAME>/.local/share/mari0
-```
-
-Replace `<YOUR_USERNAME>` with your operating-system username.
-
-### Source Installation Layout
-
-The installed files should retain their directory structure.
-
-For example:
-
-```
-mari0/
-├── enemies/
-├── graphics/
-├── languages/
-├── shaders/
-├── sounds/
-├── main.lua
-├── game.lua
-├── mario.lua
-├── enemy.lua
-├── editor.lua
-├── menu.lua
-├── portal.lua
-├── variables.lua
-└── ...
-```
-
----
-
-# Project Layout
-
-Legendary Edition is organised around the Lua systems used by Mari0 AE, together with separate directories for major asset groups.
-
-```
-Legendary Edition
-│
-├── enemies/          Enemy-specific assets and resources
-├── graphics/         Graphics and sprite resources
-├── languages/        Language and translation files
-├── shaders/          Shader programs and visual effects
-├── sounds/           Sound effects and audio resources
-│
-├── main.lua          Main LÖVE entry point
-├── game.lua          Core game and game-state systems
-├── mario.lua         Player and character behaviour
-├── enemy.lua         Enemy systems
-├── editor.lua        Course Maker
-├── menu.lua          Menus and interface
-├── portal.lua        Portal systems
-├── variables.lua     Gameplay and physics configuration
-├── dailychallenge.lua Daily Challenge systems
-└── ...
-```
-
-The repository also contains many specialised Lua files for individual objects, mechanics and gameplay systems.
-
----
-
 # Features
 
 ## Gameplay
@@ -698,15 +564,7 @@ These changes provide more information during the loading process and give the g
 
 ---
 
-# Development
-
-Legendary Edition is primarily written in **Lua** and uses **LÖVE 11.5** as its framework.
-
-The repository contains the game's Lua source code and assets directly.
-
-There is no conventional compiled build system required for the source itself. The project is structured around the source files and resources used by the LÖVE game.
-
-## Development Environment
+# Development Environment
 
 Recommended development environment:
 
