@@ -133,6 +133,13 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.0.2
+
+### ✨ Improvements
+
+* Changing controls, player, player colours, portal hues, and any misc settings (scale, letterbox, shader, volume, vsync, mappack folder) will now save the game immediately.
+* The default mappack folder is now set to `alesans_entities`.
+
 ## v1.0.1
 
 ### ✨ Improvements
