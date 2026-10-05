@@ -133,6 +133,15 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.0.3
+
+### 🧩 New Features
+
+* Added hidden options to the editor settings menu:
+  * The camera can now be set to "no backscroll".
+  * The coin limit can now be toggled.
+  * You can now use only one-time save files (aka suspend files).
+
 ## v1.0.2
 
 ### ✨ Improvements
