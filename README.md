@@ -137,7 +137,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 
 ### ✨ Improvements
 
-* Changing controls, player, player colours, portal hues, and any misc settings (scale, letterbox, shader, volume, vsync, mappack folder) will now save the game immediately.
+* Changing controls, player skins and properties (colourables and properties), and any misc settings (scale, letterbox, shader, volume, vsync, and mappack folder) will now save the game immediately.
 * The default mappack folder is now set to `alesans_entities`.
 
 ## v1.0.1
