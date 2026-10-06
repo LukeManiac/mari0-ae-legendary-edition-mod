@@ -133,14 +133,35 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.0.5
+
+### 🐛 Bug Fixes
+
+* Fixed a bug with custom power-ups in mappacks that use Super Mario Maker physics.
+* If you pick up two custom power-ups that have custom colours and the `fireenemy` property, then take damage, you now shrink to Big Mario as expected.
+* You no longer keep the custom colours or the `fireenemy` property from the power-up you had before.
+* Fixed enemies not showing their roll animation when killed in mappacks that use Super Mario Maker physics.
+* The roll animation now plays even when `dropshadow` is turned off.
+
+## v1.0.4
+
+### 🐛 Bug Fixes
+
+* Fixed Toad's off-palette running arms in his cape graphics.
+* **THE GAME FINALLY DOESN'T CRASH WHEN RENDERING A SCISSORED OBJECT WITH SHADERS ENABLED! THIS IS A MOMENT IN HISTORY!**
+
 ## v1.0.3
 
 ### 🧩 New Features
 
+* Resizable window scale is now set to 4.
+* Fixed canvas size retrieval crashes.
 * Added hidden options to the editor settings menu:
-  * The camera can now be set to "no backscroll".
+  * The camera can now be set to "forward only".
   * The coin limit can now be toggled.
   * You can now use only one-time save files (aka suspend files).
+
+### **Important Note: You will be warned for using the features mentioned as it *could* ruin your mappack gameplay.**
 
 ## v1.0.2
 
