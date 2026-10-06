@@ -161,6 +161,10 @@ All notable releases and updates to **Legendary Edition** are documented here.
   * Vaporwave: Brightness mapped onto a navy-to-pink gradient, blended back in, with chromatic offset and scanlines.
   * VHS: Worn tape look with colour bleed, line jitter, a rolling tracking band, tape noise and soft scanlines.
 
+### ✨ Improvements
+
+* Pausing the game resets the selected option state.
+
 ## v1.0.5
 
 ### 🐛 Bug Fixes
