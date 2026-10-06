@@ -133,6 +133,34 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.0.6
+
+### 🧩 New Features
+
+* Added new shaders:
+  * Anamorphic: Cinema lens look with 2.39 bars, a teal-and-orange grade, horizontal streaks from bright pixels and fine grain.
+  * Bullet Time: Cold, desaturated slow-motion grade with a radial zoom smear and a dark vignette.
+  * Dragan: Crushed portrait grade that sharpens, then overlays a high-pass layer for hard contrast.
+  * Dreamy Glow: Soft bloom that blurs bright areas outward and adds them back, with a light pastel lift.
+  * Drunk: The screen sways and breathes, with layered double vision and a slow wave rolling up the picture.
+  * Gameboy: Four-shade green LCD look with Bayer dither, snapped to the pixel grid, plus a faint LCD grid.
+  * Glitch: Mild tearing and colour split, plus vivid random squares that jump to a new layout every frame burst.
+  * Heat Haze: Rising shimmer that strengthens toward the bottom, with a warm grade and a pulsing ember glow.
+  * Hologram: Holoprojector look with a cyan cast, rolling scan bands, horizontal jitter and a little RGB split.
+  * Lightning: Rare full-frame storm flashes, a jagged bolt down the screen, and a small UV kick on each strike.
+  * Matrix: Digital rain over a green grade, with the head, trail and glyphs scrolling at the display rate.
+  * Neon-chase: Wet neon night with teal shadows, magenta highlights, pixel rain and a few anamorphic bokeh specks.
+  * Old-film: Sepia silent-movie look with gate weave, lamp flicker, grain, vignette, scratches and dust.
+  * Pixel Grain: Posterises each channel to a few levels and hides the banding with ordered Bayer dither.
+  * Poison: Sickly grade with a slow pulse and pixel bubbles rising through the frame.
+  * Posterize: Photoshop-style posterize, splitting each 8-bit channel into equal tone ranges.
+  * Snowfall: Three layers of pixel-sized flakes drifting down at different speeds over a cold blue grade.
+  * Thermal: Brightness mapped from cold black-blue through purple, red and orange to hot yellow-white, plus sensor noise.
+  * Tilt Shift: Toy-world look; the middle band stays sharp while the top and bottom blur, with extra saturation.
+  * Underwater: Wave distortion, a deep blue-green tint, depth fade and drifting caustic light.
+  * Vaporwave: Brightness mapped onto a navy-to-pink gradient, blended back in, with chromatic offset and scanlines.
+  * VHS: Worn tape look with colour bleed, line jitter, a rolling tracking band, tape noise and soft scanlines.
+
 ## v1.0.5
 
 ### 🐛 Bug Fixes
