@@ -133,6 +133,12 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.0.7
+
+### ✨ Improvements
+
+* The enemy death roll animation only plays when the mappack uses Super Mario Maker physics **and** drop shadow.
+
 ## v1.0.6
 
 ### 🧩 New Features
