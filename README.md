@@ -133,6 +133,12 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.0.8
+
+### 🐛 Bug Fixes
+
+* Fixed crash when downloading DLC.
+
 ## v1.0.7
 
 ### ✨ Improvements
