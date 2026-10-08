@@ -133,6 +133,17 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.0.9
+
+### 🐛 Bug Fixes
+
+* Fixed the center-aligned text drawing being inconsistent when the window was maximised.
+
+### ✨ Improvements
+
+* Updated the intro graphic.
+* Added an icon to the `.exe` using rcedit.
+
 ## v1.0.8
 
 ### 🐛 Bug Fixes
