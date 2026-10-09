@@ -133,6 +133,12 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.1.0
+
+### 🐛 Bug Fixes
+
+* Fixed the issue with screenshake which would only affect the HUD or the screen borders.
+
 ## v1.0.9
 
 ### 🐛 Bug Fixes
