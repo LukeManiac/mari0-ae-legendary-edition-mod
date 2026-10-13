@@ -133,6 +133,13 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.1.1
+
+### 🐛 Bug Fixes
+
+* Fixed the game crashing when block was hit while airborne and with speedx if you were specifically playing as Sonic.
+* Invincibility timers have been tweaked. If you killed an enemy as Sonic, you won't be stuck on your invincibility animation.
+
 ## v1.1.0
 
 ### 🐛 Bug Fixes
