@@ -139,6 +139,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 
 * Fixed the game crashing when block was hit while airborne and with speedx if you were specifically playing as Sonic.
 * Invincibility timers have been tweaked. If you killed an enemy as Sonic, you won't be stuck on your invincibility animation.
+* If you die, all music will be stopped every frame.
 
 ## v1.1.0
 
