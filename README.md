@@ -133,7 +133,16 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
-## v1.1.1
+## v1.1.2
+
+### ✨ Improvements
+
+* Vertical scrolling is no longer dependent on the x-furthest player.
+* One player's death only plays the death sting, unless that's the last player standing.
+* Added daily challenge fanfares.
+* The game now uses my favourite Super Mario Bros. remaster's audio: Super Mario Bros. Deluxe.
+
+## v1.1.1 (Sonic update)
 
 ### 🐛 Bug Fixes
 
@@ -151,7 +160,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 
 ### 🐛 Bug Fixes
 
-* Fixed the center-aligned text drawing being inconsistent when the window was maximised.
+* Fixed intro text drawing inconsistency when the window was maximised.
 
 ### ✨ Improvements
 
