@@ -135,12 +135,17 @@ All notable releases and updates to **Legendary Edition** are documented here.
 
 ## v1.1.2
 
+### 🧩 New Features
+
+* One player's death only plays the death sting, unless that's the last player standing.
+* Added daily challenge fanfares.
+
 ### ✨ Improvements
 
 * Vertical scrolling is no longer dependent on the x-furthest player.
-* One player's death only plays the death sting, unless that's the last player standing.
-* Added daily challenge fanfares.
 * The game now uses my favourite Super Mario Bros. remaster's audio: Super Mario Bros. Deluxe.
+* Sometimes, flying as a bunny could keep your sprite on jumping because of `self.falling and self.speedy >= 0` so it's been changed to `self.falling and self.speedy > 0`.
+* If the character has fall frames and was fluttering as Raccoon/Tanooki Mario, it would use the fall frames instead of jump frames.
 
 ## v1.1.1 (Sonic update)
 
