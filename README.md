@@ -149,6 +149,10 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Sometimes, flying as a bunny could keep your sprite on jumping because of `self.falling and self.speedy >= 0` so it's been changed to `self.falling and self.speedy > 0`.
 * If the character has fall frames and was fluttering as Raccoon/Tanooki Mario, it would use the fall frames instead of jump frames.
 
+### 🐛 Bug Fixes
+
+* Something was up with Mario's colourables so I fixed it.
+
 ## v1.1.1 (Sonic update)
 
 ### 🐛 Bug Fixes
