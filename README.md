@@ -127,6 +127,8 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 * Removed the annoying `"pipe not found"` spam that could repeatedly appear during character debugging.
 
+### Note: These changes were made with Claude and Grok.
+
 ---
 
 # Changelog
@@ -155,6 +157,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 
 * Fixed checkbox labels being drawn in black, and so becoming invisible, when the checkbox was unchecked.
 * Fixed the intro graphic sometimes scaling far too large. The `motion_curve` call was given an options table instead of its positional arguments, so its input was never clamped and the timer wasn't converted to a 0–1 range.
+* Fixed an issue where changing scale or letterbox wouldn't save the game under certain conditions.
 
 ### ❌ Removals
 
