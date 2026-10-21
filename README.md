@@ -135,6 +135,17 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.1.4
+
+### 🧩 New Features
+
+* The volume setting is now an actual slider.
+* The misc. menu is now replaced with dropdowns, checkboxes, and buttons, where appropriate.
+
+### 🔜 Upcoming Features
+
+* Controls, skins, and cheats menus might use the new GUI.
+
 ## v1.1.3
 
 ### 🧩 New Features
@@ -144,24 +155,14 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Buttons grow slightly when hovered, their border colour fades toward the highlight colour, and they zoom in and back out when pressed.
 * Dropdown lists now animate open and close instead of appearing instantly. The list is clipped to the revealed part and slides along with the animation.
 * The scroll factor sliders in the Course Maker now push-zoom when you press them and retract when you let go, like buttons.
-* The intro graphic now scales in using a random motion curve.
-
-### ✨ Improvements
-
-* Rounded the corners of the GUI to match the buttons. This covers checkboxes, dropdowns, text inputs and scrollbars.
-* The scroll factor sliders in the Course Maker now use the same rounded corners as buttons, for both the track and the handle.
-* The checkbox tick mark now has rounded ends and a rounded corner, and is drawn with smooth lines instead of rough ones.
-* Simplified the intro graphic's draw code by using LÖVE's draw origin instead of calculating the centred position manually.
-
-### 🐛 Bug Fixes
-
-* Fixed checkbox labels being drawn in black, and so becoming invisible, when the checkbox was unchecked.
-* Fixed the intro graphic sometimes scaling far too large. The `motion_curve` call was given an options table instead of its positional arguments, so its input was never clamped and the timer wasn't converted to a 0–1 range.
-* Fixed an issue where changing scale or letterbox wouldn't save the game under certain conditions.
+* The intro graphic, pause menu, and prompts now scale in using a random motion curve.
+* Checkboxes use a tickmark now.
 
 ### ❌ Removals
 
 * The dropdown arrow and the checkbox are now drawn with LÖVE's native graphics instead of image files.
+
+### Note: These changes were made with Claude and Grok.
 
 ## v1.1.2
 
