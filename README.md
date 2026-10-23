@@ -135,12 +135,29 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.1.5
+
+### 🧩 New Features
+
+* Added a log dumping system (alesans_entities/logs).
+* If you attempt to index a nil value using setframe, it'll print `Failed to get " .. arg .. " from nil quadgroup.`.
+* You can now force dump logs using **LCtrl+LShift+L**.
+* Forgot to mention that the controls and cheats menu use the new GUI. Still working on the skins menu.
+
+### 🐛 Bug Fixes
+
+* If a character shrinks to super form while ducking, the offsetY and quadcenterY is now fixed to its ducking offsetY and quadcenterY.
+
 ## v1.1.4
 
 ### 🧩 New Features
 
 * The volume setting is now an actual slider.
 * The misc. menu is now replaced with dropdowns, checkboxes, and buttons, where appropriate.
+
+### ✨ Improvements
+
+* Sped up the pause menu animation.
 
 ### 🔜 Upcoming Features
 
