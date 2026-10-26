@@ -135,6 +135,24 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.2.1
+
+### 🐛 Bug Fixes
+
+* Level screens now fade to black before loading the next map.
+* Selecting a map in the editor now fades the full screen to black before loading.
+* Pipe entries without a matching exit marker now use a vignette transition centred on the player's spawn animation.
+* Level music now resumes when fast star music ends.
+* Objects marked for instant deletion are removed immediately.
+
+### ✨ Improvements
+
+* The `freezefade` nitpick pauses gameplay updates during fade and vignette transitions. Only the logic objects listed below, and objects linked to them, continue updating.
+* Map-load animations now execute immediately when the map loads.
+
+**Note:** The logic objects that continue updating are NOT gates, AND gates, OR gates, RS flip-flops, music changers, wall indicators, region triggers, and collectable locks. Objects linked to these logic objects, and objects they are linked to, also continue updating.
+**Disclaimer:** GitHub Copilot also contributed to these changes, using the GPT-6 Luna model.
+
 ## v1.2.0
 
 ### 🧩 New Features
@@ -148,6 +166,8 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Added a music priority function. Priority list (starting with top priority): `[Mega Mushroom, Starman, P-Switch]`.
 * Splitscreen is now an lua.
 * Added transitions for changing scenes (exiting intro, toggling editor mode, selecting mappack, entering different maps, etc.)
+* If a player loses its wearable, the wearable will roll backwards.
+* The world selection cursor is now animated.
 
 ### 🐛 Bug Fixes
 
@@ -203,7 +223,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 
 * The dropdown arrow and the checkbox are now drawn with LÖVE's native graphics instead of image files.
 
-### Note: These changes were made with Claude and Grok.
+**Note**: These changes were made with Claude and Grok.
 
 ## v1.1.2
 
