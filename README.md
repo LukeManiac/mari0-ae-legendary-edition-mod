@@ -135,6 +135,32 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.1.7
+
+### 🧩 New Features
+
+* Multiplayer warp handling is now akin to from Super Mario Maker 2.
+* If a player enters a pipe/door that leads to a different map, all players have to enter that assigned pipe/door. Other warping objects are blocked.
+
+### 🐛 Bug Fixes
+
+* Fixed an issue where camera boundaries aren't respected in splitscreen viewports.
+* Onscreen object detection is now fixed for splitscreen viewports.
+
+### ✨ Improvements
+
+* Overlay rendering is now better as shaders are applied on it.
+* Rigid camera centering now tracks uncrouched hitboxes.
+
+## v1.1.6
+
+### 🧩 New Features
+
+* New nitpick `displayhiddenenemiesinspawner`, you already know what it does. Use with caution!
+* New nitpick `completelycenteredcamera`. This nitpick makes the camera rigidly centered on the furthest player.
+* New nitpick `modernmultiplayercamera`. This nitpick makes the camera concentrate on the average distance off all players. If they all go offscreen, the game focuses on the furthest player. Instead of rigidly setting camera position, the game interpolates it. The interpolation is executed when someone dies too.
+* New nitpick `splitscreenmultiplayer`. THIS IS THE BEST FEATURE I APPROVE IN GAMING! YOU GET SPLITSCREEN GAMING INSTEAD OF ONE DAMN SCREEN! Want a wider viewrange? Turn on the `horizontalsplitscreenviewports` nitpick.
+
 ## v1.1.5
 
 ### 🧩 New Features
