@@ -147,6 +147,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * If a player enters a pipe/door that leads to a different map, all players have to enter that assigned pipe/door. Other warping objects are blocked.
 * Added a music priority function. Priority list (starting with top priority): `[Mega Mushroom, Starman, P-Switch]`.
 * Splitscreen is now an lua.
+* Added transitions for changing scenes (exiting intro, toggling editor mode, selecting mappack, entering different maps, etc.)
 
 ### 🐛 Bug Fixes
 
