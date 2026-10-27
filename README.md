@@ -137,6 +137,10 @@ All notable releases and updates to **Legendary Edition** are documented here.
 
 ## v1.2.1
 
+### 🧩 New Features
+
+* Added the mappack `disabletransition` setting, which instantly completes transitions between maps during gameplay. It can be managed in the Course Maker with the **Skip trans.** setting. Editor transitions, including transitions while testing a level, remain enabled.
+
 ### 🐛 Bug Fixes
 
 * Level screens now fade to black before loading the next map.
@@ -144,11 +148,15 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Pipe entries without a matching exit marker now use a vignette transition centred on the player's spawn animation.
 * Level music now resumes when fast star music ends.
 * Objects marked for instant deletion are removed immediately.
+* Enemies with `xrelativetocamera` and/or `yrelativetocamera` now stick perfectly to the camera each frame. Both their graphic and hitbox stay at the specified camera-relative position without lag.
 
 ### ✨ Improvements
 
 * The `freezefade` nitpick pauses gameplay updates during fade and vignette transitions. Only the logic objects listed below, and objects linked to them, continue updating.
 * Map-load animations now execute immediately when the map loads.
+* With `completelycenteredcamera` enabled, the camera now interpolates when a player dies. With `completelycenteredcamera` or `modernmultiplayercamera` enabled, it also interpolates when a player moves through a portal.
+* Off-screen player markbases now show an expanded viewrange and nearby entities.
+* With `completelycenteredcamera` or `modernmultiplayercamera` enabled, player teleportation executed by custom enemies or animation `setx`/`sety` actions now use the same camera interpolation as portal travel.
 
 **Note:** The logic objects that continue updating are NOT gates, AND gates, OR gates, RS flip-flops, music changers, wall indicators, region triggers, and collectable locks. Objects linked to these logic objects, and objects they are linked to, also continue updating.
 **Disclaimer:** GitHub Copilot also contributed to these changes, using the GPT-6 Luna model.
