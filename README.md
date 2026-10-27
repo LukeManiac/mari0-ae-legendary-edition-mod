@@ -186,12 +186,27 @@ effect.
 `hurrymodeskipfanfare`: Skips the low-time sound cue and uses fast music at 99 instead of waiting until the timer drops below 99. Requires `hurrymode`.
 `freezefade`: Pauses gameplay updates during fade and vignette transitions, except for designated logic objects and linked objects.
 `disabletransitions`: Skips fade and vignette transitions.
+`infinitefireballs`: Removes the limit on how many fireballs, hammers, superballs, iceballs, boomerangs, and custom powerup projectiles the player can have active.
 
 ---
 
 # Changelog
 
 All notable releases and updates to **Legendary Edition** are documented here.
+
+## v1.2.2
+
+### 🧩 New Features
+
+* Added the `infinitefireballs` nitpick, which removes the limit on active fireballs, hammers, superballs, iceballs, boomerangs, and custom powerup projectiles.
+* Added four keybind slots for each control, so keyboard and controller inputs can be mixed and matched.
+* Maximised controller support, including joystick buttons, hats, and axes.
+
+### ✨ Improvements
+
+* Moved **Pause** into the always-visible controls list. **Aim X**, **Aim Y**, **Portal 1**, and **Portal 2** remain available when the selected player does not use the mouse.
+
+**Note:** The four-keybind system remains compatible with original Mari0 AE save data and does not negatively affect it.
 
 ## v1.2.1
 
