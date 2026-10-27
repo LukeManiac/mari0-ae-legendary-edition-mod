@@ -198,6 +198,8 @@ All notable releases and updates to **Legendary Edition** are documented here.
 ### 🧩 New Features
 
 * Added the mappack `disabletransition` setting, which instantly completes transitions between maps during gameplay. It can be managed in the Course Maker with the **Skip trans.** setting. Editor transitions, including transitions while testing a level, remain enabled.
+* Tanooki Mario enters statue mode when you press **Run** while holding **Down**. Release **Run** to exit statue mode.
+* The editor panels fade in while zooming in when opened, and fade out while zooming out when closed. Each transition lasts half a second and uses a random motion curve.
 
 ### 🐛 Bug Fixes
 
@@ -215,6 +217,8 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Transition logic objects pause while the screen fades to black, but continue updating during the fade back in and vignette zoom-out.
 * Mario can now turn around in midair while wearing a Goomba shoe, stiletto, or dry bones shell, without changing ground turning behaviour.
 * Map-load animations now execute immediately when the map loads.
+* GUI objects cannot be hovered while the editor panels are closed or animating, and editor tooltip timers reset when the panel view is toggled or unavailable.
+* The selected tile or enemy preview remains visible behind the editor panels during their animation, with its opacity fading in the opposite direction to the panels.
 * With `completelycenteredcamera` enabled, the camera now interpolates when a player dies. With `completelycenteredcamera` or `modernmultiplayercamera` enabled, it also interpolates when a player moves through a portal.
 * Off-screen player markbases now show an expanded viewrange and nearby entities.
 * With `completelycenteredcamera` or `modernmultiplayercamera` enabled, player teleportation executed by custom enemies or animation `setx`/`sety` actions now use the same camera interpolation as portal travel.
