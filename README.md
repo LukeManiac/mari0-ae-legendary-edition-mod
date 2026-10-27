@@ -13,6 +13,7 @@ The project expands Mari0 AE with new gameplay systems, playable characters, ene
 * [About](#about)
 * [What's New](#whats-new)
 * [Initial Release](#initial-release)
+* [Nitpicks](#nitpicks)
 * [Changelog](#changelog)
 * [Requirements](#requirements)
 * [Installation](#installation)
