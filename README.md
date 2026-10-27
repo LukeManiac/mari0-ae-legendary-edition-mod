@@ -400,7 +400,7 @@ Use this option if you are on Windows and want to run the game without installin
 
 1. Open the repository's **Releases** page.
 2. Download the Legendary Edition `.exe` file.
-3. Place the `.exe` file in the **same directory as your original Mari0 AE game folder**.
+3. Place the `.exe` file in the **same directory as your original [Mari0 AE](https://forum.stabyourself.net/viewtopic.php?t=3636) game folder**.
 4. Double-click the `.exe` file to launch the game.
 
 > **Important:** Do **not** place the `.exe` file in the AppData folder (`C:/Users/<YOUR_USERNAME>/AppData/Roaming/mari0`). It must sit next to the original Mari0 AE game folder, not inside the AppData folder.
@@ -582,6 +582,12 @@ In most cases, writing the custom enemy yourself is more reliable.
 AI may assist with ideas, suggestions, and other small tasks, but **custom enemy code should be written and maintained by a human**.
 
 Human-made custom enemies may still contain errors. Finding and fixing those errors is part of the development process; this helps ensure that each custom enemy works properly with the game's handling logic.
+
+### Using AI for Custom Enemies
+
+If you still want AI to create a custom enemy, you will need to give a capable AI such as Claude, Grok, or GitHub Copilot access to the game's source. Upload the source `.love` file, or use GitHub Copilot to provide access to the project folder. This gives the AI the code and context it needs to follow the game's existing logic.
+
+Using AI for custom enemies is not recommended. Many custom enemies are created by humans, and human-written code is generally a more reliable approach for this project.
 
 ## About AI Detection
 
