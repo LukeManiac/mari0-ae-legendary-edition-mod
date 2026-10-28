@@ -198,12 +198,15 @@ All notable releases and updates to **Legendary Edition** are documented here.
 
 ### 🧩 New Features
 
+* Daily challenges use built-in graphics and sounds unless the selected mappack has `overridegraphics` or `overridesounds` active, respectively. The legacy `overrideassets` setting enables both.
 * Added the `infinitefireballs` nitpick, which removes the limit on active fireballs, hammers, superballs, iceballs, boomerangs, and custom powerup projectiles.
 * Added four keybind slots for each control, so keyboard and controller inputs can be mixed and matched.
 * Maximised controller support, including joystick buttons, hats, and axes.
 
 ### 🐛 Bug Fixes
 
+* Fixed keyboard navigation in the controls menu so the Pause binding is reachable when moving through controls with mouse aiming on or off.
+* Fixed music getting stuck on a paused intro after quitting to the menu. The next song now plays without needing to pause the game.
 * Fixed the minimap toggle so opening and closing the minimap animates its visibility without incorrectly animating the editor panel.
 
 ### ✨ Improvements
