@@ -202,9 +202,14 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Added four keybind slots for each control, so keyboard and controller inputs can be mixed and matched.
 * Maximised controller support, including joystick buttons, hats, and axes.
 
+### 🐛 Bug Fixes
+
+* Fixed the minimap toggle so opening and closing the minimap animates its visibility without incorrectly animating the editor panel.
+
 ### ✨ Improvements
 
 * Moved **Pause** into the always-visible controls list. **Aim X**, **Aim Y**, **Portal 1**, and **Portal 2** remain available when the selected player does not use the mouse.
+* In splitscreen multiplayer, player coordinate labels appear only in that player's viewport.
 
 **Note:** The four-keybind system remains compatible with original Mari0 AE save data and does not negatively affect it.
 
