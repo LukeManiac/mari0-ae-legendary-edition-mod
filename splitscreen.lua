@@ -150,8 +150,9 @@ function splitscreen_update(dt)
 end
 
 function splitscreen_updatecamera(i, view, p, f, dt, snap)
-	local vw = view.w/16*screenzoom2
-	local vh = view.h/16*screenzoom2
+	local mul = (splitscreencanvases[i] and splitscreencanvases[i].viewrangemul) or 1
+	local vw = view.w/16*screenzoom2*mul
+	local vh = view.h/16*screenzoom2*mul
 	local maxx = math.max(0, mapwidth-vw)
 	local maxy = math.max(0, mapheight-vh-1)
 
@@ -304,8 +305,9 @@ end
 
 --enemies spawn when they get into view, so every viewport has to do that
 function splitscreen_spawn(i, view, f)
-	local vw = view.w/16*screenzoom2
-	local vh = view.h/16*screenzoom2
+	local mul = (splitscreencanvases[i] and splitscreencanvases[i].viewrangemul) or 1
+	local vw = view.w/16*screenzoom2*mul
+	local vh = view.h/16*screenzoom2*mul
 	local x1 = math.max(1, math.floor(splitcamx[i]))
 	local x2 = math.min(mapwidth, math.floor(splitcamx[i])+math.ceil(vw)+2)
 	local y1 = math.max(1, math.floor(splitcamy[i]))
@@ -325,23 +327,28 @@ end
 
 --every viewport is drawn onto its own canvas, so scissors/stencils used while drawing the level can't leak into other viewports
 function splitscreen_beginview(split, view)
+	local basescale = scale
 	local renderscale = scale
 	local upscale = 1
+	local viewrangemul = 1
 	-- viewports matching the game window aspect (e.g. 2x2) render at half scale and stay there
 	local gameaspect = (width * 16) / (height * 16)
 	local viewaspect = view.w / view.h
 	if math.abs(viewaspect - gameaspect) < 1e-6 then
 		renderscale = math.max(scale / 2, 1)
+		viewrangemul = basescale / renderscale
 		-- do not scale back up
 	end
-	local cw, ch = math.floor(view.w*renderscale), math.floor(view.h*renderscale)
+	-- canvas stays full viewport size so the extra view range fills the slot
+	local cw, ch = math.floor(view.w * basescale), math.floor(view.h * basescale)
 	local sc = splitscreencanvases[split]
 	if (not sc) or sc.w ~= cw or sc.h ~= ch then
-		sc = {w = cw, h = ch, canvas = love.graphics.newCanvas(cw, ch), upscale = upscale}
+		sc = {w = cw, h = ch, canvas = love.graphics.newCanvas(cw, ch), upscale = upscale, viewrangemul = viewrangemul}
 		sc.canvas:setFilter("nearest", "nearest")
 		splitscreencanvases[split] = sc
 	else
 		sc.upscale = upscale
+		sc.viewrangemul = viewrangemul
 	end
 	splitscreenprevcanvas = love.graphics.getCanvas()
 	love.graphics.origin()
