@@ -2,8 +2,7 @@ local languagemenuopen = false
 local resetwarningopen = false
 local resetwarningcursor = 2
 local resetwarningstage = 1 --1 = first warning, 2 = second "are you really sure?" warning
-local resetbuttonhovertime = 0 --seconds "reset all settings" has been hovered, drives the text shake
-local resetbuttonsuppressed = false --true after the popup was used, until the mouse leaves the button
+local resettexthovertime = 0 --seconds the "reset" option of the warning popup has been hovered, drives its shake
 local menu_updatemouseselection
 
 local previousmappackfolder
@@ -782,8 +781,11 @@ local function resetwarning_draw()
 		elseif resetwarningstage == 3 then
 			love.graphics.setColor(255, 0, 0, alpha)
 		end
+		local shakerange = math.min(resettexthovertime * 0.75, 4) --capped at 4 pixels
+		local shakex = (math.random()*2-1)*shakerange
+		local shakey = (math.random()*2-1)*shakerange
 
-		properprintF(TEXT["reset"], resetx*scale, 130*scale)
+		properprintF(TEXT["reset"], (resetx+shakex)*scale, (130+shakey)*scale)
 		love.graphics.setColor(100, 100, 100, alpha)
 		properprintF(TEXT["go back"], backx*scale, 130*scale)
 	else
@@ -871,10 +873,6 @@ local function optionsmisc_create()
 		resetwarning_open()
 	end)
 	guielements["opt_resetall"].textcolor = {255, 0, 0}
-	--the text shakes harder the longer the button is hovered (range in pixels, capped at 4)
-	guielements["opt_resetall"].shakerange = function()
-		return math.min(resetbuttonhovertime * 0.75, 4)
-	end
 
 	--Volume
 	guielements["opt_volume"] = volumeslider_new(90, 109, right-90)
@@ -1225,18 +1223,11 @@ function menu_load()
 end
 
 function menu_update(dt)
-	--text shake: the longer "reset all settings" is hovered, the harder its text shakes
-	local resetbutton = guielements["opt_resetall"]
-	local resethovered = gamestate == "options" and optionstab == 3 and resetbutton and resetbutton:hovered()
-	if resetwarningopen then
-		resetbuttonsuppressed = true --no shaking after cancelling until the mouse moves off the button
-	elseif not resethovered then
-		resetbuttonsuppressed = false
-	end
-	if resethovered and not resetwarningopen and not resetbuttonsuppressed and not languagemenuopen then
-		resetbuttonhovertime = resetbuttonhovertime + dt
+	--"reset" text shake: the longer it is hovered in the warning popup, the harder it shakes
+	if gamestate == "options" and resetwarningopen and resetwarningcursor == 1 then
+		resettexthovertime = resettexthovertime + dt
 	else
-		resetbuttonhovertime = 0
+		resettexthovertime = math.min(resettexthovertime - dt, 1)
 	end
 
 	--coinanimation
