@@ -201,6 +201,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Maximised controller support, including joystick buttons, hats, and axes.
 * Added a new "Generate Nitpicks File" button to the menu's misc tab.
 * Added animations for confirmations in editor, and a three-stage warning to confirm resetting all settings.
+* Added downscaling for viewports (may look funny when window scale is 3).
 
 ### 🐛 Bug Fixes
 
@@ -208,6 +209,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Fixed music getting stuck on a paused intro after quitting to the menu. The next song now plays without needing to pause the game.
 * Fixed the minimap toggle so opening and closing the minimap animates its visibility without incorrectly animating the editor panel.
 * Fixed an issue where the rightclick menu was unable to interact with.
+* Fixed a confusing mechanic where autodelete-able enemies would instantly vanish when a player died in multiplayer splitscreen.
 
 ### ✨ Improvements
 
