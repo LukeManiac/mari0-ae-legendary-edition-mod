@@ -215,7 +215,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 
 ### ❌ Removals
 
-* Removed `freezefade` nitpick as there were too many bugs.
+* Removed `freezefade` and `editorzoom` nitpicks as there were too many bugs.
 
 **Note:** The four-keybind system remains compatible with original Mari0 AE save data and does not negatively affect it.
 
