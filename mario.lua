@@ -2510,6 +2510,17 @@ function mario:update(dt)
 		local runkeyheld = runkey(self.playernumber)
 		local runkeypressed = runkeyheld and not self.runkeywasdown
 		self.runkeywasdown = runkeyheld
+
+		--rapidfire nitpick: hold firing button to call fire every frame
+		if HAHARAPIDFIREGOBRRR then
+			if runkeyheld then
+				self:button("run")
+				self:fire()
+			end
+			if usekey(self.playernumber) then
+				self:button("use")
+			end
+		end
 		
 		if self.size == 9 then --tanooki statue
 			if (not self.shoe) and (not self.yoshi) and downkey(self.playernumber) then

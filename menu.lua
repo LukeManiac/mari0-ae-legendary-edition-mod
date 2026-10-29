@@ -58,7 +58,7 @@ local function setmenupopupvisible(name, visible)
 end
 
 --Misc. options tab (optionstab == 3) widgets
-local optionsmiscgui = {"opt_scale", "opt_letterbox", "opt_shader1", "opt_shader2", "opt_volume", "opt_language", "opt_resetmaps", "opt_resetall", "opt_vsync", "opt_mappackfolder"}
+local optionsmiscgui = {"opt_scale", "opt_letterbox", "opt_shader1", "opt_shader2", "opt_volume", "opt_language", "opt_nitpicks", "opt_resetmaps", "opt_resetall", "opt_vsync", "opt_mappackfolder"}
 local optionsmiscselection = {}
 
 for i, option in ipairs(optionsmiscgui) do
@@ -690,14 +690,19 @@ local function optionsmisc_create()
 		languagemenu_open()
 	end)
 
+	--Generate Nitpicks File
+	guielements["opt_nitpicks"] = guielement:new("button", 30, 137, "generate nitpicks file", function()
+		generatenitpicksfile()
+	end)
+
 	--Reset Included Maps
-	guielements["opt_resetmaps"] = guielement:new("button", 30, 137, TEXT["reset included maps"], function()
+	guielements["opt_resetmaps"] = guielement:new("button", 30, 150, TEXT["reset included maps"], function()
 		reset_mappacks()
 	end)
 	guielements["opt_resetmaps"].textcolor = {255, 0, 0}
 
 	--Reset All Settings
-	guielements["opt_resetall"] = guielement:new("button", 30, 150, TEXT["reset all settings"], function()
+	guielements["opt_resetall"] = guielement:new("button", 30, 163, TEXT["reset all settings"], function()
 		resetconfig()
 	end)
 	guielements["opt_resetall"].textcolor = {255, 0, 0}
@@ -706,7 +711,7 @@ local function optionsmisc_create()
 	guielements["opt_volume"] = volumeslider_new(90, 109, right-90)
 
 	--VSync
-	guielements["opt_vsync"] = guielement:new("checkbox", right-9, 164, function(v)
+	guielements["opt_vsync"] = guielement:new("checkbox", right-9, 177, function(v)
 		vsync = v
 		guielements["opt_vsync"].var = v
 		changescale(scale)
@@ -720,7 +725,7 @@ local function optionsmisc_create()
 		start = 1
 	end
 
-	guielements["opt_mappackfolder"] = guielement:new("dropdown", 30, 187, 17, function(i)
+	guielements["opt_mappackfolder"] = guielement:new("dropdown", 30, 190, 17, function(i)
 		local option = guielements["opt_mappackfolder"].entries[i]
 		if option == "mappacks" then
 			mappackfolder = "mappacks"
@@ -744,6 +749,100 @@ end
 local function optionsmisc_remove()
 	for i = 1, #optionsmiscgui do
 		guielements[optionsmiscgui[i]] = nil
+	end
+end
+
+local nitpickkeys = {
+	"dropshadow",
+	"assistmode",
+	"playmusicineditor",
+	"disabletooltips",
+	"disablemouseinmainmenu",
+	"noportalgun",
+	"mariomakergravity",
+	"dontpauseonunfocus",
+	"firebuttoncannonhelmet",
+	"pipesineditor",
+	"noonlinemultiplayernames",
+	"letterbox",
+	"customportalcolors",
+	"usebuttoncappy",
+	"showplayercoords",
+	"alwaysnocustomenemybg",
+	"showtime",
+	"showbattery",
+	"showfps",
+	"infinitelivesmultiplayer",
+	"slowbackgrounds",
+	"nomusic",
+	"alwaysinfinitetime",
+	"alwaysinfinitelives",
+	"centercamera",
+	"render3d",
+	"viewhitboxes",
+	"viewanimationnumbers",
+	"pcversion",
+	"hideandroidbuttons",
+	"androidversion",
+	"debugGraphs",
+	"console",
+	"noexitconfirmation",
+	"persistenteditortools",
+	"persistenteditortoolslocal",
+	"dpifix",
+	"noeditorpreviews",
+	"displayhiddenenemiesinspawner",
+	"completelycenteredcamera",
+	"modernmultiplayercamera",
+	"splitscreenmultiplayer",
+	"horizontalsplitscreenviewports",
+	"hurrymode",
+	"hurrymodeskipfanfare",
+	"disabletransitions",
+	"infinitefireballs",
+	"rapidfire"
+}
+
+function generatenitpicksfile()
+	local path = "alesans_entities/nitpicks.json"
+	local existed = love.filesystem.getInfo(path) ~= nil
+	local t = {}
+	local edited = false
+
+	if existed then
+		local data = love.filesystem.read(path)
+		local decoded = JSON:decode(data or "")
+		if type(decoded) == "table" then
+			for k, v in pairs(decoded) do
+				t[tostring(k):lower()] = v
+			end
+		end
+	else
+		edited = true
+	end
+
+	for _, key in ipairs(nitpickkeys) do
+		local lowerkey = key:lower()
+		if t[lowerkey] == nil then
+			t[lowerkey] = false
+			edited = true
+		end
+	end
+
+	if not existed or edited then
+		local out = {}
+		for _, key in ipairs(nitpickkeys) do
+			out[key] = t[key:lower()]
+		end
+		love.filesystem.write(path, JSON:encode_pretty(out))
+	end
+
+	if not existed then
+		notice.new("nitpicks file created!")
+	elseif edited then
+		notice.new("nitpicks file fixed!")
+	else
+		notice.new("nitpicks file already exists!")
 	end
 end
 
@@ -2345,31 +2444,31 @@ function menu_draw()
 			end
 			properprintF(TEXT["volume:"], 30*scale, 110*scale)
 			
-			if optionsselection == 10 then
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			
-			properprintF(TEXT["vsync:"], 30*scale, 165*scale)
-			
 			if optionsselection == 11 then
 				love.graphics.setColor(255, 255, 255, 255)
 			else
 				love.graphics.setColor(100, 100, 100, 255)
 			end
 			
-			properprintF(TEXT["mappack folder:"], 30*scale, 178*scale)
+			properprintF(TEXT["vsync:"], 30*scale, 178*scale)
+			
+			if optionsselection == 12 then
+				love.graphics.setColor(255, 255, 255, 255)
+			else
+				love.graphics.setColor(100, 100, 100, 255)
+			end
+			
+			properprintF(TEXT["mappack folder:"], 30*scale, 191*scale)
 			
 			--love.graphics.setColor(100, 100, 100, 255)
 			--properprintF(TEXT["lock mouse with f12"], 30*scale, 195*scale)
 			
 			love.graphics.setColor(255, 255, 255, 255)
-			properprintF("alesan99's entities", 30*scale, 198*scale)
+			properprintF("alesan99's entities", 30*scale, 211*scale)
 			local version = "Version " .. VERSIONSTRING
-			properprintF(version, (234-(#(version)*8))*scale, 207*scale)
+			properprintF(version, (234-(#(version)*8))*scale, 220*scale)
 			
-			--widgets (scale, letterbox, shaders, language, resets, vsync, mappack folder)
+			--widgets (scale, letterbox, shaders, language, nitpicks, resets, vsync, mappack folder)
 			optionsmisc_draw()
 		elseif optionstab == 4 then
 			love.graphics.setColor(255, 255, 255, 255)
@@ -3303,7 +3402,7 @@ function menu_keypressed(key, unicode)
 					optionsselection = 1
 				end
 			elseif optionstab == 3 then
-				if optionsselection < 11 then
+				if optionsselection < 12 then
 					optionsselection = optionsselection + 1
 				else
 					optionsselection = 1
@@ -3333,7 +3432,7 @@ function menu_keypressed(key, unicode)
 					end
 					optionsselection = limit
 				elseif optionstab == 3 then
-					optionsselection = 11
+					optionsselection = 12
 				elseif optionstab == 4 and gamefinished then
 					optionsselection = 11
 				end
@@ -3399,11 +3498,11 @@ function menu_keypressed(key, unicode)
 					
 				elseif optionsselection == 6 then
 					volumeslider_step(guielements["opt_volume"], 0.1)
-				elseif optionsselection == 10 then
+				elseif optionsselection == 11 then
 					vsync = not vsync
 					changescale(scale)
 					saveconfig()
-				elseif optionsselection == 11 then
+				elseif optionsselection == 12 then
 					if mappackfolder == "mappacks" then
 						mappackfolder = "alesans_entities/mappacks"
 						savesfolder = "alesans_entities/saves"
@@ -3532,11 +3631,11 @@ function menu_keypressed(key, unicode)
 					
 				elseif optionsselection == 6 then
 					volumeslider_step(guielements["opt_volume"], -0.1)
-				elseif optionsselection == 10 then
+				elseif optionsselection == 11 then
 					vsync = not vsync
 					changescale(scale)
 					saveconfig()
-				elseif optionsselection == 11 then
+				elseif optionsselection == 12 then
 					if mappackfolder == "alesans_entities/mappacks" then
 						mappackfolder = "mappacks"
 						savesfolder = "saves"
