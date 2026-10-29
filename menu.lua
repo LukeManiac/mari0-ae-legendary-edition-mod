@@ -2,7 +2,9 @@ local languagemenuopen = false
 local resetwarningopen = false
 local resetwarningcursor = 2
 local resetwarningstage = 1 --1 = first warning, 2 = second "are you really sure?" warning
-local resettexthovertime = 0 --seconds the "reset" option of the warning popup has been hovered, drives its shake
+local resettexthovertime = 0 --seconds the "reset" option of the warning popup has been hovered, drives its shake (decays when not hovered)
+local RESET_SHAKE_MAX_TIME = 4/0.75 --hover time at which the shake reaches its 4 pixel cap
+local RESET_SHAKE_DECAY = 1.5 --how many times slower than it builds up the shake fades out
 local menu_updatemouseselection
 
 local previousmappackfolder
@@ -647,6 +649,7 @@ end
 local function resetwarning_open()
 	resetwarningcursor = 2 --"go back" is selected first
 	resetwarningstage = 1
+	resettexthovertime = 0
 	setmenupopupvisible("resetwarning", true)
 
 	--the widgets behind the popup stop right away, optionsmisc_update keeps them that way
@@ -664,6 +667,7 @@ local function resetwarning_confirm(reset)
 		--warning confirmed, ask again before actually resetting (3 warnings in total)
 		resetwarningstage = resetwarningstage + 1
 		resetwarningcursor = 2 --"go back" is selected first
+		resettexthovertime = 0 --each warning starts calm
 		if resetwarningstage == 3 then
 			playsound(lowtimesound) --the final warning pops up
 		end
@@ -771,6 +775,9 @@ local function resetwarning_draw()
 	properprintF(line2, (130-(utf8.len(line2)*4))*scale, 110*scale)
 
 	local resetx, resetwidth, backx, backwidth = resetwarning_layout()
+	local shakerange = math.min(resettexthovertime * 0.75, 4) --capped at 4 pixels
+	local shakex = (math.random()*2-1)*shakerange
+	local shakey = (math.random()*2-1)*shakerange
 	if resetwarningcursor == 1 then
 		love.graphics.setColor(255, 255, 255, alpha)
 		properprintF(">", (resetx-10)*scale, 130*scale)
@@ -781,9 +788,6 @@ local function resetwarning_draw()
 		elseif resetwarningstage == 3 then
 			love.graphics.setColor(255, 0, 0, alpha)
 		end
-		local shakerange = math.min(resettexthovertime * 0.75, 4) --capped at 4 pixels
-		local shakex = (math.random()*2-1)*shakerange
-		local shakey = (math.random()*2-1)*shakerange
 
 		properprintF(TEXT["reset"], (resetx+shakex)*scale, (130+shakey)*scale)
 		love.graphics.setColor(100, 100, 100, alpha)
@@ -1225,9 +1229,10 @@ end
 function menu_update(dt)
 	--"reset" text shake: the longer it is hovered in the warning popup, the harder it shakes
 	if gamestate == "options" and resetwarningopen and resetwarningcursor == 1 then
-		resettexthovertime = resettexthovertime + dt
+		resettexthovertime = math.min(resettexthovertime + dt, RESET_SHAKE_MAX_TIME)
 	else
-		resettexthovertime = 0
+		--moving the cursor away slowly calms the shake down instead of stopping it at once
+		resettexthovertime = math.max(resettexthovertime - dt/RESET_SHAKE_DECAY, 0)
 	end
 
 	--coinanimation
