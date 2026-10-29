@@ -325,8 +325,15 @@ end
 
 --every viewport is drawn onto its own canvas, so scissors/stencils used while drawing the level can't leak into other viewports
 function splitscreen_beginview(split, view)
-	local renderscale = scale
+	local renderscale = math.max(scale/2, 1)
 	local upscale = 1
+	-- same aspect as the game window: downscale by `scale`, do not scale back up
+	local gameaspect = (width * 16) / (height * 16)
+	local viewaspect = view.w / view.h
+	if math.abs(viewaspect - gameaspect) < 0.001 then
+		renderscale = 1
+		upscale = 1
+	end
 	local cw, ch = math.floor(view.w*renderscale), math.floor(view.h*renderscale)
 	local sc = splitscreencanvases[split]
 	if (not sc) or sc.w ~= cw or sc.h ~= ch then
