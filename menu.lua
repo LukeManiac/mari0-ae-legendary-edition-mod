@@ -2464,9 +2464,9 @@ function menu_draw()
 			--properprintF(TEXT["lock mouse with f12"], 30*scale, 195*scale)
 			
 			love.graphics.setColor(255, 255, 255, 255)
-			properprintF("alesan99's entities", 30*scale, 211*scale)
+			properprintF("alesan99's entities", 30*scale, 201*scale)
 			local version = "Version " .. VERSIONSTRING
-			properprintF(version, (234-(#(version)*8))*scale, 220*scale)
+			properprintF(version, (234-(#(version)*8))*scale, 211*scale)
 			
 			--widgets (scale, letterbox, shaders, language, nitpicks, resets, vsync, mappack folder)
 			optionsmisc_draw()
