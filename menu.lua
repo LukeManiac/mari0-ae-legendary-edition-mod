@@ -2444,6 +2444,14 @@ function menu_draw()
 			end
 			properprintF(TEXT["volume:"], 30*scale, 110*scale)
 			
+			if optionsselection == 10 then
+				love.graphics.setColor(255, 255, 255, 255)
+			else
+				love.graphics.setColor(100, 100, 100, 255)
+			end
+			
+			properprintF(TEXT["mappack folder:"], 30*scale, 168*scale)
+			
 			if optionsselection == 11 then
 				love.graphics.setColor(255, 255, 255, 255)
 			else
