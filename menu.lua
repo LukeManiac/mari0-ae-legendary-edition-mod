@@ -725,7 +725,7 @@ local function optionsmisc_create()
 		start = 1
 	end
 
-	guielements["opt_mappackfolder"] = guielement:new("dropdown", 30, 190, 17, function(i)
+	guielements["opt_mappackfolder"] = guielement:new("dropdown", 30, 192, 17, function(i)
 		local option = guielements["opt_mappackfolder"].entries[i]
 		if option == "mappacks" then
 			mappackfolder = "mappacks"
@@ -2444,14 +2444,6 @@ function menu_draw()
 			end
 			properprintF(TEXT["volume:"], 30*scale, 110*scale)
 			
-			if optionsselection == 10 then
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			
-			properprintF(TEXT["mappack folder:"], 30*scale, 168*scale)
-			
 			if optionsselection == 11 then
 				love.graphics.setColor(255, 255, 255, 255)
 			else
@@ -2466,7 +2458,7 @@ function menu_draw()
 				love.graphics.setColor(100, 100, 100, 255)
 			end
 			
-			properprintF(TEXT["mappack folder:"], 30*scale, 191*scale)
+			properprintF(TEXT["mappack folder:"], 30*scale, 182*scale)
 			
 			--love.graphics.setColor(100, 100, 100, 255)
 			--properprintF(TEXT["lock mouse with f12"], 30*scale, 195*scale)
