@@ -209,6 +209,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Fixed music getting stuck on a paused intro after quitting to the menu. The next song now plays without needing to pause the game.
 * Fixed the minimap toggle so opening and closing the minimap animates its visibility without incorrectly animating the editor panel.
 * Fixed an issue where the rightclick menu was unable to interact with.
+* Fixed the rising water graphic glitch.
 * Fixed a confusing mechanic where autodelete-able enemies would instantly vanish when a player died in multiplayer splitscreen.
 
 ### ✨ Improvements
@@ -216,7 +217,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Moved **Pause** into the always-visible controls list. **Aim X**, **Aim Y**, **Portal 1**, and **Portal 2** remain available when the selected player does not use the mouse.
 * In splitscreen multiplayer, player coordinate labels appear only in that player's viewport.
 * Running into a horizontal autoscroll border sets your speedx to 0 if you're grounded.
-* As soon as you enter the water, your animation frame and progress resets.
+* As soon as you enter the water or fall while underwater, your animation frame and progress resets.
 * Underwater checking is executed per frame even when you are climbing on a vine or fence.
 
 ### ❌ Removals
