@@ -685,24 +685,24 @@ local function optionsmisc_create()
 	end
 
 	--Change Language
-	guielements["opt_language"] = guielement:new("button", 30, 124, TEXT["change language"], function()
+	guielements["opt_language"] = guielement:new("button", 30, 120, TEXT["change language"], function()
 		languagemenuopen = true
 		languagemenu_open()
 	end)
 
 	--Generate Nitpicks File
-	guielements["opt_nitpicks"] = guielement:new("button", 30, 137, "generate nitpicks file", function()
+	guielements["opt_nitpicks"] = guielement:new("button", 30, 134, "generate nitpicks file", function()
 		generatenitpicksfile()
 	end)
 
 	--Reset Included Maps
-	guielements["opt_resetmaps"] = guielement:new("button", 30, 150, TEXT["reset included maps"], function()
+	guielements["opt_resetmaps"] = guielement:new("button", 30, 147, TEXT["reset included maps"], function()
 		reset_mappacks()
 	end)
 	guielements["opt_resetmaps"].textcolor = {255, 0, 0}
 
 	--Reset All Settings
-	guielements["opt_resetall"] = guielement:new("button", 30, 163, TEXT["reset all settings"], function()
+	guielements["opt_resetall"] = guielement:new("button", 30, 160, TEXT["reset all settings"], function()
 		resetconfig()
 	end)
 	guielements["opt_resetall"].textcolor = {255, 0, 0}
@@ -711,7 +711,7 @@ local function optionsmisc_create()
 	guielements["opt_volume"] = volumeslider_new(90, 109, right-90)
 
 	--VSync
-	guielements["opt_vsync"] = guielement:new("checkbox", right-9, 177, function(v)
+	guielements["opt_vsync"] = guielement:new("checkbox", right-9, 174, function(v)
 		vsync = v
 		guielements["opt_vsync"].var = v
 		changescale(scale)
@@ -725,7 +725,7 @@ local function optionsmisc_create()
 		start = 1
 	end
 
-	guielements["opt_mappackfolder"] = guielement:new("dropdown", 30, 192, 17, function(i)
+	guielements["opt_mappackfolder"] = guielement:new("dropdown", 30, 189, 17, function(i)
 		local option = guielements["opt_mappackfolder"].entries[i]
 		if option == "mappacks" then
 			mappackfolder = "mappacks"
