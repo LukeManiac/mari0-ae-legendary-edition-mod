@@ -3363,6 +3363,7 @@ function loadnitpicks()
 		GOTTAGOFASTINSTANT = t.hurrymodeskipfanfare
 		NoTransitions = t.disabletransitions
 		INFINITEFIREBALLS = t.infinitefireballs
+		SMWSwimming = t.smwwaterphysics
 	end
 end
 
