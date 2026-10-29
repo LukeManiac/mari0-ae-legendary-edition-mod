@@ -2158,6 +2158,10 @@ function mario:update(dt)
 			end
 		end
 		
+		if HAHARAPIDFIREGOBRRR and self.controlsenabled then
+			self:rapidfire()
+		end
+		
 		self:setquad()
 		return
 	end
@@ -2513,13 +2517,7 @@ function mario:update(dt)
 
 		--rapidfire nitpick: hold firing button to call fire every frame
 		if HAHARAPIDFIREGOBRRR then
-			if runkeyheld then
-				self:button("run")
-				self:fire()
-			end
-			if usekey(self.playernumber) then
-				self:button("use")
-			end
+			self:rapidfire()
 		end
 		
 		if self.size == 9 then --tanooki statue
@@ -7831,6 +7829,7 @@ function mario:pipe(x, y, dir, i)--, warppipe)
 	self.animation = "pipe" .. dir
 	self.animationstate = (dir == "left" or dir == "right") and "running" or "idle"
 	self.fireanimationtimer = fireanimationtime
+	self.spinanimationtimer = raccoonspintime
 	self.jumping = false
 	self.falling = false
 	self.invincible = false
@@ -8062,6 +8061,7 @@ function mario:door(x, y, i)
 	self.animation = "door"
 	self.animationstate = "idle"
 	self.fireanimationtimer = fireanimationtime
+	self.spinanimationtimer = raccoonspintime
 	self:setquad()
 	self.invincible = false
 	self.drawable = true
@@ -8217,6 +8217,7 @@ function mario:axe()
 	self.static = false
 	self.animation = "axe"
 	self.fireanimationtimer = fireanimationtime
+	self.spinanimationtimer = raccoonspintime
 	self.invincible = true--false
 	self.drawable = true
 	self.animationx = axex
@@ -8303,6 +8304,8 @@ function mario:vineanimation()
 	self.animationx = self.x
 	self.animationy = vineanimationstart
 	self.animationmisc = map[self.vinex][self.viney][3]
+	self.fireanimationtimer = fireanimationtime
+	self.spinanimationtimer = raccoonspintime
 	self.active = false
 	self.vine = false
 end
@@ -8327,6 +8330,18 @@ local function gettable(v, i)
 		return v[i]
 	else
 		return v
+	end
+end
+
+function mario:rapidfire()
+	local buttons = {"run", "use", "reload", "jump", "left", "right", "up", "down"}
+	for i, b in ipairs(buttons) do
+		if keydown(b, self.playernumber) then
+			self:button(b)
+			if b == "run" then
+				self:fire()
+			end
+		end
 	end
 end
 
