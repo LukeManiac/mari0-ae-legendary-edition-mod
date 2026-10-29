@@ -184,7 +184,6 @@ effect.
 `horizontalsplitscreenviewports`: Uses a top-and-bottom layout for two-player splitscreen.
 `hurrymode`: Plays the low-time music cue when the timer reaches its threshold.
 `hurrymodeskipfanfare`: Skips the low-time sound cue and uses fast music at 99 instead of waiting until the timer drops below 99. Requires `hurrymode`.
-`freezefade`: Pauses gameplay updates during fade and vignette transitions, except for designated logic objects and linked objects.
 `disabletransitions`: Skips fade and vignette transitions.
 `infinitefireballs`: Removes the limit on how many fireballs, hammers, superballs, iceballs, boomerangs, and custom powerup projectiles the player can have active.
 
@@ -208,11 +207,17 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Fixed keyboard navigation in the controls menu so the Pause binding is reachable when moving through controls with mouse aiming on or off.
 * Fixed music getting stuck on a paused intro after quitting to the menu. The next song now plays without needing to pause the game.
 * Fixed the minimap toggle so opening and closing the minimap animates its visibility without incorrectly animating the editor panel.
+* Fixed an issue where the rightclick menu was unable to interact with.
 
 ### ✨ Improvements
 
 * Moved **Pause** into the always-visible controls list. **Aim X**, **Aim Y**, **Portal 1**, and **Portal 2** remain available when the selected player does not use the mouse.
 * In splitscreen multiplayer, player coordinate labels appear only in that player's viewport.
+* Running into a horizontal autoscroll border sets your speedx to 0 if you're grounded.
+
+### ❌ Removals
+
+* Removed `freezefade` nitpick as there were too many bugs.
 
 **Note:** The four-keybind system remains compatible with original Mari0 AE save data and does not negatively affect it.
 
