@@ -57,6 +57,7 @@
 		"unsupported": "unsupported",
 		"shaders will really\nreduce performance!": "shaders will really\nreduce performance!",
 		"volume:": "volume:",
+		"generate nitpicks file": "generate nitpicks file",
 		"reset included maps": "reset included maps",
 		"reset all settings": "reset all settings",
 		"vsync:": "vsync:",

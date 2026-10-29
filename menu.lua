@@ -691,7 +691,7 @@ local function optionsmisc_create()
 	end)
 
 	--Generate Nitpicks File
-	guielements["opt_nitpicks"] = guielement:new("button", 30, 134, "generate nitpicks file", function()
+	guielements["opt_nitpicks"] = guielement:new("button", 30, 134, TEXT["generate nitpicks file"], function()
 		generatenitpicksfile()
 	end)
 
