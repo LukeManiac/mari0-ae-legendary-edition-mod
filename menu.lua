@@ -1227,7 +1227,7 @@ function menu_update(dt)
 	if gamestate == "options" and resetwarningopen and resetwarningcursor == 1 then
 		resettexthovertime = resettexthovertime + dt
 	else
-		resettexthovertime = math.min(resettexthovertime - dt, 1)
+		resettexthovertime = 0
 	end
 
 	--coinanimation
