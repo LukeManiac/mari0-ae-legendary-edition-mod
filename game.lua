@@ -914,7 +914,29 @@ function game_update(dt)
 					if not delete then delete = {} end
 					table.insert(delete, j)
 				elseif w.autodelete then
-					if (((w.x < xscroll - width) or (w.x > xscroll + width*4)) and not w.horautodeleteimmunity) or w.y > mapheight+1 or math.abs(w.y-yscroll) > height*5 then
+					local shoulddelete = true
+					if splitscreenactive() then
+						-- keep the object alive if it is still near any viewport (including a dead player's frozen camera)
+						local views = getsplitscreenviewscached()
+						if views then
+							for si = 1, #views do
+								local cx, cy = splitcamx[si], splitcamy[si]
+								if cx and cy then
+									local outx = ((w.x < cx - width) or (w.x > cx + width*4)) and not w.horautodeleteimmunity
+									local outy = w.y > mapheight+1 or math.abs(w.y - cy) > height*5
+									if not (outx or outy) then
+										shoulddelete = false
+										break
+									end
+								end
+							end
+						end
+					else
+						if not ((((w.x < xscroll - width) or (w.x > xscroll + width*4)) and not w.horautodeleteimmunity) or w.y > mapheight+1 or math.abs(w.y-yscroll) > height*5) then
+							shoulddelete = false
+						end
+					end
+					if shoulddelete then
 						w.delete = true
 						if w.autodeleted then
 							w:autodeleted()

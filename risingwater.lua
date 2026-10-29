@@ -290,22 +290,8 @@ function risingwater:update(dt)
 
 	--update water
 	self:updatefill()
-
-	if self.spritebatch and onscreenobj(self) then
-		self.spritebatch:clear()
-		for x = 1, math.ceil(self.width) do
-			for y = 1, math.ceil(self.height) do
-				if onscreen(self.x+(x-1), self.y+(y-1), 1, 1) then
-					local framei = 2
-					if y == 1 then
-						framei = 1
-					end
-					self.spritebatch:add(risingwaterquad[spriteset][self.quadi][framei][self.frame], math.floor((self.x+(x-1)-xscroll)*16*scale), math.floor(((self.y+(y-1)-yscroll)*16-8)*scale), 0, scale, scale)
-				end
-			end
-		end
-		self.spritebatchupdated = true
-	end
+	-- spritebatch is rebuilt in draw() so it always uses the current viewport's xscroll/yscroll
+	-- (required for splitscreen, where each viewport has its own camera)
 end
 
 function risingwater:draw()
@@ -315,23 +301,47 @@ function risingwater:draw()
 	love.graphics.setColor(0, 0, 255, 150)
 	love.graphics.rectangle("fill", (((self.x)*16)-xscroll*16)*scale, ((self.y-(8/16)-yscroll)*16)*scale, (self.width*16)*scale, (self.height*16)*scale)
 	love.graphics.setColor(255, 255, 255, 255)]]
-	if not onscreenobj(self) then
+	-- check against the *current* viewport camera only (xscroll/yscroll already set by the splitscreen draw loop)
+	if not (self.x + self.width >= xscroll and self.y + self.height -.5 >= yscroll and self.x <= xscroll + width*screenzoom2 and self.y -.5 <= yscroll + height*(1/screenzoom)) then
 		return false
 	end
 
 	love.graphics.setColor(255, 255, 255, 255)
-	love.graphics.setScissor(math.floor((((self.x)*16)-xscroll*16)*scale), math.floor(((self.y-(8/16)-yscroll)*16)*scale), math.ceil((self.width*16)*scale), math.ceil((self.height*16)*scale))
-	if self.spritebatch and self.spritebatchupdated then
-		love.graphics.draw(self.spritebatch)
-	else
+	local scx = math.floor((((self.x)*16)-xscroll*16)*scale)
+	local scy = math.floor(((self.y-(8/16)-yscroll)*16)*scale)
+	local scw = math.ceil((self.width*16)*scale)
+	local sch = math.ceil((self.height*16)*scale)
+	-- clamp scissor so it never goes negative or past the current canvas (fixes accidental clipping in splitscreen viewports)
+	if scx < 0 then scw = scw + scx; scx = 0 end
+	if scy < 0 then sch = sch + scy; scy = 0 end
+	if scw > 0 and sch > 0 then
+		love.graphics.setScissor(scx, scy, scw, sch)
+	end
+	if self.spritebatch then
+		self.spritebatch:clear()
 		for x = 1, math.ceil(self.width) do
 			for y = 1, math.ceil(self.height) do
-				if onscreen(self.x+(x-1), self.y+(y-1), 1, 1) then
+				local tx, ty = self.x+(x-1), self.y+(y-1)
+				if tx + 1 >= xscroll and ty + 1 -.5 >= yscroll and tx <= xscroll + width*screenzoom2 and ty -.5 <= yscroll + height*(1/screenzoom) then
 					local framei = 2
 					if y == 1 then
 						framei = 1
 					end
-					love.graphics.draw(risingwaterimg, risingwaterquad[spriteset][self.quadi][framei][self.frame], math.floor((self.x+(x-1)-xscroll)*16*scale), math.floor(((self.y+(y-1)-yscroll)*16-8)*scale), 0, scale, scale)
+					self.spritebatch:add(risingwaterquad[spriteset][self.quadi][framei][self.frame], math.floor((tx-xscroll)*16*scale), math.floor(((ty-yscroll)*16-8)*scale), 0, scale, scale)
+				end
+			end
+		end
+		love.graphics.draw(self.spritebatch)
+	else
+		for x = 1, math.ceil(self.width) do
+			for y = 1, math.ceil(self.height) do
+				local tx, ty = self.x+(x-1), self.y+(y-1)
+				if tx + 1 >= xscroll and ty + 1 -.5 >= yscroll and tx <= xscroll + width*screenzoom2 and ty -.5 <= yscroll + height*(1/screenzoom) then
+					local framei = 2
+					if y == 1 then
+						framei = 1
+					end
+					love.graphics.draw(risingwaterimg, risingwaterquad[spriteset][self.quadi][framei][self.frame], math.floor((tx-xscroll)*16*scale), math.floor(((ty-yscroll)*16-8)*scale), 0, scale, scale)
 				end
 			end
 		end
