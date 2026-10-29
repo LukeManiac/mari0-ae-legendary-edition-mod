@@ -7269,6 +7269,7 @@ function mario:startfall()
 		if self.water then
 			self.swimanimationprogress = 1
 			self.swimframe = 1
+			self.swimpush = false
 		end
 		self:setquad()
 	end
@@ -8977,6 +8978,7 @@ function mario:dive(water)
 		if self.jumping or self.falling then
 			self.swimanimationprogress = 1
 			self.swimframe = 1
+			self.swimpush = false
 		end
 
 		if self.capefly then
