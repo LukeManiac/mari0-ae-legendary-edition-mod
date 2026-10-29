@@ -676,6 +676,7 @@ local function resetwarning_confirm(reset)
 		playsound(gameoversound)
 	else
 		playsound(oneupsound)
+		lowtimesound:stop()
 	end
 
 	--closing after the reset, so the loading time does not eat the fade out
@@ -724,6 +725,7 @@ local function resetwarning_keypressed(key)
 		resetwarning_confirm(resetwarningcursor == 1)
 	elseif key == "escape" then
 		playsound(oneupsound)
+		lowtimesound:stop()
 		setmenupopupvisible("resetwarning", false)
 	end
 end
