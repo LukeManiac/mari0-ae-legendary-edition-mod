@@ -5787,36 +5787,22 @@ function editor_mousepressed(x, y, button)
 		if button == "wu" then tilescrollingver = true end
 		if editormenuopen or rightclickmenuopen then
 		else
-			if EditorZoom and ctrlpressed then
-				local dy = 1
-				local r1, r2 = love.mouse.getX()/(width*16*scale), love.mouse.getY()/(height*16*scale)
-				local zoom1 = screenzoom
-				local centerx, centery = xscroll+(width*(1/screenzoom))*r1, yscroll+(height*(1/screenzoom))*r2
-				setscreenzoom(math.min(1,math.max(0.05, screenzoom + (screenzoom/(dy*5)))))
-				if zoom1 ~= screenzoom then
-					xscroll = centerx - (width*(1/screenzoom))*r1
-					yscroll = centery - (height*(1/screenzoom))*r2
-					splitxscroll[1] = xscroll
-					splityscroll[1] = yscroll
-				end
-				autoscroll = false
-				return
-			elseif editentities then
-					local dobreak = false
-					for formi, form in pairs(entitiesform) do
-						for count = 1, #form do
-							ti = form[count]
-							if currenttile == ti then
-								local ti = math.max(count-1, 1)
-								currenttile = form[ti]
-								editortilemousescroll = {form[ti-1] or 0, form[ti-2] or 0, form[ti+1] or 0, form[ti+2] or 0}
-								editortilemousescrolltimer = 0
-								dobreak = true
-								break
-							end
+			if editentities then
+				local dobreak = false
+				for formi, form in pairs(entitiesform) do
+					for count = 1, #form do
+						ti = form[count]
+						if currenttile == ti then
+							local ti = math.max(count-1, 1)
+							currenttile = form[ti]
+							editortilemousescroll = {form[ti-1] or 0, form[ti-2] or 0, form[ti+1] or 0, form[ti+2] or 0}
+							editortilemousescrolltimer = 0
+							dobreak = true
+							break
 						end
-						if dobreak then break end
 					end
+					if dobreak then break end
+				end
 			else
 				if tonumber(currenttile) and currenttile > 1 then
 					if currenttile ~= 90001 then
@@ -5834,21 +5820,7 @@ function editor_mousepressed(x, y, button)
 		if button == "wd" then tilescrollingver = true end
 		if editormenuopen or rightclickmenuopen then
 		else
-			if EditorZoom and ctrlpressed then
-				local dy = -1
-				local r1, r2 = love.mouse.getX()/(width*16*scale), love.mouse.getY()/(height*16*scale)
-				local zoom1 = screenzoom
-				local centerx, centery = xscroll+(width*(1/screenzoom))*r1, yscroll+(height*(1/screenzoom))*r2
-				setscreenzoom(math.min(1,math.max(0.05, screenzoom + (screenzoom/(dy*5)))))
-				if zoom1 ~= screenzoom then
-					xscroll = centerx - (width*(1/screenzoom))*r1
-					yscroll = centery - (height*(1/screenzoom))*r2
-					splitxscroll[1] = xscroll
-					splityscroll[1] = yscroll
-				end
-				autoscroll = false
-				return
-			elseif editentities then
+			if editentities then
 				local dobreak = false
 				for formi, form in pairs(entitiesform) do
 					for count = 1, #form do

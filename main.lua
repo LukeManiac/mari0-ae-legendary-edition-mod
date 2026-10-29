@@ -3323,7 +3323,6 @@ function loadnitpicks()
 		NoMusic = t.nomusic
 		AlwaysInfiniteTime = t.alwaysinfinitetime
 		AlwaysInfiniteLives = t.alwaysinfinitelives
-		EditorZoom = t.editorzoom
 		CenterCamera = t.centercamera
 		_3DMODE = t.render3d
 		HITBOXDEBUG = t.viewhitboxes

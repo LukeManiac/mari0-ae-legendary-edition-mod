@@ -136,56 +136,54 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use `true` to enable them. Settings assigned directly from the JSON keep their supplied value; an omitted setting is `nil`. `letterbox` is applied whenever its key exists, including when set to `false`. `dpifix` accepts `true` (use a scale factor of 2) or a number (use that scale factor). `androidversion` is copied into the Android setting when truthy. `persistenteditortools` is enabled by default when the file exists, and only the explicit value `false` disables it. The key `debugGraphs` uses that exact capitalisation.
 
-`dropshadow`: Forces drop shadows in loaded mappacks, outside the editor. Alias for `forcedropshadow`.
-`forcedropshadow`: Forces drop shadows in loaded mappacks, outside the editor. Alias for `dropshadow`.
-`assistmode`: Set the editor's initial Assist Mode value when Assist Mode has not already been initialised.
-`playmusicineditor`: Allows music to play in the editor.
-`disabletooltips`: Suppresses editor tooltips.
-`disablemouseinmainmenu`: Stops mouse movement from changing the main-menu selection; keyboard and joystick navigation remain available.
-`noportalgun`: Selects the classic player type.
-`mariomakergravity`: Uses the Super Mario Bros. maximum vertical speed.
-`dontpauseonunfocus`: Prevents the game from pausing when another window takes focus from it.
-`firebuttoncannonhelmet`: Fires the cannon helmet with the fire button instead of its automatic firing behaviour.
-`pipesineditor`: Loads pipe entities while editing a level.
-`noonlinemultiplayernames`: Hides online multiplayer names.
-`letterbox`: Set `letterboxfullscreen` to the supplied value, either `true` or `false`, when this key exists.
-`customportalcolors`: Uses the configured portal colours in single-player.
-`usebuttoncappy`: Triggers Cappy with the use button rather than the run button.
-`showplayercoords`: Displays each visible player's coordinates during gameplay.
-`alwaysnocustomenemybg`: Removes the background fill behind custom enemies.
-`showtime`: Displays the device's current local time.
-`showbattery`: Displays battery status and charge, when available.
-`showfps`: Displays the FPS counter.
-`infinitelivesmultiplayer`: Gives infinite lives in local multiplayer when there is more than one player.
-`slowbackgrounds`: Draws custom backgrounds as repeated tiles instead of using the static-background optimisation.
-`nomusic`: Disables music.
-`alwaysinfinitetime`: Starts with infinite time enabled.
-`alwaysinfinitelives`: Starts with infinite lives enabled.
-`editorzoom`: Enables the editor's zoom controls.
-effect.
-`centercamera`: Selects the centred camera mode when loading a mappack outside the editor.
-`render3d`: Enables 3D rendering.
-`viewhitboxes`: Draws object hitboxes.
-`viewanimationnumbers`: Displays animation numbers.
-`pcversion`: Disables Android mode and enables Android-safe settings.
-`hideandroidbuttons`: Hides the Android on-screen buttons.
-`androidversion`: When truthy, set the Android mode value to the supplied value, enable Android testing mode, and update the display scale.
-`debugGraphs`: When truthy, set the debug-graph value to the supplied value and display the FPS, memory, performance, and draw graphs.
-`console`: Opens the LÖVE console.
-`noexitconfirmation`: Skips the editor's exit confirmation.
-`persistenteditortools`: Enabled by default when the nitpicks file exists; set to `false` to stop carrying editor tool settings between editor actions.
-`persistenteditortoolslocal`: Saves editor tool settings to the current mappack's `editorsave.json`.
-`dpifix`: Set to `true` to double window dimensions when calculating the window size, or set a number to use it as the scale factor. Applies to resizable windows.
-`noeditorpreviews`: Hides mappack preview images in the editor.
-`displayhiddenenemiesinspawner`: Shows hidden enemy types in the editor's enemy spawner.
-`completelycenteredcamera`: Keeps the camera rigidly centred on the furthest player.
-`modernmultiplayercamera`: Centres the camera on the players' average position, focuses on the furthest player if they all go off-screen, and interpolates camera movement.
-`splitscreenmultiplayer`: Enables splitscreen in local multiplayer.
-`horizontalsplitscreenviewports`: Uses a top-and-bottom layout for two-player splitscreen.
-`hurrymode`: Plays the low-time music cue when the timer reaches its threshold.
-`hurrymodeskipfanfare`: Skips the low-time sound cue and uses fast music at 99 instead of waiting until the timer drops below 99. Requires `hurrymode`.
-`disabletransitions`: Skips fade and vignette transitions.
-`infinitefireballs`: Removes the limit on how many fireballs, hammers, superballs, iceballs, boomerangs, and custom powerup projectiles the player can have active.
+- `dropshadow`: Forces drop shadows in loaded mappacks, outside the editor. Alias for `forcedropshadow`.
+- `forcedropshadow`: Forces drop shadows in loaded mappacks, outside the editor. Alias for `dropshadow`.
+- `assistmode`: Set the editor's initial Assist Mode value when Assist Mode has not already been initialised.
+- `playmusicineditor`: Allows music to play in the editor.
+- `disabletooltips`: Suppresses editor tooltips.
+- `disablemouseinmainmenu`: Stops mouse movement from changing the main-menu selection; keyboard and joystick navigation remain available.
+- `noportalgun`: Selects the classic player type.
+- `mariomakergravity`: Uses the Super Mario Bros. maximum vertical speed.
+- `dontpauseonunfocus`: Prevents the game from pausing when another window takes focus from it.
+- `firebuttoncannonhelmet`: Fires the cannon helmet with the fire button instead of its automatic firing behaviour.
+- `pipesineditor`: Loads pipe entities while editing a level.
+- `noonlinemultiplayernames`: Hides online multiplayer names.
+- `letterbox`: Set `letterboxfullscreen` to the supplied value, either `true` or `false`, when this key exists.
+- `customportalcolors`: Uses the configured portal colours in single-player.
+- `usebuttoncappy`: Triggers Cappy with the use button rather than the run button.
+- `showplayercoords`: Displays each visible player's coordinates during gameplay.
+- `alwaysnocustomenemybg`: Removes the background fill behind custom enemies.
+- `showtime`: Displays the device's current local time.
+- `showbattery`: Displays battery status and charge, when available.
+- `showfps`: Displays the FPS counter.
+- `infinitelivesmultiplayer`: Gives infinite lives in local multiplayer when there is more than one player.
+- `slowbackgrounds`: Draws custom backgrounds as repeated tiles instead of using the static-background optimisation.
+- `nomusic`: Disables music.
+- `alwaysinfinitetime`: Starts with infinite time enabled.
+- `alwaysinfinitelives`: Starts with infinite lives enabled.
+- `centercamera`: Selects the centered camera mode when loading a mappack outside the editor.
+- `render3d`: Enables 3D rendering.
+- `viewhitboxes`: Draws object hitboxes.
+- `viewanimationnumbers`: Displays animation numbers.
+- `pcversion`: Disables Android mode and enables Android-safe settings.
+- `hideandroidbuttons`: Hides the Android on-screen buttons.
+- `androidversion`: When truthy, set the Android mode value to the supplied value, enable Android testing mode, and update the display scale.
+- `debugGraphs`: When truthy, set the debug-graph value to the supplied value and display the FPS, memory, performance, and draw graphs.
+- `console`: Opens the LÖVE console.
+- `noexitconfirmation`: Skips the editor's exit confirmation.
+- `persistenteditortools`: Enabled by default when the nitpicks file exists; set to `false` to stop carrying editor tool settings between editor actions.
+- `persistenteditortoolslocal`: Saves editor tool settings to the current mappack's `editorsave.json`.
+- `dpifix`: Set to `true` to double window dimensions when calculating the window size, or set a number to use it as the scale factor. Applies to resizable windows.
+- `noeditorpreviews`: Hides mappack preview images in the editor.
+- `displayhiddenenemiesinspawner`: Shows hidden enemy types in the editor's enemy spawner.
+- `completelycenteredcamera`: Keeps the camera rigidly centered on the furthest player.
+- `modernmultiplayercamera`: Centres the camera on the players' average position, focuses on the furthest player if they all go off-screen, and interpolates camera movement.
+- `splitscreenmultiplayer`: Enables splitscreen in local multiplayer.
+- `horizontalsplitscreenviewports`: Uses a top-and-bottom layout for two-player splitscreen.
+- `hurrymode`: Plays the low-time music cue when the timer reaches its threshold.
+- `hurrymodeskipfanfare`: Skips the low-time sound cue and uses fast music at 99 instead of waiting until the timer drops below 99. Requires `hurrymode`.
+- `disabletransitions`: Skips fade and vignette transitions.
+- `infinitefireballs`: Removes the limit on how many fireballs, hammers, superballs, iceballs, boomerangs, and custom powerup projectiles the player can have active.
 
 ---
 
@@ -233,7 +231,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 
 * Level screens now fade to black before loading the next map.
 * Selecting a map in the editor now fades the full screen to black before loading.
-* Pipe entries without a matching exit marker now use a vignette transition centred on the player's spawn animation.
+* Pipe entries without a matching exit marker now use a vignette transition centered on the player's spawn animation.
 * Level music now resumes when fast star music ends.
 * Objects marked for instant deletion are removed immediately.
 * Enemies with `xrelativetocamera` and/or `yrelativetocamera` now stick perfectly to the camera each frame. Both their graphic and hitbox stay at the specified camera-relative position without lag.
