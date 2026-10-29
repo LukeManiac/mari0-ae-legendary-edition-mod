@@ -214,6 +214,8 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Moved **Pause** into the always-visible controls list. **Aim X**, **Aim Y**, **Portal 1**, and **Portal 2** remain available when the selected player does not use the mouse.
 * In splitscreen multiplayer, player coordinate labels appear only in that player's viewport.
 * Running into a horizontal autoscroll border sets your speedx to 0 if you're grounded.
+* As soon as you enter the water, your animation frame and progress resets.
+* Underwater checking is executed per frame even when you are climbing on a vine or fence.
 
 ### ❌ Removals
 
