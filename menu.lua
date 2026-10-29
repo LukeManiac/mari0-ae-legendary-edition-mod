@@ -781,25 +781,30 @@ local function resetwarning_draw()
 	if resetwarningcursor == 1 then
 		love.graphics.setColor(255, 255, 255, alpha)
 		properprintF(">", (resetx-10)*scale, 130*scale)
-		love.graphics.setColor(255, 80, 80, alpha)
 
+		local r, g, b = 255, 80, 80
 		if resetwarningstage == 2 then
-			love.graphics.setColor(255, 40, 40, alpha)
+			r, g, b = 255, 40, 40
 		elseif resetwarningstage == 3 then
-			love.graphics.setColor(255, 0, 0, alpha)
+			r, g, b = 255, 0, 0
 		end
 
-		properprintF(TEXT["reset"], (resetx+shakex)*scale, (130+shakey)*scale)
-		love.graphics.setColor(100, 100, 100, alpha)
-		properprintF(TEXT["go back"], backx*scale, 130*scale)
+		love.graphics.setColor(r, g, b, alpha)
 	else
 		love.graphics.setColor(255, 255, 255, alpha)
 		properprintF(">", (backx-10)*scale, 130*scale)
 		love.graphics.setColor(100, 100, 100, alpha)
-		properprintF(TEXT["reset"], resetx*scale, 130*scale)
-		love.graphics.setColor(255, 255, 255, alpha)
-		properprintF(TEXT["go back"], backx*scale, 130*scale)
 	end
+
+	properprintF(TEXT["reset"], (resetx+shakex)*scale, (130+shakey)*scale)
+
+	if resetwarningcursor == 1 then
+		love.graphics.setColor(100, 100, 100, alpha)
+	else
+		love.graphics.setColor(255, 255, 255, alpha)
+	end
+
+	properprintF(TEXT["go back"], backx*scale, 130*scale)
 
 	love.graphics.pop()
 	love.graphics.setColor(255, 255, 255, 255)
