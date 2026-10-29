@@ -1,6 +1,8 @@
 local languagemenuopen = false
 local resetwarningopen = false
 local resetwarningcursor = 2
+local resetwarningstage = 1 --1 = first warning, 2 = second "are you really sure?" warning
+local resetbuttonhovertime = 0 --seconds "reset all settings" has been hovered, drives the screen shake
 local menu_updatemouseselection
 
 local previousmappackfolder
@@ -644,6 +646,7 @@ end
 --"reset all settings" warning, animated like the other menu popups (see menupopupanimations)
 local function resetwarning_open()
 	resetwarningcursor = 2 --"go back" is selected first
+	resetwarningstage = 1
 	setmenupopupvisible("resetwarning", true)
 
 	--the widgets behind the popup stop right away, optionsmisc_update keeps them that way
@@ -657,8 +660,21 @@ local function resetwarning_open()
 end
 
 local function resetwarning_confirm(reset)
+	if reset and resetwarningstage < 3 then
+		--warning confirmed, ask again before actually resetting (3 warnings in total)
+		resetwarningstage = resetwarningstage + 1
+		resetwarningcursor = 2 --"go back" is selected first
+		if resetwarningstage == 3 then
+			playsound(lowtimesound) --the final warning pops up
+		end
+		return
+	end
+
 	if reset then
 		resetconfig()
+		playsound(gameoversound)
+	else
+		playsound(oneupsound)
 	end
 
 	--closing after the reset, so the loading time does not eat the fade out
@@ -706,6 +722,7 @@ local function resetwarning_keypressed(key)
 	elseif (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
 		resetwarning_confirm(resetwarningcursor == 1)
 	elseif key == "escape" then
+		playsound(oneupsound)
 		setmenupopupvisible("resetwarning", false)
 	end
 end
@@ -739,8 +756,14 @@ local function resetwarning_draw()
 	love.graphics.setLineWidth(scale)
 	love.graphics.rectangle("line", 20*scale, 92*scale, 220*scale, 60*scale, popupradius)
 	love.graphics.setLineWidth(previouslinewidth)
-	properprintF(TEXT["all settings and controls"], (130-(utf8.len(TEXT["all settings and controls"])*4))*scale, 100*scale)
-	properprintF(TEXT["will be reset to default!"], (130-(utf8.len(TEXT["will be reset to default!"])*4))*scale, 110*scale)
+	local line1 = TEXT["all settings and controls"]
+	local line2 = TEXT["will be reset to default!"]
+	if resetwarningstage == 2 then
+		line1 = TEXT["are you really sure?"]
+		line2 = TEXT["this cannot be undone!"]
+	end
+	properprintF(line1, (130-(utf8.len(line1)*4))*scale, 100*scale)
+	properprintF(line2, (130-(utf8.len(line2)*4))*scale, 110*scale)
 
 	local resetx, resetwidth, backx, backwidth = resetwarning_layout()
 	if resetwarningcursor == 1 then
@@ -1185,6 +1208,14 @@ function menu_load()
 end
 
 function menu_update(dt)
+	--screen shake: the longer "reset all settings" is hovered, the harder it shakes
+	local resetbutton = guielements["opt_resetall"]
+	if gamestate == "options" and optionstab == 3 and resetbutton and resetbutton:hovered() and not resetwarningopen and not languagemenuopen then
+		resetbuttonhovertime = resetbuttonhovertime + dt
+	else
+		resetbuttonhovertime = 0
+	end
+
 	--coinanimation
 	coinanimation = coinanimation + dt*6.75
 	while coinanimation >= 6 do
@@ -1459,6 +1490,12 @@ end
 function menu_draw()
 	--GUI LIBRARY?! Never heard of that.
 	--I'm not proud of this at all; But I'm even lazier than not proud.
+
+	--SCREEN SHAKE while hovering "reset all settings" (range grows with hover time, capped at 8 pixels)
+	if resetbuttonhovertime > 0 then
+		local shakerange = math.min(resetbuttonhovertime * 1.5, 8) * scale
+		love.graphics.translate((math.random()*2-1)*shakerange, (math.random()*2-1)*shakerange)
+	end
 
 	--TILES
 	love.graphics.translate(0, yoffset*scale)
