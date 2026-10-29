@@ -1,4 +1,6 @@
 local languagemenuopen = false
+local resetwarningopen = false
+local resetwarningcursor = 2
 local menu_updatemouseselection
 
 local previousmappackfolder
@@ -10,7 +12,8 @@ local keypromptpage = 1
 local menupopupduration = 0.25
 local menupopupanimations = {
 	newgamewarning = {from = 0, to = 0},
-	selectworld = {from = 0, to = 0}
+	selectworld = {from = 0, to = 0},
+	resetwarning = {from = 0, to = 0}
 }
 
 local function menupopupscale(name, now)
@@ -34,6 +37,8 @@ local function setmenupopupvisible(name, visible)
 	local currentlyvisible
 	if name == "newgamewarning" then
 		currentlyvisible = newgamewarning
+	elseif name == "resetwarning" then
+		currentlyvisible = resetwarningopen
 	else
 		currentlyvisible = selectworldopen
 	end
@@ -52,6 +57,8 @@ local function setmenupopupvisible(name, visible)
 
 	if name == "newgamewarning" then
 		newgamewarning = visible
+	elseif name == "resetwarning" then
+		resetwarningopen = visible
 	else
 		selectworldopen = visible
 	end
@@ -634,6 +641,128 @@ function volumeslider_new(x, y, range)
 	return slider
 end
 
+--"reset all settings" warning, animated like the other menu popups (see menupopupanimations)
+local function resetwarning_open()
+	resetwarningcursor = 2 --"go back" is selected first
+	setmenupopupvisible("resetwarning", true)
+
+	--the widgets behind the popup stop right away, optionsmisc_update keeps them that way
+	for i = 1, #optionsmiscgui do
+		local v = guielements[optionsmiscgui[i]]
+		if v then
+			v.active = false
+			v.nohover = true
+		end
+	end
+end
+
+local function resetwarning_confirm(reset)
+	if reset then
+		resetconfig()
+	end
+
+	--closing after the reset, so the loading time does not eat the fade out
+	setmenupopupvisible("resetwarning", false)
+end
+
+--x position and width of the two options, shared by drawing and mouse selection
+local function resetwarning_layout()
+	local resetlength = utf8.len(TEXT["reset"])
+	local backlength = utf8.len(TEXT["go back"])
+	local gap = 32
+	local resetx = 130 - ((resetlength + backlength)*8 + gap)/2
+	local backx = resetx + resetlength*8 + gap
+	return resetx, resetlength*8, backx, backlength*8
+end
+
+local function resetwarning_updatemouse(x, y)
+	x, y = x/scale, y/scale
+	local resetx, resetwidth, backx, backwidth = resetwarning_layout()
+	if y > 128 and y < 140 then
+		if x > resetx - 2 and x < resetx + resetwidth + 2 then
+			resetwarningcursor = 1
+			return true
+		elseif x > backx - 2 and x < backx + backwidth + 2 then
+			resetwarningcursor = 2
+			return true
+		end
+	end
+	return false
+end
+
+local function resetwarning_mousepressed(x, y, button)
+	ignoregui = true --the widgets behind the popup must not get this click
+
+	if button == "l" and resetwarning_updatemouse(x, y) then
+		resetwarning_confirm(resetwarningcursor == 1)
+	end
+end
+
+local function resetwarning_keypressed(key)
+	if (key == "left" or key == "a") then
+		resetwarningcursor = 1
+	elseif (key == "right" or key == "d") then
+		resetwarningcursor = 2
+	elseif (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
+		resetwarning_confirm(resetwarningcursor == 1)
+	elseif key == "escape" then
+		setmenupopupvisible("resetwarning", false)
+	end
+end
+
+local function resetwarning_draw()
+	if gamestate ~= "options" then
+		return
+	end
+
+	local popupscale = menupopupscale("resetwarning", love.timer.getTime())
+	if not resetwarningopen and popupscale <= 0 then
+		return
+	end
+
+	--the dimmed foreground fades in and out with the popup
+	love.graphics.setColor(0, 0, 0, 150*popupscale)
+	love.graphics.rectangle("fill", 0, 0, width*16*scale, height*16*scale)
+
+	love.graphics.push()
+	love.graphics.translate(130*scale, 122*scale)
+	love.graphics.scale(popupscale, popupscale)
+	love.graphics.translate(-130*scale, -122*scale)
+	love.graphics.translate(0, (1 - popupscale) * 8 * scale)
+
+	local alpha = 255*popupscale
+	local popupradius = 60 * scale * 0.2
+	love.graphics.setColor(0, 0, 0, alpha)
+	love.graphics.rectangle("fill", 20*scale, 92*scale, 220*scale, 60*scale, popupradius)
+	love.graphics.setColor(255, 255, 255, alpha)
+	local previouslinewidth = love.graphics.getLineWidth()
+	love.graphics.setLineWidth(scale)
+	love.graphics.rectangle("line", 20*scale, 92*scale, 220*scale, 60*scale, popupradius)
+	love.graphics.setLineWidth(previouslinewidth)
+	properprintF(TEXT["all settings and controls"], (130-(utf8.len(TEXT["all settings and controls"])*4))*scale, 100*scale)
+	properprintF(TEXT["will be reset to default!"], (130-(utf8.len(TEXT["will be reset to default!"])*4))*scale, 110*scale)
+
+	local resetx, resetwidth, backx, backwidth = resetwarning_layout()
+	if resetwarningcursor == 1 then
+		love.graphics.setColor(255, 255, 255, alpha)
+		properprintF(">", (resetx-10)*scale, 130*scale)
+		love.graphics.setColor(255, 80, 80, alpha)
+		properprintF(TEXT["reset"], resetx*scale, 130*scale)
+		love.graphics.setColor(100, 100, 100, alpha)
+		properprintF(TEXT["go back"], backx*scale, 130*scale)
+	else
+		love.graphics.setColor(255, 255, 255, alpha)
+		properprintF(">", (backx-10)*scale, 130*scale)
+		love.graphics.setColor(100, 100, 100, alpha)
+		properprintF(TEXT["reset"], resetx*scale, 130*scale)
+		love.graphics.setColor(255, 255, 255, alpha)
+		properprintF(TEXT["go back"], backx*scale, 130*scale)
+	end
+
+	love.graphics.pop()
+	love.graphics.setColor(255, 255, 255, 255)
+end
+
 local function optionsmisc_create()
 	local right = 235 --right edge of the dropdowns and checkboxes
 
@@ -703,7 +832,7 @@ local function optionsmisc_create()
 
 	--Reset All Settings
 	guielements["opt_resetall"] = guielement:new("button", 30, 160, TEXT["reset all settings"], function()
-		resetconfig()
+		resetwarning_open()
 	end)
 	guielements["opt_resetall"].textcolor = {255, 0, 0}
 
@@ -889,8 +1018,8 @@ function optionsmisc_update()
 		--the widgets sit still (no clicks, no hover animations) while the language menu is open
 		for i = 1, #optionsmiscgui do
 			if guielements[optionsmiscgui[i]] then
-				guielements[optionsmiscgui[i]].active = not languagemenuopen
-				guielements[optionsmiscgui[i]].nohover = languagemenuopen
+				guielements[optionsmiscgui[i]].active = not (languagemenuopen or resetwarningopen)
+				guielements[optionsmiscgui[i]].nohover = languagemenuopen or resetwarningopen
 			end
 		end
 	elseif guielements["opt_scale"] then
@@ -971,6 +1100,8 @@ function menu_load()
 	optionsselection = 1
 	keybindpage = 1
 	keybindpageanimation = nil
+	resetwarningopen = false
+	menupopupanimations.resetwarning = {from = 0, to = 0}
 	skinningplayer = 1
 	characteri = characters.data[mariocharacter[1]].i
 	rgbselection = 1
@@ -1252,6 +1383,9 @@ function menu_update(dt)
 	local x, y = love.mouse.getPosition()
 	if (x ~= oldmouse[1] or y ~= oldmouse[2]) and gamestate == "menu" and (not DisableMouseInMainMenu) and (not languagemenuopen) then
 		menu_updatemouseselection(x,y)
+	end
+	if (x ~= oldmouse[1] or y ~= oldmouse[2]) and resetwarningopen and gamestate == "options" and (not DisableMouseInMainMenu) and (not languagemenuopen) then
+		resetwarning_updatemouse(x, y)
 	end
 	oldmouse = {x, y}
 	
@@ -2504,6 +2638,7 @@ function menu_draw()
 			optionscheats_draw()
 		end
 	end
+	resetwarning_draw()
 	love.graphics.translate(0, yoffset*scale)
 	
 	if languagemenuopen then
@@ -2999,6 +3134,10 @@ function menu_keypressed(key, unicode)
 		if languagemenu_keypressed(key, unicode) then
 			languagemenuopen = false
 		end
+		return
+	end
+	if resetwarningopen then
+		resetwarning_keypressed(key)
 		return
 	end
 	if gamestate == "menu" then
@@ -3736,6 +3875,10 @@ function menu_mousepressed(x, y, button)
 		if languagemenu_mousepressed(x, y, button) then
 			languagemenuopen = false
 		end
+		return
+	end
+	if resetwarningopen then
+		resetwarning_mousepressed(x, y, button)
 		return
 	end
 	if gamestate == "menu" then

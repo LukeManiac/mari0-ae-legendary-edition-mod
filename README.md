@@ -200,6 +200,8 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Added the `infinitefireballs` nitpick, which removes the limit on active fireballs, hammers, superballs, iceballs, boomerangs, and custom powerup projectiles.
 * Added four keybind slots for each control, so keyboard and controller inputs can be mixed and matched.
 * Maximised controller support, including joystick buttons, hats, and axes.
+* Added a new "Generate Nitpicks File" button to the menu's misc tab.
+* Added animations for confirmations in editor, and a warning to confirm resetting all settings.
 
 ### 🐛 Bug Fixes
 

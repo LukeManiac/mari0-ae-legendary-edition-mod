@@ -43,6 +43,15 @@ local editor_minimap_progress
 local editor_reset_tooltip
 local editor_set_menu_view
 local editor_set_minimap_visible
+local editorConfirmAnimation
+local editorConfirmCanvas
+local editorConfirmCanvasWidth, editorConfirmCanvasHeight
+local EDITOR_CONFIRM_ANIM_TIME = 0.25
+local editor_confirm_progress
+local editor_set_confirm_visible
+local editor_confirm_cleanup
+local editor_confirm_begin
+local editor_confirm_end
 
 local editorsavedata = false
 
@@ -59,6 +68,9 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	editorRCCanvas = nil
 	editorRCCanvasWidth, editorRCCanvasHeight = nil, nil
 	editorRCOpen = false
+	editorConfirmAnimation = nil
+	editorConfirmCanvas = nil
+	editorConfirmCanvasWidth, editorConfirmCanvasHeight = nil, nil
 	
 	--BLOCKTOGGLE STUFF
 	solidblockperma = {false, false, false, false}
@@ -640,6 +652,78 @@ editor_set_minimap_visible = function(open)
 	end
 end
 
+editor_confirm_progress = function()
+	if not editorConfirmAnimation then
+		return bool2int(confirmmenuopen), true
+	end
+
+	local animation = editorConfirmAnimation
+	local t = (love.timer.getTime() - animation.start) / EDITOR_CONFIRM_ANIM_TIME
+	local progress = motion_curve(t, animation.curve, animation.curve_in, false, true, true)
+	return lerp(animation.from, animation.to, progress), t >= 1
+end
+
+--call this before confirmmenuopen changes, the animation starts from the current progress
+editor_set_confirm_visible = function(open)
+	local progress = editor_confirm_progress()
+	editorConfirmAnimation = {
+		from = progress,
+		to = bool2int(open),
+		start = love.timer.getTime(),
+		curve = random_motion_curve(),
+		curve_in = open
+	}
+end
+
+--the confirm buttons are kept around until the fade out is done
+editor_confirm_cleanup = function()
+	if confirmmenuopen then
+		return
+	end
+
+	local _, animationDone = editor_confirm_progress()
+	if animationDone then
+		editorConfirmAnimation = nil
+		guielements["confirmsave"] = nil
+		guielements["confirmexit"] = nil
+	end
+end
+
+--the popup is drawn into a canvas so everything in it (box, text, buttons) can fade together
+editor_confirm_begin = function()
+	local canvasWidth, canvasHeight = love.graphics.getDimensions()
+	if not editorConfirmCanvas or editorConfirmCanvasWidth ~= canvasWidth or editorConfirmCanvasHeight ~= canvasHeight then
+		editorConfirmCanvas = love.graphics.newCanvas(canvasWidth, canvasHeight)
+		editorConfirmCanvas:setFilter("nearest", "nearest")
+		editorConfirmCanvasWidth, editorConfirmCanvasHeight = canvasWidth, canvasHeight
+	end
+
+	love.graphics.push("all")
+	love.graphics.setCanvas({editorConfirmCanvas, stencil = true})
+	love.graphics.origin()
+	love.graphics.setScissor()
+	love.graphics.setShader()
+	love.graphics.setColor(255, 255, 255, 255)
+	love.graphics.clear(0, 0, 0, 0)
+end
+
+editor_confirm_end = function(progress)
+	love.graphics.pop()
+
+	if progress <= 0 then
+		return
+	end
+
+	local anchorx, anchory = 200*scale, 112*scale --middle of the popup
+	local zoom = 0.9 + 0.1 * progress
+	local a = math.floor(255 * progress + 0.5)
+	love.graphics.push("all")
+	love.graphics.setBlendMode("alpha", "premultiplied")
+	love.graphics.setColor(a, a, a, a)
+	love.graphics.draw(editorConfirmCanvas, anchorx, anchory, 0, zoom, zoom, anchorx, anchory)
+	love.graphics.pop()
+end
+
 editor_rc_progress = function()
 	if not editorRCAnimation then
 		return bool2int(editorRCOpen), true
@@ -783,6 +867,8 @@ function editor_update(dt)
 	if not editor_gui_interaction_enabled() then
 		editor_reset_tooltip()
 	end
+
+	editor_confirm_cleanup()
 
 	if editormenuopen == false or minimapmoving then
 		--key scroll
@@ -3556,9 +3642,13 @@ local function editor_draw_content(menuVisible, minimapOverlay)
 			end
 		end
 		
-		if confirmmenuopen then
-			love.graphics.setColor(0,0,0,200)
+		local confirmprogress = editor_confirm_progress()
+		if (confirmmenuopen or confirmprogress > 0) and guielements["confirmsave"] and guielements["confirmexit"] then
+			--the dimmed foreground fades in and out with the popup
+			love.graphics.setColor(0,0,0,200*confirmprogress)
 			love.graphics.rectangle("fill", 0, 0, width*16*scale, height*16*scale)
+
+			editor_confirm_begin()
 			love.graphics.setColor(0,0,0)
 			love.graphics.rectangle("fill", 69*scale, 71*scale, 262*scale, 82*scale)
 			love.graphics.setColor(255, 255, 255)
@@ -3569,6 +3659,7 @@ local function editor_draw_content(menuVisible, minimapOverlay)
 			guielements["confirmsave"]:draw()
 			guielements["confirmexit"]:draw()
 			--guielements["confirmcancel"]:draw()
+			editor_confirm_end(confirmprogress)
 		end
 	end
 end
@@ -4239,6 +4330,7 @@ function openconfirmmenu(menutype, args)
 		return
 	end
 
+	editor_set_confirm_visible(true)
 	confirmmenuopen = true
 	confirmmenuguisave = {}
 	for i, v in pairs(guielements) do
@@ -4265,14 +4357,20 @@ function openconfirmmenu(menutype, args)
 end
 
 function closeconfirmmenu()
+	editor_set_confirm_visible(false)
 	confirmmenuopen = false
 	for i, v in pairs(confirmmenuguisave) do
 		v.active = true
 	end
 	confirmmenuguisave = false
 
-	guielements["confirmsave"] = nil
-	guielements["confirmexit"] = nil
+	--the buttons stay until the fade out is done (see editor_confirm_cleanup), but can't be clicked anymore
+	if guielements["confirmsave"] then
+		guielements["confirmsave"].active = false
+	end
+	if guielements["confirmexit"] then
+		guielements["confirmexit"].active = false
+	end
 	--guielements["confirmcancel"] = nil
 end
 

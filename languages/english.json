@@ -60,6 +60,8 @@
 		"generate nitpicks file": "generate nitpicks file",
 		"reset included maps": "reset included maps",
 		"reset all settings": "reset all settings",
+		"all settings and controls": "all settings and controls",
+		"will be reset to default!": "will be reset to default!",
 		"vsync:": "vsync:",
 		"mappack folder:": "mappack folder:",
 		"lock mouse with f12": "lock mouse with f12",
