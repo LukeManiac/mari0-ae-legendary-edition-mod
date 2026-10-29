@@ -3,7 +3,7 @@ local resetwarningopen = false
 local resetwarningcursor = 2
 local resetwarningstage = 1 --1 = first warning, 2 = second "are you really sure?" warning
 local resettexthovertime = 0 --seconds the "reset" option of the warning popup has been hovered, drives its shake (decays when not hovered)
-local RESET_SHAKE_MAX_TIME = 4/0.75 --hover time at which the shake reaches its 4 pixel cap
+local RESET_SHAKE_MAX_TIME = 4 --hover time at which the shake reaches its 4 pixel cap
 local RESET_SHAKE_DECAY = 1.5 --how many times slower than it builds up the shake fades out
 local menu_updatemouseselection
 
@@ -775,7 +775,7 @@ local function resetwarning_draw()
 	properprintF(line2, (130-(utf8.len(line2)*4))*scale, 110*scale)
 
 	local resetx, resetwidth, backx, backwidth = resetwarning_layout()
-	local shakerange = math.min(resettexthovertime * 0.75, 4) --capped at 4 pixels
+	local shakerange = math.min(resettexthovertime, 4) --capped at 4 pixels
 	local shakex = (math.random()*2-1)*shakerange
 	local shakey = (math.random()*2-1)*shakerange
 	if resetwarningcursor == 1 then
