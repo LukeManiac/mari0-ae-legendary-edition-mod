@@ -184,7 +184,6 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `hurrymodeskipfanfare`: Skips the low-time sound cue and uses fast music at 99 instead of waiting until the timer drops below 99. Requires `hurrymode`.
 - `disabletransitions`: Skips fade and vignette transitions.
 - `infinitefireballs`: Removes the limit on how many fireballs, hammers, superballs, iceballs, boomerangs, and custom powerup projectiles the player can have active.
-- `rapidfire`: Players will now fire perframe if active. It's highly recommended to set `infinitefireballs` to true.
 
 ---
 

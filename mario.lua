@@ -1037,6 +1037,8 @@ function mario:update(dt)
 	
 	if underwater and not self.water then
 		self.water = true
+		self.swimanimationprogress = 1
+		self.swimframe = 1
 	end
 
 	--laser fields
@@ -2095,6 +2097,7 @@ function mario:update(dt)
 	--vine controls and shit
 	if self.vine then
 		self.animationstate = "climbing"
+		self:updateclimbwater()
 		if upkey(self.playernumber) and self.controlsenabled then
 			self.vinemovetimer = self.vinemovetimer + dt
 			
@@ -2158,16 +2161,13 @@ function mario:update(dt)
 			end
 		end
 		
-		if HAHARAPIDFIREGOBRRR and self.controlsenabled then
-			self:rapidfire()
-		end
-		
 		self:setquad()
 		return
 	end
 	--fence controls and shit :)
 	if self.fence then
 		self:updateangle()
+		self:updateclimbwater()
 		--no more fence flying, actually check if we're on a fence
 		local x = math.floor(self.x+self.width/2)+1
 		local y = math.floor(self.y+self.height/2)+1
@@ -2515,11 +2515,6 @@ function mario:update(dt)
 		local runkeypressed = runkeyheld and not self.runkeywasdown
 		self.runkeywasdown = runkeyheld
 
-		--rapidfire nitpick: hold firing button to call fire every frame
-		if HAHARAPIDFIREGOBRRR then
-			self:rapidfire()
-		end
-		
 		if self.size == 9 then --tanooki statue
 			if (not self.shoe) and (not self.yoshi) and downkey(self.playernumber) then
 				if self.statue then
@@ -6685,7 +6680,11 @@ function mario:dropvine(dir)
 	end
 	self.animationstate = "falling"
 	self:setquad()
-	self.gravity = self.characterdata.yacceleration
+	if self.water then
+		self.gravity = self.characterdata.uwyacceleration
+	else
+		self.gravity = self.characterdata.yacceleration
+	end
 	self.vine = false
 	self.mask[18] = false
 	self.ignoreplatform = false
@@ -7829,7 +7828,6 @@ function mario:pipe(x, y, dir, i)--, warppipe)
 	self.animation = "pipe" .. dir
 	self.animationstate = (dir == "left" or dir == "right") and "running" or "idle"
 	self.fireanimationtimer = fireanimationtime
-	self.spinanimationtimer = raccoonspintime
 	self.jumping = false
 	self.falling = false
 	self.invincible = false
@@ -8061,7 +8059,6 @@ function mario:door(x, y, i)
 	self.animation = "door"
 	self.animationstate = "idle"
 	self.fireanimationtimer = fireanimationtime
-	self.spinanimationtimer = raccoonspintime
 	self:setquad()
 	self.invincible = false
 	self.drawable = true
@@ -8217,7 +8214,6 @@ function mario:axe()
 	self.static = false
 	self.animation = "axe"
 	self.fireanimationtimer = fireanimationtime
-	self.spinanimationtimer = raccoonspintime
 	self.invincible = true--false
 	self.drawable = true
 	self.animationx = axex
@@ -8304,8 +8300,6 @@ function mario:vineanimation()
 	self.animationx = self.x
 	self.animationy = vineanimationstart
 	self.animationmisc = map[self.vinex][self.viney][3]
-	self.fireanimationtimer = fireanimationtime
-	self.spinanimationtimer = raccoonspintime
 	self.active = false
 	self.vine = false
 end
@@ -8330,18 +8324,6 @@ local function gettable(v, i)
 		return v[i]
 	else
 		return v
-	end
-end
-
-function mario:rapidfire()
-	local buttons = {"run", "use", "reload", "jump", "left", "right", "up", "down"}
-	for i, b in ipairs(buttons) do
-		if keydown(b, self.playernumber) then
-			self:button(b)
-			if b == "run" then
-				self:fire()
-			end
-		end
 	end
 end
 
@@ -8951,10 +8933,39 @@ function mario:respawn()
 	self.active = true
 end
 
+function mario:updateclimbwater()
+	local inwater = underwater
+	if not inwater then
+		local x = math.floor(self.x+self.width/2)+1
+		local y = math.floor(self.y+self.height/2)+1
+		if inmap(x, y) and tilequads[map[x][y][1]]:getproperty("water", x, y) then
+			inwater = true
+		end
+	end
+	if inwater and not self.water then
+		if self.fence then
+			self:dive(true)
+		else
+			self.water = true
+			self.swimanimationprogress = 1
+			self.swimframe = 1
+		end
+	elseif (not inwater) and self.water and not self.swimwing and not self.risingwater then
+		if self.fence then
+			self:dive(false)
+		else
+			self.water = false
+		end
+	end
+	self.risingwater = false
+end
+
 function mario:dive(water)
 	if water then
 		self.gravity = self.characterdata.uwyacceleration
 		self.water = true
+		self.swimanimationprogress = 1
+		self.swimframe = 1
 		self.speedx = self.speedx*waterdamping
 		self.speedy = self.speedy*waterdamping
 

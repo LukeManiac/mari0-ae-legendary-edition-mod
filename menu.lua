@@ -975,8 +975,7 @@ local nitpickkeys = {
 	"hurrymode",
 	"hurrymodeskipfanfare",
 	"disabletransitions",
-	"infinitefireballs",
-	"rapidfire"
+	"infinitefireballs"
 }
 
 function generatenitpicksfile()
