@@ -1037,8 +1037,6 @@ function mario:update(dt)
 	
 	if underwater and not self.water then
 		self.water = true
-		self.swimanimationprogress = 1
-		self.swimframe = 1
 	end
 
 	--laser fields
@@ -8954,8 +8952,6 @@ function mario:updateclimbwater()
 			self:dive(true)
 		else
 			self.water = true
-			self.swimanimationprogress = 1
-			self.swimframe = 1
 		end
 	elseif (not inwater) and self.water and not self.swimwing and not self.risingwater then
 		if self.fence then
@@ -8971,8 +8967,6 @@ function mario:dive(water)
 	if water then
 		self.gravity = self.characterdata.uwyacceleration
 		self.water = true
-		self.swimanimationprogress = 1
-		self.swimframe = 1
 		self.speedx = self.speedx*waterdamping
 		self.speedy = self.speedy*waterdamping
 
