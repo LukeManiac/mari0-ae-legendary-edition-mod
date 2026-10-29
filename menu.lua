@@ -711,7 +711,7 @@ local function optionsmisc_create()
 	guielements["opt_volume"] = volumeslider_new(90, 109, right-90)
 
 	--VSync
-	guielements["opt_vsync"] = guielement:new("checkbox", right-9, 170, function(v)
+	guielements["opt_vsync"] = guielement:new("checkbox", right-9, 172, function(v)
 		vsync = v
 		guielements["opt_vsync"].var = v
 		changescale(scale)
@@ -2450,7 +2450,7 @@ function menu_draw()
 				love.graphics.setColor(100, 100, 100, 255)
 			end
 			
-			properprintF(TEXT["vsync:"], 30*scale, 170*scale)
+			properprintF(TEXT["vsync:"], 30*scale, 172*scale)
 			
 			if optionsselection == 12 then
 				love.graphics.setColor(255, 255, 255, 255)
