@@ -761,6 +761,9 @@ local function resetwarning_draw()
 	if resetwarningstage == 2 then
 		line1 = TEXT["are you really sure?"]
 		line2 = TEXT["this cannot be undone!"]
+	elseif resetwarningstage == 3 then
+		line1 = TEXT["last chance!"]
+		line2 = TEXT["really reset everything?"]
 	end
 	properprintF(line1, (130-(utf8.len(line1)*4))*scale, 100*scale)
 	properprintF(line2, (130-(utf8.len(line2)*4))*scale, 110*scale)
