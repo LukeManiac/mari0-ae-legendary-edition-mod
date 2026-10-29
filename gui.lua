@@ -736,6 +736,13 @@ function guielement:draw(a, offx, offy)
 			love.graphics.draw(self.image, (self.x+self.imageoffsetx)*scale, (self.y+self.imageoffsety)*scale, 0, scale, scale)
 		end
 		
+		--optional text shake (shakerange returns the range in pixels), only the text moves
+		local shakerange = self.shakerange and self.shakerange() or 0
+		if shakerange > 0 then
+			love.graphics.push()
+			love.graphics.translate((math.random()*2-1)*shakerange*scale, (math.random()*2-1)*shakerange*scale)
+		end
+
 		love.graphics.setColor(self.textcolor)
 		if type(self.text) == "table" then
 			love.graphics.draw(self.text[1], self.text[2], (self.x+2+self.xpadding+self.space)*scale, (self.y+2+self.ypadding+self.space)*scale, 0, scale, scale)
@@ -753,6 +760,10 @@ function guielement:draw(a, offx, offy)
 			else
 				properprintF(self.text, (self.x+1+self.xpadding+self.space)*scale, (self.y+2+self.ypadding+self.space)*scale)
 			end
+		end
+
+		if shakerange > 0 then
+			love.graphics.pop()
 		end
 		
 		if zoom ~= 1 then

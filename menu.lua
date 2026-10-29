@@ -2,7 +2,8 @@ local languagemenuopen = false
 local resetwarningopen = false
 local resetwarningcursor = 2
 local resetwarningstage = 1 --1 = first warning, 2 = second "are you really sure?" warning
-local resetbuttonhovertime = 0 --seconds "reset all settings" has been hovered, drives the screen shake
+local resetbuttonhovertime = 0 --seconds "reset all settings" has been hovered, drives the text shake
+local resetbuttonsuppressed = false --true after the popup was used, until the mouse leaves the button
 local menu_updatemouseselection
 
 local previousmappackfolder
@@ -773,6 +774,13 @@ local function resetwarning_draw()
 		love.graphics.setColor(255, 255, 255, alpha)
 		properprintF(">", (resetx-10)*scale, 130*scale)
 		love.graphics.setColor(255, 80, 80, alpha)
+
+		if resetwarningstage == 2 then
+			love.graphics.setColor(255, 40, 40, alpha)
+		elseif resetwarningstage == 3 then
+			love.graphics.setColor(255, 0, 0, alpha)
+		end
+
 		properprintF(TEXT["reset"], resetx*scale, 130*scale)
 		love.graphics.setColor(100, 100, 100, alpha)
 		properprintF(TEXT["go back"], backx*scale, 130*scale)
@@ -861,6 +869,10 @@ local function optionsmisc_create()
 		resetwarning_open()
 	end)
 	guielements["opt_resetall"].textcolor = {255, 0, 0}
+	--the text shakes harder the longer the button is hovered (range in pixels, capped at 4)
+	guielements["opt_resetall"].shakerange = function()
+		return math.min(resetbuttonhovertime * 0.75, 4)
+	end
 
 	--Volume
 	guielements["opt_volume"] = volumeslider_new(90, 109, right-90)
@@ -1211,9 +1223,15 @@ function menu_load()
 end
 
 function menu_update(dt)
-	--screen shake: the longer "reset all settings" is hovered, the harder it shakes
+	--text shake: the longer "reset all settings" is hovered, the harder its text shakes
 	local resetbutton = guielements["opt_resetall"]
-	if gamestate == "options" and optionstab == 3 and resetbutton and resetbutton:hovered() and not resetwarningopen and not languagemenuopen then
+	local resethovered = gamestate == "options" and optionstab == 3 and resetbutton and resetbutton:hovered()
+	if resetwarningopen then
+		resetbuttonsuppressed = true --no shaking after cancelling until the mouse moves off the button
+	elseif not resethovered then
+		resetbuttonsuppressed = false
+	end
+	if resethovered and not resetwarningopen and not resetbuttonsuppressed and not languagemenuopen then
 		resetbuttonhovertime = resetbuttonhovertime + dt
 	else
 		resetbuttonhovertime = 0
@@ -1493,12 +1511,6 @@ end
 function menu_draw()
 	--GUI LIBRARY?! Never heard of that.
 	--I'm not proud of this at all; But I'm even lazier than not proud.
-
-	--SCREEN SHAKE while hovering "reset all settings" (range grows with hover time, capped at 8 pixels)
-	if resetbuttonhovertime > 0 then
-		local shakerange = math.min(resetbuttonhovertime * 1.5, 8) * scale
-		love.graphics.translate((math.random()*2-1)*shakerange, (math.random()*2-1)*shakerange)
-	end
 
 	--TILES
 	love.graphics.translate(0, yoffset*scale)
