@@ -725,7 +725,7 @@ local function optionsmisc_create()
 		start = 1
 	end
 
-	guielements["opt_mappackfolder"] = guielement:new("dropdown", 30, 189, 17, function(i)
+	guielements["opt_mappackfolder"] = guielement:new("dropdown", 30, 191, 17, function(i)
 		local option = guielements["opt_mappackfolder"].entries[i]
 		if option == "mappacks" then
 			mappackfolder = "mappacks"
