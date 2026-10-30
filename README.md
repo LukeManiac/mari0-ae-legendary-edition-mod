@@ -202,6 +202,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Added a new "Generate Nitpicks File" button to the menu's misc tab.
 * Added animations for confirmations in editor, and a three-stage warning to confirm resetting all settings.
 * Added downscaling for viewports (may look funny when window scale is 3).
+* Luigi is no longer a basic recolour of Mario. He now has his own unique sprites.
 
 ### 🐛 Bug Fixes
 
