@@ -219,6 +219,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Running into a horizontal autoscroll border sets your speedx to 0 if you're grounded.
 * As soon as you enter the water or fall while underwater, your animation frame and progress resets.
 * Underwater checking is executed per frame even when you are climbing on a vine or fence.
+* Ditching a wearable now dismounts instead of kills it.
 
 ### ❌ Removals
 
