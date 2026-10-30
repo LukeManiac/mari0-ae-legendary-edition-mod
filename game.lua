@@ -6427,9 +6427,9 @@ function moveoutportal() --pushes objects out of the portal i in.
 	end
 end
 
-function warpfadeoutnow()
+function warpfadeoutnow(ignorelevelsetting)
 	--blocking fade to black for transitions that load everything immediately (menu, editor, mappacks)
-	if maptransitionsdisabled() then
+	if NoTransitions or (not ignorelevelsetting and maptransitionsdisabled()) then
 		warptransition_update(0)
 		return
 	end
@@ -10585,7 +10585,7 @@ end
 
 function renderoverlay(text, donotpresentgraphics, donotupdate)
 	if not donotpresentgraphics and warpfadetexts and warpfadetexts[text:lower()] then
-		warpfadeoutnow()
+		warpfadeoutnow(text:lower() == "returning to menu...")
 	end
 	if TEXT[text:lower()] then
 		text = TEXT[text:lower()]
