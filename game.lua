@@ -10585,7 +10585,7 @@ end
 
 function renderoverlay(text, donotpresentgraphics, donotupdate)
 	if not donotpresentgraphics and warpfadetexts and warpfadetexts[text:lower()] then
-		warpfadeoutnow(text:lower() == "returning to menu...")
+		warpfadeoutnow(text:lower() == "returning to menu..." or text:lower() == "saving game...")
 	end
 	if TEXT[text:lower()] then
 		text = TEXT[text:lower()]

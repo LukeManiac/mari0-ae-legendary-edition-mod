@@ -699,6 +699,7 @@ warpfadetexts = {
 	["returning to menu..."] = true,
 	["testing level..."] = true,
 	["returning to editor..."] = true,
+	["saving game..."] = true
 }
 
 --flag animation
