@@ -9206,13 +9206,12 @@ function mario:shoed(shoe, initial, drop) --get in shoe (type, make sound?, drop
         elseif self.shoe then
             if drop then
                 soundfordrop = shotsound
+            end
+            if self.shoe == "drybonesshell" then
+                self:dropwearable(drybonesshellimg, starquad[spriteset][1], 12/16, 12/16, 6, 3, 8, 8)
             else
-                if self.shoe == "drybonesshell" then
-                    self:dropwearable(drybonesshellimg, starquad[spriteset][1], 12/16, 12/16, 6, 3, 8, 8)
-                else
-                    local frame = self.shoe == "heel" and 6 or 4
-                    self:dropwearable(goombashoeimg, goombashoequad[spriteset][frame], 12/16, 12/16, 6, -5, 8, 8)
-                end
+                local frame = self.shoe == "heel" and 6 or 4
+                self:dropwearable(goombashoeimg, goombashoequad[spriteset][frame], 12/16, 12/16, 6, -5, 8, 8)
             end
         end
 		self.shoe = false
