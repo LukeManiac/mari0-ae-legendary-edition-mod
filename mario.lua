@@ -9206,12 +9206,26 @@ function mario:shoed(shoe, initial, drop) --get in shoe (type, make sound?, drop
         elseif self.shoe then
             if drop then
                 soundfordrop = shotsound
-            end
-            if self.shoe == "drybonesshell" then
-                self:dropwearable(drybonesshellimg, starquad[spriteset][1], 12/16, 12/16, 6, 3, 8, 8)
+                local t = "goombashoe"
+                if self.shoe == "drybonesshell" then
+                    t = "drybonesshell"
+                end
+                local obj = mushroom:new(self.x+self.width/2, self.y+self.height-1/16, t)
+                obj.uptimer = mushroomtime+0.00001
+                if self.animationdirection == "right" then
+                    obj.animationdirection = "left"
+                else
+                    obj.animationdirection = "right"
+                end
+                obj.heel = (self.shoe == "heel")
+                table.insert(objects["mushroom"], obj)
             else
-                local frame = self.shoe == "heel" and 6 or 4
-                self:dropwearable(goombashoeimg, goombashoequad[spriteset][frame], 12/16, 12/16, 6, -5, 8, 8)
+                if self.shoe == "drybonesshell" then
+                    self:dropwearable(drybonesshellimg, starquad[spriteset][1], 12/16, 12/16, 6, 3, 8, 8)
+                else
+                    local frame = self.shoe == "heel" and 6 or 4
+                    self:dropwearable(goombashoeimg, goombashoequad[spriteset][frame], 12/16, 12/16, 6, -5, 8, 8)
+                end
             end
         end
 		self.shoe = false
