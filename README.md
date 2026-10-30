@@ -221,12 +221,13 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * As soon as you enter the water or fall while underwater, your animation frame and progress resets.
 * Underwater checking is executed per frame even when you are climbing on a vine or fence.
 * Ditching a wearable now dismounts instead of kills it.
+* Changing hat now saves the game.
 
 ### ❌ Removals
 
 * Removed `freezefade` and `editorzoom` nitpicks as there were too many bugs.
 
-**Note:** The four-keybind system remains compatible with original Mari0 AE save data and does not negatively affect it.
+**Note:** The four-keybind system remains compatible with original Mari0 AE save data and does not negatively affect it. Running Mari0 AE may remove the secondary, tertiary, and quaternary keybinds from your save data so make sure to backup your data.
 
 ## v1.2.1
 

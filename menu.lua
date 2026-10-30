@@ -3646,6 +3646,7 @@ function menu_keypressed(key, unicode)
 					elseif mariohats[skinningplayer][1] < #hat then
 						mariohats[skinningplayer][1] = mariohats[skinningplayer][1] + 1
 					end
+					saveconfig()
 				elseif characters.data[mariocharacter[skinningplayer]].colorables and optionsselection == 5 then
 					--next color set
 					colorsetedit = colorsetedit + 1
@@ -3778,6 +3779,7 @@ function menu_keypressed(key, unicode)
 					elseif mariohats[skinningplayer][1] and mariohats[skinningplayer][1] > 1 then
 						mariohats[skinningplayer][1] = mariohats[skinningplayer][1] - 1
 					end
+					saveconfig()
 				elseif characters.data[mariocharacter[skinningplayer]].colorables and optionsselection == 5 then
 					--previous color set
 					colorsetedit = colorsetedit - 1
