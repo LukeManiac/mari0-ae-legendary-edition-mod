@@ -3759,12 +3759,12 @@ function mario:jump(force)
 			return
 		end
 		if self.raccoonfly and (self.size == 6 or self.size == 9) then --fly as raccoon Mario (SMB3 style discrete flaps)
-			self.speedy = math.min(-self.characterdata.raccoonflyjumpforce, self.speedy)
+			self.speedy = -self.characterdata.raccoonflyjumpforce
 			playsound(raccoonswingsound)
 			self.raccoonflyframe = 1
 			self.raccoonflyanimationprogress = 1
 			self:setquad()
-		end		
+		end	
 		self.redseesaw = false
 		
 		if not self.water then
