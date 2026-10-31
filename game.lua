@@ -3192,6 +3192,9 @@ function game_draw()
 		pauseheight = winheight*0.75
 		pauseradius = get_corner_radius(pausewidth, pauseheight) / 2
 		prevlinewidth = love.graphics.getLineWidth()
+		--black background behind the menu, fades in and out together with the scaling
+		love.graphics.setColor(0, 0, 0, math.min(math.max(bettertimer, 0), 1) * 180)
+		love.graphics.rectangle("fill", 0, 0, winwidth, winheight)
 		--scale the whole menu from its center
 		love.graphics.push()
 		love.graphics.translate(winwidth/2, winheight/2)
@@ -3348,6 +3351,9 @@ function drawprompt(timer, duration, open, curve)
     promptheight = winheight/4
     promptradius = get_corner_radius(promptwidth, promptheight) / 2
     prevlinewidth = love.graphics.getLineWidth()
+    --every prompt has its own black background, it fades in and out together with the scaling
+    love.graphics.setColor(0, 0, 0, math.min(math.max(prompttimer, 0), 1) * 180)
+    love.graphics.rectangle("fill", 0, 0, winwidth, winheight)
     --scale the prompt from the center of the screen, the caller draws its text and then calls love.graphics.pop()
     love.graphics.push()
     love.graphics.translate(winwidth/2, winheight/2)
