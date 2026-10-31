@@ -5083,10 +5083,6 @@ function mario:stompenemy(a, b)
 		self.falling = true
 		self.landed = false
 
-		if self.planemode then
-			self.planetimer = 0
-		end
-
 		if self.raccoonfly then
 			self.raccoonflyingtimer = 0
 		end
@@ -5329,9 +5325,6 @@ function mario:stompbounce(a, b) --bounce off of enemy (koopaling in shell for e
 	self.landed = false
 	self:setquad()
 	self.speedy = -bouncespeed
-	if self.planemode then
-		self.planetimer = 0
-	end
 	if self.raccoonfly then
 		self.raccoonflyingtimer = 0
 	end
