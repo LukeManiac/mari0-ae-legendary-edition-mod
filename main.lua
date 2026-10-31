@@ -2018,7 +2018,7 @@ function love.keypressed(key, scancode, isrepeat, textinput)
 	end
 	
 	if keyprompt then
-		if not isrepeat then
+		if not isrepeat and keypromptinputactive() then
 			keypromptenter("key", key)
 			saveconfig()
 		end
@@ -2328,8 +2328,10 @@ function love.joystickpressed(joystick, button, simulated)
 	end
 	
 	if keyprompt then
-		keypromptenter("joybutton", joystick, button)
-		saveconfig()
+		if keypromptinputactive() then
+			keypromptenter("joybutton", joystick, button)
+			saveconfig()
+		end
 		return
 	end
 	
@@ -2551,7 +2553,24 @@ function getaveragecolor2(imgdata, cox, coy)
 end
 
 function keyprompt_update()
-	if keyprompt then
+	if not keyprompt then
+		return
+	end
+
+	local keypromptscale = menupopupscale("keyprompt", love.timer.getTime())
+	if keypromptclosing then
+		if keypromptscale == 0 then
+			keyprompt = false
+			keypromptclosing = false
+		end
+		return
+	end
+
+	if not keypromptready and keypromptscale == 1 then
+		keypromptready = true
+	end
+
+	if keypromptinputactive() then
 		for i = 1, prompt.joysticks do
 			for j = 1, #prompt.joystick[i].validhats do
 				local dir = love.joystick.getHat(i, prompt.joystick[i].validhats[j])
@@ -2561,7 +2580,7 @@ function keyprompt_update()
 					return
 				end
 			end
-			
+
 			for j = 1, prompt.joystick[i].axes do
 				local value = love.joystick.getAxis(i, j)
 				if value > prompt.joystick[i].axisposition[j] + joystickdeadzone then
