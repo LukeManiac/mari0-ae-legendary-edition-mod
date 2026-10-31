@@ -18,8 +18,7 @@ local menupopupanimations = {
 	newgamewarning = {from = 0, to = 0},
 	selectworld = {from = 0, to = 0},
 	resetwarning = {from = 0, to = 0},
-	controls = {from = 0, to = 0},
-	keyprompt = {from = 0, to = 0}
+	controls = {from = 0, to = 0}
 }
 
 function menupopupscale(name, now)
@@ -553,7 +552,6 @@ local function optionscontrols_draw_page(page, offset)
 		end
 	end
 	optionscontrols_draw(page, true)
-	love.graphics.pop()
 	love.graphics.pop()
 end
 
@@ -2383,12 +2381,7 @@ function menu_draw()
 			love.graphics.setColor(255, 255, 255, 255)
 			properprintF(tooltipline1 .. "\n" .. tooltipline2, tooltipx*scale, 0)
 				
-			local keypromptscale = menupopupscale("keyprompt", love.timer.getTime())
-			if keyprompt or keypromptscale > 0 then
-				love.graphics.push()
-				love.graphics.translate(130*scale, 130*scale)
-				love.graphics.scale(keypromptscale, keypromptscale)
-				love.graphics.translate(-130*scale, -130*scale)
+			if keyprompt then
 				love.graphics.setColor(0, 0, 0, 255)
 				love.graphics.rectangle("fill", 30*scale, 100*scale, 200*scale, 60*scale)
 				love.graphics.setColor(255, 255, 255, 255)
@@ -2406,7 +2399,7 @@ function menu_draw()
 					escapetext = TEXT["press 'esc' to clear"] or "press 'esc' to clear"
 				end
 				properprintF(escapetext, 40*scale, 140*scale)
-
+				
 				if buttonerror then
 					love.graphics.setColor(200, 0, 0)
 					properprintF(TEXT["you can only set"], 40*scale, 120*scale)
@@ -2416,7 +2409,6 @@ function menu_draw()
 					properprintF(TEXT["you can only set"], 40*scale, 120*scale)
 					properprintF(TEXT["axes for this"], 40*scale, 130*scale)
 				end
-				love.graphics.pop()
 			end
 		elseif optionstab == 2 then
 			--SKINS
@@ -3972,19 +3964,6 @@ function menu_keyreleased(key, unicode)
 	local changingColour = key == "left" or key == "right" or key == "a" or key == "d"
 	local anyHold = love.keyboard.isDown("left") or love.keyboard.isDown("right") or love.keyboard.isDown("a") or love.keyboard.isDown("d")
 
-	for _, joystick in ipairs(love.joystick.getJoysticks()) do
-		for button = 1, joystick:getButtonCount() do
-			if joystick:isDown(button) and (controlbindingmatchesjoy(1, "left", joystick, button) or controlbindingmatchesjoy(1, "right", joystick, button)) then
-				anyHold = true
-				break
-			end
-		end
-
-		if anyHold then
-			break
-		end
-	end
-
 	if gamestate == "options" and optionstab == 2 and changingColour and ((colorables and optionsselection > 5 and optionsselection < 9) or (colorables and optionsselection == 9) or (not colorables and optionsselection == 5) or (colorables and optionsselection == 10) or (not colorables and optionsselection == 6)) and not anyHold then
 		saveconfig()
 	end
@@ -4224,50 +4203,10 @@ function menu_joystickpressed(joystick, button)
 end
 
 function menu_joystickreleased(joystick, button)
-	local colorables = characters.data[mariocharacter[skinningplayer]].colorables
-	local changingColour = controlbindingmatchesjoy(1, "left", joystick, button) or controlbindingmatchesjoy(1, "right", joystick, button)
-	local anyHold = love.keyboard.isDown("left") or love.keyboard.isDown("right") or love.keyboard.isDown("a") or love.keyboard.isDown("d")
 
-	if gamestate == "options" and optionstab == 2 and changingColour and ((colorables and optionsselection > 5 and optionsselection < 9) or (colorables and optionsselection == 9) or (not colorables and optionsselection == 5) or (colorables and optionsselection == 10) or (not colorables and optionsselection == 6)) and not anyHold then
-		saveconfig()
-	end
-end
-
-function keypromptinputactive()
-	if not keyprompt or keypromptclosing then
-		return false
-	end
-
-	if menupopupscale("keyprompt", love.timer.getTime()) < 1 then
-		return false
-	end
-
-	keypromptready = true
-	return true
-end
-
-function keypromptfinish()
-	if not keyprompt or keypromptclosing then
-		return
-	end
-
-	keypromptready = false
-	keypromptclosing = true
-
-	local now = love.timer.getTime()
-	local anim = menupopupanimations.keyprompt
-	anim.from = menupopupscale("keyprompt", now)
-	anim.to = 0
-	anim.start = now
-	anim.curve = random_motion_curve()
-	anim.opening = false
 end
 
 function keypromptenter(t, ...)
-	if not keypromptinputactive() then
-		return
-	end
-
 	arg = {...}
 	if t == "key" and (arg[1] == ";" or arg[1] == "," or arg[1] == "," or arg[1] == "-") then
 		return
@@ -4311,45 +4250,35 @@ function keypromptenter(t, ...)
 			end
 		end
 	end
-
+	
 	if (not buttonerror and not axiserror) or arg[1] == "escape" then
-		keypromptfinish()
+		keyprompt = false
 	end
 end
 
 function keypromptstart()
 	keyprompt = true
-	keypromptready = false
-	keypromptclosing = false
 	keypromptpage = keybindpage
 	buttonerror = false
 	axiserror = false
-
-	local now = love.timer.getTime()
-	local anim = menupopupanimations.keyprompt
-	anim.from = menupopupscale("keyprompt", now)
-	anim.to = 1
-	anim.start = now
-	anim.curve = random_motion_curve()
-	anim.opening = true
-
+	
 	--save number of stuff
 	prompt = {}
 	prompt.joystick = {}
 	prompt.joysticks = love.joystick.getJoystickCount()
-
+	
 	for i = 1, prompt.joysticks do
 		prompt.joystick[i] = {}
 		prompt.joystick[i].hats = love.joystick.getHatCount(i)
 		prompt.joystick[i].axes = love.joystick.getAxisCount(i)
-
+		
 		prompt.joystick[i].validhats = {}
 		for j = 1, prompt.joystick[i].hats do
 			if love.joystick.getHat(i, j) == "c" then
 				table.insert(prompt.joystick[i].validhats, j)
 			end
 		end
-
+		
 		prompt.joystick[i].axisposition = {}
 		for j = 1, prompt.joystick[i].axes do
 			table.insert(prompt.joystick[i].axisposition, love.joystick.getAxis(i, j))
@@ -4752,12 +4681,7 @@ function drawcontrolsoverlay()
 	optionscontrols_draw(nil, false, true)
 
 	-- waiting for a key / button to bind
-	local keypromptscale = menupopupscale("keyprompt", love.timer.getTime())
-	if keyprompt or keypromptscale > 0 then
-		love.graphics.push()
-		love.graphics.translate(130*scale, 130*scale)
-		love.graphics.scale(keypromptscale, keypromptscale)
-		love.graphics.translate(-130*scale, -130*scale)
+	if keyprompt then
 		love.graphics.setColor(0, 0, 0, 255)
 		love.graphics.rectangle("fill", 30*scale, 100*scale, 200*scale, 60*scale)
 		love.graphics.setColor(255, 255, 255, 255)
@@ -4785,10 +4709,8 @@ function drawcontrolsoverlay()
 			properprintF(TEXT["you can only set"], 40*scale, 120*scale)
 			properprintF(TEXT["axes for this"], 40*scale, 130*scale)
 		end
-		love.graphics.pop()
 	end
-
-	-- how to leave
+	love.graphics.pop()
 
 	-- how to leave
 	if not keyprompt then
