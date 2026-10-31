@@ -223,6 +223,11 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Underwater checking is executed per frame even when you are climbing on a vine or fence.
 * Ditching a wearable now dismounts instead of kills it.
 * Changing hat now saves the game.
+* When your raccoon/tanooki wag animation finishes, your animation resets to jumping, or falling if you have fallframes active.
+* Mounting Yoshi resets the tongue state.
+* If you land on the ground while raccoon/tanooki and your speedx is less than 8.9 or your animation state isn't "running", it's disabled.
+* The raccoon flying animation only plays when you press jump.
+* Holding jump no longer flies you up, you now have to press jump to fly upwards like in Super Mario Bros. 3.
 
 ### ❌ Removals
 
