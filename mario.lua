@@ -320,6 +320,7 @@ function mario:init(x, y, i, animation, size, t, properties)
 	self.playraccoonplanesound = true
 	self.raccoonflyingtimer = 0
 	self.raccoonfly = false
+	self.raccoonflaptimer = 0
 	
 	--CAPPY
 	if playertype == "cappy" then
@@ -3772,6 +3773,7 @@ function mario:jump(force)
 			playsound(raccoonswingsound)
 			self.raccoonflyframe = 1
 			self.raccoonflyanimationprogress = 1
+			self.raccoonflaptimer = 0.3
 			self:setquad()
 		end	
 		self.redseesaw = false
