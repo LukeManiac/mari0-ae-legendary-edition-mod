@@ -8730,6 +8730,7 @@ function game_joystickpressed( joystick, button )
 			local haspausebinding = hasjoystickbuttonbinding(i, "pause")
 			if (haspausebinding or i == 1) and controlbindingmatchesjoy(i, "jump", joystick, button) then
 				game_keypressed("return")
+				break
 			end
 		end
 		return
