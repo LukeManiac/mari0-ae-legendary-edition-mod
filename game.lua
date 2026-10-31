@@ -5457,15 +5457,15 @@ function game_keypressed(key, textinput)
 			return
 		end
 		if pausemenuopentimer >= pausemenuopenduration and menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 then
-			if (key == "down" or key == "s") then
+			if controlbindingmatcheskey(1, "down", key) then
 				if pausemenuselected < #pausemenuoptions + 2 then
 					pausemenuselected = pausemenuselected + 1
 				end
-			elseif (key == "up" or key == "w") then
+			elseif controlbindingmatcheskey(1, "up", key) then
 				if pausemenuselected > 1 then
 					pausemenuselected = pausemenuselected - 1
 				end
-			elseif (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
+			elseif controlbindingmatcheskey(1, "jump", key) or key == "return" or key == "enter" or key == "kpenter" then
 				if pausemenuoptions[pausemenuselected] == "resume" then
 					pausemenuopen = false
 					if pausedaudio then
@@ -5491,7 +5491,7 @@ function game_keypressed(key, textinput)
 					desktopprompt = true
 					pausemenuselected2 = 1
 				end
-			elseif key == "escape" then
+			elseif key == "escape" or controlbindingmatcheskey(1, "pause", key) then
 				pausemenuopen = false
 				if pausedaudio then
 					love.audio.play(pausedaudio)
@@ -5499,7 +5499,7 @@ function game_keypressed(key, textinput)
 				else
 					playmusic()
 				end
-			elseif (key == "right" or key == "d") then
+			elseif controlbindingmatcheskey(1, "right", key) then
 				if pausemenuoptions[pausemenuselected] == "volume" then
 					volumeslider_step(guielements["pause_volume"], 0.1)
 				elseif pausemenuselected == #pausemenuoptions + 1 then
@@ -5526,7 +5526,7 @@ function game_keypressed(key, textinput)
 					saveconfig()
 				end
 				
-			elseif (key == "left" or key == "a") then
+			elseif controlbindingmatcheskey(1, "left", key) then
 				if pausemenuoptions[pausemenuselected] == "volume" then
 					volumeslider_step(guielements["pause_volume"], -0.1)
 				elseif pausemenuselected == #pausemenuoptions + 1 then
@@ -8730,7 +8730,6 @@ function game_joystickpressed( joystick, button )
 			local haspausebinding = hasjoystickbuttonbinding(i, "pause")
 			if (haspausebinding or i == 1) and controlbindingmatchesjoy(i, "jump", joystick, button) then
 				game_keypressed("return")
-				break
 			end
 		end
 		return
