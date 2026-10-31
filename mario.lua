@@ -517,18 +517,16 @@ function mario:update(dt)
 			self.raccoonflyingtimer = self.raccoonflyingtimer + dt
 			if self.raccoonflyingtimer < self.characterdata.raccoonflytime then
 				-- removed continuous hold-to-fly-higher; now discrete jump presses only (SMB3 style)
+				-- animation only advances/resets on discrete flaps (see jump()), not continuously
+				if self.falling and self.speedy > 0 then
+					self.raccoonflyframe = 1
+					self.raccoonflyanimationprogress = 1
+				end
 			else
 				self.raccoonflyingtimer = 0
 				self.raccoonfly = false
 			end
-			self.raccoonflyanimationprogress = self.raccoonflyanimationprogress + (math.abs(1)+4)/5*dt*self.characterdata.runanimationspeed
-			while self.raccoonflyanimationprogress >= 4 do
-				self.raccoonflyanimationprogress = self.raccoonflyanimationprogress - 3
-			end
-			if self.raccoonflyframe == 4 then
-				self.raccoonflyframe = 1
-			end
-			self.raccoonflyframe = math.floor(self.raccoonflyanimationprogress)
+			-- continuous animation progress removed so fly frames only animate on SMB3-style discrete flaps
 		elseif self.size == 10 then--fly as cape mario
 			if self.capefly and (not (runkey(self.playernumber) and self.controlsenabled)) then
 				self.raccoonfly = false
@@ -3759,7 +3757,7 @@ function mario:jump(force)
 			return
 		end
 		if self.raccoonfly and (self.size == 6 or self.size == 9) then --fly as raccoon Mario (SMB3 style discrete flaps)
-			self.speedy = -self.characterdata.raccoonflyjumpforce
+			self.speedy = math.min(-self.characterdata.raccoonflyjumpforce, self.speedy)
 			playsound(raccoonswingsound)
 			self.raccoonflyframe = 1
 			self.raccoonflyanimationprogress = 1
