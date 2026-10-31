@@ -374,7 +374,7 @@ function game_update(dt)
 		local s3 = controls[1]["down"]
 		local s4 = controls[1]["up"]
 		if hasjoystickaxisbinding(1, "right") then
-			if checkkey(s1,1,"right") then
+			if joystickaxisdown(1,"right") then
 				if not oldjoystick[1] then
 					game_keypressed("right")
 					oldjoystick[1] = true
@@ -384,7 +384,7 @@ function game_update(dt)
 			end
 		end
 		if hasjoystickaxisbinding(1, "left") then
-			if checkkey(s2,1,"left") then
+			if joystickaxisdown(1,"left") then
 				if not oldjoystick[2] then
 					game_keypressed("left")
 					oldjoystick[2] = true
@@ -394,7 +394,7 @@ function game_update(dt)
 			end
 		end
 		if hasjoystickaxisbinding(1, "down") then
-			if checkkey(s3,1,"down") then
+			if joystickaxisdown(1,"down") then
 				if not oldjoystick[3] then
 					game_keypressed("down")
 					oldjoystick[3] = true
@@ -404,7 +404,7 @@ function game_update(dt)
 			end
 		end
 		if hasjoystickaxisbinding(1, "up") then
-			if checkkey(s4,1,"up") then
+			if joystickaxisdown(1,"up") then
 				if not oldjoystick[4] then
 					game_keypressed("up")
 					oldjoystick[4] = true
@@ -5457,15 +5457,15 @@ function game_keypressed(key, textinput)
 			return
 		end
 		if pausemenuopentimer >= pausemenuopenduration and menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 then
-			if controlbindingmatcheskey(1, "down", key) then
+			if (key == "down" or key == "s") then
 				if pausemenuselected < #pausemenuoptions + 2 then
 					pausemenuselected = pausemenuselected + 1
 				end
-			elseif controlbindingmatcheskey(1, "up", key) then
+			elseif (key == "up" or key == "w") then
 				if pausemenuselected > 1 then
 					pausemenuselected = pausemenuselected - 1
 				end
-			elseif controlbindingmatcheskey(1, "jump", key) or key == "return" or key == "enter" or key == "kpenter" then
+			elseif (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
 				if pausemenuoptions[pausemenuselected] == "resume" then
 					pausemenuopen = false
 					if pausedaudio then
@@ -5491,7 +5491,7 @@ function game_keypressed(key, textinput)
 					desktopprompt = true
 					pausemenuselected2 = 1
 				end
-			elseif key == "escape" or controlbindingmatcheskey(1, "pause", key) then
+			elseif key == "escape" then
 				pausemenuopen = false
 				if pausedaudio then
 					love.audio.play(pausedaudio)
@@ -5499,7 +5499,7 @@ function game_keypressed(key, textinput)
 				else
 					playmusic()
 				end
-			elseif controlbindingmatcheskey(1, "right", key) then
+			elseif (key == "right" or key == "d") then
 				if pausemenuoptions[pausemenuselected] == "volume" then
 					volumeslider_step(guielements["pause_volume"], 0.1)
 				elseif pausemenuselected == #pausemenuoptions + 1 then
@@ -5526,7 +5526,7 @@ function game_keypressed(key, textinput)
 					saveconfig()
 				end
 				
-			elseif controlbindingmatcheskey(1, "left", key) then
+			elseif (key == "left" or key == "a") then
 				if pausemenuoptions[pausemenuselected] == "volume" then
 					volumeslider_step(guielements["pause_volume"], -0.1)
 				elseif pausemenuselected == #pausemenuoptions + 1 then
