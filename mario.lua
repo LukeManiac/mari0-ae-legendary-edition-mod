@@ -5087,6 +5087,10 @@ function mario:stompenemy(a, b)
 			self.planetimer = 0
 		end
 
+		if self.raccoonfly then
+			self.raccoonflyingtimer = 0
+		end
+
 		if (mariomakerphysics and jumpkey(self.playernumber)) or (self.animationstate == "idle" or self.animationstate == "running" or self.animationstate == "sliding") then
 			self.animationstate = "jumping"
 			self:setquad()
@@ -5325,6 +5329,12 @@ function mario:stompbounce(a, b) --bounce off of enemy (koopaling in shell for e
 	self.landed = false
 	self:setquad()
 	self.speedy = -bouncespeed
+	if self.planemode then
+		self.planetimer = 0
+	end
+	if self.raccoonfly then
+		self.raccoonflyingtimer = 0
+	end
 	if b.stompbouncesound then
 		playsound(stompsound)
 	end
@@ -7774,10 +7784,6 @@ function mario:duck(ducking, size, dontmove, playercontrols) --goose
 					self.blueshelled = true
 				end
 			end
-			self.raccoonfly = false
-			self.capefly = false
-			self.planemode = false
-			self.planetimer = 0
 		else
 			if self.size == 16 then
 				self.quadcenterY = self.characterdata.hugeclassicquadcenterY
