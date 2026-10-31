@@ -1,0 +1,15 @@
+{
+	"i": 35,
+
+	"x": 5,
+	"y": 0,
+	"height": 3,
+	"graphic": "aviator",
+
+	"bigx": -4,
+	"bigy": -1,
+	"bigheight": 4,
+	"biggraphic": "aviatorbig",
+
+	"directions": true
+}

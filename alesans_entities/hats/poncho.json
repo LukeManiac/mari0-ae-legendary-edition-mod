@@ -1,0 +1,13 @@
+{
+	"i": 34,
+
+	"x": 5,
+	"y": -2,
+	"height": 3,
+	"graphic": "poncho",
+
+	"bigx": -5,
+	"bigy": -5,
+	"bigheight": 4,
+	"biggraphic": "ponchobig"
+}
