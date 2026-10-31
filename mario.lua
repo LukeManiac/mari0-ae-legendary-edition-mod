@@ -431,6 +431,7 @@ function mario:init(x, y, i, animation, size, t, properties)
 				self.yoshi = obj
 				table.insert(objects["yoshi"], obj)
 				self:shoed("yoshi", true)
+				self.yoshitounge = false
 			else
 				self:shoed(properties.shoe, true)
 			end
@@ -483,7 +484,7 @@ function mario:update(dt)
 			self.floattimer = 0
 			self.float = false
 			self.ignoregravity = false
-			if self.characterdata.fallframes > 0 then
+			if self.characterdata.fallframes > 0 and self.falling and self.speedy > 0 then
 				self.animationstate = "falling"
 			else
 				self.animationstate = "jumping"
@@ -501,43 +502,21 @@ function mario:update(dt)
 				end
 				self.planemode = true
 			end
-		else
-			-- running but not fast enough: slowly decrease planetimer
-			self.planetimer = math.max(0, self.planetimer - dt)
-			if self.planetimer <= 0 then
-				if self.animationstate ~= "jumping" and self.raccoonfly == false then
-					raccoonplanesound:stop()
-					self.planemode = false
-				end
-				self.playraccoonplanesound = true
-			end
 		end
 	else
-		-- not in running state: slowly decrease planetimer instead of rigid reset
-		self.planetimer = math.max(0, self.planetimer - dt)
-		if self.planetimer <= 0 or (self.animationstate ~= "jumping" and self.raccoonfly == false) then
-			if self.animationstate ~= "jumping" and self.raccoonfly == false then
-				raccoonplanesound:stop()
-				self.planemode = false
-			end
-			self.playraccoonplanesound = true
+		if self.animationstate ~= "jumping" and self.raccoonfly == false then
+			raccoonplanesound:stop()
+			self.planemode = false
 		end
+		self.playraccoonplanesound = true
+		self.planetimer = math.max(0, self.planetimer - dt * 1.5)
 	end
 	
 	if self.raccoonfly then
 		if (self.size == 6 or self.size == 9) then --fly as raccoon Mario
 			self.raccoonflyingtimer = self.raccoonflyingtimer + dt
 			if self.raccoonflyingtimer < self.characterdata.raccoonflytime then
-				if jumpkey(self.playernumber) and self.controlsenabled then
-					if self.gravitydir == "up" then
-						self.speedy = math.min(self.characterdata.raccoonflyjumpforce, self.speedy+100*dt)
-					else
-						self.speedy = math.max(-self.characterdata.raccoonflyjumpforce, self.speedy-100*dt)
-					end
-					if self.speedy < 0 then
-						self.y = math.max(-4, self.y)
-					end
-				end
+				-- removed continuous hold-to-fly-higher; now discrete jump presses only (SMB3 style)
 			else
 				self.raccoonflyingtimer = 0
 				self.raccoonfly = false
@@ -3779,18 +3758,12 @@ function mario:jump(force)
 		if self.shoe == "cloud" then
 			return
 		end
-		if self.raccoonfly and (self.size == 6 or self.size == 9) then --fly as raccoon Mario
+		if self.raccoonfly and (self.size == 6 or self.size == 9) then --fly as raccoon Mario (SMB3 style discrete flaps)
 			self.speedy = math.min(-self.characterdata.raccoonflyjumpforce, self.speedy)
-		elseif self.planemode and (self.size == 6 or self.size == 9) and (self.falling or self.jumping) and (not self.shoe) then
-			-- next jump press while airborne in planemode starts flight (SMB3 style)
-			self.raccoonfly = true
 			playsound(raccoonswingsound)
-			self.speedy = math.min(-self.characterdata.raccoonflyjumpforce, self.speedy)
-			if self.speedx < 0 then
-				self.raccoonflydirection = "left"
-			else
-				self.raccoonflydirection = "right"
-			end
+			self.raccoonflyframe = 1
+			self.raccoonflyanimationprogress = 1
+			self:setquad()
 		end		
 		self.redseesaw = false
 		
@@ -3866,15 +3839,14 @@ function mario:jump(force)
 					if (self.size == 6 or self.size == 9 or self.size == 10) and self.planemode and (not self.shoe) then
 						if self.size == 10 then
 							self.speedy = -self.characterdata.capejumpforce
-							self.raccoonfly = true
-							if self.speedx < 0 then
-								self.raccoonflydirection = "left"
-							else
-								self.raccoonflydirection = "right"
-							end
 						else
-							-- raccoon/tanooki: do the high jump now, but wait for next jump press to start flying
 							self.speedy = -self.characterdata.raccoonjumpforce
+						end
+						self.raccoonfly = true
+						if self.speedx < 0 then
+							self.raccoonflydirection = "left"
+						else
+							self.raccoonflydirection = "right"
 						end
 					elseif self.gravitydir == "down" then
 						self.speedy = force
@@ -4815,12 +4787,10 @@ function mario:floorcollide(a, b)
 			self.planemode = false
 			self.planetimer = 0
 		end
-
-		-- if landing while planemode active and not fast enough or not running, disable planemode (timer will decrease in update)
+		
 		if self.planemode and (math.abs(self.speedx) <= 8.9 or self.animationstate ~= "running") then
 			self.planemode = false
-			raccoonplanesound:stop()
-			self.playraccoonplanesound = true
+			-- timer will start decreasing in update
 		end
 		
 		if ((self.shoe and self.shoe ~= "yoshi") or self.statue) and self.animation == "flag" then
@@ -4910,6 +4880,7 @@ function mario:floorcollide(a, b)
 			self.groundpounding = false
 			self:shoed("yoshi")
 			b:ride(self)
+			self.yoshitounge = false
 		end
 		return false
 	elseif (a == "plantfire" or a == "brofireball" or a == "castlefirefire" or a == "fire") and self.size == 4 and self.ducking then
@@ -9179,11 +9150,6 @@ function mario:shoed(shoe, initial, drop) --get in shoe (type, make sound?, drop
 		self.planemode = false
 		self.planetimer = 0
 		if shoe == "yoshi" then
-			-- ensure tongue state is off when mounting
-			self.yoshitounge = false
-			self.yoshitoungewidth = 0
-			self.yoshitoungespeed = yoshitoungespeed
-			self.yoshitoungeenemy = false
 			if self.size == 1 then
 				self.shoeoffsetY = self.characterdata.smallyoshioffsetY
 			elseif self.size == 8 then
@@ -9195,6 +9161,7 @@ function mario:shoed(shoe, initial, drop) --get in shoe (type, make sound?, drop
 			elseif self.size > 1 then
 				self.shoeoffsetY = self.characterdata.bigyoshioffsetY
 			end
+			self.yoshitounge = false
 		else
 			if self.size == 1 then
 				self.shoeoffsetY = self.characterdata.smallshoeoffsetY
