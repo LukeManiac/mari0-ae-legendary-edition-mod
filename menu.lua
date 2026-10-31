@@ -554,6 +554,7 @@ local function optionscontrols_draw_page(page, offset)
 	end
 	optionscontrols_draw(page, true)
 	love.graphics.pop()
+	love.graphics.pop()
 end
 
 --where the pause menu's controls popup is on screen, and how far its widgets are shifted from where the options menu draws them
