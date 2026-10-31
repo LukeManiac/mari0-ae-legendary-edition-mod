@@ -18,7 +18,8 @@ local menupopupanimations = {
 	newgamewarning = {from = 0, to = 0},
 	selectworld = {from = 0, to = 0},
 	resetwarning = {from = 0, to = 0},
-	controls = {from = 0, to = 0}
+	controls = {from = 0, to = 0},
+	keyprompt = {from = 0, to = 0}
 }
 
 function menupopupscale(name, now)
@@ -39,10 +40,21 @@ function menupopupscale(name, now)
 end
 
 controlsopen = false
+keyprompt = false
 
 --true while the pause menu's controls popup is open or still animating closed
 function controlspopupvisible()
 	return controlsopen or menupopupscale("controls", love.timer.getTime()) > 0
+end
+
+--true while the keyprompt popup is open or still animating
+function keypromptvisible()
+	return keyprompt or menupopupscale("keyprompt", love.timer.getTime()) > 0
+end
+
+--true only when the keyprompt animation has fully opened
+function keypromptfullyopen()
+	return keyprompt and menupopupscale("keyprompt", love.timer.getTime()) >= 1
 end
 
 function setmenupopupvisible(name, visible)
@@ -53,6 +65,8 @@ function setmenupopupvisible(name, visible)
 		currentlyvisible = resetwarningopen
 	elseif name == "controls" then
 		currentlyvisible = controlsopen
+	elseif name == "keyprompt" then
+		currentlyvisible = keyprompt
 	else
 		currentlyvisible = selectworldopen
 	end
@@ -83,6 +97,8 @@ function setmenupopupvisible(name, visible)
 			skinningplayer = 1
 			optionsselection = 2
 		end
+	elseif name == "keyprompt" then
+		keyprompt = visible
 	else
 		selectworldopen = visible
 	end
@@ -355,7 +371,7 @@ function optionscontrols_create()
 		saveconfig()
 	end, skinningplayer, "1", "2", "3", "4")
 
-	local currentbindlabel = TEXT["current bind:"] or "current bind:"
+	local currentbindlabel = TEXT["current bind:"]
 	local bindlabelwidth = utf8.len(currentbindlabel) * 8
 	local binddropdownwidth = 13 + 8
 	local bindgroupx = 130 - (bindlabelwidth + 4 + binddropdownwidth) / 2
@@ -2344,7 +2360,7 @@ function menu_draw()
 			else
 				love.graphics.setColor(100, 100, 100, 255)
 			end
-			local currentbindlabel = TEXT["current bind:"] or "current bind:"
+			local currentbindlabel = TEXT["current bind:"]
 			local bindlabelwidth = utf8.len(currentbindlabel) * 8
 			local bindgroupwidth = bindlabelwidth + 4 + 21
 			properprintF(currentbindlabel, (130 - bindgroupwidth/2)*scale, 66*scale)
@@ -2381,11 +2397,25 @@ function menu_draw()
 			love.graphics.setColor(255, 255, 255, 255)
 			properprintF(tooltipline1 .. "\n" .. tooltipline2, tooltipx*scale, 0)
 				
-			if keyprompt then
-				love.graphics.setColor(0, 0, 0, 255)
-				love.graphics.rectangle("fill", 30*scale, 100*scale, 200*scale, 60*scale)
-				love.graphics.setColor(255, 255, 255, 255)
-				drawrectangle(30, 100, 200, 60)
+			local now = love.timer.getTime()
+			local keypromptscale = menupopupscale("keyprompt", now)
+			if keyprompt or keypromptscale > 0 then
+				love.graphics.push()
+				love.graphics.translate(130*scale, 130*scale)
+				love.graphics.scale(keypromptscale, keypromptscale)
+				love.graphics.translate(-130*scale, -130*scale)
+
+				local progress = keypromptscale
+				love.graphics.translate(0, (1 - progress) * 8 * scale)
+
+				local popupradius = math.min(200, 60) * scale * 0.2
+				love.graphics.setColor(0, 0, 0)
+				love.graphics.rectangle("fill", 30*scale, 100*scale, 200*scale, 60*scale, popupradius)
+				love.graphics.setColor(255, 255, 255)
+				local previouslinewidth = love.graphics.getLineWidth()
+				love.graphics.setLineWidth(scale)
+				love.graphics.rectangle("line", 30*scale, 100*scale, 200*scale, 60*scale, popupradius)
+				love.graphics.setLineWidth(previouslinewidth)
 				local controlname = optionscontrols_controlnames[optionsselection-4]
 				if controlname == "aimx" then
 					properprintF(TEXT["move stick right"], 40*scale, 110*scale)
@@ -2396,7 +2426,7 @@ function menu_draw()
 				end
 				local escapetext = TEXT["press 'esc' to cancel"]
 				if keypromptpage > 1 then
-					escapetext = TEXT["press 'esc' to clear"] or "press 'esc' to clear"
+					escapetext = TEXT["press 'esc' to clear"]
 				end
 				properprintF(escapetext, 40*scale, 140*scale)
 				
@@ -2409,6 +2439,7 @@ function menu_draw()
 					properprintF(TEXT["you can only set"], 40*scale, 120*scale)
 					properprintF(TEXT["axes for this"], 40*scale, 130*scale)
 				end
+				love.graphics.pop()
 			end
 		elseif optionstab == 2 then
 			--SKINS
@@ -4252,12 +4283,11 @@ function keypromptenter(t, ...)
 	end
 	
 	if (not buttonerror and not axiserror) or arg[1] == "escape" then
-		keyprompt = false
+		setmenupopupvisible("keyprompt", false)
 	end
 end
 
 function keypromptstart()
-	keyprompt = true
 	keypromptpage = keybindpage
 	buttonerror = false
 	axiserror = false
@@ -4284,6 +4314,8 @@ function keypromptstart()
 			table.insert(prompt.joystick[i].axisposition, love.joystick.getAxis(i, j))
 		end
 	end
+
+	setmenupopupvisible("keyprompt", true)
 end
 
 function reset_mappacks()
@@ -4673,7 +4705,7 @@ function drawcontrolsoverlay()
 	else
 		love.graphics.setColor(100, 100, 100, 255)
 	end
-	local currentbindlabel = TEXT["current bind:"] or "current bind:"
+	local currentbindlabel = TEXT["current bind:"]
 	local bindgroupwidth = utf8.len(currentbindlabel) * 8 + 4 + 21
 	properprintF(currentbindlabel, (130 - bindgroupwidth/2)*scale, 66*scale)
 
@@ -4681,11 +4713,25 @@ function drawcontrolsoverlay()
 	optionscontrols_draw(nil, false, true)
 
 	-- waiting for a key / button to bind
-	if keyprompt then
-		love.graphics.setColor(0, 0, 0, 255)
-		love.graphics.rectangle("fill", 30*scale, 100*scale, 200*scale, 60*scale)
-		love.graphics.setColor(255, 255, 255, 255)
-		drawrectangle(30, 100, 200, 60)
+	local now = love.timer.getTime()
+	local keypromptscale = menupopupscale("keyprompt", now)
+	if keyprompt or keypromptscale > 0 then
+		love.graphics.push()
+		love.graphics.translate(130*scale, 130*scale)
+		love.graphics.scale(keypromptscale, keypromptscale)
+		love.graphics.translate(-130*scale, -130*scale)
+
+		local progress = keypromptscale
+		love.graphics.translate(0, (1 - progress) * 8 * scale)
+
+		local popupradius = math.min(200, 60) * scale * 0.2
+		love.graphics.setColor(0, 0, 0)
+		love.graphics.rectangle("fill", 30*scale, 100*scale, 200*scale, 60*scale, popupradius)
+		love.graphics.setColor(255, 255, 255)
+		local previouslinewidth = love.graphics.getLineWidth()
+		love.graphics.setLineWidth(scale)
+		love.graphics.rectangle("line", 30*scale, 100*scale, 200*scale, 60*scale, popupradius)
+		love.graphics.setLineWidth(previouslinewidth)
 		local controlname = optionscontrols_controlnames[optionsselection-4]
 		if controlname == "aimx" then
 			properprintF(TEXT["move stick right"], 40*scale, 110*scale)
@@ -4696,7 +4742,7 @@ function drawcontrolsoverlay()
 		end
 		local escapetext = TEXT["press 'esc' to cancel"]
 		if keypromptpage > 1 then
-			escapetext = TEXT["press 'esc' to clear"] or "press 'esc' to clear"
+			escapetext = TEXT["press 'esc' to clear"]
 		end
 		properprintF(escapetext, 40*scale, 140*scale)
 
@@ -4709,11 +4755,12 @@ function drawcontrolsoverlay()
 			properprintF(TEXT["you can only set"], 40*scale, 120*scale)
 			properprintF(TEXT["axes for this"], 40*scale, 130*scale)
 		end
+		love.graphics.pop()
 	end
 	love.graphics.pop()
 
 	-- how to leave
-	if not keyprompt then
+	if not keypromptvisible() then
 		local hint = "esc: back"
 		love.graphics.setColor(100, 100, 100, 255)
 		properprintF(hint, popupx + (popupw - utf8.len(hint)*8*scale)/2, popupy + popuph - 12*scale)

@@ -2017,8 +2017,8 @@ function love.keypressed(key, scancode, isrepeat, textinput)
 		return
 	end
 	
-	if keyprompt then
-		if not isrepeat then
+	if keypromptvisible() then
+		if keypromptfullyopen() and not isrepeat then
 			keypromptenter("key", key)
 			saveconfig()
 		end
@@ -2327,9 +2327,11 @@ function love.joystickpressed(joystick, button, simulated)
 		joystick = joystick:getID()
 	end
 	
-	if keyprompt then
-		keypromptenter("joybutton", joystick, button)
-		saveconfig()
+	if keypromptvisible() then
+		if keypromptfullyopen() then
+			keypromptenter("joybutton", joystick, button)
+			saveconfig()
+		end
 		return
 	end
 	
@@ -2551,7 +2553,7 @@ function getaveragecolor2(imgdata, cox, coy)
 end
 
 function keyprompt_update()
-	if keyprompt then
+	if keypromptfullyopen() then
 		for i = 1, prompt.joysticks do
 			for j = 1, #prompt.joystick[i].validhats do
 				local dir = love.joystick.getHat(i, prompt.joystick[i].validhats[j])
