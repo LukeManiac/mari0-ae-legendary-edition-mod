@@ -494,7 +494,7 @@ function mario:update(dt)
 		end
 	end
 	if (self.size == 6 or self.size == 9 or self.size == 10) and self.animationstate == "running" then --be able to fly when runing for whatever seconds
-		if (self.animationdirection == "left" and self.speedx < -8.8) or (self.animationdirection == "right" and self.speedx > 8.9) then
+		if math.abs(self.speedx) >= 8.9 then
 			self.planetimer = self.planetimer + dt
 			if self.planetimer > 1.1 then
 				if self.playraccoonplanesound and self.size ~= 10 then
@@ -4801,6 +4801,9 @@ function mario:floorcollide(a, b)
 		
 		if self.planemode and (math.abs(self.speedx) <= 8.9 or self.animationstate ~= "running") then
 			self.planemode = false
+			self.raccoonfly = false
+			self.raccoonflyingtimer = 0
+			self.raccoonflaptimer = 0
 			-- timer will start decreasing in update
 		end
 		
