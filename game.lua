@@ -1292,6 +1292,11 @@ function game_update(dt)
 			end
 		end
 	end
+
+	-- camera stoppers (must run after CompletelyCenteredCamera so they are not ignored)
+	for i, v in pairs(objects["camerastop"]) do
+		v:collide(oldscroll, oldscrolly)
+	end
 	
 	if players == 2 then
 		--updatesplitscreen()
