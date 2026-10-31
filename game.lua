@@ -8725,6 +8725,11 @@ function game_joystickpressed( joystick, button )
 	end
 
 	if pausemenuopen then
+		for _, dir in ipairs({"right", "left", "down", "up"}) do
+			if controlbindingmatchesjoy(1, dir, joystick, button) then
+				game_keypressed(dir)
+			end
+		end
 		--select pause options
 		for i = 1, players do
 			local haspausebinding = hasjoystickbuttonbinding(i, "pause")
