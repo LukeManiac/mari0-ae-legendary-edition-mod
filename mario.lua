@@ -481,7 +481,7 @@ function mario:update(dt)
 		self.animationstate = "floating"
 		self:setquad()
 		self.floattimer = self.floattimer + dt
-		if (self.size == 11 and self.floattimer > 0.3) or (self.size ~= 11 and self.floattimer > 0.25) then
+		if self.size ~= 11 and self.floattimer > 0.25 then
 			self.floattimer = 0
 			self.float = false
 			self.ignoregravity = false
