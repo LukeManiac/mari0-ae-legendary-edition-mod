@@ -329,6 +329,9 @@ function game_update(dt)
 	desktopprompttimer = math.max(0, math.min(desktopprompttimer + (dt * (desktopprompt and 1 or -1)), desktoppromptduration))
 	suspendprompttimer = math.max(0, math.min(suspendprompttimer + (dt * (suspendprompt and 1 or -1)), suspendpromptduration))
 
+	--controls popup of the pause menu
+	controlspopup_update()
+
 	--pause menu volume slider
 	if pausemenuopentimer > 0 then
 		local volumeslider = guielements["pause_volume"]
@@ -344,8 +347,8 @@ function game_update(dt)
 			end
 		end
 
-		--only usable and hoverable once the menu is fully open and no prompt is showing
-		volumeslider.active = (pausemenuopentimer >= pausemenuopenduration and menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0)
+		--only usable and hoverable once the menu is fully open and no prompt (or the controls popup) is showing
+		volumeslider.active = (pausemenuopentimer >= pausemenuopenduration and menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 and not controlspopupvisible())
 		volumeslider.nohover = not volumeslider.active
 
 		if volumeslider.dragging and not volumeslider.active then
@@ -5471,10 +5474,7 @@ function game_keypressed(key, textinput)
 			return
 		end
 		if controlsopen then
-			if key == "escape" then
-				setmenupopupvisible("controls", false)
-			end
-			-- Let options controls handle further input if needed; for now close on escape
+			controlspopup_keypressed(key)
 			return
 		end
 
@@ -5867,6 +5867,7 @@ end
 function game_mousepressed(x, y, button)
 	local s = ""
 	if pausemenuopen then
+		controlspopup_mousepressed(x, y, button)
 		return
 	end
 	if editormode and editorstate ~= "portalgun" then

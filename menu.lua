@@ -40,6 +40,11 @@ end
 
 controlsopen = false
 
+--true while the pause menu's controls popup is open or still animating closed
+function controlspopupvisible()
+	return controlsopen or menupopupscale("controls", love.timer.getTime()) > 0
+end
+
 function setmenupopupvisible(name, visible)
 	local currentlyvisible
 	if name == "newgamewarning" then
@@ -385,6 +390,11 @@ function optionscontrols_create()
 		controlsbutton.controlbindpage = true
 		guielements["ctrl_" .. name] = controlsbutton
 	end
+
+	--these are also drawn inside the pause menu's controls popup, where the mouse has to be translated (see optionscontrols_transformmouse)
+	guielements["ctrl_player"].controlspopup = true
+	guielements["ctrl_mouse"].controlspopup = true
+	guielements["ctrl_bindpage"].controlspopup = true
 end
 
 function optionscontrols_remove()
@@ -545,7 +555,25 @@ local function optionscontrols_draw_page(page, offset)
 	love.graphics.pop()
 end
 
+--where the pause menu's controls popup is on screen, and how far its widgets are shifted from where the options menu draws them
+local function controlspopup_geometry()
+	local winwidth, winheight = getproperwindowsize()
+	local popupw = 240 * scale
+	local popuph = 208 * scale
+	local popupx = (winwidth - popupw) / 2
+	local popupy = (winheight - popuph) / 2
+	return popupx, popupy, popupw, popuph, popupx - 20*scale, popupy - 20*scale
+end
+
 function optionscontrols_transformmouse(x, y)
+	if gamestate == "game" then
+		--pause menu popup: the widgets are drawn shifted, so move the mouse the same way (and ignore it while the popup is animating)
+		if not controlsopen or keybindpageanimation or menupopupscale("controls", love.timer.getTime()) ~= 1 then
+			return -math.huge, -math.huge
+		end
+		local _, _, _, _, offsetx, offsety = controlspopup_geometry()
+		return x - offsetx, y - offsety
+	end
 	if gamestate ~= "options" or optionstab ~= 1 then
 		return x, y
 	end
@@ -4599,10 +4627,7 @@ function drawcontrolsoverlay()
 	love.graphics.scale(controlspopupscale, controlspopupscale)
 	love.graphics.translate(-cx, -cy)
 
-	local popupw = 240 * scale
-	local popuph = 180 * scale
-	local popupx = (winwidth - popupw) / 2
-	local popupy = (winheight - popuph) / 2
+	local popupx, popupy, popupw, popuph, offsetx, offsety = controlspopup_geometry()
 	local popupradius = get_corner_radius(popupw, popuph) / 2
 
 	love.graphics.setColor(0, 0, 0, 255)
@@ -4616,17 +4641,181 @@ function drawcontrolsoverlay()
 	-- Title
 	properprintF("controls:", (winwidth/2 - 36*scale), popupy + 8*scale)
 
-	-- Draw the controls content (repositioned)
-	love.graphics.setScissor(popupx + 4*scale, popupy + 20*scale, popupw - 8*scale, popuph - 28*scale)
+	-- Draw the controls content (repositioned, the widgets are laid out like in the options menu)
 	love.graphics.push()
-	love.graphics.translate(popupx - 20*scale, popupy - 20*scale)
+	love.graphics.translate(offsetx, offsety)
+
+	-- the key bindings (clipped, they slide sideways when the page changes)
+	love.graphics.setScissor(popupx + 4*scale, popupy + 20*scale, popupw - 8*scale, popuph - 28*scale)
 	local pageviews = optionscontrols_pageviews()
 	for i = 1, #pageviews do
 		optionscontrols_draw_page(pageviews[i].page, pageviews[i].offset)
 	end
-	optionscontrols_draw(nil, false, true)
-	love.graphics.pop()
 	love.graphics.setScissor()
 
+	-- labels of the widgets at the top (the options menu draws these itself)
+	if optionsselection == 2 then
+		love.graphics.setColor(255, 255, 255, 255)
+	else
+		love.graphics.setColor(100, 100, 100, 255)
+	end
+	properprintF(TEXT["edit player:"], 30*scale, 40*scale)
+
+	if optionsselection == 3 then
+		love.graphics.setColor(255, 255, 255, 255)
+	else
+		love.graphics.setColor(100, 100, 100, 255)
+	end
+	properprintF(TEXT["uses the mouse:"], 30*scale, 52*scale)
+
+	if optionsselection == 4 then
+		love.graphics.setColor(255, 255, 255, 255)
+	else
+		love.graphics.setColor(100, 100, 100, 255)
+	end
+	local currentbindlabel = TEXT["current bind:"] or "current bind:"
+	local bindgroupwidth = utf8.len(currentbindlabel) * 8 + 4 + 21
+	properprintF(currentbindlabel, (130 - bindgroupwidth/2)*scale, 66*scale)
+
+	-- player, mouse and bind page widgets (drawn last so an open dropdown is on top)
+	optionscontrols_draw(nil, false, true)
+
+	-- waiting for a key / button to bind
+	if keyprompt then
+		love.graphics.setColor(0, 0, 0, 255)
+		love.graphics.rectangle("fill", 30*scale, 100*scale, 200*scale, 60*scale)
+		love.graphics.setColor(255, 255, 255, 255)
+		drawrectangle(30, 100, 200, 60)
+		local controlname = optionscontrols_controlnames[optionsselection-4]
+		if controlname == "aimx" then
+			properprintF(TEXT["move stick right"], 40*scale, 110*scale)
+		elseif controlname == "aimy" then
+			properprintF(TEXT["move stick down"], 40*scale, 110*scale)
+		elseif controlname then
+			properprintF(TEXT["press key for '"] .. TEXT[controlname] .. "'", 40*scale, 110*scale)
+		end
+		local escapetext = TEXT["press 'esc' to cancel"]
+		if keypromptpage > 1 then
+			escapetext = TEXT["press 'esc' to clear"] or "press 'esc' to clear"
+		end
+		properprintF(escapetext, 40*scale, 140*scale)
+
+		if buttonerror then
+			love.graphics.setColor(200, 0, 0)
+			properprintF(TEXT["you can only set"], 40*scale, 120*scale)
+			properprintF(TEXT["buttons for this"], 40*scale, 130*scale)
+		elseif axiserror then
+			love.graphics.setColor(200, 0, 0)
+			properprintF(TEXT["you can only set"], 40*scale, 120*scale)
+			properprintF(TEXT["axes for this"], 40*scale, 130*scale)
+		end
+	end
 	love.graphics.pop()
+
+	-- how to leave
+	if not keyprompt then
+		local hint = "esc: back"
+		love.graphics.setColor(100, 100, 100, 255)
+		properprintF(hint, popupx + (popupw - utf8.len(hint)*8*scale)/2, popupy + popuph - 12*scale)
+	end
+
+	love.graphics.pop()
+end
+
+--called every frame from game_update: keeps the widgets of the pause menu's controls popup in sync (selection highlight, which ones can be used)
+--and removes them again once the popup has closed so they stop reacting to the mouse and keys
+function controlspopup_update()
+	if controlsopen then
+		if not pausemenuopen then
+			setmenupopupvisible("controls", false)
+			return
+		end
+		if not guielements["ctrl_player"] then
+			optionscontrols_create()
+		end
+		optionscontrols_sync()
+	elseif guielements["ctrl_player"] and menupopupscale("controls", love.timer.getTime()) == 0 then
+		optionscontrols_remove()
+	end
+end
+
+--keyboard / controller input for the pause menu's controls popup (controller buttons and sticks arrive as up, down, left, right, return and escape)
+function controlspopup_keypressed(key)
+	if keyprompt then
+		return --the next key or button gets bound, see love.keypressed
+	end
+
+	local dropdown = guielement.getopendropdown()
+	if key == "escape" then
+		if dropdown then
+			dropdown:close()
+		else
+			setmenupopupvisible("controls", false)
+		end
+		return
+	end
+
+	if menupopupscale("controls", love.timer.getTime()) < 1 then
+		return --still opening
+	end
+
+	if dropdown then
+		--keys that skip love.keypressed (controller buttons) still belong to an open dropdown
+		dropdown:keypress(key)
+		return
+	end
+
+	--left / right on the bind page row or a binding flips the page
+	if optionsselection >= 4 and (key == "left" or key == "right" or key == "a" or key == "d") then
+		if optionscontrols_change_page((key == "left" or key == "a") and -1 or 1) then
+			return
+		end
+	end
+
+	if optionsselection == 2 then
+		--left / right on the player row changes the player
+		if key == "left" or key == "a" then
+			if skinningplayer > 1 then
+				skinningplayer = skinningplayer - 1
+			end
+		elseif key == "right" or key == "d" then
+			if skinningplayer < 4 then
+				skinningplayer = skinningplayer + 1
+			end
+		end
+		if characters.data[mariocharacter[skinningplayer]] then
+			characteri = characters.data[mariocharacter[skinningplayer]].i
+		end
+	end
+
+	if key == "return" or key == "enter" or key == "kpenter" or key == " " then
+		optionscontrols_activate(optionsselection)
+	elseif key == "down" or key == "s" then
+		if optionsselection < optionscontrols_lastselection() then
+			optionsselection = optionsselection + 1
+		else
+			optionsselection = 2
+		end
+	elseif key == "up" or key == "w" then
+		if optionsselection > 2 then
+			optionsselection = optionsselection - 1
+		else
+			optionsselection = optionscontrols_lastselection()
+		end
+	end
+end
+
+--a click outside of the pause menu's controls popup closes it
+function controlspopup_mousepressed(x, y, button)
+	if not controlsopen or keyprompt or button ~= "l" or guielement.getopendropdown() then
+		return
+	end
+	if menupopupscale("controls", love.timer.getTime()) < 1 then
+		return
+	end
+
+	local popupx, popupy, popupw, popuph = controlspopup_geometry()
+	if x < popupx or x >= popupx + popupw or y < popupy or y >= popupy + popuph then
+		setmenupopupvisible("controls", false)
+	end
 end

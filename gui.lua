@@ -1621,7 +1621,7 @@ function guielement:inhighlight(x, y)
 	if editormode and not editor_gui_interaction_enabled(self) then
 		return false
 	end
-	if self.controlbindpage and optionscontrols_transformmouse then
+	if (self.controlbindpage or (self.controlspopup and gamestate == "game")) and optionscontrols_transformmouse then
 		x, y = optionscontrols_transformmouse(x, y)
 	end
 	if self.nohover then --e.g. the level properties panel while it is still sliding, or a menu on top of it
