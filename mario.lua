@@ -2540,7 +2540,7 @@ function mario:update(dt)
 			end
 		end
 		
-		if self.falling == false and self.jumping == false and self.groundpounding == false then
+		if (self.falling == false and self.jumping == false and self.groundpounding == false) or self.raccoonfly then
 			if self.shoe == "drybonesshell" then
 				if downkey(self.playernumber) then
 					if self.ducking == false and (not self.lavasurfing) and (not self.risingwater) then
