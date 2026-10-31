@@ -17,10 +17,11 @@ local menupopupduration = 0.25
 local menupopupanimations = {
 	newgamewarning = {from = 0, to = 0},
 	selectworld = {from = 0, to = 0},
-	resetwarning = {from = 0, to = 0}
+	resetwarning = {from = 0, to = 0},
+	controls = {from = 0, to = 0}
 }
 
-local function menupopupscale(name, now)
+function menupopupscale(name, now)
 	local anim = menupopupanimations[name]
 	if not anim.start then
 		return anim.to
@@ -37,12 +38,16 @@ local function menupopupscale(name, now)
 	return lerp(anim.from, anim.to, progress)
 end
 
-local function setmenupopupvisible(name, visible)
+controlsopen = false
+
+function setmenupopupvisible(name, visible)
 	local currentlyvisible
 	if name == "newgamewarning" then
 		currentlyvisible = newgamewarning
 	elseif name == "resetwarning" then
 		currentlyvisible = resetwarningopen
+	elseif name == "controls" then
+		currentlyvisible = controlsopen
 	else
 		currentlyvisible = selectworldopen
 	end
@@ -63,6 +68,16 @@ local function setmenupopupvisible(name, visible)
 		newgamewarning = visible
 	elseif name == "resetwarning" then
 		resetwarningopen = visible
+	elseif name == "controls" then
+		controlsopen = visible
+		if visible then
+			if not guielements["ctrl_player"] then
+				optionscontrols_create()
+			end
+			optionscontrols_sync()
+			skinningplayer = 1
+			optionsselection = 2
+		end
 	else
 		selectworldopen = visible
 	end
@@ -542,7 +557,7 @@ function optionscontrols_transformmouse(x, y)
 end
 
 function optionscontrols_update()
-	if gamestate == "options" and optionstab == 1 then
+	if (gamestate == "options" and optionstab == 1) or controlsopen then
 		if not guielements["ctrl_player"] then
 			optionscontrols_create()
 		end
@@ -4563,4 +4578,55 @@ function brprint(text, y)
 	end
 
 	properprint(text, (width*16-#(text)*8-8)*scale, y*scale)
+end
+
+function drawcontrolsoverlay()
+	local now = love.timer.getTime()
+	local controlspopupscale = menupopupscale("controls", now)
+	if not (controlsopen or controlspopupscale > 0) then
+		return
+	end
+
+	local winwidth, winheight = getproperwindowsize()
+	-- Animated alpha for the foreground (dim behind the overlay)
+	local dimalpha = controlspopupscale * 180
+	love.graphics.setColor(0, 0, 0, dimalpha)
+	love.graphics.rectangle("fill", 0, 0, winwidth, winheight)
+
+	love.graphics.push()
+	local cx, cy = winwidth / 2, winheight / 2
+	love.graphics.translate(cx, cy)
+	love.graphics.scale(controlspopupscale, controlspopupscale)
+	love.graphics.translate(-cx, -cy)
+
+	local popupw = 240 * scale
+	local popuph = 180 * scale
+	local popupx = (winwidth - popupw) / 2
+	local popupy = (winheight - popuph) / 2
+	local popupradius = get_corner_radius(popupw, popuph) / 2
+
+	love.graphics.setColor(0, 0, 0, 255)
+	love.graphics.rectangle("fill", popupx, popupy, popupw, popuph, popupradius)
+	love.graphics.setColor(255, 255, 255, 255)
+	local previouslinewidth = love.graphics.getLineWidth()
+	love.graphics.setLineWidth(scale)
+	love.graphics.rectangle("line", popupx, popupy, popupw, popuph, popupradius)
+	love.graphics.setLineWidth(previouslinewidth)
+
+	-- Title
+	properprintF("controls:", (winwidth/2 - utf8.len("controls:") * 4 * scale), popupy + 8 * scale)
+
+	-- Draw the controls content (repositioned)
+	love.graphics.setScissor(popupx + 4*scale, popupy + 20*scale, popupw - 8*scale, popuph - 28*scale)
+	love.graphics.push()
+	love.graphics.translate(popupx - 20*scale, popupy - 20*scale)
+	local pageviews = optionscontrols_pageviews()
+	for i = 1, #pageviews do
+		optionscontrols_draw_page(pageviews[i].page, pageviews[i].offset)
+	end
+	optionscontrols_draw(nil, false, true)
+	love.graphics.pop()
+	love.graphics.setScissor()
+
+	love.graphics.pop()
 end

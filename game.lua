@@ -3217,35 +3217,49 @@ function game_draw()
 			end
 		end
 
+		-- Controls, Shader1, Shader2 (vertically centered as a group)
+		-- Spacing of 30 between labels; group centered around 112
 		love.graphics.setColor(100, 100, 100, 255)
 		if pausemenuselected == #pausemenuoptions + 1 then
 			love.graphics.setColor(255, 255, 255, 255)
-			properprint(">", (width*8*scale)-5*scale, (112*scale)-20*scale)
+			properprint(">", (width*8*scale)-5*scale, (112*scale)-35*scale)
 		end
 
-		properprintF(TEXT["shader1:"], (width*8*scale)+5*scale, (112*scale)-20*scale)
-
-		if shaderssupported == false then
-			properprintF(TEXT["unsupported"], (width*8*scale)+5*scale, (112*scale)-10*scale)
-		else
-			properprintF(string.lower(shaderlist[currentshaderi1]), (width*8*scale)+5*scale, (112*scale)-10*scale)
-		end
+		properprintF("controls:", (width*8*scale)+5*scale, (112*scale)-35*scale)
+		properprintF("edit", (width*8*scale)+5*scale, (112*scale)-25*scale)
 
 		love.graphics.setColor(100, 100, 100, 255)
 		if pausemenuselected == #pausemenuoptions + 2 then
 			love.graphics.setColor(255, 255, 255, 255)
-			properprint(">", (width*8*scale)-5*scale, (112*scale)+10*scale)
+			properprint(">", (width*8*scale)-5*scale, (112*scale)-5*scale)
 		end
 
-		properprintF(TEXT["shader2:"], (width*8*scale)+5*scale, (112*scale)+10*scale)
+		properprintF(TEXT["shader1:"], (width*8*scale)+5*scale, (112*scale)-5*scale)
 
 		if shaderssupported == false then
-			properprintF(TEXT["unsupported"], (width*8*scale)+5*scale, (112*scale)+20*scale)
+			properprintF(TEXT["unsupported"], (width*8*scale)+5*scale, (112*scale)+5*scale)
 		else
-			properprintF(string.lower(shaderlist[currentshaderi2]), (width*8*scale)+5*scale, (112*scale)+20*scale)
+			properprintF(string.lower(shaderlist[currentshaderi1]), (width*8*scale)+5*scale, (112*scale)+5*scale)
+		end
+
+		love.graphics.setColor(100, 100, 100, 255)
+		if pausemenuselected == #pausemenuoptions + 3 then
+			love.graphics.setColor(255, 255, 255, 255)
+			properprint(">", (width*8*scale)-5*scale, (112*scale)+25*scale)
+		end
+
+		properprintF(TEXT["shader2:"], (width*8*scale)+5*scale, (112*scale)+25*scale)
+
+		if shaderssupported == false then
+			properprintF(TEXT["unsupported"], (width*8*scale)+5*scale, (112*scale)+35*scale)
+		else
+			properprintF(string.lower(shaderlist[currentshaderi2]), (width*8*scale)+5*scale, (112*scale)+35*scale)
 		end
 
 		love.graphics.setScissor()
+
+		-- Controls overlay (drawn on top, with animated dim of the foreground)
+		drawcontrolsoverlay()
 
 		if menuprompttimer > 0 then
 			drawprompt(menuprompttimer, menupromptduration, menuprompt, menupromptcurve)
@@ -5456,9 +5470,17 @@ function game_keypressed(key, textinput)
 			end
 			return
 		end
+		if controlsopen then
+			if key == "escape" then
+				setmenupopupvisible("controls", false)
+			end
+			-- Let options controls handle further input if needed; for now close on escape
+			return
+		end
+
 		if pausemenuopentimer >= pausemenuopenduration and menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 then
 			if (key == "down" or key == "s") then
-				if pausemenuselected < #pausemenuoptions + 2 then
+				if pausemenuselected < #pausemenuoptions + 3 then
 					pausemenuselected = pausemenuselected + 1
 				end
 			elseif (key == "up" or key == "w") then
@@ -5490,6 +5512,8 @@ function game_keypressed(key, textinput)
 				elseif pausemenuoptions2[pausemenuselected] == "desktop" then
 					desktopprompt = true
 					pausemenuselected2 = 1
+				elseif pausemenuselected == #pausemenuoptions + 1 then
+					setmenupopupvisible("controls", true)
 				end
 			elseif key == "escape" then
 				pausemenuopen = false
@@ -5503,6 +5527,8 @@ function game_keypressed(key, textinput)
 				if pausemenuoptions[pausemenuselected] == "volume" then
 					volumeslider_step(guielements["pause_volume"], 0.1)
 				elseif pausemenuselected == #pausemenuoptions + 1 then
+					setmenupopupvisible("controls", true)
+				elseif pausemenuselected == #pausemenuoptions + 2 then
 					currentshaderi1 = currentshaderi1 + 1
 					if currentshaderi1 > #shaderlist then
 						currentshaderi1 = 1
@@ -5513,7 +5539,7 @@ function game_keypressed(key, textinput)
 						shaders:set(1, shaderlist[currentshaderi1])
 					end
 					saveconfig()
-				elseif pausemenuselected == #pausemenuoptions + 2 then
+				elseif pausemenuselected == #pausemenuoptions + 3 then
 					currentshaderi2 = currentshaderi2 + 1
 					if currentshaderi2 > #shaderlist then
 						currentshaderi2 = 1
@@ -5529,7 +5555,7 @@ function game_keypressed(key, textinput)
 			elseif (key == "left" or key == "a") then
 				if pausemenuoptions[pausemenuselected] == "volume" then
 					volumeslider_step(guielements["pause_volume"], -0.1)
-				elseif pausemenuselected == #pausemenuoptions + 1 then
+				elseif pausemenuselected == #pausemenuoptions + 2 then
 					currentshaderi1 = currentshaderi1 - 1
 					if currentshaderi1 < 1 then
 						currentshaderi1 = #shaderlist
@@ -5540,7 +5566,7 @@ function game_keypressed(key, textinput)
 						shaders:set(1, shaderlist[currentshaderi1])
 					end
 					saveconfig()
-				elseif pausemenuselected == #pausemenuoptions + 2 then
+				elseif pausemenuselected == #pausemenuoptions + 3 then
 					currentshaderi2 = currentshaderi2 - 1
 					if currentshaderi2 < 1 then
 						currentshaderi2 = #shaderlist
