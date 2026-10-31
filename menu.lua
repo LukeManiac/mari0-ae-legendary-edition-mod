@@ -334,7 +334,7 @@ local function optionscontrols_getkeystring(player, name, page)
 	return s
 end
 
-local function optionscontrols_create()
+function optionscontrols_create()
 	local right = 235
 
 	--Edit Player dropdown
@@ -387,13 +387,13 @@ local function optionscontrols_create()
 	end
 end
 
-local function optionscontrols_remove()
+function optionscontrols_remove()
 	for i = 1, #optionscontrolsgui do
 		guielements[optionscontrolsgui[i]] = nil
 	end
 end
 
-local function optionscontrols_sync()
+function optionscontrols_sync()
 	if not guielements["ctrl_player"] then
 		return
 	end
@@ -4614,7 +4614,7 @@ function drawcontrolsoverlay()
 	love.graphics.setLineWidth(previouslinewidth)
 
 	-- Title
-	properprintF("controls:", (winwidth/2 - utf8.len("controls:") * 4 * scale), popupy + 8 * scale)
+	properprintF("controls:", (winwidth/2 - 36*scale), popupy + 8*scale)
 
 	-- Draw the controls content (repositioned)
 	love.graphics.setScissor(popupx + 4*scale, popupy + 20*scale, popupw - 8*scale, popuph - 28*scale)
