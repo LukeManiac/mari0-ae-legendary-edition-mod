@@ -2558,7 +2558,7 @@ function enemy:customtimeraction(action, arg, arg2)
 			local parameter = string.sub(action, 9, string.len(action))
 			self[parameter] = self[parameter] * arg
 		elseif action == "setframe" then
-			if self.quadgroup == nil then print(self.t .. "failed to get " .. arg .. " from nil quadgroup.") end
+			if self.quadgroup == nil then print(self.t .. " failed to get " .. arg .. " from nil quadgroup.") end
 			self.quad = self.quadgroup[arg]
 		elseif action == "print" then --only for advanced users!
 			if self[arg] then
