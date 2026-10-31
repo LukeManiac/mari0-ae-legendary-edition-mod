@@ -204,6 +204,8 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Added downscaling for viewports (may look funny when window scale is 3).
 * Luigi is no longer a basic recolour of Mario. He now has his own unique sprites.
 * Added the poncho and aviator hats from Super Mario Odyssey.
+* Pause menu and prompts are now scaled instead of scissored.
+* You can now change controls midgame.
 
 ### 🐛 Bug Fixes
 

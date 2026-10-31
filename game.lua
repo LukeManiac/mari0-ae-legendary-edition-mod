@@ -3192,7 +3192,11 @@ function game_draw()
 		pauseheight = winheight*0.75
 		pauseradius = get_corner_radius(pausewidth, pauseheight) / 2
 		prevlinewidth = love.graphics.getLineWidth()
-		love.graphics.setScissor((winwidth - (pausewidth * bettertimer)) / 2, (winheight - (pauseheight * bettertimer)) / 2, pausewidth * bettertimer, pauseheight * bettertimer)
+		--scale the whole menu from its center
+		love.graphics.push()
+		love.graphics.translate(winwidth/2, winheight/2)
+		love.graphics.scale(math.max(bettertimer, 0.0001), math.max(bettertimer, 0.0001))
+		love.graphics.translate(-winwidth/2, -winheight/2)
 		love.graphics.setLineWidth(1)
 		love.graphics.setColor(0, 0, 0)
 		love.graphics.rectangle("fill", (width*8*scale)-150*scale, winheight/8, pausewidth, pauseheight, pauseradius)
@@ -3259,7 +3263,7 @@ function game_draw()
 			properprintF(string.lower(shaderlist[currentshaderi2]), (width*8*scale)+5*scale, (112*scale)+35*scale)
 		end
 
-		love.graphics.setScissor()
+		love.graphics.pop()
 
 		-- Controls overlay (drawn on top, with animated dim of the foreground)
 		drawcontrolsoverlay()
@@ -3281,7 +3285,7 @@ function game_draw()
 				properprintF(TEXT["no"], (width*8*scale)+28*scale, (112*scale)+4*scale)
 			end
 
-			love.graphics.setScissor()
+			love.graphics.pop()
 		end
 		
 		if desktopprompttimer > 0 then
@@ -3301,7 +3305,7 @@ function game_draw()
 				properprintF(TEXT["no"], (width*8*scale)+28*scale, (112*scale)+4*scale)
 			end
 
-			love.graphics.setScissor()
+			love.graphics.pop()
 		end
 		
 		if suspendprompttimer > 0 then
@@ -3327,7 +3331,7 @@ function game_draw()
 				properprintF(TEXT["no"], (width*8*scale)+28*scale, (112*scale)+4*scale)
 			end
 
-			love.graphics.setScissor()
+			love.graphics.pop()
 		end
 	end
 	
@@ -3344,7 +3348,11 @@ function drawprompt(timer, duration, open, curve)
     promptheight = winheight/4
     promptradius = get_corner_radius(promptwidth, promptheight) / 2
     prevlinewidth = love.graphics.getLineWidth()
-    love.graphics.setScissor((winwidth - (promptwidth * prompttimer)) / 2, (winheight - (promptheight * prompttimer)) / 2, promptwidth * prompttimer, promptheight * prompttimer)
+    --scale the prompt from the center of the screen, the caller draws its text and then calls love.graphics.pop()
+    love.graphics.push()
+    love.graphics.translate(winwidth/2, winheight/2)
+    love.graphics.scale(math.max(prompttimer, 0.0001), math.max(prompttimer, 0.0001))
+    love.graphics.translate(-winwidth/2, -winheight/2)
     love.graphics.setLineWidth(1)
     love.graphics.setColor(0, 0, 0, 255)
     love.graphics.rectangle("fill", (winwidth-promptwidth)/2, (winheight-promptheight)/2, promptwidth, promptheight, promptradius)
