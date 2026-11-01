@@ -27,6 +27,7 @@ local editorResizeAnimation
 local editorResizeCanvas
 local editorResizeCanvasWidth, editorResizeCanvasHeight
 local editorResizeOverlayVisible = false
+local EDITOR_ENTITY_CATEGORY_ANIM_TIME = 0.25
 local editorResizeGuiElementNames = {
 	"maptopup", "maptopdown", "mapbottomup", "mapbottomdown",
 	"mapleftleft", "mapleftright", "maprightleft", "maprightright",
@@ -658,6 +659,41 @@ local function editor_overlay_input_blocked()
 	return editor_overlay_alpha() > 0
 end
 
+local function editor_update_entity_category_animations()
+	if not entitiesform or not guielements["tilesscrollbar"] then
+		return
+	end
+
+	local layoutChanged = false
+	for _, form in ipairs(entitiesform) do
+		local animation = form.animation
+		if animation then
+			layoutChanged = true
+			local t = (love.timer.getTime() - animation.start) / EDITOR_ENTITY_CATEGORY_ANIM_TIME
+			local progress = motion_curve(t, animation.curve, animation.curve_in, false, true, true)
+			form.h = lerp(animation.from, animation.to, progress)
+			if t >= 1 then
+				form.h = animation.to
+				form.animation = nil
+			end
+		end
+	end
+
+	if layoutChanged then
+		local scrollOffset = (guielements["tilesscrollbar"].value or 0) * (tilescrollbarheight or 1)
+		local ly = 0
+		for _, form in ipairs(entitiesform) do
+			ly = ly + 10
+			form.y = ly
+			ly = ly + form.h
+		end
+
+		tilescrollbarheight = math.max(0.01, entitiesform[#entitiesform].y + entitiesform[#entitiesform].h - 164)
+		updatetilesscrollbar()
+		guielements["tilesscrollbar"].value = math.max(0, math.min(1, scrollOffset / tilescrollbarheight))
+	end
+end
+
 editor_reset_tooltip = function()
 	tooltipa = -1000
 	prevtile = nil
@@ -938,6 +974,7 @@ function editor_update(dt)
 	end
 
 	editor_confirm_cleanup()
+	editor_update_entity_category_animations()
 
 	if editormenuopen == false or minimapmoving then
 		--key scroll
@@ -2730,7 +2767,11 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 					end
 					properprintF(TEXT[entitiesform[list].name], (5)*scale, (40+entitiesform[list].y-10)*scale-tilesoffset)
 					love.graphics.setColor(255, 255, 255)
-					if not entitiesform[list].hidden then
+					if entitiesform[list].h > 0 then
+						local categoryTop = (38+entitiesform[list].y)*scale-tilesoffset
+						local clipTop = math.max(38*scale, categoryTop)
+						local clipBottom = math.min(203*scale, categoryTop + entitiesform[list].h*scale)
+						love.graphics.setScissor(5*scale, clipTop, 373*scale, math.max(0, clipBottom-clipTop))
 						for i = 1, #entitiesform[list] do
 							local t = entitiesform[list][i]
 							local x = math.fmod((i-1), 22)*17*scale+5*scale
@@ -2741,11 +2782,9 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 							else
 								local v = enemiesdata[t]
 								local starty = y-tilesoffset
-								if starty < 39*scale and starty > 23*scale then
-									love.graphics.setScissor(x, 39*scale, 16*scale, (16*scale)-((39*scale)-starty))
-								else
-									love.graphics.setScissor(x, math.min(y-tilesoffset, 186*scale), 16*scale, 16*scale)
-								end
+								local iconTop = math.max(clipTop, starty)
+								local iconBottom = math.min(clipBottom, starty + 16*scale)
+								love.graphics.setScissor(x, iconTop, 16*scale, math.max(0, iconBottom-iconTop))
 								if starty > 23*scale then
 									if v.icongraphic then
 										love.graphics.draw(v.icongraphic, x, y-tilesoffset, 0, scale, scale)
@@ -2755,12 +2794,13 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 										love.graphics.draw(entityquads[1].image, entityquads[1].quad, x, y-tilesoffset, 0, scale, scale)
 									end
 								end
-								love.graphics.setScissor(5*scale, 38*scale, 373*scale, 165*scale)
+								love.graphics.setScissor(5*scale, clipTop, 373*scale, math.max(0, clipBottom-clipTop))
 							end
 							if tilehotkeysentityindex[t] then
 								properprintbackground(tilehotkeysentityindex[t], x+8*scale, y-tilesoffset+9*scale)
 							end
 						end
+						love.graphics.setScissor(5*scale, 38*scale, 373*scale, 165*scale)
 					end
 				end
 				love.graphics.setColor(255, 255, 255)
@@ -5955,31 +5995,15 @@ function editor_mousepressed(x, y, button)
 							allowdrag = false
 						end
 					elseif list then
-						if entitiesform[list].hidden then --unhide
-							entitiesform[list].hidden = false
-							entitiesform[list].h = 17*(math.ceil(#entitiesform[list]/22))
-							local namespacing = 10
-							local ly = 0 --listy
-							for list = 1, #entitiesform do
-								ly = ly + namespacing
-								entitiesform[list].y = ly
-								ly = ly + entitiesform[list].h
-							end
-						else --hide
-							entitiesform[list].hidden = true
-							entitiesform[list].h = 0
-							local namespacing = 10
-							local ly = 0 --listy
-							for list = 1, #entitiesform do
-								ly = ly + namespacing
-								entitiesform[list].y = ly
-								ly = ly + entitiesform[list].h
-							end
-						end
-						local v = guielements["tilesscrollbar"].value*tilescrollbarheight
-						tilescrollbarheight = math.max(0.01, entitiesform[#entitiesform].y+entitiesform[#entitiesform].h - 164)
-						updatetilesscrollbar()
-						guielements["tilesscrollbar"].value = math.max(0,math.min(1,v/tilescrollbarheight))
+						local form = entitiesform[list]
+						form.hidden = not form.hidden
+						form.animation = {
+							from = form.h,
+							to = form.hidden and 0 or 17*(math.ceil(#form/22)),
+							start = love.timer.getTime(),
+							curve = random_motion_curve(),
+							curve_in = not form.hidden
+						}
 					end
 				end
 			elseif editorstate == "main" then
