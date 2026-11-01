@@ -3806,9 +3806,11 @@ end
 function editor_draw()
 	editor_rc_track()
 	local minimapProgress, minimapAnimationDone = editor_minimap_progress()
+	local resizeProgress, resizeAnimationDone = editor_resize_progress()
+	local cursorAlpha = 1 - minimapProgress * resizeProgress
 	
 	if not editorMenuAnimation then
-		editor_draw_content(editormenuopen, false, false, 1 - minimapProgress)
+		editor_draw_content(editormenuopen, false, false, cursorAlpha)
 	else
 		local progress, animationDone = editor_menu_progress()
 		local canvasWidth, canvasHeight = love.graphics.getDimensions()
@@ -3826,7 +3828,7 @@ function editor_draw()
 		love.graphics.setShader()
 		love.graphics.setColor(255, 255, 255, 255)
 		love.graphics.clear(0, 0, 0, 0)
-		editor_draw_content(editormenuopen or progress > 0, false, false, 1 - minimapProgress)
+		editor_draw_content(editormenuopen or progress > 0, false, false, cursorAlpha)
 		if previousCanvas then
 			love.graphics.setCanvas({previousCanvas, stencil = true})
 		else
@@ -3834,7 +3836,7 @@ function editor_draw()
 		end
 		love.graphics.pop()
 		
-		editor_draw_cursor_preview((1 - progress) * (1 - minimapProgress))
+		editor_draw_cursor_preview((1 - progress) * cursorAlpha)
 		
 		local zoom = 1.1 - 0.1 * progress
 		love.graphics.setColor(255, 255, 255, 255 * progress)
@@ -3880,7 +3882,6 @@ function editor_draw()
 		editorMinimapAnimation = nil
 	end
 
-	local resizeProgress, resizeAnimationDone = editor_resize_progress()
 	if resizeProgress > 0 then
 		local canvasWidth, canvasHeight = love.graphics.getDimensions()
 		if not editorResizeCanvas or editorResizeCanvasWidth ~= canvasWidth or editorResizeCanvasHeight ~= canvasHeight then
@@ -3916,7 +3917,7 @@ function editor_draw()
 	end
 
 	if editorRCAnimation and not rightclickmenuopen and not editormenuopen then
-		editor_draw_cursor_preview(1 - (editor_rc_progress()))
+		editor_draw_cursor_preview((1 - editor_rc_progress()) * cursorAlpha)
 	end
 	editor_rc_draw_closing()
 end
