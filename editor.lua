@@ -3812,6 +3812,9 @@ function editor_draw()
 		love.graphics.draw(editorMinimapCanvas, canvasWidth/2, canvasHeight/2, 0, zoom, zoom, canvasWidth/2, canvasHeight/2)
 		love.graphics.setColor(255, 255, 255, 255)
 	end
+	if minimapmoving or editorMinimapAnimation then
+		editor_draw_cursor_preview(1 - minimapProgress)
+	end
 
 	if minimapAnimationDone then
 		editorMinimapAnimation = nil
@@ -4695,17 +4698,14 @@ function mapwidthapply()
 	objects["screenboundary"]["right"].x = mapwidth
 	generatespritebatch()
 	
-	editorclose()
+	maintab()
 	allowdrag = false
-	
-	--maintab()
 end
 
 function mapwidthcancel()
 	changemapwidthmenu = false
-	editorclose()
+	maintab()
 	allowdrag = false
-	--maintab()
 end
 
 function changenewmapsize(side, dir)
