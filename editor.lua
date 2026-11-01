@@ -2765,7 +2765,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 						love.graphics.setColor(255, 255, 255)
 						properprint("-", (367)*scale, (40+entitiesform[list].y-10)*scale-tilesoffset)
 					end
-					properprintF(TEXT[entitiesform[list].name], (5)*scale, (40+entitiesform[list].y-10)*scale-tilesoffset)
+					properprintF(TEXT[entitiesform[list].name] or entitiesform[list].displayName, (5)*scale, (40+entitiesform[list].y-10)*scale-tilesoffset)
 					love.graphics.setColor(255, 255, 255)
 					if entitiesform[list].h > 0 then
 						local categoryTop = (38+entitiesform[list].y)*scale-tilesoffset

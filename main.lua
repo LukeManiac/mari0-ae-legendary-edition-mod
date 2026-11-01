@@ -605,7 +605,7 @@ function love.load()
 			231,--[[229,230,232]] --funnels
 			310,--pneumatic tube (just clearpipe but shhh)
 		},
-		{name = "custom enemies",
+		{name = "custom enemies", customEnemies = true,
 		},
 	}
 

@@ -16,6 +16,8 @@ function enemies_load()
 	
 	--ENEMIIIIEEES
 	loaddelayed = {}
+	local enemyFolderCategories = {}
+	local categoriseEnemyFolders = not mappacksettingenabled("donotcategoriseenemyfolders")
 	
 	local enemiesexist = love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/enemies/")
 	if (not enemiesexist) and (not editormode) then
@@ -44,6 +46,10 @@ function enemies_load()
 			--load enemies from folder
 			local fl3 = love.filesystem.getDirectoryItems(mpepath)
 			for i2 = 1, #fl3 do
+				if categoriseEnemyFolders and string.sub(fl3[i2]:lower(), -5) == ".json" then
+					local enemyName = string.sub(fl3[i2], 1, -6):lower()
+					enemyFolderCategories[enemyName] = fl2[i]
+				end
 				table.insert(realfl, mpepath .. "/" .. fl3[i2])
 			end
 		else
@@ -81,25 +87,92 @@ function enemies_load()
 	JSONcrashgame = true
 	
 	--ADD CUSTOM ENEMIES TO ENTITY LIST
-	for i = #entitiesform[#entitiesform], 1, -1 do
-		entitiesform[#entitiesform][i] = nil
+	local customEnemiesForm
+	local previousCategoryStates = {}
+	for i = #entitiesform, 1, -1 do
+		local form = entitiesform[i]
+		if form.editorCategory then
+			previousCategoryStates[form.editorCategory] = form.hidden
+			table.remove(entitiesform, i)
+		elseif form.customEnemies then
+			customEnemiesForm = form
+		end
+	end
+	if not customEnemiesForm then
+		for _, form in ipairs(entitiesform) do
+			if form.name == "custom enemies" then
+				customEnemiesForm = form
+				break
+			end
+		end
+	end
+	if not customEnemiesForm then
+		error("Missing custom enemies entity category")
+	end
+	for i = #customEnemiesForm, 1, -1 do
+		customEnemiesForm[i] = nil
 	end
 	local defaultenemies = {} --check for replaced default enemies
+	local customCategories = {}
 	for _, filename in pairs(fl) do
 		if string.sub(filename, -4) == "json" then
 			defaultenemies[string.sub(filename, 1, -6)] = 0
 		end
 	end
-	for j, w in pairs(customenemies) do
+	for _, w in ipairs(customenemies) do
 		if (not enemiesdata[w].hidden) and ((not defaultenemies[w]) or defaultenemies[w] == 0) then
-			table.insert(entitiesform[#entitiesform], w)
+			local category
+			local folderCategory = enemyFolderCategories[w]
+			if folderCategory then
+				category = folderCategory:lower()
+			elseif enemiesdata[w].editorcategory ~= nil then
+				category = tostring(enemiesdata[w].editorcategory):lower()
+			end
+			if category then
+				if not customCategories[category] then
+					customCategories[category] = {}
+				end
+				table.insert(customCategories[category], w)
+			else
+				table.insert(customEnemiesForm, w)
+			end
 			if defaultenemies[w] then
 				defaultenemies[w] = defaultenemies[w] + 1
 			end
 		end
 	end
-	if not entitiesform[#entitiesform].hidden then
-		entitiesform[#entitiesform].h = 17*(math.ceil(#entitiesform[#entitiesform]/22))
+	if customEnemiesForm.hidden then
+		customEnemiesForm.h = 0
+	else
+		customEnemiesForm.h = 17*(math.ceil(#customEnemiesForm/22))
+	end
+	local categories = {}
+	for category in pairs(customCategories) do
+		table.insert(categories, category)
+	end
+	table.sort(categories)
+	for _, category in ipairs(categories) do
+		local form = {
+			name = category,
+			displayName = category,
+			editorCategory = category,
+			hidden = previousCategoryStates[category] or false,
+			h = 0
+		}
+		for _, enemy in ipairs(customCategories[category]) do
+			table.insert(form, enemy)
+		end
+		if not form.hidden then
+			form.h = 17*(math.ceil(#form/22))
+		end
+		table.insert(entitiesform, form)
+	end
+
+	local ly = 0
+	for _, form in ipairs(entitiesform) do
+		ly = ly + 10
+		form.y = ly
+		ly = ly + form.h
 	end
 	for i = 1, #customenemies do
 		entityquads[customenemies[i]] = entityquads[2]
