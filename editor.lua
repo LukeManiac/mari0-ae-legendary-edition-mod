@@ -3816,7 +3816,7 @@ editor_draw_cursor_preview = function(alpha)
 		if not editentities then
 			local quad = tilequads[currenttile]
 			if quad then
-				love.graphics.setColor(255, 255, 255, 200 * alpha)
+				love.graphics.setColor(255, 255, 255, 192 * alpha)
 				love.graphics.draw(quad.image, quad.quad,
 					math.floor((x-splitxscroll[1]-1+xl)*16*scale),
 					math.floor(((y-splityscroll[1]-1+yl)*16+8)*scale), 0, scale, scale)
@@ -3824,14 +3824,14 @@ editor_draw_cursor_preview = function(alpha)
 		elseif not tilequads[currenttile] and enemiesdata[currenttile] then
 			local enemy = enemiesdata[currenttile]
 			if enemy.showicononeditor and enemy.icongraphic then
-				love.graphics.setColor(255, 255, 255, 255 * alpha)
+				love.graphics.setColor(255, 255, 255, 192 * alpha)
 				love.graphics.draw(enemy.icongraphic,
 					math.floor((x-xscroll-1+offsetx+xl)*16*scale),
 					math.floor(((y-yscroll-0.5+yl)*16)*scale), 0, scale, scale)
 			else
 				local xoff = ((0.5-enemy.width/2+(enemy.spawnoffsetx or 0))*16 + enemy.offsetX - enemy.quadcenterX)*scale
 				local yoff = (((enemy.spawnoffsety or 0)-enemy.height+1)*16-enemy.offsetY - enemy.quadcenterY)*scale
-				love.graphics.setColor(255, 255, 255, 255 * alpha)
+				love.graphics.setColor(255, 255, 255, 192 * alpha)
 				love.graphics.draw(enemy.graphic, enemy.quad,
 					math.floor((x-splitxscroll[1]-1+offsetx+xl)*16*scale+xoff),
 					math.floor(((y-splityscroll[1]-1+yl)*16+8)*scale+yoff), 0, scale, scale)
@@ -3839,7 +3839,7 @@ editor_draw_cursor_preview = function(alpha)
 		else
 			local quad = entityquads[currenttile]
 			if quad then
-				love.graphics.setColor(255, 255, 255, 255 * alpha)
+				love.graphics.setColor(255, 255, 255, 192 * alpha)
 				love.graphics.draw(quad.image, quad.quad,
 					math.floor((x-splitxscroll[1]-1+offsetx+xl)*16*scale),
 					math.floor(((y-splityscroll[1]-1+yl)*16+8)*scale), 0, scale, scale)
