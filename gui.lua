@@ -677,6 +677,7 @@ function guielement:draw(a, offx, offy)
 			end
 		end
 	elseif self.type == "button" then
+		local alpha = a or 255
 		local high = self:hovered()
 		
 		--smooth hover scale (1 → 1.04) and press zoom
@@ -716,7 +717,8 @@ function guielement:draw(a, offx, offy)
 		love.graphics.setColor(
 			lerp(self.bordercolor[1], self.bordercolorhigh[1], t),
 			lerp(self.bordercolor[2], self.bordercolorhigh[2], t),
-			lerp(self.bordercolor[3], self.bordercolorhigh[3], t)
+			lerp(self.bordercolor[3], self.bordercolorhigh[3], t),
+			alpha
 		)
 		
 		local bw = (3+self.width+self.space*2)*scale
@@ -724,19 +726,19 @@ function guielement:draw(a, offx, offy)
 		local br = math.min(bw, bh) * 0.15
 		love.graphics.rectangle("fill", self.x*scale, self.y*scale, bw, bh, br)
 		
-		love.graphics.setColor(self.fillcolor)
+		love.graphics.setColor(self.fillcolor[1], self.fillcolor[2], self.fillcolor[3], alpha)
 		love.graphics.rectangle("fill", (self.x+1)*scale, (self.y+1)*scale, (1+self.width+self.space*2)*scale, (-1+self.height*10+self.space*2)*scale, br * 0.7)
 
 		if self.image then
 			if self.imagecolor then
-				love.graphics.setColor(self.imagecolor)
+				love.graphics.setColor(self.imagecolor[1], self.imagecolor[2], self.imagecolor[3], alpha)
 			else
-				love.graphics.setColor(255,255,255)
+				love.graphics.setColor(255,255,255,alpha)
 			end
 			love.graphics.draw(self.image, (self.x+self.imageoffsetx)*scale, (self.y+self.imageoffsety)*scale, 0, scale, scale)
 		end
 		
-		love.graphics.setColor(self.textcolor)
+		love.graphics.setColor(self.textcolor[1], self.textcolor[2], self.textcolor[3], alpha)
 		if type(self.text) == "table" then
 			love.graphics.draw(self.text[1], self.text[2], (self.x+2+self.xpadding+self.space)*scale, (self.y+2+self.ypadding+self.space)*scale, 0, scale, scale)
 		else
@@ -1469,7 +1471,7 @@ end
 
 --true when the mouse is over the element, or when it is made to look hovered (forcehover, e.g. selected with the keyboard)
 function guielement:hovered()
-	if editormode and not editor_gui_interaction_enabled(self) then
+	if editormode and not self.alwaysinteractable and not editor_gui_interaction_enabled(self) then
 		return false
 	end
 	if self:inhighlight(love.mouse.getPosition()) then
@@ -1618,7 +1620,7 @@ function guielement:smoothcursor(x, y)
 end
 
 function guielement:inhighlight(x, y)
-	if editormode and not editor_gui_interaction_enabled(self) then
+	if editormode and not self.alwaysinteractable and not editor_gui_interaction_enabled(self) then
 		return false
 	end
 	if (self.controlbindpage or (self.controlspopup and gamestate == "game")) and optionscontrols_transformmouse then

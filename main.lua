@@ -1181,6 +1181,9 @@ function love.update(dt)
 	end
 	
 	notice.update(dt)
+	if jsonerrorwindow.opened then
+		jsonerrorwindow:update(dt)
+	end
 end
 
 function love.draw(donotupdate)

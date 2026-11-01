@@ -19,6 +19,8 @@ function errorwindow:init(title, text)
 	self.button["ignore"] = guielement:new("button", self.x+padding, self.y+self.height-15-padding, "ignore", function() end, 2)
 	self.button["retry"] = guielement:new("button", self.x+self.width-8-padding, self.y+self.height-15-padding, "retry", function() end, 2)
 	self.button["retry"].x = self.button["retry"].x - self.button["retry"].width
+	self.button["ignore"].alwaysinteractable = true
+	self.button["retry"].alwaysinteractable = true
 
 	self.a = 255
 	self.opened = false
