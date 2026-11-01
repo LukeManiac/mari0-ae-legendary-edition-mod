@@ -3891,6 +3891,10 @@ function editor_draw()
 	end
 
 	local minimapProgress, minimapAnimationDone = editor_minimap_progress()
+	if minimapmoving or editorMinimapAnimation then
+		editor_draw_cursor_preview(1 - minimapProgress)
+	end
+
 	if minimapProgress > 0 then
 		local canvasWidth, canvasHeight = love.graphics.getDimensions()
 		if not editorMinimapCanvas or editorMinimapCanvasWidth ~= canvasWidth or editorMinimapCanvasHeight ~= canvasHeight then
@@ -3919,9 +3923,6 @@ function editor_draw()
 		love.graphics.setColor(255, 255, 255, 255 * minimapProgress)
 		love.graphics.draw(editorMinimapCanvas, canvasWidth/2, canvasHeight/2, 0, zoom, zoom, canvasWidth/2, canvasHeight/2)
 		love.graphics.setColor(255, 255, 255, 255)
-	end
-	if minimapmoving or editorMinimapAnimation then
-		editor_draw_cursor_preview(1 - minimapProgress)
 	end
 
 	if minimapAnimationDone then
