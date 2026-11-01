@@ -905,8 +905,12 @@ function editor_gui_interaction_enabled(element)
 	return editormenuopen and not editorMenuAnimation
 end
 
+local function editor_minimap_active()
+	return minimapmoving or editorMinimapAnimation ~= nil
+end
+
 local function editor_cursor_preview_interaction_enabled()
-	return not editorMenuAnimation and not editorMapResizeAnimation and not editorMinimapAnimation
+	return not editorMenuAnimation and not editorMapResizeAnimation and not editor_minimap_active()
 end
 
 function editor_update(dt)
@@ -3726,6 +3730,10 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 end
 
 editor_draw_cursor_preview = function(alpha)
+	if editor_minimap_active() then
+		return
+	end
+
 	if pastingtiles or tileselection or ctrlpressed or tileselectionmoving or
 		editorstate == "linktool" or editorstate == "portalgun" or editorstate == "selectiontool" or editorstate == "powerline" then
 		return
@@ -3891,9 +3899,6 @@ function editor_draw()
 	end
 
 	local minimapProgress, minimapAnimationDone = editor_minimap_progress()
-	if minimapmoving or editorMinimapAnimation then
-		editor_draw_cursor_preview(1 - minimapProgress)
-	end
 
 	if minimapProgress > 0 then
 		local canvasWidth, canvasHeight = love.graphics.getDimensions()
@@ -5034,6 +5039,10 @@ function tilesobjects()
 end
 
 function placetile(x, y, tilei)
+	if editor_minimap_active() then
+		return
+	end
+
 	local cox, coy = getMouseTile(x, y+8*screenzoom*scale)
 	if inmap(cox, coy) == false then
 		return
@@ -5551,7 +5560,7 @@ function addsublevel(l)
 end
 
 function editor_mousepressed(x, y, button)
-	if changemapwidthmenu or minimapmoving then
+	if changemapwidthmenu or editor_minimap_active() then
 		return
 	end
 	
@@ -7296,6 +7305,9 @@ function editor_keypressed(key, textinput)
 	if changemapwidthmenu and key ~= "escape" then
 		return
 	end
+	if editor_minimap_active() and key ~= "escape" and key ~= "m" then
+		return
+	end
 
 	if (not editormenuopen) and (not customrcopen) and (not rightclickmenuopen) then
 		if key == "=" then
@@ -7380,7 +7392,7 @@ function editor_keypressed(key, textinput)
 				customrcopen = false
 				rightclickmenuopen = false
 			end
-		elseif minimapmoving then
+		elseif editor_minimap_active() then
 			editor_set_minimap_visible(false)
 		elseif changemapwidthmenu then
 			mapwidthcancel()
@@ -7563,7 +7575,7 @@ function editor_keypressed(key, textinput)
 end
 
 function editor_mousemoved(x, y, dx, dy)
-	if not editor_cursor_preview_interaction_enabled() then
+	if not editor_cursor_preview_interaction_enabled() and not minimapmoving then
 		return
 	end
 
@@ -7651,6 +7663,10 @@ function getTilesSelection()
 end
 
 function emptySelection(storeundo)
+	if editor_minimap_active() then
+		return
+	end
+
 	for x = tileselection[1], tileselection[3] do
 		for y = tileselection[2], tileselection[4] do
 			--[[if storeundo then
