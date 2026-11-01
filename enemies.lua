@@ -168,11 +168,18 @@ function enemies_load()
 	end
 
 	local ly = 0
+	local listBottom = 0
 	for _, form in ipairs(entitiesform) do
-		ly = ly + 10
-		form.y = ly
-		ly = ly + form.h
+		if form.customEnemies and #form == 0 then
+			form.y = ly
+		else
+			ly = ly + 10
+			form.y = ly
+			ly = ly + form.h
+			listBottom = ly
+		end
 	end
+	tilescrollbarheight = math.max(0, listBottom - 164)
 	for i = 1, #customenemies do
 		entityquads[customenemies[i]] = entityquads[2]
 	end
@@ -203,6 +210,8 @@ function loadenemy(filename, editorFolderCategory)
 			return
 		end
 		data = data:gsub("\r", "")
+		local jsonEditorCategory
+		local hasJSONEditorCategory = false
 		
 		if string.sub(data, 1, 4) == "base" then
 			local split = data:split("\n")
@@ -223,6 +232,10 @@ function loadenemy(filename, editorFolderCategory)
 				
 				if temp then
 					for i, v in pairs(temp) do
+						if type(i) == "string" and i:lower() == "editorcategory" then
+							jsonEditorCategory = v
+							hasJSONEditorCategory = true
+						end
 						enemiesdata[s][i] = v
 					end
 				end
@@ -242,6 +255,12 @@ function loadenemy(filename, editorFolderCategory)
 			local suc, err = pcall(function() return JSON:decode(data) end)
 			if suc then
 				enemiesdata[s] = err
+				for i, v in pairs(enemiesdata[s]) do
+					if type(i) == "string" and i:lower() == "editorcategory" then
+						jsonEditorCategory = v
+						hasJSONEditorCategory = true
+					end
+				end
 			else
 				jsonerrorwindow:open("JSON ERROR! (" .. s .. ".json)", JSONerror[2], function() enemies_load() end)
 				return false
@@ -298,8 +317,16 @@ function loadenemy(filename, editorFolderCategory)
 			end
 		end
 
-		if enemiesdata[s].editorcategory == nil and editorFolderCategory ~= nil then
+		if hasJSONEditorCategory then
+			if jsonEditorCategory ~= nil then
+				enemiesdata[s].editorcategory = tostring(jsonEditorCategory):lower()
+			else
+				enemiesdata[s].editorcategory = nil
+			end
+		elseif editorFolderCategory ~= nil then
 			enemiesdata[s].editorcategory = tostring(editorFolderCategory):lower()
+		else
+			enemiesdata[s].editorcategory = nil
 		end
 		
 		--Load graphics if it exists

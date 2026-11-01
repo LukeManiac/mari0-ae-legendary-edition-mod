@@ -682,13 +682,19 @@ local function editor_update_entity_category_animations()
 	if layoutChanged then
 		local scrollOffset = (guielements["tilesscrollbar"].value or 0) * (tilescrollbarheight or 1)
 		local ly = 0
+		local listBottom = 0
 		for _, form in ipairs(entitiesform) do
-			ly = ly + 10
-			form.y = ly
-			ly = ly + form.h
+			if form.customEnemies and #form == 0 then
+				form.y = ly
+			else
+				ly = ly + 10
+				form.y = ly
+				ly = ly + form.h
+				listBottom = ly
+			end
 		end
 
-		tilescrollbarheight = math.max(0.01, entitiesform[#entitiesform].y + entitiesform[#entitiesform].h - 164)
+		tilescrollbarheight = math.max(0.01, listBottom - 164)
 		updatetilesscrollbar()
 		guielements["tilesscrollbar"].value = math.max(0, math.min(1, scrollOffset / tilescrollbarheight))
 	end
@@ -2758,24 +2764,27 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 			else
 				--nice and organized entities
 				for list = 1, #entitiesform do
-					if entitiesform[list].hidden then
-						love.graphics.setColor(127, 127, 127)
-						properprint("+", (368)*scale, (40+entitiesform[list].y-10)*scale-tilesoffset)
-					else
-						love.graphics.setColor(255, 255, 255)
-						properprint("-", (367)*scale, (40+entitiesform[list].y-10)*scale-tilesoffset)
+					local form = entitiesform[list]
+					if not (form.customEnemies and #form == 0) then
+						if form.hidden then
+							love.graphics.setColor(127, 127, 127)
+							properprint("+", (368)*scale, (40+form.y-10)*scale-tilesoffset)
+						else
+							love.graphics.setColor(255, 255, 255)
+							properprint("-", (367)*scale, (40+form.y-10)*scale-tilesoffset)
+						end
+						properprintF(TEXT[form.name] or form.displayName, (5)*scale, (40+form.y-10)*scale-tilesoffset)
 					end
-					properprintF(TEXT[entitiesform[list].name] or entitiesform[list].displayName, (5)*scale, (40+entitiesform[list].y-10)*scale-tilesoffset)
 					love.graphics.setColor(255, 255, 255)
-					if entitiesform[list].h > 0 then
-						local categoryTop = (38+entitiesform[list].y)*scale-tilesoffset
+					if form.h > 0 then
+						local categoryTop = (38+form.y)*scale-tilesoffset
 						local clipTop = math.max(38*scale, categoryTop)
-						local clipBottom = math.min(203*scale, categoryTop + entitiesform[list].h*scale)
+						local clipBottom = math.min(203*scale, categoryTop + form.h*scale)
 						love.graphics.setScissor(5*scale, clipTop, 373*scale, math.max(0, clipBottom-clipTop))
-						for i = 1, #entitiesform[list] do
-							local t = entitiesform[list][i]
+						for i = 1, #form do
+							local t = form[i]
 							local x = math.fmod((i-1), 22)*17*scale+5*scale
-							local y = (math.floor((i-1)/22)*17*scale+(39+entitiesform[list].y)*scale)
+							local y = (math.floor((i-1)/22)*17*scale+(39+form.y)*scale)
 							love.graphics.setColor(255, 255, 255)
 							if tonumber(t) then
 								love.graphics.draw(entityquads[t].image, entityquads[t].quad, x, y-tilesoffset, 0, scale, scale)
@@ -8435,18 +8444,19 @@ function getentitylistpos(x, y)
 		x = (x - 5*scale)/scale
 		y = (y - 38*scale) + tilesoffset
 		for list = 1, #entitiesform do
-			if y > entitiesform[list].y*scale and y < (entitiesform[list].y+entitiesform[list].h)*scale then
-				y = (y - entitiesform[list].y*scale)/scale
+			local form = entitiesform[list]
+			if not (form.customEnemies and #form == 0) and y > form.y*scale and y < (form.y+form.h)*scale then
+				y = (y - form.y*scale)/scale
 				
 				out = math.floor(x/17)+1
 				out = out + math.floor(y/17)*22
 				
-				if out <= #entitiesform[list] then
+				if out <= #form then
 					return out, list
 				else
 					return false
 				end
-			elseif y > (entitiesform[list].y-10)*scale and y < (entitiesform[list].y)*scale then
+			elseif not (form.customEnemies and #form == 0) and y > (form.y-10)*scale and y < form.y*scale then
 				return false, list
 			end
 		end
