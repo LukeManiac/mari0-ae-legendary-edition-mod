@@ -16,8 +16,6 @@ function enemies_load()
 	
 	--ENEMIIIIEEES
 	loaddelayed = {}
-	local enemyFolderCategories = {}
-	local categoriseEnemyFolders = not mappacksettingenabled("donotcategoriseenemyfolders")
 	
 	local enemiesexist = love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/enemies/")
 	if (not enemiesexist) and (not editormode) then
@@ -33,11 +31,12 @@ function enemies_load()
 		fl = love.filesystem.getDirectoryItems("customenemies/")
 	end
 	local fl2 = love.filesystem.getDirectoryItems(mappackfolder .. "/" .. mappack .. "/enemies/")
+	local categorizeEnemyFolders = not mappacksettingenabled("donotcategoriseenemyfolders")
 	
 	local realfl = {}
 	
 	for i = 1, #fl do
-		table.insert(realfl, "customenemies/" .. fl[i]) --STANDARD ENEMIES
+		table.insert(realfl, {filename = "customenemies/" .. fl[i]}) --STANDARD ENEMIES
 	end
 	
 	for i = 1, #fl2 do
@@ -46,14 +45,13 @@ function enemies_load()
 			--load enemies from folder
 			local fl3 = love.filesystem.getDirectoryItems(mpepath)
 			for i2 = 1, #fl3 do
-				if categoriseEnemyFolders and string.sub(fl3[i2]:lower(), -5) == ".json" then
-					local enemyName = string.sub(fl3[i2], 1, -6):lower()
-					enemyFolderCategories[enemyName] = fl2[i]
-				end
-				table.insert(realfl, mpepath .. "/" .. fl3[i2])
+				table.insert(realfl, {
+					filename = mpepath .. "/" .. fl3[i2],
+					editorFolderCategory = categorizeEnemyFolders and fl2[i] or nil
+				})
 			end
 		else
-			table.insert(realfl, mpepath) --MAPPACK ENEMIES
+			table.insert(realfl, {filename = mpepath}) --MAPPACK ENEMIES
 		end
 	end
 
@@ -68,10 +66,13 @@ function enemies_load()
 					--load enemies from folder
 					local fl4 = love.filesystem.getDirectoryItems(cepath)
 					for i3 = 1, #fl4 do
-						table.insert(realfl, cepath .. "/" .. fl4[i3])
+						table.insert(realfl, {
+							filename = cepath .. "/" .. fl4[i3],
+							editorFolderCategory = categorizeEnemyFolders and fl3[i2] or nil
+						})
 					end
 				else
-					table.insert(realfl, cepath) --CHARACTER ENEMIES
+					table.insert(realfl, {filename = cepath}) --CHARACTER ENEMIES
 				end
 			end
 			characterenemiesloaded[mariocharacter[i]] = true
@@ -80,8 +81,9 @@ function enemies_load()
 	
 	JSONcrashgame = false
 	for i = 1, #realfl do
-		if string.sub(realfl[i], -4) == "json" then
-			loadenemy(realfl[i])
+		local enemyfile = realfl[i]
+		if string.sub(enemyfile.filename, -4) == "json" then
+			loadenemy(enemyfile.filename, enemyfile.editorFolderCategory)
 		end
 	end
 	JSONcrashgame = true
@@ -122,10 +124,7 @@ function enemies_load()
 	for _, w in ipairs(customenemies) do
 		if (not enemiesdata[w].hidden) and ((not defaultenemies[w]) or defaultenemies[w] == 0) then
 			local category
-			local folderCategory = enemyFolderCategories[w]
-			if folderCategory then
-				category = folderCategory:lower()
-			elseif enemiesdata[w].editorcategory ~= nil then
+			if enemiesdata[w].editorcategory ~= nil then
 				category = tostring(enemiesdata[w].editorcategory):lower()
 			end
 			if category then
@@ -179,7 +178,7 @@ function enemies_load()
 	end
 end
 
-function loadenemy(filename)
+function loadenemy(filename, editorFolderCategory)
 	local ss = filename:split("/")
 	local folder = ""
 	for i = 1, #ss-1 do
@@ -232,7 +231,7 @@ function loadenemy(filename)
 				if not loaddelayed[base] then
 					loaddelayed[base] = {}
 				end
-				table.insert(loaddelayed[base], filename)
+				table.insert(loaddelayed[base], {filename = filename, editorFolderCategory = editorFolderCategory})
 				--print("DON'T HAVE BASE " .. base .. " FOR " .. s)
 				if editormode then
 					--notice.new("don't have base " .. base .. " for " .. s)
@@ -297,6 +296,10 @@ function loadenemy(filename)
 			if enemiesdata[s][i] == nil then
 				enemiesdata[s][i] = v
 			end
+		end
+
+		if enemiesdata[s].editorcategory == nil and editorFolderCategory ~= nil then
+			enemiesdata[s].editorcategory = tostring(editorFolderCategory):lower()
 		end
 		
 		--Load graphics if it exists
@@ -374,7 +377,7 @@ function loadenemy(filename)
 		
 		if loaddelayed[s] and #loaddelayed[s] > 0 then
 			for ji, jv in ipairs(loaddelayed[s]) do
-				loadenemy(jv)
+				loadenemy(jv.filename, jv.editorFolderCategory)
 			end
 			loaddelayed[s] = nil
 		end
