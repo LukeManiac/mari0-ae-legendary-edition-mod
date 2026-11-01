@@ -48,6 +48,7 @@ local editor_rc_begin
 local editor_rc_end
 local editor_rc_draw_closing
 local editor_draw_cursor_preview
+local editor_cursor_preview_drawn = false
 local editor_menu_progress
 local editor_minimap_progress
 local editor_resize_progress
@@ -2350,7 +2351,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 								local adjacentscale = 1-(math.abs(i)/4)
 
 								if (i>0 and (adjacenttile<=smbtilecount+portaltilecount+customtilecount or adjacenttile>=90000) and (adjacenttile<=animatedtilecount+90000 or adjacenttile<=89996)) or (i<0 and adjacenttile>=1 and (adjacenttile<89996 or adjacenttile>=90001)) then
-									love.graphics.setColor(255, 255, 255, 85*(3-math.abs(i))*cursorAlpha)
+									love.graphics.setColor(255, 255, 255, 70*(3-math.abs(i))*cursorAlpha)
 
 									local currenttilex = (x-splitxscroll[1]-1)*16
 									local currenttiley = (y-splityscroll[1]-0.5)*16
@@ -2466,7 +2467,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 							local adjacentscale = 1-(math.abs(i)/4)
 
 							if valid then
-								love.graphics.setColor(255, 255, 255, 85*(3-math.abs(i))*cursorAlpha)
+								love.graphics.setColor(255, 255, 255, 70*(3-math.abs(i))*cursorAlpha)
 
 								local currenttilex = (x-splitxscroll[1]-1)*16
 								local currenttiley = (y-splityscroll[1]-0.5)*16
@@ -3788,6 +3789,10 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 end
 
 editor_draw_cursor_preview = function(alpha)
+	if editor_cursor_preview_drawn then
+		return
+	end
+
 	if pastingtiles or tileselection or ctrlpressed or tileselectionmoving or
 		editorstate == "linktool" or editorstate == "portalgun" or editorstate == "selectiontool" or editorstate == "powerline" then
 		return
@@ -3797,6 +3802,7 @@ editor_draw_cursor_preview = function(alpha)
 	if not inmap(x, y+1) then
 		return
 	end
+	editor_cursor_preview_drawn = true
 	
 	local offsetx = 0
 	if editentities and ((entitylist[currenttile] and entitylist[currenttile].offset) or
@@ -3816,7 +3822,7 @@ editor_draw_cursor_preview = function(alpha)
 		if not editentities then
 			local quad = tilequads[currenttile]
 			if quad then
-				love.graphics.setColor(255, 255, 255, 192 * alpha)
+				love.graphics.setColor(255, 255, 255, 210 * alpha)
 				love.graphics.draw(quad.image, quad.quad,
 					math.floor((x-splitxscroll[1]-1+xl)*16*scale),
 					math.floor(((y-splityscroll[1]-1+yl)*16+8)*scale), 0, scale, scale)
@@ -3824,14 +3830,14 @@ editor_draw_cursor_preview = function(alpha)
 		elseif not tilequads[currenttile] and enemiesdata[currenttile] then
 			local enemy = enemiesdata[currenttile]
 			if enemy.showicononeditor and enemy.icongraphic then
-				love.graphics.setColor(255, 255, 255, 192 * alpha)
+				love.graphics.setColor(255, 255, 255, 210 * alpha)
 				love.graphics.draw(enemy.icongraphic,
 					math.floor((x-xscroll-1+offsetx+xl)*16*scale),
 					math.floor(((y-yscroll-0.5+yl)*16)*scale), 0, scale, scale)
 			else
 				local xoff = ((0.5-enemy.width/2+(enemy.spawnoffsetx or 0))*16 + enemy.offsetX - enemy.quadcenterX)*scale
 				local yoff = (((enemy.spawnoffsety or 0)-enemy.height+1)*16-enemy.offsetY - enemy.quadcenterY)*scale
-				love.graphics.setColor(255, 255, 255, 192 * alpha)
+				love.graphics.setColor(255, 255, 255, 210 * alpha)
 				love.graphics.draw(enemy.graphic, enemy.quad,
 					math.floor((x-splitxscroll[1]-1+offsetx+xl)*16*scale+xoff),
 					math.floor(((y-splityscroll[1]-1+yl)*16+8)*scale+yoff), 0, scale, scale)
@@ -3839,7 +3845,7 @@ editor_draw_cursor_preview = function(alpha)
 		else
 			local quad = entityquads[currenttile]
 			if quad then
-				love.graphics.setColor(255, 255, 255, 192 * alpha)
+				love.graphics.setColor(255, 255, 255, 210 * alpha)
 				love.graphics.draw(quad.image, quad.quad,
 					math.floor((x-splitxscroll[1]-1+offsetx+xl)*16*scale),
 					math.floor(((y-splityscroll[1]-1+yl)*16+8)*scale), 0, scale, scale)
@@ -3864,6 +3870,7 @@ editor_draw_cursor_preview = function(alpha)
 end
 
 function editor_draw()
+	editor_cursor_preview_drawn = false
 	editor_rc_track()
 	local minimapProgress, minimapAnimationDone = editor_minimap_progress()
 	local resizeProgress, resizeAnimationDone = editor_resize_progress()
