@@ -122,7 +122,15 @@ function squid:update(dt)
 		end
 		local relativex, relativey = (v.x+ -self.x), (v.y + -self.y) - self.i/8
 		local distance = math.sqrt(relativex*relativex+relativey*relativey)
-		if not self.chase then
+		if self.chase then
+			self.state = "upward"
+			self.speedx, self.speedy = (relativex)/distance*(squidxspeed), (relativey)/distance*(squidxspeed)
+			if distance < 1/16 then
+				self.speedx = 0
+				self.state = "idle"
+				self.chase = false
+			end
+		else
 			self.speedx = 0
 			self.speedy = squidfallspeed
 			self.state = "idle"
@@ -130,14 +138,6 @@ function squid:update(dt)
 				self.chase = (distance > self.supersized)
 			else
 				self.chase = (distance > 1)
-			end
-		else
-			self.state = "upward"
-			self.speedx, self.speedy = (relativex)/distance*(squidxspeed), (relativey)/distance*(squidxspeed)
-			if distance < 1/16 then
-				self.speedx = 0
-				self.state = "idle"
-				self.chase = false
 			end
 		end
 		self.x = self.x+self.speedx*dt

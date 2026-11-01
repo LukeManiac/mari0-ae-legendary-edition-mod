@@ -109,14 +109,14 @@ function tilemoving:update(dt)
 		if self.moveobject.delete then
 			self.moveobject = nil
 			if self.moveobjectitem then
-				if not (self.moveobjectitem.static or self.moveobjectitem.movealongtrackblock) then
-					self.moveobjectitem = nil
-				else
+				if self.moveobjectitem.static or self.moveobjectitem.movealongtrackblock then
 					self.moveobject = self.moveobjectitem
 					self.moveobjectitem = nil
 					local syncobj = self.moveobject
 					self.moveobjectoffsetx = syncobj.x-self.x
 					self.moveobjectoffsety = syncobj.y-self.y
+				else
+					self.moveobjectitem = nil
 				end
 			end
 		else

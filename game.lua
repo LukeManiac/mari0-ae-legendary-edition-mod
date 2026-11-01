@@ -1710,10 +1710,10 @@ function game_update(dt)
 	
 	--minecraft stuff
 	if breakingblockX then
-		if not objects["tile"][tilemap(breakingblockX, breakingblockY)] then
-			breakingblockprogress = breakingblockprogress + dt*0.2
-		else
+		if objects["tile"][tilemap(breakingblockX, breakingblockY)] then
 			breakingblockprogress = breakingblockprogress + dt
+		else
+			breakingblockprogress = breakingblockprogress + dt*0.2
 		end
 		if breakingblockprogress > minecraftbreaktime then
 			breakblock(breakingblockX, breakingblockY)
@@ -4633,10 +4633,10 @@ function startlevel(level, reason)
 	objects["screenboundary"]["right"] = screenboundary:new(mapwidth)
 	
 	if flagx then
-		if not flagborder then
-			objects["screenboundary"]["flag"] = screenboundary:new(mapwidth)
-		else
+		if flagborder then
 			objects["screenboundary"]["flag"] = screenboundary:new(flagx+6/16)
+		else
+			objects["screenboundary"]["flag"] = screenboundary:new(mapwidth)
 		end
 	end
 	
@@ -6819,10 +6819,10 @@ function savemap(filename)
 			s = s .. ";customforeground"
 		end
 	end
-	if not portalgun then
-		s = s .. ";noportalgun"
-	else
+	if portalgun then
 		s = s .. ";portalguni=" .. portalguni
+	else
+		s = s .. ";noportalgun"
 	end
 	if musici == 7 then
 		if guielements["custommusiciinput"] then
@@ -7623,11 +7623,7 @@ function spawnentity(t, x, y, r, id)
 
 	elseif t == "collectable" then
 		local coinblock = (tilequads[map[x][y][1]].collision and (tilequads[map[x][y][1]].breakable or tilequads[map[x][y][1]].coinblock))
-		if not checkcollectable(x, y, tonumber(r[3])) then
-			objects["collectable"][tilemap(x, y)] = collectable:new(x, y, r, false, coinblock)
-		else
-			objects["collectable"][tilemap(x, y)] = collectable:new(x, y, r, true, coinblock)
-		end
+		objects["collectable"][tilemap(x, y)] = collectable:new(x, y, r, checkcollectable(x, y, tonumber(r[3])), coinblock)
 	elseif t == "collectablelock" then
 		table.insert(objects["collectablelock"], collectablelock:new(x, y, r[3]))
 
@@ -9957,7 +9953,14 @@ function convertr(r, types, dontgivedefaultvalues) --convert right cick values
 	local t = r:split("|")
 	for i = 1, #types do
 		local id = types[i]
-		if not t[i] then
+		if t[i] then
+			if id == "num" then
+				local s = t[i]:gsub("n", "-")
+				t[i] = tonumber(s) or 0
+			elseif id == "bool" then
+				t[i] = (t[i] == "true")
+			end
+		else
 			if dontgivedefaultvalues then
 				t[i] = nil
 			else
@@ -9970,13 +9973,6 @@ function convertr(r, types, dontgivedefaultvalues) --convert right cick values
 				else
 					t[i] = id
 				end
-			end
-		else
-			if id == "num" then
-				local s = t[i]:gsub("n", "-")
-				t[i] = tonumber(s) or 0
-			elseif id == "bool" then
-				t[i] = (t[i] == "true")
 			end
 		end
 	end

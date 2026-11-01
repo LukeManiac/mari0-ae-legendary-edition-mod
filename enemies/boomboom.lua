@@ -316,18 +316,18 @@ function boomboom:update(dt)
 				animspeed = 0.045
 			end
 			while self.animationtimer > animspeed do
-				if not self.stomped then
-					self.quadi = self.quadi + 1
-					if self.quadi == 7 then
-						self.quadi = 1
-					end
-					self.quad = boomboomquad[spriteset][self.quadi]
-				else
+				if self.stomped then
 					if self.animationdirection == "left" then
 						self.animationdirection = "right"
 					else
 						self.animationdirection = "left"
 					end
+				else
+					self.quadi = self.quadi + 1
+					if self.quadi == 7 then
+						self.quadi = 1
+					end
+					self.quad = boomboomquad[spriteset][self.quadi]
 				end
 				self.animationtimer = self.animationtimer - animspeed
 			end

@@ -95,10 +95,10 @@ function musicchanger:input(t)
 			self:play()
 		end
 	else
-		if not self.on then
-			self:play()
-		else
+		if self.on then
 			self:stop()
+		else
+			self:play()
 		end
 	end
 end

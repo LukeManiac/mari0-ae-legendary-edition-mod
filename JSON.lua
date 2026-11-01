@@ -800,18 +800,7 @@ function encode_pretty_value(self, value, parents, indent, etc)
       local result_value
 
       local object_keys = object_or_array(self, T, etc)
-      if not object_keys then
-         --
-         -- An array...
-         --
-         local ITEMS = { }
-         for i = 1, #T do
-            table.insert(ITEMS, encode_pretty_value(self, T[i], parents, indent, etc))
-         end
-
-         result_value = "[ " .. table.concat(ITEMS, ", ") .. " ]"
-
-      else
+      if object_keys then
 
          --
          -- An object -- can keys be numbers?
@@ -835,6 +824,17 @@ function encode_pretty_value(self, value, parents, indent, etc)
             table.insert(COMBINED_PARTS, string.format(FORMAT, key_indent, KEYS[i], encoded_val))
          end
          result_value = "{\n" .. table.concat(COMBINED_PARTS, ",\n") .. "\n" .. indent .. "}"
+      else
+         --
+         -- An array...
+         --
+         local ITEMS = { }
+         for i = 1, #T do
+            table.insert(ITEMS, encode_pretty_value(self, T[i], parents, indent, etc))
+         end
+
+         result_value = "[ " .. table.concat(ITEMS, ", ") .. " ]"
+
       end
 
       parents[T] = false

@@ -367,11 +367,12 @@ function platform:input(t)
 		self.on = not self.on
 	end
 
-	if not self.on then
-		self.speedx = 0; self.speedy = 0
-		self.trackspeed = 0
-	else
+	if self.on then
 		self.trackspeed = nil
+	else
+		self.speedx = 0
+		self.speedy = 0
+		self.trackspeed = 0
 	end
 end
 

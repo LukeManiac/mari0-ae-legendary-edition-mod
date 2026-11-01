@@ -1596,10 +1596,10 @@ function loadconfig(nodefaultconfig)
 	end
 	
 	for i = 1, math.max(4, players) do
-		if not portalhues[i] then
-			break
-		else
+		if portalhues[i] then
 			portalcolor[i] = {getrainbowcolor(portalhues[i][1]), getrainbowcolor(portalhues[i][2])}
+		else
+			break
 		end
 	end
 	players = 1
@@ -1997,10 +1997,10 @@ function love.keypressed(key, scancode, isrepeat, textinput)
 			func = loadstring(debuginput)
 			ok, result = pcall(func) -- execute the chunk safely
 
-			if not ok then -- will be false if there is an error
-				print('The following error happened: ' .. tostring(result))
-			else
+			if ok then -- will be false if there is an error
 				print('The result of loading is: ' .. tostring(result))
+			else
+				print('The following error happened: ' .. tostring(result))
 			end
 		elseif key == "tab" then
 			debuginputon = not debuginputon

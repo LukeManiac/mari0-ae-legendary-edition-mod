@@ -291,12 +291,11 @@ function guielement:update(dt)
 				self.scroll = self.scrollbar.value*(((#self.entries+1)*10)-(height*16)+1)
 			end
 			if self.multiy then
-				if not self.dropup then
-					--glide up/down together with the list opening/closing
-					local p = self:getlistprogress()
-					self.y = lerp(self.multiy[1], self.multiy[2], p)
-				else
+				if self.dropup then
 					self.y = self.multiy[1]
+				else
+					--glide up/down together with the list opening/closing
+					self.y = lerp(self.multiy[1], self.multiy[2], self:getlistprogress())
 				end
 			end
 		end
@@ -1242,26 +1241,26 @@ function guielement:keypress(key,textinput)
 						end
 					end
 				elseif key == "left" then
-					if not self.shift then
+					if self.shift then
+						self.highlight = self.highlight or self.cursorpos
+					else
 						if self.highlight then
 							self.cursorpos = math.min(self.cursorpos,self.highlight)+1
 							self.highlight = false
 						end
-					else
-						self.highlight = self.highlight or self.cursorpos
 					end
 					self.cursorpos = math.max(1, self.cursorpos - 1)
 					--while self.cursorpos-1 < self.textoffset do
 						self.textoffset = math.max(math.min(self.cursorpos-1, self.textoffset), 0)
 					--end
 				elseif key == "right" then
-					if not self.shift then
+					if self.shift then
+						self.highlight = self.highlight or self.cursorpos
+					else
 						if self.highlight then
 							self.cursorpos = math.max(self.cursorpos,self.highlight)-1
 							self.highlight = false
 						end
-					else
-						self.highlight = self.highlight or self.cursorpos
 					end
 
 					self.cursorpos = math.min(string.len(self.value) + 1, self.cursorpos + 1)
@@ -1269,18 +1268,18 @@ function guielement:keypress(key,textinput)
 						self.textoffset = math.min(math.max(self.textoffset, self.cursorpos-self.width), self.maxlength - self.width)
 					--end
 				elseif key == "up" and self.height > 1 then
-					if not self.shift then
-						self.highlight = false
-					else
+					if self.shift then
 						self.highlight = self.highlight or self.cursorpos
+					else
+						self.highlight = false
 					end
 
 					self.cursorpos = math.max(1, self.cursorpos - self.width)
 				elseif key == "down" and self.height > 1 then
-					if not self.shift then
-						self.highlight = false
-					else
+					if self.shift then
 						self.highlight = self.highlight or self.cursorpos
+					else
+						self.highlight = false
 					end
 
 					self.cursorpos = math.min(string.len(self.value) + 1, self.cursorpos + self.width)
@@ -1717,10 +1716,10 @@ function guielement:updatePos()
 			self.scrollbar.yrange = self.scrollbar.yrange - self.scrollbar.height
 			self.scrollbar.scrollstep = math.max(0.0001, 73/yrange)
 		end
-		if not self.cutoff and self.y+10*(#self.entries+1) > height*16 then
-			self.multiy = {self.y, height*16-(10*(#self.entries+1))}
-		else
+		if self.cutoff and self.y+10*(#self.entries+1) > height*16 then
 			self.multiy = false
+		else
+			self.multiy = {self.y, height*16-(10*(#self.entries+1))}
 		end
 	elseif self.type == "rightclick" then
 		if self.direction == "up" and self.y-#self.entries*10-10 < 0 then

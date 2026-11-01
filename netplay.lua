@@ -872,27 +872,29 @@ function net_doaction(player, s)
 end
 
 function server_infinitelives(bool, t) --true?, client
-	if not t then
+	if t then
+		udp:sendto(string.format("%s~%s", 'infinitelives', tostring(bool) or true), t[1], t[2])
+	else
 		for i, t in pairs(clients) do
 			udp:sendto(string.format("%s~%s", 'infinitelives', tostring(bool) or true), t[1], t[2])
 		end
-	else
-		udp:sendto(string.format("%s~%s", 'infinitelives', tostring(bool) or true), t[1], t[2])
 	end
 end
 
 function server_infinitetime(bool, t)
-	if not t then
+	if t then
+		udp:sendto(string.format("%s~%s", 'infinitetime', tostring(bool) or true), t[1], t[2])
+	else
 		for i, t in pairs(clients) do
 			udp:sendto(string.format("%s~%s", 'infinitetime', tostring(bool) or true), t[1], t[2])
 		end
-	else
-		udp:sendto(string.format("%s~%s", 'infinitetime', tostring(bool) or true), t[1], t[2])
 	end
 end
 
 function server_setmappack(m, t)
-	if not t then
+	if t then
+		udp:sendto(string.format("%s~%s", 'mappack', m), t[1], t[2])
+	else
 		mappack = mappacklist[mappackselection]
 		if mappackbackground and mappackbackground[mappackselection] then
 			loadbackground(mappackbackground[mappackselection] .. ".txt")
@@ -903,8 +905,6 @@ function server_setmappack(m, t)
 		for i, t in pairs(clients) do
 			udp:sendto(s, t[1], t[2])
 		end
-	else
-		udp:sendto(string.format("%s~%s", 'mappack', m), t[1], t[2])
 	end
 end
 

@@ -109,12 +109,12 @@ function physicsupdate(dt)
 					--PORTALS LOL
 					local passed = false
 					if v.portalable ~= false then
-						if not checkportalVER(v, v.x+v.speedx*dt) then
+						if checkportalVER(v, v.x+v.speedx*dt) then
+							passed = true
+						else
 							if checkportalHOR(v, v.y+v.speedy*dt) then
 								passed = true
 							end
-						else
-							passed = true
 						end
 						
 						if passed and j == "player" then
@@ -547,8 +547,6 @@ function checkcollisionslope(v, t, h, g, j, i, dt, passed) --v: b1table | t: b2t
 		local ty = t.y+getslopey(location, t.y1, t.y2) --, v.y+v.speedy*dt)
 		if not t.UPSIDEDOWNSLOPE then
 			ty = ty - v.height
-		else
-			ty = ty
 		end
 
 		local docollide = inslopedirection and (insideaabb) and finside and (diff >= -math.max(0.1,math.abs(diffy)) or math.abs((ty-v.y)) < v.height)
@@ -599,10 +597,9 @@ function checkcollisionslope(v, t, h, g, j, i, dt, passed) --v: b1table | t: b2t
 					end
 					postlocation = math.max(0, math.min(1, postlocation))
 					local postty = t.y+getslopey(postlocation, t.y1, t.y2) --, v.y+v.speedy*dt)
+					v.slopeposty = postty
 					if not t.UPSIDEDOWNSLOPE then
-						v.slopeposty = postty-v.height
-					else
-						v.slopeposty = postty
+						postty = postty-v.height
 					end
 					 --TODO: Calculate a lower speedy incase the object will still be inside the slope next frame (aka sliding along ceiling slopes)
 				end

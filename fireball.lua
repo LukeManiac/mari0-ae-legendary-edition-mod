@@ -294,21 +294,21 @@ function fireball:hitstuff(a, b, hitdir)
 		self:explode()
 	
 	elseif a == "bomb" then
-		if not b.explosion then
+		if b.explosion then
+			self:explode()
+		else
 			local dir = "right"
 			if self.x > b.x then
 				dir = "left"
 			end
 			b:shotted2(dir)
 			self:explode()
-		else
-			self:explode()
 		end
 	elseif a == "boomboom" then
-		if not b.ducking then
-			b:shotted("right")
+		if b.ducking then
 			self:explode()
 		else
+			b:shotted("right")
 			self:explode()
 		end
 	end

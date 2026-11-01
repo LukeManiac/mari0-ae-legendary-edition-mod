@@ -107,18 +107,18 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 
 	--sublevels in level
 	sublevelstable = {}
-	if not (mappacklevels[marioworld]) then
-		print("PANIC, levels not found!")
-		for k = 0, defaultsublevels do
-			table.insert(sublevelstable, k)
-		end
-	else
+	if mappacklevels[marioworld] then
 		if (not mappacklevels[marioworld][mariolevel]) then
 			print("PANIC, sublevels not found!")
 			mappacklevels[marioworld][mariolevel] = defaultsublevels
 		end
 
 		for k = 0, mappacklevels[marioworld][mariolevel] do
+			table.insert(sublevelstable, k)
+		end
+	else
+		print("PANIC, levels not found!")
+		for k = 0, defaultsublevels do
 			table.insert(sublevelstable, k)
 		end
 	end
@@ -594,14 +594,14 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 		--test from position
 		objects["player"][1].x = player_position[1]
 		objects["player"][1].y = player_position[2]
-		if not CompletelyCenteredCamera then
+		if CompletelyCenteredCamera then
+			camerasnap(player_position[3], player_position[4])
+		else
 			-- free camera: centre the view on the player the moment the editor opens
 			local p = objects["player"][1]
 			local cx = (p.x + p.width/2) - (width*screenzoom2)/2
 			local cy = getunduckedhitbox(p).centery - (height*screenzoom2)/2 - .5
 			camerasnap(cx, cy, true)
-		else
-			camerasnap(player_position[3], player_position[4])
 		end
 	end
 	trackgenerationid = 0
@@ -641,10 +641,21 @@ editor_resize_progress = function()
 	return lerp(animation.from, animation.to, progress), t >= 1
 end
 
-local function editor_overlay_input_blocked()
+local function editor_overlay_alpha()
 	local minimapProgress = editor_minimap_progress()
 	local resizeProgress = editor_resize_progress()
-	return minimapProgress > 0 or resizeProgress > 0
+	local overlayAlpha = 0
+	if minimapProgress > 0 then
+		overlayAlpha = math.max(overlayAlpha, minimapProgress)
+	end
+	if resizeProgress > 0 then
+		overlayAlpha = math.max(overlayAlpha, resizeProgress)
+	end
+	return overlayAlpha
+end
+
+local function editor_overlay_input_blocked()
+	return editor_overlay_alpha() > 0
 end
 
 editor_reset_tooltip = function()
@@ -1732,7 +1743,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 		end
 		if rightclickmenuopen then
 			if editorRCAnimation then
-				editor_draw_cursor_preview(1 - (editor_rc_progress()))
+				editor_draw_cursor_preview((1 - editor_rc_progress()) * cursorAlpha)
 			end
 			editor_rc_begin()
 			if customrcopen then
@@ -2378,7 +2389,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 							end
 						end
 					end
-					if not tilequads[currenttile] and enemiesdata[currenttile] then --custom enemy
+					if enemiesdata[currenttile] and not tilequads[currenttile] then --custom enemy
 						love.graphics.setColor(255, 255, 255, 255 * cursorAlpha)
 						local v = enemiesdata[currenttile]
 						if v.showicononeditor and v.icongraphic then
@@ -2634,10 +2645,10 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 			love.graphics.setColor(0, 0, 0, 230)
 		end
 		
-		if not minimapdragging then
-			love.graphics.rectangle("fill", scale, 18*scale, 398*scale, (205+tilemenuy)*scale)		
-		else
+		if minimapdragging then
 			love.graphics.rectangle("fill", scale, 18*scale, 398*scale, (18+minimapheight*2)*scale)
+		else
+			love.graphics.rectangle("fill", scale, 18*scale, 398*scale, (205+tilemenuy)*scale)
 		end
 		
 		guielements["tabmain"]:draw()
@@ -3807,14 +3818,9 @@ function editor_draw()
 	editor_rc_track()
 	local minimapProgress, minimapAnimationDone = editor_minimap_progress()
 	local resizeProgress, resizeAnimationDone = editor_resize_progress()
-	local cursorAlpha = 1 - minimapProgress
-	if minimapProgress > 0 and resizeProgress > 0 then
-		cursorAlpha = 0
-	end
+	local cursorAlpha = 1 - editor_overlay_alpha()
 	
-	if not editorMenuAnimation then
-		editor_draw_content(editormenuopen, false, false, cursorAlpha)
-	else
+	if editorMenuAnimation then
 		local progress, animationDone = editor_menu_progress()
 		local canvasWidth, canvasHeight = love.graphics.getDimensions()
 		if not editorMenuCanvas or editorMenuCanvasWidth ~= canvasWidth or editorMenuCanvasHeight ~= canvasHeight then
@@ -3849,6 +3855,8 @@ function editor_draw()
 		if animationDone then
 			editorMenuAnimation = nil
 		end
+	else
+		editor_draw_content(editormenuopen, false, false, cursorAlpha)
 	end
 
 	if minimapProgress > 0 then
@@ -3920,7 +3928,7 @@ function editor_draw()
 	end
 
 	if editorRCAnimation and not rightclickmenuopen and not editormenuopen then
-		editor_draw_cursor_preview(1 - (editor_rc_progress()))
+		editor_draw_cursor_preview((1 - editor_rc_progress()) * cursorAlpha)
 	end
 	editor_rc_draw_closing()
 end
@@ -5947,9 +5955,9 @@ function editor_mousepressed(x, y, button)
 							allowdrag = false
 						end
 					elseif list then
-						if not entitiesform[list].hidden then --hide
-							entitiesform[list].hidden = true
-							entitiesform[list].h = 0
+						if entitiesform[list].hidden then --unhide
+							entitiesform[list].hidden = false
+							entitiesform[list].h = 17*(math.ceil(#entitiesform[list]/22))
 							local namespacing = 10
 							local ly = 0 --listy
 							for list = 1, #entitiesform do
@@ -5957,9 +5965,9 @@ function editor_mousepressed(x, y, button)
 								entitiesform[list].y = ly
 								ly = ly + entitiesform[list].h
 							end
-						else --unhide
-							entitiesform[list].hidden = false
-							entitiesform[list].h = 17*(math.ceil(#entitiesform[list]/22))
+						else --hide
+							entitiesform[list].hidden = true
+							entitiesform[list].h = 0
 							local namespacing = 10
 							local ly = 0 --listy
 							for list = 1, #entitiesform do

@@ -103,7 +103,9 @@ function box:update(dt)
 		end
 	end
 	
-	if not self.pushed then
+	if self.pushed then
+		self.pushed = false
+	else
 		if self.gravitydir == "right" or self.gravity == "left" then
 			if self.speedy > 0 then
 				self.speedy = self.speedy - friction*dt
@@ -129,8 +131,6 @@ function box:update(dt)
 				end
 			end
 		end
-	else
-		self.pushed = false
 	end
 	
 	--rotate back to 0 (portals)

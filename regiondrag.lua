@@ -24,10 +24,10 @@ end
 
 function regiondrag:draw()
 	--center panel
-	if not self.grabbed["corner1"] and not self.grabbed["corner2"] and not self.grabbed["corner3"] and not self.grabbed["corner4"] and (self.over.center or self.grabbed.center) then
-		love.graphics.setColor(255, 180, 65, 111)
-	else
+	if self.grabbed["corner1"] or self.grabbed["corner2"] or self.grabbed["corner3"] or self.grabbed["corner4"] or (not self.over.center and not self.grabbed.center) then
 		love.graphics.setColor(234, 160, 45, 111)
+	else
+		love.graphics.setColor(255, 180, 65, 111)
 	end
 	love.graphics.rectangle("fill", ((((self.x)*16)-xscroll*16))*scale, ((self.y-(8/16)-yscroll)*16)*scale, (self.width*16)*scale, (self.height*16)*scale)
 	--corners

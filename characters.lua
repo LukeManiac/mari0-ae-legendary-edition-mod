@@ -592,10 +592,10 @@ function setcustomplayer(i, pn, initial) --name, player number, initial (don't c
 						end
 					elseif love.filesystem.getInfo("alesans_entities/characters/" .. i .. "/" .. n .. "1.png") then
 						for j = 0, #characters.data[i].colorables do
-							if not love.filesystem.getInfo("alesans_entities/characters/" .. i .. "/" .. n .. j .. ".png") then
-								characters.data[i][n][j] = blankimg
-							else
+							if love.filesystem.getInfo("alesans_entities/characters/" .. i .. "/" .. n .. j .. ".png") then
 								characters.data[i][n][j] = love.graphics.newImage("alesans_entities/characters/" .. i .. "/" .. n .. j .. ".png")
+							else
+								characters.data[i][n][j] = blankimg
 							end
 						end
 					else

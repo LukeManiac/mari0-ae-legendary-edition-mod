@@ -128,14 +128,14 @@ function lakito:update(dt)
 			self.animationdirection = "left"
 		end
 		
-		if not self.frozen then
+		if self.frozen then
+			self.speedx = 0
+		else
 			if self.direction == "right" then
 				self.speedx = math.max(2, round((distance-3)*2))
 			else
 				self.speedx = -2
 			end
-		else
-			self.speedx = 0
 		end
 	end
 		

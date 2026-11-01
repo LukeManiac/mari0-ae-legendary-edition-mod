@@ -147,10 +147,10 @@ function smbsitem:action(b)
 		playsound(mushroomeatsound)
 		addpoints(1000, self.x+self.width/2, self.y)
 	elseif self.t == "key" then
-		if not b.key then
-			b.key = 1
-		else
+		if b.key then
 			b.key = b.key + 1
+		else
+			b.key = 1
 		end
 		playsound(keysound)
 	elseif self.t == "luckystar" then

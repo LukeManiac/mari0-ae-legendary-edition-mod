@@ -68,7 +68,11 @@ function levelscreen_load(reason, i)
 			checkpointsublevel = false
 			
 			--check if next level doesn't exist
-			if not dcplaying then
+			if dcplaying then
+				dcfinish = true
+				blacktime = dcwin2sound:getDuration("seconds")
+				playsound(dcwin2sound)
+			else
 				local gamefinished = false
 				if not love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/" .. marioworld .. "-" .. mariolevel .. ".txt") then
 					gamefinished = true
@@ -113,10 +117,6 @@ function levelscreen_load(reason, i)
 						levelscreenimagecheck = true
 					end
 				end
-			else
-				dcfinish = true
-				blacktime = dcwin2sound:getDuration("seconds")
-				playsound(dcwin2sound)
 			end
 		else
 			checkcheckpoint = true

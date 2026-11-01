@@ -640,29 +640,7 @@ function goomba:update(dt)
 			if self.supersized then
 				scaled = self.supersized
 			end
-			if not self.chase then
-				if distance > 3*scaled then
-					self:shotted()
-					return false
-				elseif distance > scaled then
-					self.x = ((v.x+v.width/2)+math.sin(angle-math.pi*.5)*(10/16*scaled)) -self.width/2
-					self.y = ((v.y+v.height/2)+math.cos(angle-math.pi*.5)*(10/16*scaled))-self.height/2
-					--self:shotted()
-					--return false
-				end
-				self.chase = (distance > (10/16*scaled))
-				if self.chase then
-					if self.angry then
-						self.speed = wigglerspeedangry
-					else
-						self.speed = wigglerspeed
-					end
-					self.chasex = v.x
-					self.chasey = v.y
-				else
-					self.speed = 0
-				end
-			else
+			if self.chase then
 				if distance > 3*scaled then
 					self:shotted()
 					return false
@@ -696,6 +674,28 @@ function goomba:update(dt)
 					self.animationdirection = "left"
 				else
 					self.animationdirection = "right"
+				end
+			else
+				if distance > 3*scaled then
+					self:shotted()
+					return false
+				elseif distance > scaled then
+					self.x = ((v.x+v.width/2)+math.sin(angle-math.pi*.5)*(10/16*scaled)) -self.width/2
+					self.y = ((v.y+v.height/2)+math.cos(angle-math.pi*.5)*(10/16*scaled))-self.height/2
+					--self:shotted()
+					--return false
+				end
+				self.chase = (distance > (10/16*scaled))
+				if self.chase then
+					if self.angry then
+						self.speed = wigglerspeedangry
+					else
+						self.speed = wigglerspeed
+					end
+					self.chasex = v.x
+					self.chasey = v.y
+				else
+					self.speed = 0
 				end
 			end
 		end

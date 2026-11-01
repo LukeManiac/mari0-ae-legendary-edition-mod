@@ -89,7 +89,9 @@ function turret:update(dt)
 		end
 	end
 	
-	if not self.pushed then
+	if self.pushed then
+		self.pushed = false
+	else
 		if self.speedx > 0 then
 			self.speedx = self.speedx - friction*dt
 			if self.speedx < 0 then
@@ -101,8 +103,6 @@ function turret:update(dt)
 				self.speedx = 0
 			end
 		end
-	else
-		self.pushed = false
 	end
 
 	if self.parent then
@@ -487,19 +487,19 @@ function turret:draw()
 	end
 	
 	love.graphics.setColor(255, 255, 255)
-	if not self.frenzy then
-		love.graphics.draw(self.graphic, turretquad[1], math.floor(((self.x-xscroll)*16+self.offsetX+1)*scale), ((self.y-.5-yscroll)*16+self.offsetY-1)*scale, 0, dirscale, scale, self.quadcenterX, self.quadcenterY)
-	else
+	if self.frenzy then
 		love.graphics.draw(self.graphic, turretquad[1], math.floor(((self.x-xscroll)*16+self.offsetX+1)*scale), ((self.y-.5-yscroll)*16+self.offsetY)*scale,  self.rotation, dirscale, scale, self.quadcenterX, self.quadcenterY)
+	else
+		love.graphics.draw(self.graphic, turretquad[1], math.floor(((self.x-xscroll)*16+self.offsetX+1)*scale), ((self.y-.5-yscroll)*16+self.offsetY-1)*scale, 0, dirscale, scale, self.quadcenterX, self.quadcenterY)
 	end
 
 	local shade = 255*(1-turretdarkenfactor*self.timer)
 	love.graphics.setColor(shade, shade, shade)
 
-	if not self.frenzy then
-		love.graphics.draw(self.graphic, turretquad[2], math.floor(((self.x-xscroll)*16+self.armoffsetX)*scale), ((self.y-.5-yscroll)*16+self.armoffsetY-1)*scale, self.armrotation+self.rotation, dirscale, scale, self.armquadcenterX, self.armquadcenterY)
-	else
+	if self.frenzy then
 		love.graphics.draw(self.graphic, turretquad[2], math.floor(((self.x-xscroll)*16+self.armoffsetX)*scale), ((self.y-.5-yscroll)*16+self.armoffsetY)*scale, self.armrotation+self.rotation, dirscale, scale, self.armquadcenterX, self.armquadcenterY)
+	else
+		love.graphics.draw(self.graphic, turretquad[2], math.floor(((self.x-xscroll)*16+self.armoffsetX)*scale), ((self.y-.5-yscroll)*16+self.armoffsetY-1)*scale, self.armrotation+self.rotation, dirscale, scale, self.armquadcenterX, self.armquadcenterY)
 	end
 end
 

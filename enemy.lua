@@ -3855,19 +3855,17 @@ function enemy:dropped(gravitydir)
 		self.throwntimer = self.throwntime or 1.3
 	end
 	self.speedy = self.thrownspeedy or 0
-	if not self.thrownignorecarryspeed then
-		if (self.carryparent.portalgun and self.carryparent.pointingangle > 0) or self.carryparent.animationdirection == "left" then --left
-			self.speedx = self.carryparent.speedx-(self.thrownspeedx or 0)
-		else
-			self.speedx = self.carryparent.speedx+(self.thrownspeedx or 0)
-		end
+	if (self.carryparent.portalgun and self.carryparent.pointingangle > 0) or self.carryparent.animationdirection == "left" then --left
+		speedx = -(self.thrownspeedx or 0)
 	else
-		if (self.carryparent.portalgun and self.carryparent.pointingangle > 0) or self.carryparent.animationdirection == "left" then --left
-			self.speedx = -(self.thrownspeedx or 0)
-		else
-			self.speedx = (self.thrownspeedx or 0)
-		end
+		speedx = (self.thrownspeedx or 0)
 	end
+
+	if not self.thrownignorecarryspeed then
+		speedx = speedx + self.carryparent.speedx
+	end
+
+	self.speedx = speedx
 
 	local offsetx = (self.carryoffsetx or 0)
 	if self.carryoffsetx and ((self.carryparent.portalgun and self.carryparent.pointingangle > 0) or self.carryparent.animationdirection == "left") then

@@ -441,12 +441,12 @@ end
 
 function buttonblock:change()
 	self.solid = not self.solid
-	if not self.solid then
-		self.quad = self.quadoff
-		self.active = false
-	else
+	if self.solid then
 		self.quad = self.quadon
 		self.active = true
+	else
+		self.quad = self.quadoff
+		self.active = false
 	end
 end
 

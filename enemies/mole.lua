@@ -61,10 +61,10 @@ function mole:init(x, y, r)
 		and not tilequads[map[round(x)][math.floor(y+17/16)][1]].collision) then
 		self.inground = false
 		self.speedx = -molespeed
-		if not ground then
-			self.quad = molequad[spriteset][3]
-		else
+		if ground then
 			self.quad = molequad[spriteset][2]
+		else
+			self.quad = molequad[spriteset][3]
 		end
 		self.gravity = yacceleration
 		self.mask = {	true, 

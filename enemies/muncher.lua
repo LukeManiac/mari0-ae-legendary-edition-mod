@@ -67,15 +67,7 @@ function muncher:init(x, y, physics, r)
 end
 
 function muncher:updateimage()
-	if not self.frozen then
-		self.graphic = muncherimg
-		self.quad = starquad[spriteset][self.quadi]
-		self.offsetX = 7
-		self.offsetY = 2
-		self.quadcenterX = 8
-		self.quadcenterY = 8
-		self.category = 4
-	else
+	if self.frozen then
 		self.graphic = muncherfrozenimg
 		self.quad = coinquads[spriteset][coinframe]
 		self.offsetX = 8
@@ -83,6 +75,14 @@ function muncher:updateimage()
 		self.quadcenterX = 8
 		self.quadcenterY = 8
 		self.category = 32
+	else
+		self.graphic = muncherimg
+		self.quad = starquad[spriteset][self.quadi]
+		self.offsetX = 7
+		self.offsetY = 2
+		self.quadcenterX = 8
+		self.quadcenterY = 8
+		self.category = 4
 	end
 end
 

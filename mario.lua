@@ -1727,7 +1727,7 @@ function mario:update(dt)
 						sub = checkpointsublevel
 					end
 				end
-				if not editormode and testlevel then
+				if testlevel and not editormode then
 					stoptestinglevel()
 				else
 					--fade to black when everyone is dead
@@ -2140,11 +2140,11 @@ function mario:update(dt)
 		if self.vine == "entity" and self.vineb.moving and self.vineb.oldx then
 			local fx = self.x+(self.vineb.x-self.vineb.oldx)
 			local fy = self.y+(self.vineb.oy-self.vineb.oldy)
-			if not checkintile(fx, fy, self.width, self.height, {}, self, "ignoreplatforms") then
+			if checkintile(fx, fy, self.width, self.height, {}, self, "ignoreplatforms") then
+				self:dropvine(self.vineside)
+			else
 				self.x = fx
 				self.y = fy
-			else
-				self:dropvine(self.vineside)
 			end
 		end
 			
@@ -2721,10 +2721,10 @@ function mario:update(dt)
 			angrysunend = true
 		end
 	else
-		if not self.underwater then
-			self:movement(dt)
-		else
+		if self.underwater then
 			self:underwatermovement(dt)
+		else
+			self:movement(dt)
 		end
 	end
 	
@@ -3778,7 +3778,64 @@ function mario:jump(force)
 		end	
 		self.redseesaw = false
 		
-		if not self.water then
+		if self.water then --swim
+			if self.vine then
+				if mariomakerphysics then
+					if self.vineside == "right" then
+						self.x = self.x+1/16
+					else
+						self.x = self.x-1/16
+					end
+					self:dropvine(self.vineside)
+					self.falling = false
+				else
+					return
+				end
+			end
+			if self.fence then
+				self:dropfence()
+				self.falling = false
+			end
+			if self.ducking then
+				self:duck(false)
+			end
+			if not self.frog then --don't use bad swimming when frog mario
+				playsound(swimsound)
+				
+				local speedx = self.speedx
+				if self.gravitydir == "right" or self.gravitydir == "left" then
+					speedx = self.speedy
+				end
+				local force = self.characterdata.uwjumpforce + (math.abs(speedx) / self.characterdata.maxrunspeed)*self.characterdata.uwjumpforceadd
+				if SMWSwimming then
+					if downkey(self.playernumber) then
+						force = force / 2
+					elseif upkey(self.playernumber) then
+						force = force * 1.5
+					end
+				end
+				if self.gravitydir == "up" then
+					self.speedy = force
+				elseif self.gravitydir == "down" then
+					self.speedy = -force
+				elseif self.gravitydir == "right" then
+					self.speedx = -force
+				elseif self.gravitydir == "left" then
+					self.speedx = force
+				end
+
+				self.jumping = true
+				if self.characterdata.swimpushframes > 0 then
+					if (not self.swimpush) then 
+						self.swimpush = 1
+					else
+						self.swimpush = ((self.swimpush-1)%3)+1
+					end
+				end
+				self.animationstate = "jumping"
+				self:setquad()
+			end
+		else
 			if (self.gravitydir == "left" or self.gravitydir == "right") and self.speedx ~= 0 then
 				return false
 			else
@@ -3903,63 +3960,6 @@ function mario:jump(force)
 						end
 					end
 				end
-			end
-		else --swim
-			if self.vine then
-				if mariomakerphysics then
-					if self.vineside == "right" then
-						self.x = self.x+1/16
-					else
-						self.x = self.x-1/16
-					end
-					self:dropvine(self.vineside)
-					self.falling = false
-				else
-					return
-				end
-			end
-			if self.fence then
-				self:dropfence()
-				self.falling = false
-			end
-			if self.ducking then
-				self:duck(false)
-			end
-			if not self.frog then --don't use bad swimming when frog mario
-				playsound(swimsound)
-				
-				local speedx = self.speedx
-				if self.gravitydir == "right" or self.gravitydir == "left" then
-					speedx = self.speedy
-				end
-				local force = self.characterdata.uwjumpforce + (math.abs(speedx) / self.characterdata.maxrunspeed)*self.characterdata.uwjumpforceadd
-				if SMWSwimming then
-					if downkey(self.playernumber) then
-						force = force / 2
-					elseif upkey(self.playernumber) then
-						force = force * 1.5
-					end
-				end
-				if self.gravitydir == "up" then
-					self.speedy = force
-				elseif self.gravitydir == "down" then
-					self.speedy = -force
-				elseif self.gravitydir == "right" then
-					self.speedx = -force
-				elseif self.gravitydir == "left" then
-					self.speedx = force
-				end
-
-				self.jumping = true
-				if self.characterdata.swimpushframes > 0 then
-					if (not self.swimpush) then 
-						self.swimpush = 1
-					else
-						self.swimpush = ((self.swimpush-1)%3)+1
-					end
-				end
-				self.animationstate = "jumping"
-				self:setquad()
 			end
 		end
 		--check if upper half is inside block

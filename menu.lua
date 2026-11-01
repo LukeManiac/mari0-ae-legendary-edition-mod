@@ -1607,10 +1607,10 @@ function menu_draw()
 			for x = 1, xtodraw do
 				local backgroundtile = bmapt(x, y, 1)
 				if backgroundtile then
-					if not tilequads[backgroundtile] then 
-						print("background tile doesn't exist:",backgroundtile)
-					else
+					if tilequads[backgroundtile] then 
 						love.graphics.draw(tilequads[backgroundtile].image, tilequads[backgroundtile].quad, math.floor((x-1)*16*scale), ((y-1)*16-8)*scale, 0, scale, scale)
+					else
+						print("background tile doesn't exist:",backgroundtile)
 					end
 				end
 			end
@@ -2045,10 +2045,10 @@ function menu_draw()
 					love.graphics.setColor(0, 0, 0, 200)
 					love.graphics.rectangle("fill", 241*scale, 125*scale, 150*scale, 65*scale, 10*scale)
 					love.graphics.setColor(255, 255, 255, 255)
-					if not savefolderfailed then
-						properprintF(TEXT["mappack folder instructions"], 244*scale, 129*scale)
-					else
+					if savefolderfailed then
 						properprintF(TEXT["mappack folder fail"], 244*scale, 129*scale)
+					else
+						properprintF(TEXT["mappack folder instructions"], 244*scale, 129*scale)
 					end
 					openmappacksbutton:draw()
 					properprintF("       open\n  mappacks folder", 239*scale, 194*scale)
@@ -2733,11 +2733,11 @@ function menu_draw()
 		elseif optionstab == 4 then
 			love.graphics.setColor(255, 255, 255, 255)
 
-			if not gamefinished then
+			if gamefinished then
+				properprintF(TEXT["have fun with these!"], 30*scale, 45*scale)
+			else
 				properprintF(TEXT["unlock this by completing"], 30*scale, 40*scale)
 				properprintF(TEXT["the original levels pack!"], 30*scale, 50*scale)
-			else
-				properprintF(TEXT["have fun with these!"], 30*scale, 45*scale)
 			end
 
 			local labels = {
@@ -2801,30 +2801,7 @@ function loadbackground(background)
 	collectablescount = {0,0,0,0,0,0,0,0,0,0}
 	animationnumbers = {}
 	
-	if not love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/" .. background) then
-	
-		map = {}
-		mapwidth = width
-		originalmapwidth = mapwidth
-		mapheight = 15
-		for x = 1, width do
-			map[x] = {}
-			for y = 1, 13 do
-				map[x][y] = {1}
-			end
-		
-			for y = 14, mapheight do
-				map[x][y] = {2}
-			end
-		end
-		startx = 3
-		starty = 13
-		custombackground = false
-		backgroundi = 1
-		love.graphics.setBackgroundColor(backgroundcolor[backgroundi])
-		portalgun = true
-		portalguni = 1
-	else
+	if love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/" .. background) then
 		local s = love.filesystem.read( mappackfolder .. "/" .. mappack .. "/" .. background )
 		local s2 = s:split(";")
 		
@@ -2985,6 +2962,28 @@ function loadbackground(background)
 		if customforeground then
 			loadcustomforeground(customforeground)
 		end
+	else
+		map = {}
+		mapwidth = width
+		originalmapwidth = mapwidth
+		mapheight = 15
+		for x = 1, width do
+			map[x] = {}
+			for y = 1, 13 do
+				map[x][y] = {1}
+			end
+		
+			for y = 14, mapheight do
+				map[x][y] = {2}
+			end
+		end
+		startx = 3
+		starty = 13
+		custombackground = false
+		backgroundi = 1
+		love.graphics.setBackgroundColor(backgroundcolor[backgroundi])
+		portalgun = true
+		portalguni = 1
 	end
 end
 
@@ -3429,17 +3428,12 @@ function menu_keypressed(key, unicode)
 				love.graphics.present()
 				
 				if asset.download then
-					if not asset.downloadable then
-						--link
-						if love.system.openURL(asset.download.url) then
-							notice.new(TEXT["Opened Download Link"], nil, 2)
-						else
-							love.system.setClipboardText(asset.download.url)
-							notice.new(TEXT["Couldn't Open Link\nLink copied to clipboard"], notice.red, 3)
-						end
-					else
+					if asset.downloadable then
 						onlinemappackerror = not downloadasset(asset)
-						if not onlinemappackerror then
+						if onlinemappackerror then
+							downloadedmappacks[i] = false
+							notice.new(TEXT["Download failed"], notice.red, 2)
+						else
 							mountasset(asset)
 							if asset.type == "mappack" then
 								loadmappacks()
@@ -3459,9 +3453,14 @@ function menu_keypressed(key, unicode)
 							updatescroll()
 							onlineupdatescroll()
 							notice.new(TEXT["DLC downloaded!"], nil, 2)
+						end
+					else
+						--link
+						if love.system.openURL(asset.download.url) then
+							notice.new(TEXT["Opened Download Link"], nil, 2)
 						else
-							downloadedmappacks[i] = false
-							notice.new(TEXT["Download failed"], notice.red, 2)
+							love.system.setClipboardText(asset.download.url)
+							notice.new(TEXT["Couldn't Open Link\nLink copied to clipboard"], notice.red, 3)
 						end
 					end
 				else

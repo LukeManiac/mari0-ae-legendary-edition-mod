@@ -409,10 +409,10 @@ end
 
 function hammerbro:globalcollide(a, b)
 	if a == "hammer" then
-		if not b.killstuff then
-			return true
-		else
+		if b.killstuff then
 			self:shotted()
+		else
+			return true
 		end
 	elseif a == "player" then
 		return true

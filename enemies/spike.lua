@@ -691,13 +691,13 @@ function spikeball:floorcollide(a, b)
 		end
 		return false
 	end
-	if not self.rolling then
-		self:broke()
-	else
+	if self.rolling then
 		self.falling = false
 		if self.speedy > 0 then
 			self.speedy = -((self.speedy-1)*0.5)
 		end
+	else
+		self:broke()
 	end
 end
 

@@ -205,13 +205,7 @@ function drawplayercard(x, y, colortable, hattable, nick, ping, focus, character
 	love.graphics.setColor(255, 255, 255)
 	properprintF(nick, x*scale+35*scale, y*scale+10*scale)
 
-	if not ping then
-		love.graphics.setColor(127, 127, 127)
-	end
-	if not ping then
-		properprintF("ping:", x*scale+35*scale, y*scale+22*scale)
-		properprintF("host", x*scale+75*scale, y*scale+22*scale)
-	else
+	if ping then
 		if tonumber(ping) then
 			if tonumber(ping) < 40 then
 				love.graphics.setColor(100+125*(tonumber(ping)/40), 255, 100)
@@ -225,6 +219,10 @@ function drawplayercard(x, y, colortable, hattable, nick, ping, focus, character
 		end
 		properprintF("ping:", x*scale+35*scale, y*scale+22*scale)
 		properprintF(ping .. "ms", (x+123-#(ping .. "ms")*8)*scale, y*scale+22*scale)
+	else
+		love.graphics.setColor(127, 127, 127)
+		properprintF("ping:", x*scale+35*scale, y*scale+22*scale)
+		properprintF("host", x*scale+75*scale, y*scale+22*scale)
 	end
 end
 

@@ -659,7 +659,17 @@ function trackcontroller:release(dir, soft)
 		--find a solution if enemies with pre-defined gravity become static after releasing from track
 		self.b.gravity = self.oldb.gravity
 	end
-	if not soft then --dont do this if object is ejecting itself from the track
+	if soft then
+		self.b.static = false
+		
+		if not self.b.dontreturnmaskontrackrelease then
+			--if self.oldb.mask then
+				self.b.mask[2] = self.oldb.mask[2]--false--not self.b.mask[1]
+			--end
+			--change this maybe if it breaks?
+			--koopas fall if it uses the commented one because they change masks when shelled
+		end
+	else --dont do this if object is ejecting itself from the track
 		for name, value in pairs(self.oldb) do
 			if name ~= "mask" then
 				self.b[name] = value
@@ -683,16 +693,6 @@ function trackcontroller:release(dir, soft)
 	
 		if self.b.mask then
 			self.b.mask[33] = not self.b.mask[1] --collide with tracks
-		end
-	else
-		self.b.static = false
-		
-		if not self.b.dontreturnmaskontrackrelease then
-			--if self.oldb.mask then
-				self.b.mask[2] = self.oldb.mask[2]--false--not self.b.mask[1]
-			--end
-			--change this maybe if it breaks?
-			--koopas fall if it uses the commented one because they change masks when shelled
 		end
 	end
 	if self.b.dotrack then

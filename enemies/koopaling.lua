@@ -675,14 +675,14 @@ function koopaling:update(dt)
 				end
 				if self.t == 8 then
 					--bowser jr.
-					if not self.jumpthrough and math.random(1, 8) == 1 then --jump higher if player jumping
+					if math.random(1, 8) == 1 and not self.jumpthrough then --jump higher if player jumping
 						self.speedy = -koopalingjumpforce[self.t]
 						self.heavyjump = true
 					else
 						self.speedy = -koopalinghopjumpforce[self.t]
 					end
 				else
-					if not self.jumpthrough and math.random(1, 3) == 1 then --jump higher if player jumping
+					if math.random(1, 3) == 1 and not self.jumpthrough then --jump higher if player jumping
 						self.speedy = -koopalingjumpforce[self.t]
 					else
 						self.speedy = -koopalinghopjumpforce[self.t]
@@ -938,10 +938,10 @@ function koopaling:leftcollide(a, b)
 	end
 	
 	if self.jumping then
-		if not self.jumpthrough then
-			self.speedx = -self.speedx
-		else
+		if self.jumpthrough then
 			self.speedx = 0
+		else
+			self.speedx = -self.speedx
 		end
 	elseif a == "tile" and self.animationdirection == "left" then
 		self.speedx = 0
@@ -982,10 +982,10 @@ function koopaling:rightcollide(a, b)
 	end
 	
 	if self.jumping then
-		if not self.jumpthrough then
-			self.speedx = -self.speedx
-		else
+		if self.jumpthrough then
 			self.speedx = 0
+		else
+			self.speedx = -self.speedx
 		end
 	elseif a == "tile" and self.animationdirection == "right" then
 		self.speedx = 0

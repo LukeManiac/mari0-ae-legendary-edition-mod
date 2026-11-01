@@ -288,35 +288,7 @@ function koopa:update(dt)
 		end
 		
 		if not self.frozen then
-			if not self.small then
-				if self.t == "blue" then
-					self.animationtimer = self.animationtimer + 1.5*dt
-				else
-					self.animationtimer = self.animationtimer + dt
-				end
-				while self.animationtimer > koopaanimationspeed do
-					self.animationtimer = self.animationtimer - koopaanimationspeed
-					if self.t == "bigkoopa" or self.t == "bigbeetle" then
-						if self.quad == bigkoopaquad[spriteset][1] then
-							self.quad = bigkoopaquad[spriteset][2]
-						else
-							self.quad = bigkoopaquad[spriteset][1]
-						end
-					elseif not self.flying then
-						if self.quad == koopaquad[spriteset][1] then
-							self.quad = koopaquad[spriteset][2]
-						else
-							self.quad = koopaquad[spriteset][1]
-						end
-					else
-						if self.quad == koopaquad[spriteset][4] then
-							self.quad = koopaquad[spriteset][5]
-						else
-							self.quad = koopaquad[spriteset][4]
-						end
-					end
-				end
-			else
+			if self.small then
 				if self.shellwakingup then
 					self.animationtimer = self.animationtimer + dt
 					while self.animationtimer > koopawakeupanimationspeed do
@@ -366,6 +338,34 @@ function koopa:update(dt)
 									self.offsetY = 0
 								end
 							end
+						end
+					end
+				end
+			else
+				if self.t == "blue" then
+					self.animationtimer = self.animationtimer + 1.5*dt
+				else
+					self.animationtimer = self.animationtimer + dt
+				end
+				while self.animationtimer > koopaanimationspeed do
+					self.animationtimer = self.animationtimer - koopaanimationspeed
+					if self.t == "bigkoopa" or self.t == "bigbeetle" then
+						if self.quad == bigkoopaquad[spriteset][1] then
+							self.quad = bigkoopaquad[spriteset][2]
+						else
+							self.quad = bigkoopaquad[spriteset][1]
+						end
+					elseif not self.flying then
+						if self.quad == koopaquad[spriteset][1] then
+							self.quad = koopaquad[spriteset][2]
+						else
+							self.quad = koopaquad[spriteset][1]
+						end
+					else
+						if self.quad == koopaquad[spriteset][4] then
+							self.quad = koopaquad[spriteset][5]
+						else
+							self.quad = koopaquad[spriteset][4]
 						end
 					end
 				end

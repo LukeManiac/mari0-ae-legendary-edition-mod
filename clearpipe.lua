@@ -848,12 +848,12 @@ function clearpipe:draw()
 end
 
 addsegment = function(x, y, parent, quad, stage, dir, entrance, exit, graphic)
-	if not objects["clearpipesegment"][tilemap(x, y)] then
-		objects["clearpipesegment"][tilemap(x, y)] = clearpipesegment:new(x, y, parent, quad, stage, dir, entrance, exit, graphic)
-	else
+	if objects["clearpipesegment"][tilemap(x, y)] then
 		--just add the sprite if a segment already exists
 		table.insert(objects["clearpipesegment"][tilemap(x, y)].quad, clearpipequad[quad[1]][quad[2]])
 		table.insert(objects["clearpipesegment"][tilemap(x, y)].graphic, graphic)
+	else
+		objects["clearpipesegment"][tilemap(x, y)] = clearpipesegment:new(x, y, parent, quad, stage, dir, entrance, exit, graphic)
 	end
 end
 function clearpipe:getstage(v,dir)

@@ -64,7 +64,9 @@ function core:update(dt)
 		friction = boxfriction
 	end
 	
-	if not self.pushed then
+	if self.pushed then
+		self.pushed = false
+	else
 		if self.speedx > 0 then
 			self.speedx = self.speedx - friction*dt
 			if self.speedx < 0 then
@@ -76,8 +78,6 @@ function core:update(dt)
 				self.speedx = 0
 			end
 		end
-	else
-		self.pushed = false
 	end
 	
 	--rotate back to 0 (portals)

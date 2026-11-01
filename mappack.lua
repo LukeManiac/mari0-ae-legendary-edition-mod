@@ -238,10 +238,10 @@ function savecustomtext()
 		s = s .. t:gsub("-", "|") .. "|" .. text .. ","
 		amount = true
 	end
-	if not amount then
-		s = s .. "1|1|"
-	else
+	if amount then
 		s = s:sub(1, -2)
+	else
+		s = s .. "1|1|"
 	end
 
 	s = s .. "\r\nhudhidecollectables="
@@ -616,14 +616,14 @@ function loadcustomsounds(forcebuiltins)
 		end
 		customstarmusic = false
 	end
-	if not forcebuiltins and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/sounds/princessmusic.ogg") then
-		music:preload(mappackfolder .. "/" .. mappack .. "/sounds/princessmusic.ogg", "princessmusic")
-		customprincessmusic = true
-	else
+	if forcebuiltins and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/sounds/princessmusic.ogg") then
 		if customprincessmusic then
 			music:preload("sounds/princessmusic.ogg", "princessmusic")
 		end
 		customprincessmusic = false
+	else
+		music:preload(mappackfolder .. "/" .. mappack .. "/sounds/princessmusic.ogg", "princessmusic")
+		customprincessmusic = true
 	end
 	
 	if forcebuiltins and not customsounds then

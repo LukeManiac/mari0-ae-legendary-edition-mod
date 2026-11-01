@@ -305,8 +305,6 @@ function loadenemy(filename)
 			end
 			loaddelayed[s] = nil
 		end
-	else
-		--Bad.
 	end
 end
 

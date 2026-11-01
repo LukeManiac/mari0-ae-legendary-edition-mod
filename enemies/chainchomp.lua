@@ -289,7 +289,14 @@ function chainchomp:update(dt)
 				self.chargespeedx, self.chargespeedy = (rx)/d*(chainchompattackspeed), (ry)/d*(chainchompattackspeed)
 				self.freecount = self.freecount + 1
 			elseif self.attacktimer > chainchompattackwait+self.randomattackadd then
-				if not self.targetplayer then
+				if self.targetplayer then
+					if self.targetplayer.x+self.targetplayer.width/2 < self.x+self.width/2 then
+						self.animationdirection = "right"
+					else
+						self.animationdirection = "left"
+					end
+					self.speedx = 0
+				else
 					local closestplayer = false
 					local closestdist = math.huge
 					for i = 1, players do
@@ -312,13 +319,6 @@ function chainchomp:update(dt)
 					else
 						self.attacktimer = 0
 					end
-				else
-					if self.targetplayer.x+self.targetplayer.width/2 < self.x+self.width/2 then
-						self.animationdirection = "right"
-					else
-						self.animationdirection = "left"
-					end
-					self.speedx = 0
 				end
 			end
 			
