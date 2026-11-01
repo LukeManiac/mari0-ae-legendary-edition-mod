@@ -20,18 +20,21 @@ local tilehotkeysentityindex = {}
 local editorMenuAnimation
 local editorMenuCanvas
 local editorMenuCanvasWidth, editorMenuCanvasHeight
-local editorMapResizeAnimation
-local editorMapResizeCanvas
-local editorMapResizeCanvasWidth, editorMapResizeCanvasHeight
-local editorMapResizeVisible = false
 local editorMinimapAnimation
 local editorMinimapCanvas
 local editorMinimapCanvasWidth, editorMinimapCanvasHeight
+local editorResizeAnimation
+local editorResizeCanvas
+local editorResizeCanvasWidth, editorResizeCanvasHeight
+local editorResizeOverlayVisible = false
+local editorResizeGuiElementNames = {
+	"maptopup", "maptopdown", "mapbottomup", "mapbottomdown",
+	"mapleftleft", "mapleftright", "maprightleft", "maprightright",
+	"mapwidthapply", "mapwidthcancel"
+}
 local EDITOR_MENU_ANIM_TIME = 0.25
-local EDITOR_MAP_RESIZE_ANIM_TIME = EDITOR_MENU_ANIM_TIME
 local EDITOR_RC_ANIM_TIME = 0.25
 local editor_menu_progress
-local editor_map_resize_progress
 local editorRCAnimation
 local editorRCCanvas
 local editorRCCanvasWidth, editorRCCanvasHeight
@@ -46,22 +49,11 @@ local editor_rc_draw_closing
 local editor_draw_cursor_preview
 local editor_menu_progress
 local editor_minimap_progress
+local editor_resize_progress
 local editor_reset_tooltip
 local editor_set_menu_view
-local editor_set_map_resize_visible
 local editor_set_minimap_visible
-local editorMapResizeControls = {
-	maptopup = true,
-	maptopdown = true,
-	mapbottomup = true,
-	mapbottomdown = true,
-	mapleftleft = true,
-	mapleftright = true,
-	maprightleft = true,
-	maprightright = true,
-	mapwidthapply = true,
-	mapwidthcancel = true
-}
+local editor_set_resize_visible
 local editorConfirmAnimation
 local editorConfirmCanvas
 local editorConfirmCanvasWidth, editorConfirmCanvasHeight
@@ -80,13 +72,14 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	editorMenuAnimation = nil
 	editorMenuCanvas = nil
 	editorMenuCanvasWidth, editorMenuCanvasHeight = nil, nil
-	editorMapResizeAnimation = nil
-	editorMapResizeCanvas = nil
-	editorMapResizeCanvasWidth, editorMapResizeCanvasHeight = nil, nil
-	editorMapResizeVisible = false
 	editorMinimapAnimation = nil
 	editorMinimapCanvas = nil
 	editorMinimapCanvasWidth, editorMinimapCanvasHeight = nil, nil
+	editorResizeAnimation = nil
+	editorResizeCanvas = nil
+	editorResizeCanvasWidth, editorResizeCanvasHeight = nil, nil
+	editorResizeOverlayVisible = false
+	changemapwidthmenu = false
 	editorRCAnimation = nil
 	editorRCCanvas = nil
 	editorRCCanvasWidth, editorRCCanvasHeight = nil, nil
@@ -626,17 +619,6 @@ editor_menu_progress = function()
 	return lerp(animation.from, animation.to, progress), t >= 1
 end
 
-editor_map_resize_progress = function()
-	if not editorMapResizeAnimation then
-		return bool2int(editorMapResizeVisible), true
-	end
-
-	local animation = editorMapResizeAnimation
-	local t = (love.timer.getTime() - animation.start) / EDITOR_MAP_RESIZE_ANIM_TIME
-	local progress = motion_curve(t, animation.curve, animation.curve_in, false, true, true)
-	return lerp(animation.from, animation.to, progress), t >= 1
-end
-
 editor_minimap_progress = function()
 	if not editorMinimapAnimation then
 		return bool2int(minimapmoving), true
@@ -646,6 +628,23 @@ editor_minimap_progress = function()
 	local t = (love.timer.getTime() - animation.start) / EDITOR_MENU_ANIM_TIME
 	local progress = motion_curve(t, animation.curve, animation.curve_in, false, true, true)
 	return lerp(animation.from, animation.to, progress), t >= 1
+end
+
+editor_resize_progress = function()
+	if not editorResizeAnimation then
+		return bool2int(editorResizeOverlayVisible), true
+	end
+
+	local animation = editorResizeAnimation
+	local t = (love.timer.getTime() - animation.start) / EDITOR_MENU_ANIM_TIME
+	local progress = motion_curve(t, animation.curve, animation.curve_in, false, true, true)
+	return lerp(animation.from, animation.to, progress), t >= 1
+end
+
+local function editor_overlay_input_blocked()
+	local minimapProgress = editor_minimap_progress()
+	local resizeProgress = editor_resize_progress()
+	return minimapProgress > 0 or resizeProgress > 0
 end
 
 editor_reset_tooltip = function()
@@ -672,20 +671,6 @@ editor_set_menu_view = function(open)
 	end
 end
 
-editor_set_map_resize_visible = function(open)
-	if editorMapResizeVisible ~= open then
-		local progress = editor_map_resize_progress()
-		editorMapResizeAnimation = {
-			from = progress,
-			to = bool2int(open),
-			start = love.timer.getTime(),
-			curve = random_motion_curve(),
-			curve_in = open
-		}
-		editorMapResizeVisible = open
-	end
-end
-
 editor_set_minimap_visible = function(open)
 	if minimapmoving ~= open then
 		local progress = editor_minimap_progress()
@@ -697,6 +682,20 @@ editor_set_minimap_visible = function(open)
 			curve_in = open
 		}
 		minimapmoving = open
+	end
+end
+
+editor_set_resize_visible = function(open)
+	if editorResizeOverlayVisible ~= open then
+		local progress = editor_resize_progress()
+		editorResizeAnimation = {
+			from = progress,
+			to = bool2int(open),
+			start = love.timer.getTime(),
+			curve = random_motion_curve(),
+			curve_in = open
+		}
+		editorResizeOverlayVisible = open
 	end
 end
 
@@ -893,24 +892,18 @@ function editor_gui_interaction_enabled(element)
 		return true
 	end
 
-	if changemapwidthmenu then
-		for name in pairs(editorMapResizeControls) do
-			if guielements[name] == element then
-				return not editorMenuAnimation
+	if element and changemapwidthmenu then
+		local resizeProgress, resizeAnimationDone = editor_resize_progress()
+		if resizeProgress >= 1 and resizeAnimationDone then
+			for _, name in ipairs(editorResizeGuiElementNames) do
+				if element == guielements[name] then
+					return true
+				end
 			end
 		end
-		return false
 	end
 	
 	return editormenuopen and not editorMenuAnimation
-end
-
-local function editor_minimap_active()
-	return minimapmoving or editorMinimapAnimation ~= nil
-end
-
-local function editor_cursor_preview_interaction_enabled()
-	return not editorMenuAnimation and not editorMapResizeAnimation and not editor_minimap_active()
 end
 
 function editor_update(dt)
@@ -978,7 +971,7 @@ function editor_update(dt)
 			end
 		end
 	end
-	if editormenuopen == false and (not minimapmoving) then
+	if editormenuopen == false and (not minimapmoving) and not editor_overlay_input_blocked() then
 		if editorstate == "powerline" then
 			local x, y = love.mouse.getPosition()
 			if love.mouse.isDown("l") then
@@ -1303,7 +1296,7 @@ function editor_update(dt)
 		end
 		
 		tileselectionants = (tileselectionants + 8*dt)%16
-		if love.mouse.isDown("l") and allowdrag and editor_cursor_preview_interaction_enabled() and customrcopen == false and not (assistmode and quickmenuopen) then
+		if love.mouse.isDown("l") and allowdrag and customrcopen == false and not (assistmode and quickmenuopen) then
 			local x, y = love.mouse.getPosition()
 			if tileselection then
 				if not tileselection.finished then
@@ -1612,7 +1605,8 @@ function editor_update(dt)
 	end
 end
 
-local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
+local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, cursorAlpha)
+	cursorAlpha = cursorAlpha or 1
 	love.graphics.setColor(255, 255, 255)
 	
 	local mousex, mousey = love.mouse.getPosition()
@@ -2289,6 +2283,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 					end
 					love.graphics.setStencilTest()
 				elseif editentities == false and not pastingtiles then
+					love.graphics.setColor(255, 255, 255, 255 * cursorAlpha)
 					love.graphics.draw(tilequads[currenttile].image, tilequads[currenttile].quad, math.floor((x-splitxscroll[1]-1)*16*scale), math.floor(((y-splityscroll[1]-1)*16+8)*scale), 0, scale, scale)
 					if android then
 						love.graphics.setLineWidth(scale)
@@ -2301,7 +2296,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 								local adjacentscale = 1-(math.abs(i)/4)
 
 								if (i>0 and (adjacenttile<=smbtilecount+portaltilecount+customtilecount or adjacenttile>=90000) and (adjacenttile<=animatedtilecount+90000 or adjacenttile<=89996)) or (i<0 and adjacenttile>=1 and (adjacenttile<89996 or adjacenttile>=90001)) then
-									love.graphics.setColor(255, 255, 255, 85*(3-math.abs(i)))
+									love.graphics.setColor(255, 255, 255, 85*(3-math.abs(i))*cursorAlpha)
 
 									local currenttilex = (x-splitxscroll[1]-1)*16
 									local currenttiley = (y-splityscroll[1]-0.5)*16
@@ -2332,7 +2327,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 							for yl = 1, brushsizey do
 								if yl == 1 and xl == 1 then
 								else
-									love.graphics.setColor(255, 255, 255, 200)
+									love.graphics.setColor(255, 255, 255, 200*cursorAlpha)
 									love.graphics.draw(tilequads[currenttile].image, tilequads[currenttile].quad, math.floor((x-splitxscroll[1]-1+xl-1)*16*scale), math.floor(((y-splityscroll[1]-1+yl-1)*16+8)*scale), 0, scale, scale)
 								end
 							end
@@ -2344,7 +2339,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 						for x = math.floor(xscroll)+1, math.min(mapwidth, math.floor(xscroll+width)+1) do
 							for y = math.floor(yscroll)+1, math.min(mapheight, math.floor(yscroll+height)+1) do
 								if onscreen(x-1, y-1, 1, 1) and ontile == map[x][y][1] then
-									love.graphics.setColor(255, 255, 255, 200)
+									love.graphics.setColor(255, 255, 255, 200*cursorAlpha)
 									love.graphics.draw(tilequads[currenttile].image, tilequads[currenttile].quad, math.floor((x-splitxscroll[1]-1)*16*scale), math.floor(((y-splityscroll[1]-2)*16+8)*scale), 0, scale, scale)
 								end
 							end
@@ -2358,7 +2353,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 						for i, t in pairs(replacetiles) do
 							local x, y = t[1], t[2]
 							--if onscreen(x-1, y-1, 1, 1) then
-								love.graphics.setColor(255, 255, 255, 200)
+								love.graphics.setColor(255, 255, 255, 200*cursorAlpha)
 								love.graphics.draw(tilequads[currenttile].image, tilequads[currenttile].quad, math.floor((x-splitxscroll[1]-1)*16*scale), math.floor(((y-splityscroll[1]-2)*16+8)*scale), 0, scale, scale)
 							--end
 						end
@@ -2384,6 +2379,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 						end
 					end
 					if not tilequads[currenttile] and enemiesdata[currenttile] then --custom enemy
+						love.graphics.setColor(255, 255, 255, 255 * cursorAlpha)
 						local v = enemiesdata[currenttile]
 						if v.showicononeditor and v.icongraphic then
 							love.graphics.draw(v.icongraphic, math.floor((x-xscroll-1+offsetx)*16*scale), math.floor(((y-yscroll-0.5)*16)*scale), 0, scale, scale)
@@ -2392,6 +2388,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 							love.graphics.draw(v.graphic, v.quad, math.floor((x-xscroll-1+offsetx)*16*scale+xoff), math.floor(((y-yscroll)*16)*scale+yoff), 0, scale, scale)
 						end
 					else
+						love.graphics.setColor(255, 255, 255, 255 * cursorAlpha)
 						love.graphics.draw(entityquads[currenttile].image, entityquads[currenttile].quad, math.floor((x-splitxscroll[1]-1+offsetx)*16*scale), math.floor(((y-splityscroll[1]-1)*16+8)*scale), 0, scale, scale)
 					end
 					if android then
@@ -2415,7 +2412,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 							local adjacentscale = 1-(math.abs(i)/4)
 
 							if valid then
-								love.graphics.setColor(255, 255, 255, 85*(3-math.abs(i)))
+								love.graphics.setColor(255, 255, 255, 85*(3-math.abs(i))*cursorAlpha)
 
 								local currenttilex = (x-splitxscroll[1]-1)*16
 								local currenttiley = (y-splityscroll[1]-0.5)*16
@@ -2446,6 +2443,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 								if yl == 1 and xl == 1 then 
 								elseif not tilequads[currenttile] and enemiesdata[currenttile] then --custom enemy
 									local v = enemiesdata[currenttile]
+									love.graphics.setColor(255, 255, 255, 255 * cursorAlpha)
 									if v.showicononeditor and v.icongraphic then
 										love.graphics.draw(v.icongraphic, math.floor((x-splitxscroll[1]-1+xl-1)*16*scale), math.floor(((y-splityscroll[1]-0.5+yl-1)*16)*scale), 0, scale, scale)
 									else
@@ -2453,7 +2451,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 										love.graphics.draw(v.graphic, v.quad, math.floor((x-splitxscroll[1]-1+xl-1)*16*scale+xoff), math.floor(((y-splityscroll[1]-1+yl-1)*16+16)*scale+yoff), 0, scale, scale)
 									end
 								else
-									love.graphics.setColor(255, 255, 255, 200)
+									love.graphics.setColor(255, 255, 255, 200*cursorAlpha)
 									love.graphics.draw(entityquads[currenttile].image, entityquads[currenttile].quad, math.floor((x-splitxscroll[1]-1+xl-1)*16*scale), math.floor(((y-splityscroll[1]-1+yl-1)*16+8)*scale), 0, scale, scale)
 								end
 							end
@@ -2534,12 +2532,12 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 			properprint(tx .. "-" .. ty, mousex, mousey)
 			-- .. " " .. tilemap(tx, ty)
 		end
-	elseif resizeOverlay == true or (resizeOverlay ~= false and (changemapwidthmenu or minimapOverlay)) then
+	elseif resizeOverlay or minimapOverlay then
 		local w = width*16-52
 		local h = height*16-52
 		
 		local s, nmw, nmox, nmh, nmoy --newmapwidth, newmapoffsetx, newmapheight, newmapoffsety
-		if changemapwidthmenu then
+		if resizeOverlay then
 			s = math.min(w/newmapwidth, h/newmapheight)
 		
 			w = newmapwidth*s
@@ -2588,7 +2586,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 		drawrectangle(mapx-1, mapy-1, w+2, h+2)
 		
 		--resizing stuff
-		if changemapwidthmenu then
+		if resizeOverlay then
 			love.graphics.setColor(255, 255, 255)
 			properprintFbackground(TEXT["old width: "] .. mapwidth, 26*scale, (mapy-21)*scale, true)
 			properprintFbackground(TEXT["old height: "] .. mapheight, 26*scale, (mapy-11)*scale, true)
@@ -3681,7 +3679,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 			
 			--GUI not priority
 			for i, v in pairs(guielements) do
-				if not v.priority and v.active and not (resizeOverlay == false and editorMapResizeControls[i]) then
+				if not v.priority and v.active then
 					v:draw()
 				end
 			end
@@ -3701,7 +3699,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 
 			--GUI priority
 			for i, v in pairs(guielements) do
-				if v.priority and v.active and not (resizeOverlay == false and editorMapResizeControls[i]) then
+				if v.priority and v.active then
 					v:draw()
 				end
 			end
@@ -3730,10 +3728,6 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay)
 end
 
 editor_draw_cursor_preview = function(alpha)
-	if editor_minimap_active() then
-		return
-	end
-
 	if pastingtiles or tileselection or ctrlpressed or tileselectionmoving or
 		editorstate == "linktool" or editorstate == "portalgun" or editorstate == "selectiontool" or editorstate == "powerline" then
 		return
@@ -3811,9 +3805,10 @@ end
 
 function editor_draw()
 	editor_rc_track()
+	local minimapProgress, minimapAnimationDone = editor_minimap_progress()
 	
 	if not editorMenuAnimation then
-		editor_draw_content(editormenuopen)
+		editor_draw_content(editormenuopen, false, false, 1 - minimapProgress)
 	else
 		local progress, animationDone = editor_menu_progress()
 		local canvasWidth, canvasHeight = love.graphics.getDimensions()
@@ -3831,7 +3826,7 @@ function editor_draw()
 		love.graphics.setShader()
 		love.graphics.setColor(255, 255, 255, 255)
 		love.graphics.clear(0, 0, 0, 0)
-		editor_draw_content(editormenuopen or progress > 0, false, false)
+		editor_draw_content(editormenuopen or progress > 0, false, false, 1 - minimapProgress)
 		if previousCanvas then
 			love.graphics.setCanvas({previousCanvas, stencil = true})
 		else
@@ -3839,9 +3834,7 @@ function editor_draw()
 		end
 		love.graphics.pop()
 		
-		if not editorMapResizeVisible and not editorMapResizeAnimation then
-			editor_draw_cursor_preview(1 - progress)
-		end
+		editor_draw_cursor_preview((1 - progress) * (1 - minimapProgress))
 		
 		local zoom = 1.1 - 0.1 * progress
 		love.graphics.setColor(255, 255, 255, 255 * progress)
@@ -3852,53 +3845,6 @@ function editor_draw()
 			editorMenuAnimation = nil
 		end
 	end
-
-	local mapResizeProgress, mapResizeAnimationDone = editor_map_resize_progress()
-	if changemapwidthmenu then
-		local canvasWidth, canvasHeight = love.graphics.getDimensions()
-		if not editorMapResizeCanvas or editorMapResizeCanvasWidth ~= canvasWidth or editorMapResizeCanvasHeight ~= canvasHeight then
-			editorMapResizeCanvas = love.graphics.newCanvas(canvasWidth, canvasHeight)
-			editorMapResizeCanvas:setFilter("nearest", "nearest")
-			editorMapResizeCanvasWidth, editorMapResizeCanvasHeight = canvasWidth, canvasHeight
-		end
-
-		local previousCanvas = love.graphics.getCanvas()
-		love.graphics.push("all")
-		love.graphics.setCanvas(editorMapResizeCanvas)
-		love.graphics.origin()
-		love.graphics.setScissor()
-		love.graphics.setShader()
-		love.graphics.setColor(255, 255, 255, 255)
-		love.graphics.clear(0, 0, 0, 0)
-		editor_draw_content(true, false, true)
-		if previousCanvas then
-			love.graphics.setCanvas({previousCanvas, stencil = true})
-		else
-			love.graphics.setCanvas()
-		end
-		love.graphics.pop()
-	end
-
-	if mapResizeProgress > 0 and editorMapResizeCanvas then
-		local canvasWidth, canvasHeight = love.graphics.getDimensions()
-		local zoom = 1.1 - 0.1 * mapResizeProgress
-		love.graphics.setColor(255, 255, 255, 255 * mapResizeProgress)
-		love.graphics.draw(editorMapResizeCanvas, canvasWidth/2, canvasHeight/2, 0, zoom, zoom, canvasWidth/2, canvasHeight/2)
-		love.graphics.setColor(255, 255, 255, 255)
-	end
-	if editorMapResizeVisible or editorMapResizeAnimation then
-		editor_draw_cursor_preview(1 - mapResizeProgress)
-	end
-
-	if mapResizeAnimationDone then
-		editorMapResizeAnimation = nil
-		if not editorMapResizeVisible then
-			editorMapResizeCanvas = nil
-			editorMapResizeCanvasWidth, editorMapResizeCanvasHeight = nil, nil
-		end
-	end
-
-	local minimapProgress, minimapAnimationDone = editor_minimap_progress()
 
 	if minimapProgress > 0 then
 		local canvasWidth, canvasHeight = love.graphics.getDimensions()
@@ -3932,6 +3878,41 @@ function editor_draw()
 
 	if minimapAnimationDone then
 		editorMinimapAnimation = nil
+	end
+
+	local resizeProgress, resizeAnimationDone = editor_resize_progress()
+	if resizeProgress > 0 then
+		local canvasWidth, canvasHeight = love.graphics.getDimensions()
+		if not editorResizeCanvas or editorResizeCanvasWidth ~= canvasWidth or editorResizeCanvasHeight ~= canvasHeight then
+			editorResizeCanvas = love.graphics.newCanvas(canvasWidth, canvasHeight)
+			editorResizeCanvas:setFilter("nearest", "nearest")
+			editorResizeCanvasWidth, editorResizeCanvasHeight = canvasWidth, canvasHeight
+		end
+
+		local previousCanvas = love.graphics.getCanvas()
+		love.graphics.push("all")
+		love.graphics.setCanvas(editorResizeCanvas)
+		love.graphics.origin()
+		love.graphics.setScissor()
+		love.graphics.setShader()
+		love.graphics.setColor(255, 255, 255, 255)
+		love.graphics.clear(0, 0, 0, 0)
+		editor_draw_content(true, false, true)
+		if previousCanvas then
+			love.graphics.setCanvas({previousCanvas, stencil = true})
+		else
+			love.graphics.setCanvas()
+		end
+		love.graphics.pop()
+
+		local zoom = 1.1 - 0.1 * resizeProgress
+		love.graphics.setColor(255, 255, 255, 255 * resizeProgress)
+		love.graphics.draw(editorResizeCanvas, canvasWidth/2, canvasHeight/2, 0, zoom, zoom, canvasWidth/2, canvasHeight/2)
+		love.graphics.setColor(255, 255, 255, 255)
+	end
+
+	if resizeAnimationDone then
+		editorResizeAnimation = nil
 	end
 
 	if editorRCAnimation and not rightclickmenuopen and not editormenuopen then
@@ -4720,7 +4701,14 @@ end
 
 function openchangewidth()
 	levelmodified = true
-	
+	changemapwidthmenu = true
+	newmapwidth = mapwidth
+	newmapheight = mapheight
+	newmapoffsetx = 0
+	newmapoffsety = 0
+	editor_set_resize_visible(true)
+	editorclose()
+
 	guielements["maptopup"].active = true
 	guielements["maptopdown"].active = true
 	guielements["mapbottomup"].active = true
@@ -4731,17 +4719,10 @@ function openchangewidth()
 	guielements["maprightright"].active = true
 	guielements["mapwidthapply"].active = true
 	guielements["mapwidthcancel"].active = true
-
-	changemapwidthmenu = true
-	newmapwidth = mapwidth
-	newmapheight = mapheight
-	newmapoffsetx = 0
-	newmapoffsety = 0
-	editor_set_menu_view(false)
-	editor_set_map_resize_visible(true)
 end
 
 function mapwidthapply()
+	editor_set_resize_visible(false)
 	changemapwidthmenu = false
 	objects["tile"] = {}
 	
@@ -4811,18 +4792,18 @@ function mapwidthapply()
 	objects["screenboundary"]["right"].x = mapwidth
 	generatespritebatch()
 	
-	maintab()
-	editor_set_map_resize_visible(false)
-	editor_set_menu_view(true)
+	editorclose()
 	allowdrag = false
+	
+	--maintab()
 end
 
 function mapwidthcancel()
+	editor_set_resize_visible(false)
 	changemapwidthmenu = false
-	maintab()
-	editor_set_map_resize_visible(false)
-	editor_set_menu_view(true)
+	editorclose()
 	allowdrag = false
+	--maintab()
 end
 
 function changenewmapsize(side, dir)
@@ -5039,7 +5020,7 @@ function tilesobjects()
 end
 
 function placetile(x, y, tilei)
-	if editor_minimap_active() then
+	if editor_overlay_input_blocked() then
 		return
 	end
 
@@ -5560,7 +5541,7 @@ function addsublevel(l)
 end
 
 function editor_mousepressed(x, y, button)
-	if changemapwidthmenu or editor_minimap_active() then
+	if editor_overlay_input_blocked() then
 		return
 	end
 	
@@ -5718,10 +5699,6 @@ function editor_mousepressed(x, y, button)
 		levelrightclickmenu:click(x, y, button)
 		levelrightclickmenu.active = false
 		ignoregui = true
-		return
-	end
-
-	if not editor_cursor_preview_interaction_enabled() then
 		return
 	end
 
@@ -7118,7 +7095,7 @@ function resetrclink(id) --id
 end
 
 function editor_mousereleased(x, y, button)
-	if minimapmoving or not editor_cursor_preview_interaction_enabled() then
+	if editor_overlay_input_blocked() then
 		return
 	end
 
@@ -7302,10 +7279,16 @@ function editor_mousereleased(x, y, button)
 end
 
 function editor_keypressed(key, textinput)
-	if changemapwidthmenu and key ~= "escape" then
-		return
-	end
-	if editor_minimap_active() and key ~= "escape" and key ~= "m" then
+	if editor_overlay_input_blocked() then
+		if key == "escape" then
+			if changemapwidthmenu then
+				mapwidthcancel()
+			elseif minimapmoving then
+				editor_set_minimap_visible(false)
+			end
+		elseif key == "m" and not changemapwidthmenu then
+			editor_set_minimap_visible(not minimapmoving)
+		end
 		return
 	end
 
@@ -7392,7 +7375,7 @@ function editor_keypressed(key, textinput)
 				customrcopen = false
 				rightclickmenuopen = false
 			end
-		elseif editor_minimap_active() then
+		elseif minimapmoving then
 			editor_set_minimap_visible(false)
 		elseif changemapwidthmenu then
 			mapwidthcancel()
@@ -7575,10 +7558,6 @@ function editor_keypressed(key, textinput)
 end
 
 function editor_mousemoved(x, y, dx, dy)
-	if not editor_cursor_preview_interaction_enabled() and not minimapmoving then
-		return
-	end
-
 	if love.mouse.isDown("l") then
 		if minimapmoving then
 			local w = width*16-52
@@ -7663,10 +7642,9 @@ function getTilesSelection()
 end
 
 function emptySelection(storeundo)
-	if editor_minimap_active() then
+	if editor_overlay_input_blocked() then
 		return
 	end
-
 	for x = tileselection[1], tileselection[3] do
 		for y = tileselection[2], tileselection[4] do
 			--[[if storeundo then
