@@ -290,14 +290,6 @@ function guielement:update(dt)
 				self.scrollbar:update(dt)
 				self.scroll = self.scrollbar.value*(((#self.entries+1)*10)-(height*16)+1)
 			end
-			if self.multiy then
-				if self.dropup then
-					self.y = self.multiy[1]
-				else
-					--glide up/down together with the list opening/closing
-					self.y = lerp(self.multiy[1], self.multiy[2], self:getlistprogress())
-				end
-			end
 		end
 	end
 end
@@ -1484,10 +1476,6 @@ function guielement:open(keyboard)
 	if self.type ~= "dropdown" then
 		return
 	end
-	if self.multiy then
-		--could be mid-animation, start from the real position
-		self.y = self.multiy[1]
-	end
 	self:updatePos()
 	self.extended = true
 	self.priority = true
@@ -1705,6 +1693,9 @@ end
 
 function guielement:updatePos()
 	if self.type == "dropdown" then
+		local listheight = 10*#self.entries
+		self.dropup = self.y+11+listheight > height*16 and self.y >= listheight
+
 		if 10*(#self.entries+1) > height*16 then
 			local yrange = (((#self.entries+1)*10)-(height*16)+1)
 			self.cutoff = true
@@ -1715,11 +1706,6 @@ function guielement:updatePos()
 			self.scrollbar.height = math.max(30, math.min(1, (height*16)/(yrange+(height*16)))*(height*16))
 			self.scrollbar.yrange = self.scrollbar.yrange - self.scrollbar.height
 			self.scrollbar.scrollstep = math.max(0.0001, 73/yrange)
-		end
-		if self.cutoff and self.y+10*(#self.entries+1) > height*16 then
-			self.multiy = false
-		else
-			self.multiy = {self.y, height*16-(10*(#self.entries+1))}
 		end
 	elseif self.type == "rightclick" then
 		if self.direction == "up" and self.y-#self.entries*10-10 < 0 then
