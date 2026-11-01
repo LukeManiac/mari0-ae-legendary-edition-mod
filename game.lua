@@ -2711,7 +2711,7 @@ function game_draw()
 				player = objects["player"][pl]
 				if player.controlsenabled and player.t == "portal" and player.vine == false and player.fence == false and player.portalgun then
 					local sourcex, sourcey = player.x+player.portalsourcex, player.y+player.portalsourcey
-					local cox, coy, side, tend, x, y = traceline(sourcex, sourcey, player.pointingangle)
+					local cox, coy, side, tend, x, y = traceline(sourcex, sourcey, player.pointingangle, true)
 					
 					local portalpossible = true
 					if cox == false or getportalposition(1, cox, coy, side, tend) == false then
@@ -5866,7 +5866,7 @@ function shootportal(plnumber, i, sourcex, sourcey, direction, mirrored)
 		color = objects["player"][plnumber].portal1color
 	end
 	
-	local cox, coy, side, tendency, x, y = traceline(sourcex, sourcey, direction)
+	local cox, coy, side, tendency, x, y = traceline(sourcex, sourcey, direction, true)
 	
 	local mirror = false
 	if cox and inmap(cox, coy) and tilequads[map[cox][coy][1]]:getproperty("mirror", cox, coy) then
@@ -6228,12 +6228,14 @@ function getTile(x, y, portalable, portalcheck, facing, ignoregrates, dir) --ret
 		return not portalcheck
 	end
 
-	if objects["tile"][tilemap(x, y)] and (objects["tile"][tilemap(x, y)].slant or objects["tile"][tilemap(x, y)].slab) and ismaptile(x,y) then
+	if objects["tile"][tilemap(x, y)] and objects["tile"][tilemap(x, y)].slab and ismaptile(x,y) then
 		if portalcheck then
 			return false, map[x][y][1]
 		else
 			return true, map[x][y][1]
 		end
+	elseif objects["tile"][tilemap(x, y)] and objects["tile"][tilemap(x, y)].slant and ismaptile(x,y) and not portalcheck then
+		return true, map[x][y][1]
 	end
 	
 	--bonusstage thing for keeping it from screwing up by allowing portals to be shot next to the vine in 4-2_2 for example
@@ -6247,9 +6249,10 @@ function getTile(x, y, portalable, portalcheck, facing, ignoregrates, dir) --ret
 		return false, 1
 	end
 	
-	if tilequads[map[x][y][1]]:getproperty("invisible", x, y) or tilequads[map[x][y][1]].leftslant or tilequads[map[x][y][1]].rightslant 
+	if tilequads[map[x][y][1]]:getproperty("invisible", x, y) or (not portalcheck and
+		(tilequads[map[x][y][1]].leftslant or tilequads[map[x][y][1]].rightslant
 		or tilequads[map[x][y][1]].halfleftslant1 or tilequads[map[x][y][1]].halfleftslant2
-		or tilequads[map[x][y][1]].halfrightslant1 or tilequads[map[x][y][1]].halfrightslant2 then
+		or tilequads[map[x][y][1]].halfrightslant1 or tilequads[map[x][y][1]].halfrightslant2)) then
 		return false
 	end
 	
@@ -6913,10 +6916,10 @@ function traceline(sourcex, sourcey, radians, reportal)
 
 	local pixeltilecollide = false --TODO: fix? I don't think the +1 should be added to the x
 	if objects["tile"][tileposition] then
-		if objects["tile"][tileposition].slant then
-			pixeltilecollide = true
-		elseif objects["tile"][tileposition].slab then
+		if objects["tile"][tileposition].slab then
 			buttonblockcollide = true
+		elseif objects["tile"][tileposition].slant then
+			pixeltilecollide = not reportal
 		end
 	end
 	
@@ -7049,7 +7052,11 @@ function traceline(sourcex, sourcey, radians, reportal)
 
 		if objects["tile"][tileposition] then
 			if (objects["tile"][tileposition].slant or objects["tile"][tileposition].slab) and (tilequads[tileno] and not tilequads[tileno].grate) then
-				return false, false, false, false, x, y
+				if reportal and objects["tile"][tileposition].slant and not objects["tile"][tileposition].slab then
+					collide = true
+				else
+					return false, false, false, false, x, y
+				end
 			end
 		end
 			
