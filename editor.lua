@@ -3807,7 +3807,10 @@ function editor_draw()
 	editor_rc_track()
 	local minimapProgress, minimapAnimationDone = editor_minimap_progress()
 	local resizeProgress, resizeAnimationDone = editor_resize_progress()
-	local cursorAlpha = 1 - minimapProgress * resizeProgress
+	local cursorAlpha = 1 - minimapProgress
+	if minimapProgress > 0 and resizeProgress > 0 then
+		cursorAlpha = 0
+	end
 	
 	if not editorMenuAnimation then
 		editor_draw_content(editormenuopen, false, false, cursorAlpha)
@@ -3917,7 +3920,7 @@ function editor_draw()
 	end
 
 	if editorRCAnimation and not rightclickmenuopen and not editormenuopen then
-		editor_draw_cursor_preview((1 - editor_rc_progress()) * cursorAlpha)
+		editor_draw_cursor_preview(1 - (editor_rc_progress()))
 	end
 	editor_rc_draw_closing()
 end
