@@ -894,7 +894,12 @@ function editor_gui_interaction_enabled(element)
 	end
 
 	if changemapwidthmenu then
-		return editorMapResizeControls[element] == true and not editorMenuAnimation
+		for name in pairs(editorMapResizeControls) do
+			if guielements[name] == element then
+				return not editorMenuAnimation
+			end
+		end
+		return false
 	end
 	
 	return editormenuopen and not editorMenuAnimation
