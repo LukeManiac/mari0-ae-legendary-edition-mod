@@ -109,12 +109,12 @@ function physicsupdate(dt)
 					--PORTALS LOL
 					local passed = false
 					if v.portalable ~= false then
-						if checkportalVER(v, v.x+v.speedx*dt) then
-							passed = true
-						else
+						if not checkportalVER(v, v.x+v.speedx*dt) then
 							if checkportalHOR(v, v.y+v.speedy*dt) then
 								passed = true
 							end
+						else
+							passed = true
 						end
 						
 						if passed and j == "player" then
@@ -444,7 +444,7 @@ function checkcollision(v, t, h, g, j, i, dt, passed) --v: b1table | t: b2table 
 				end
 				
 			else 
-				--We're screwed, it's a diagonal collision! run!
+				--We're fucked, it's a diagonal collision! run!
 				--Okay actually let's take this slow okay. Let's just see if we're moving faster horizontally than vertically, aight?
 				local grav = yacceleration
 				if self and self.gravity then
@@ -547,6 +547,8 @@ function checkcollisionslope(v, t, h, g, j, i, dt, passed) --v: b1table | t: b2t
 		local ty = t.y+getslopey(location, t.y1, t.y2) --, v.y+v.speedy*dt)
 		if not t.UPSIDEDOWNSLOPE then
 			ty = ty - v.height
+		else
+			ty = ty
 		end
 
 		local docollide = inslopedirection and (insideaabb) and finside and (diff >= -math.max(0.1,math.abs(diffy)) or math.abs((ty-v.y)) < v.height)
@@ -597,9 +599,10 @@ function checkcollisionslope(v, t, h, g, j, i, dt, passed) --v: b1table | t: b2t
 					end
 					postlocation = math.max(0, math.min(1, postlocation))
 					local postty = t.y+getslopey(postlocation, t.y1, t.y2) --, v.y+v.speedy*dt)
-					v.slopeposty = postty
 					if not t.UPSIDEDOWNSLOPE then
-						postty = postty-v.height
+						v.slopeposty = postty-v.height
+					else
+						v.slopeposty = postty
 					end
 					 --TODO: Calculate a lower speedy incase the object will still be inside the slope next frame (aka sliding along ceiling slopes)
 				end
@@ -974,7 +977,11 @@ function checkrect(x, y, width, height, list, statics, condition)
 			end
 			for j = 1, #list do
 				if list[j] == i then
-					contains = not inobj
+					if inobj then
+						contains = false
+					else
+						contains = true
+					end
 				end
 			end
 		end
@@ -1310,10 +1317,8 @@ function checkportalHOR(self, nextY) --handles horizontal (up- and down facing) 
 				
 				local testx, testy, testspeedx, testspeedy, testrotation = portalcoords(self.x, self.y, self.speedx, self.speedy, self.width, self.height, self.rotation, self.animationdirection, entryportalX, entryportalY, entryportalfacing, exitportalX, exitportalY, exitportalfacing, self, true)
 			
-				local teleported = false
 				if self.ignoreportalspacecheck or #checkrect(testx, testy, self.width, self.height, {"exclude", self}, false) == 0 then --Check if exit position is free
 					self.x, self.y, self.speedx, self.speedy, self.rotation = testx, testy, testspeedx, testspeedy, testrotation
-					teleported = true
 				else
 					self.speedy = -self.speedy*0.95
 					if math.abs(self.speedy) < 2 then
@@ -1325,9 +1330,6 @@ function checkportalHOR(self, nextY) --handles horizontal (up- and down facing) 
 					end
 				end
 				
-				if teleported and self.playernumber and registercameraportaltransition then
-					registercameraportaltransition()
-				end
 				
 				if (entryportalfacing == "down" and exitportalfacing == "up") or (entryportalfacing == "up" and exitportalfacing == "down") then
 					
@@ -1415,17 +1417,12 @@ function checkportalVER(self, nextX) --handles vertical (left- and right facing)
 				
 				local testx, testy, testspeedx, testspeedy, testrotation = portalcoords(self.x, self.y, self.speedx, self.speedy, self.width, self.height, self.rotation, self.animationdirection, entryportalX, entryportalY, entryportalfacing, exitportalX, exitportalY, exitportalfacing, self, true)
 			
-				local teleported = false
 				if self.ignoreportalspacecheck or #checkrect(testx, testy, self.width, self.height, {"exclude", self}, false) == 0 then
 					self.x, self.y, self.speedx, self.speedy, self.rotation = testx, testy, testspeedx, testspeedy, testrotation
-					teleported = true
 				else
 					self.speedx = -self.speedx
 				end
 				
-				if teleported and self.playernumber and registercameraportaltransition then
-					registercameraportaltransition()
-				end
 				self.jumping = false
 				self.falling = true
 				
