@@ -905,6 +905,10 @@ function editor_gui_interaction_enabled(element)
 	return editormenuopen and not editorMenuAnimation
 end
 
+local function editor_cursor_preview_interaction_enabled()
+	return not editorMenuAnimation and not editorMapResizeAnimation and not editorMinimapAnimation
+end
+
 function editor_update(dt)
 	----------
 	--EDITOR--
@@ -1295,7 +1299,7 @@ function editor_update(dt)
 		end
 		
 		tileselectionants = (tileselectionants + 8*dt)%16
-		if love.mouse.isDown("l") and allowdrag and customrcopen == false and not (assistmode and quickmenuopen) then
+		if love.mouse.isDown("l") and allowdrag and editor_cursor_preview_interaction_enabled() and customrcopen == false and not (assistmode and quickmenuopen) then
 			local x, y = love.mouse.getPosition()
 			if tileselection then
 				if not tileselection.finished then
@@ -3827,7 +3831,9 @@ function editor_draw()
 		end
 		love.graphics.pop()
 		
-		editor_draw_cursor_preview(1 - progress)
+		if not editorMapResizeVisible and not editorMapResizeAnimation then
+			editor_draw_cursor_preview(1 - progress)
+		end
 		
 		local zoom = 1.1 - 0.1 * progress
 		love.graphics.setColor(255, 255, 255, 255 * progress)
@@ -3871,6 +3877,9 @@ function editor_draw()
 		love.graphics.setColor(255, 255, 255, 255 * mapResizeProgress)
 		love.graphics.draw(editorMapResizeCanvas, canvasWidth/2, canvasHeight/2, 0, zoom, zoom, canvasWidth/2, canvasHeight/2)
 		love.graphics.setColor(255, 255, 255, 255)
+	end
+	if editorMapResizeVisible or editorMapResizeAnimation then
+		editor_draw_cursor_preview(1 - mapResizeProgress)
 	end
 
 	if mapResizeAnimationDone then
@@ -5702,6 +5711,10 @@ function editor_mousepressed(x, y, button)
 		return
 	end
 
+	if not editor_cursor_preview_interaction_enabled() then
+		return
+	end
+
 	if button == "m" or (button == "l" and eyedroppertool) then
 		--eye dropper (pick tile)
 		local cox, coy = getMouseTile(x, y+8*screenzoom*scale)
@@ -7095,7 +7108,7 @@ function resetrclink(id) --id
 end
 
 function editor_mousereleased(x, y, button)
-	if minimapmoving then
+	if minimapmoving or not editor_cursor_preview_interaction_enabled() then
 		return
 	end
 
@@ -7549,6 +7562,10 @@ function editor_keypressed(key, textinput)
 end
 
 function editor_mousemoved(x, y, dx, dy)
+	if not editor_cursor_preview_interaction_enabled() then
+		return
+	end
+
 	if love.mouse.isDown("l") then
 		if minimapmoving then
 			local w = width*16-52
