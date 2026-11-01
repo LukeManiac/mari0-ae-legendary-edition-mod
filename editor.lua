@@ -71,6 +71,7 @@ local editorsavedata = false
 local trackgenerationid
 
 function editor_load(player_position) --{x, y, xscroll, yscroll}
+	editormenuopen = false
 	editorMenuAnimation = nil
 	editorMenuCanvas = nil
 	editorMenuCanvasWidth, editorMenuCanvasHeight = nil, nil
