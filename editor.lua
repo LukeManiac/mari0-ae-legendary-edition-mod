@@ -2337,8 +2337,9 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 						love.graphics.draw(antsimg, math.floor(((sx+sw-xscroll)*16-math.floor(tileselectionants)))*scale, math.floor((sy+my-1-yscroll)*16-8-math.floor(tileselectionants))*scale, 0, scale, scale)
 					end
 					love.graphics.setStencilTest()
-				elseif editentities == false and not pastingtiles then
-					love.graphics.setColor(255, 255, 255, 255 * cursorAlpha)
+				elseif not editor_cursor_preview_drawn and editentities == false and not pastingtiles then
+					editor_cursor_preview_drawn = true
+					love.graphics.setColor(255, 255, 255, 210 * cursorAlpha)
 					love.graphics.draw(tilequads[currenttile].image, tilequads[currenttile].quad, math.floor((x-splitxscroll[1]-1)*16*scale), math.floor(((y-splityscroll[1]-1)*16+8)*scale), 0, scale, scale)
 					if android then
 						love.graphics.setLineWidth(scale)
@@ -2382,7 +2383,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 							for yl = 1, brushsizey do
 								if yl == 1 and xl == 1 then
 								else
-									love.graphics.setColor(255, 255, 255, 200*cursorAlpha)
+									love.graphics.setColor(255, 255, 255, 210*cursorAlpha)
 									love.graphics.draw(tilequads[currenttile].image, tilequads[currenttile].quad, math.floor((x-splitxscroll[1]-1+xl-1)*16*scale), math.floor(((y-splityscroll[1]-1+yl-1)*16+8)*scale), 0, scale, scale)
 								end
 							end
@@ -2413,7 +2414,8 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 							--end
 						end
 					end
-				elseif not pastingtiles then 
+				elseif not editor_cursor_preview_drawn and not pastingtiles then 
+					editor_cursor_preview_drawn = true
 					--offset enemy
 					local offsetx = 0
 					if (entitylist[currenttile] and entitylist[currenttile].offset) or (enemiesdata[currenttile] and enemiesdata[currenttile].offsetable) then
@@ -2434,7 +2436,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 						end
 					end
 					if enemiesdata[currenttile] and not tilequads[currenttile] then --custom enemy
-						love.graphics.setColor(255, 255, 255, 255 * cursorAlpha)
+						love.graphics.setColor(255, 255, 255, 210 * cursorAlpha)
 						local v = enemiesdata[currenttile]
 						if v.showicononeditor and v.icongraphic then
 							love.graphics.draw(v.icongraphic, math.floor((x-xscroll-1+offsetx)*16*scale), math.floor(((y-yscroll-0.5)*16)*scale), 0, scale, scale)
@@ -2443,7 +2445,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 							love.graphics.draw(v.graphic, v.quad, math.floor((x-xscroll-1+offsetx)*16*scale+xoff), math.floor(((y-yscroll)*16)*scale+yoff), 0, scale, scale)
 						end
 					else
-						love.graphics.setColor(255, 255, 255, 255 * cursorAlpha)
+						love.graphics.setColor(255, 255, 255, 210 * cursorAlpha)
 						love.graphics.draw(entityquads[currenttile].image, entityquads[currenttile].quad, math.floor((x-splitxscroll[1]-1+offsetx)*16*scale), math.floor(((y-splityscroll[1]-1)*16+8)*scale), 0, scale, scale)
 					end
 					if android then
@@ -2498,7 +2500,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 								if yl == 1 and xl == 1 then 
 								elseif not tilequads[currenttile] and enemiesdata[currenttile] then --custom enemy
 									local v = enemiesdata[currenttile]
-									love.graphics.setColor(255, 255, 255, 255 * cursorAlpha)
+									love.graphics.setColor(255, 255, 255, 210 * cursorAlpha)
 									if v.showicononeditor and v.icongraphic then
 										love.graphics.draw(v.icongraphic, math.floor((x-splitxscroll[1]-1+xl-1)*16*scale), math.floor(((y-splityscroll[1]-0.5+yl-1)*16)*scale), 0, scale, scale)
 									else
@@ -2506,7 +2508,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 										love.graphics.draw(v.graphic, v.quad, math.floor((x-splitxscroll[1]-1+xl-1)*16*scale+xoff), math.floor(((y-splityscroll[1]-1+yl-1)*16+16)*scale+yoff), 0, scale, scale)
 									end
 								else
-									love.graphics.setColor(255, 255, 255, 200*cursorAlpha)
+									love.graphics.setColor(255, 255, 255, 210*cursorAlpha)
 									love.graphics.draw(entityquads[currenttile].image, entityquads[currenttile].quad, math.floor((x-splitxscroll[1]-1+xl-1)*16*scale), math.floor(((y-splityscroll[1]-1+yl-1)*16+8)*scale), 0, scale, scale)
 								end
 							end
