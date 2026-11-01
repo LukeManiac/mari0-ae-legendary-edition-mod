@@ -616,14 +616,14 @@ function loadcustomsounds(forcebuiltins)
 		end
 		customstarmusic = false
 	end
-	if forcebuiltins and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/sounds/princessmusic.ogg") then
+	if love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/sounds/princessmusic.ogg") and not forcebuiltins then
+		music:preload(mappackfolder .. "/" .. mappack .. "/sounds/princessmusic.ogg", "princessmusic")
+		customprincessmusic = true
+	else
 		if customprincessmusic then
 			music:preload("sounds/princessmusic.ogg", "princessmusic")
 		end
 		customprincessmusic = false
-	else
-		music:preload(mappackfolder .. "/" .. mappack .. "/sounds/princessmusic.ogg", "princessmusic")
-		customprincessmusic = true
 	end
 	
 	if forcebuiltins and not customsounds then
