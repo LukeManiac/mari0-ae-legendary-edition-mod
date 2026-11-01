@@ -3662,7 +3662,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 			if #animations > 0 then
 				love.graphics.setScissor(animationguiarea[1]*scale, animationguiarea[2]*scale, (animationguiarea[3]-animationguiarea[1])*scale, (animationguiarea[4]-animationguiarea[2])*scale)
 				local completeheight = 14+#animationguilines.triggers*13+12+#animationguilines.conditions*13+12+#animationguilines.actions*13
-				local offy = math.max(0, guielements["animationsscrollbarver"].value/(completeheight-(animationguiarea[4]-animationguiarea[2])))
+				local offy = math.max(0, guielements["animationsscrollbarver"].value*(completeheight-(animationguiarea[4]-animationguiarea[2])))
 				local completewidth = 0
 				for i, v in pairs(animationguilines) do
 					for k, w in pairs(v) do
@@ -3676,7 +3676,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 					end
 				end
 				
-				local offx = -math.max(0, guielements["animationsscrollbarhor"].value/(completewidth-(animationguiarea[3]-animationguiarea[1])))
+				local offx = -math.max(0, guielements["animationsscrollbarhor"].value*(completewidth-(animationguiarea[3]-animationguiarea[1])))
 				
 				love.graphics.setColor(255, 255, 255)
 				
