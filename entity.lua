@@ -1151,6 +1151,15 @@ rightclicktype["enemytool"] = {
 	objfunc = function()
 		rightclickobjects[2].entries = rightclicktype["enemytool"].t
 		rightclickobjects[2].displayentries = rightclicktype["enemytool"].tnames
+		local displaynames = {}
+		for _, name in ipairs(rightclicktype["enemytool"].tnames) do
+			if name:sub(1, 6) == "_ENEMY" then
+				table.insert(displaynames, " " .. name:sub(7))
+			else
+				table.insert(displaynames, name)
+			end
+		end
+		rightclickobjects[2].width = getlongeststring(displaynames)
 		rightclickobjects[2]:updatePos()
 	end,
 	savefunc = function()

@@ -306,18 +306,17 @@ function guielement:update(dt)
 	end
 end
 
-local function drawdropdownentry(self, index, x, y, maxwidth)
-	local entry = self.entries[index]
-	if self.displayentries then
-		entry = self.displayentries[index]
-	end
-
-	if type(entry) == "string" and entry:sub(1, 6) == "_ENEMY" then
-		love.graphics.draw(customenemyiconimg, x*scale, y*scale, 0, scale, scale)
+local function drawdropdownentry(entry, x, y, maxchars)
+	local customenemy = type(entry) == "string" and entry:sub(1, 6) == "_ENEMY"
+	if customenemy then
 		entry = " " .. entry:sub(7)
+		local r, g, b, a = love.graphics.getColor()
+		love.graphics.setColor(255, 255, 255, 255)
+		love.graphics.draw(customenemyiconimg, x*scale, y*scale, 0, scale, scale)
+		love.graphics.setColor(r, g, b, a)
 	end
 	if type(entry) == "string" then
-		entry = entry:sub(1, maxwidth)
+		entry = entry:sub(1, maxchars)
 	end
 	properprint(entry, x*scale, y*scale)
 end
@@ -486,7 +485,8 @@ function guielement:draw(a, offx, offy)
 			love.graphics.setColor(255, 255, 255)
 		end
 
-		drawdropdownentry(self, self.var, self.x+1, self.y+2, self.width)
+		if self.displayentries then s = self.displayentries[self.var] end
+		drawdropdownentry(s, self.x+1, self.y+2, self.width)
 	
 		if ext then
 			love.graphics.setColor(127, 127, 127)
@@ -537,7 +537,11 @@ function guielement:draw(a, offx, offy)
 					else
 						love.graphics.setColor(0, 0, 0)
 					end
-					drawdropdownentry(self, i, self.x+1, rowy+2, self.width+1)
+					local entry = self.entries[i]
+					if self.displayentries then
+						entry = self.displayentries[i]
+					end
+					drawdropdownentry(entry, self.x+1, rowy+2, self.width+1)
 				end
 
 				self.scrollbar:draw()
@@ -554,10 +558,14 @@ function guielement:draw(a, offx, offy)
 						love.graphics.setColor(0, 0, 0)
 						love.graphics.rectangle("fill", (self.x+1)*scale, ((self.y+2+i*10)-(11+(10*#self.entries)))*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
 						love.graphics.setColor(255, 255, 255)
-						drawdropdownentry(self, i, self.x+1, (self.y+3+10*i)-(11+(10*#self.entries)), self.width+1)
+						local s = self.entries[i]
+						if self.displayentries then s = self.displayentries[i] end
+						drawdropdownentry(s, self.x+1, (self.y+3+10*i)-(11+(10*#self.entries)), self.width+1)
 					else
 						love.graphics.setColor(0, 0, 0)
-						drawdropdownentry(self, i, self.x+1, (self.y+3+10*i)-(11+(10*#self.entries)), self.width+1)
+						local s = self.entries[i]
+						if self.displayentries then s = self.displayentries[i] end
+						drawdropdownentry(s, self.x+1, (self.y+3+10*i)-(11+(10*#self.entries)), self.width+1)
 					end
 				end
 			else
@@ -568,18 +576,21 @@ function guielement:draw(a, offx, offy)
 						love.graphics.setColor(0, 0, 0)
 						love.graphics.rectangle("fill", (self.x+1)*scale, (self.y+1+i*10)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
 						love.graphics.setColor(255, 255, 255)
+						local s = self.entries[i]
 						if self.coloredtext then
-							local s = self.entries[i]
 							if s == "black" then
 								love.graphics.setColor(80,80,80)
 							else
 								love.graphics.setColor(textcolors[s])
 							end
 						end
-						drawdropdownentry(self, i, self.x+1, self.y+2+10*i, self.width+1)
+						if self.displayentries then s = self.displayentries[i] end
+						drawdropdownentry(s, self.x+1, self.y+2+10*i, self.width+1)
 					else
 						love.graphics.setColor(0, 0, 0)
-						drawdropdownentry(self, i, self.x+1, self.y+2+10*i, self.width+1)
+						local s = self.entries[i]
+						if self.displayentries then s = self.displayentries[i] end
+						drawdropdownentry(s, self.x+1, self.y+2+10*i, self.width+1)
 					end
 				end
 			end

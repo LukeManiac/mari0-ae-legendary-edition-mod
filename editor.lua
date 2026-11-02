@@ -435,7 +435,7 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 
 	--custom enemies
 	changecurrentenemy(1, true)
-	guielements["currentenemydropdown"] = guielement:new("dropdown", 184, 63, math.max(1, getlongeststring(customenemies)), changecurrentenemy, 1, unpack(customenemies))
+	guielements["currentenemydropdown"] = guielement:new("dropdown", 184, 63, 22, changecurrentenemy, 1, unpack(customenemies))
 	if guielements["currentenemydropdown"].scrollbar then
 		--guielements["currentenemydropdown"].scrollbar.scrollstep = 0.11 --how much mousewheel scrolls
 	end
