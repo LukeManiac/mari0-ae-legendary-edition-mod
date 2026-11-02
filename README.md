@@ -206,6 +206,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Added the poncho and aviator hats from Super Mario Odyssey.
 * Pause menu and prompts are now scaled instead of scissored.
 * You can now change controls midgame.
+* Added custom categories for custom enemies. Set donotcategoriseenemyfolders to true to disable enemies being categorised by folders.
 
 ### 🐛 Bug Fixes
 

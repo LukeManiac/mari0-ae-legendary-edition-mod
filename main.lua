@@ -3639,9 +3639,7 @@ function print(...)
 	value = value .. "\n"
 	logstring = logstring .. value
 
-	if not LoveConsole then
-		io.write(value)
-	end
+	io.write(value)
 end
 
 function drawbattery()
