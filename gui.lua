@@ -288,7 +288,7 @@ function guielement:update(dt)
 			end
 			if self.scrollbar then
 				self.scrollbar:update(dt)
-				self.scroll = self.scrollbar.value*(((#self.entries+1)*10)-(height*16)+1)
+				self.scroll = self.scrollbar.value*self.scrollrange
 			end
 		end
 	end
@@ -502,6 +502,13 @@ function guielement:draw(a, offx, offy)
 			end
 			
 			if self.cutoff then --have a scrollbar
+				local clipx, clipy, clipw, cliph = love.graphics.getScissor()
+				love.graphics.intersectScissor(
+					math.floor(self.x*scale),
+					0,
+					math.ceil((21+self.width*8)*scale),
+					math.ceil(self.scrollheight*scale)
+				)
 				love.graphics.rectangle("fill", self.x*scale, -self.scroll*scale, (13+self.width*8)*scale, (10*(#self.entries+1)+1)*scale, listr)
 				
 				love.graphics.setColor(127, 127, 127)
@@ -531,7 +538,7 @@ function guielement:draw(a, offx, offy)
 				
 				for i = 1, #self.entries do
 					local y = ((2+10*i)-self.scroll)
-					if y+10*scale > 0 and y < height*16 then
+					if y+10 > 0 and y < self.scrollheight then
 						if high ~= i then
 							love.graphics.setColor(0, 0, 0)
 							love.graphics.rectangle("fill", (self.x+1)*scale, ((1+i*10)-self.scroll)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
@@ -554,6 +561,11 @@ function guielement:draw(a, offx, offy)
 				end
 				
 				self.scrollbar:draw()
+				if clipx then
+					love.graphics.setScissor(clipx, clipy, clipw, cliph)
+				else
+					love.graphics.setScissor()
+				end
 			elseif self.dropup then
 				love.graphics.rectangle("fill", self.x*scale, (self.y-(10*#self.entries))*scale, (13+self.width*8)*scale, (10*#self.entries)*scale, listr)
 				
@@ -1223,6 +1235,13 @@ function guielement:keypress(key,textinput)
 							end
 						else
 							self:func()
+							if not self.inputting then
+								typingintextinput = false
+								love.keyboard.setKeyRepeat(false)
+								if android then
+									love.keyboard.setTextInput(false)--[DROID]
+								end
+							end
 						end
 					else
 						self.inputting = false
@@ -1519,14 +1538,14 @@ end
 --dropdown: scroll a long (cut off) list so the keyboard's option is on screen
 function guielement:scrolltocursor()
 	if self.cutoff and self.scrollbar and self.keycursor then
-		local range = ((#self.entries+1)*10)-(height*16)+1
+		local range = self.scrollrange
 		local top = 10*self.keycursor
 		local bottom = top + 11
 		local scroll = self.scroll or 0
 		if top < scroll then
 			scroll = top
-		elseif bottom > scroll + height*16 then
-			scroll = bottom - height*16
+		elseif bottom > scroll + self.scrollheight then
+			scroll = bottom - self.scrollheight
 		end
 		self.scrollbar.value = math.max(0, math.min(1, scroll/range))
 		self.scroll = self.scrollbar.value*range
@@ -1631,7 +1650,7 @@ function guielement:inhighlight(x, y)
 			end
 		else
 			if self.cutoff then
-				if x >= self.x*scale and x < (self.x+13+self.width*8)*scale and y >= -self.scroll*scale and y < ((10*#self.entries+11)-self.scroll)*scale then
+				if x >= self.x*scale and x < (self.x+13+self.width*8)*scale and y >= 0 and y < self.scrollheight*scale then
 					--get which entry
 					return math.max(0, math.min(#self.entries, math.floor((y+self.scroll*scale) / (10*scale))))
 				end
@@ -1694,18 +1713,28 @@ end
 function guielement:updatePos()
 	if self.type == "dropdown" then
 		local listheight = 10*#self.entries
+		self.scrollheight = height*16
+		if self.maxvisibleentries then
+			self.scrollheight = math.min(self.scrollheight, (self.maxvisibleentries+1)*10)
+		end
 		self.dropup = self.y+11+listheight > height*16 and self.y >= listheight
 
-		if 10*(#self.entries+1) > height*16 then
-			local yrange = (((#self.entries+1)*10)-(height*16)+1)
+		local fullheight = 10*(#self.entries+1)
+		self.cutoff = fullheight > self.scrollheight
+		if self.cutoff then
+			local yrange = fullheight-self.scrollheight+1
+			self.scrollrange = yrange
 			self.cutoff = true
 			self.scroll = 0
-			self.scrollbar = guielement:new("scrollbar", self.x+(self.width*8+13), 0, height*16, 8, 40, 0, "ver")
+			self.scrollbar = guielement:new("scrollbar", self.x+(self.width*8+13), 0, self.scrollheight, 8, 40, 0, "ver")
 			self.scrollbar.active = false
 			self.scrollbar.yrange = self.scrollbar.yrange + self.scrollbar.height
-			self.scrollbar.height = math.max(30, math.min(1, (height*16)/(yrange+(height*16)))*(height*16))
+			self.scrollbar.height = math.max(30, math.min(1, self.scrollheight/(yrange+self.scrollheight))*self.scrollheight)
 			self.scrollbar.yrange = self.scrollbar.yrange - self.scrollbar.height
 			self.scrollbar.scrollstep = math.max(0.0001, 73/yrange)
+		else
+			self.scrollrange = 0
+			self.scrollbar = nil
 		end
 	elseif self.type == "rightclick" then
 		if self.direction == "up" and self.y-#self.entries*10-10 < 0 then

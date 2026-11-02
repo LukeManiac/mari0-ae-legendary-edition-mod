@@ -59,6 +59,9 @@ local editor_set_resize_visible
 local editorConfirmAnimation
 local editorConfirmCanvas
 local editorConfirmCanvasWidth, editorConfirmCanvasHeight
+local mtobjectbuttons = {}
+local editor_mtobject_action
+local editor_position_mtobjectbuttons
 local EDITOR_CONFIRM_ANIM_TIME = 0.25
 local editor_confirm_progress
 local editor_set_confirm_visible
@@ -838,7 +841,7 @@ editor_rc_progress = function()
 end
 
 editor_rc_track = function()
-	local open = rightclickmenuopen
+	local open = rightclickmenuopen and customrcopen ~= "link"
 	if open ~= editorRCOpen then
 		local progress = editor_rc_progress()
 		editorRCAnimation = {
@@ -1787,10 +1790,13 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 			love.graphics.setLineStyle("smooth")
 		end
 		if rightclickmenuopen then
-			if editorRCAnimation then
+			local linking = customrcopen == "link"
+			if editorRCAnimation and not linking then
 				editor_draw_cursor_preview((1 - editor_rc_progress()) * cursorAlpha)
 			end
-			editor_rc_begin()
+			if not linking then
+				editor_rc_begin()
+			end
 			if customrcopen then
 				--custom right-click menus
 				if customrcopen == "seesaw" then --draw seesaw
@@ -2270,7 +2276,9 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 			elseif rightclickmenu then
 				rightclickmenu:draw()
 			end
-			editor_rc_end()
+			if not linking then
+				editor_rc_end()
+			end
 			
 		elseif not editorRCAnimation and editorstate ~= "linktool" and editorstate ~= "portalgun" and editorstate ~= "selectiontool" and editorstate ~= "powerline" then
 			local x, y = getMouseTile(love.mouse.getX(), love.mouse.getY()-8*screenzoom*scale)
@@ -2861,31 +2869,12 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 			elseif editmtobjects then
 				if #multitileobjects > 0 then
 					entry = getlistpos(mousex, mousey)
-					mtbutton = getmtbutton(mousex) -- 0 1 2 3 = nobutton up down delete
-					if entry and entry <= #multitileobjects-1 then
+					mtbutton = entry and getmtbutton(entry, mousex, mousey) or 0
+					if entry then
 						love.graphics.setColor(255, 255, 255, 64)
-						love.graphics.rectangle("fill", 5*scale, (38+math.floor((tile-1)/22)*17)*scale-tilesoffset, 373*scale, 16*scale)
-						--buttons
-						for i = 1, 3 do
-							if mtbutton == i then love.graphics.setColor(255, 255, 255, 255)
-							else love.graphics.setColor(127, 127, 127, 255) end
-							love.graphics.rectangle("fill", (333+15*(i-1))*scale, (39+math.floor((tile-1)/22)*17)*scale-tilesoffset, 14*scale, 14*scale)
-							love.graphics.setColor(0, 0, 0, 255)
-							love.graphics.rectangle("fill", (333+15*(i-1)+1)*scale, (39+math.floor((tile-1)/22)*17)*scale-tilesoffset+scale, 14*scale-2*scale, 14*scale-2*scale)
-							if mtbutton == i then
-								if i == 3 then love.graphics.setColor(255, 0, 0, 255)
-								else love.graphics.setColor(255, 255, 255, 255) end
-							else love.graphics.setColor(127, 127, 127, 255) end
-							if i == 1 then
-								--up
-								love.graphics.draw(uparrowimg, (333+15*(i-1)+3)*scale, (38+math.floor((tile-1)/22)*17)*scale-tilesoffset+3*scale, 0, scale, scale)
-							elseif i == 2 then
-								--down
-								love.graphics.draw(downarrowimg, (333+15*(i-1)+3)*scale, (38+math.floor((tile-1)/22)*17)*scale-tilesoffset+3*scale, 0, scale, scale)
-							elseif i == 3 then
-								--delete
-								properprint("x",(333+15*(i-1)+3)*scale, (39+math.floor((tile-1)/22)*17)*scale-tilesoffset+3*scale)
-							end
+						love.graphics.rectangle("fill", 5*scale, (38+entry*17)*scale-tilesoffset, 373*scale, 16*scale)
+						for _, button in ipairs(mtobjectbuttons[entry+1]) do
+							button:draw()
 						end
 					end
 
@@ -3913,6 +3902,11 @@ function editor_draw()
 
 		if animationDone then
 			editorMenuAnimation = nil
+			if not editormenuopen then
+				for _, element in pairs(guielements) do
+					element.active = false
+				end
+			end
 		end
 	else
 		editor_draw_content(editormenuopen, false, false, cursorAlpha)
@@ -5363,8 +5357,10 @@ end
 
 function editorclose()
 	editor_set_menu_view(false)
-	for i, v in pairs(guielements) do
-		v.active = false
+	if not editorMenuAnimation then
+		for i, v in pairs(guielements) do
+			v.active = false
+		end
 	end
 end
 
@@ -5954,9 +5950,15 @@ function editor_mousepressed(x, y, button)
 				local tile = gettilelistpos(x, y)
 				if editmtobjects then
 					tile = getlistpos(x, y)
-					local mtbutton = getmtbutton(x)
 					if tile and not guielements["mtobjectrename"].active then
-						if mtbutton == 0 then
+						local buttons = mtobjectbuttons[tile+1]
+						editor_position_mtobjectbuttons(tile)
+						for i, element in ipairs(buttons) do
+							if element:click(x, y, button) then
+								return
+							end
+						end
+						if getmtbutton(tile, x, y) == 0 then
 							allowdrag = false
 							editorclose()
 							mtclipboard = multitileobjects[tile+1]
@@ -5965,17 +5967,6 @@ function editor_mousepressed(x, y, button)
 							editentities = false
 							tilesall()
 							resettileselection()
-						else
-							if mtbutton == 1 then
-								moveline(mappackfolder .. "/" .. mappack .. "/objects.txt",tile+1,"up")
-								loadmtobjects()
-							elseif mtbutton == 2 then
-								moveline(mappackfolder .. "/" .. mappack .. "/objects.txt",tile+1,"down")
-								loadmtobjects()
-							elseif mtbutton == 3 then
-								deleteline(mappackfolder .. "/" .. mappack .. "/objects.txt", tile+1)
-								loadmtobjects()
-							end
 						end
 					end
 				elseif editentities == false then
@@ -7061,6 +7052,8 @@ function startrclink(t, i) --name of link, link id
 	rightclickobjects = {}
 	customrcopen = "link"
 	rightclickmenuopen = true
+	editorRCAnimation = nil
+	editorRCOpen = false
 end
 
 function setrclink(endx, endy)
@@ -7110,6 +7103,8 @@ function setrclink(endx, endy)
 	allowdrag = false
 	customrcopen = false
 	rightclickmenuopen = false
+	editorRCAnimation = nil
+	editorRCOpen = false
 end
 
 function resetrclink(id) --id
@@ -7331,6 +7326,11 @@ function editor_mousereleased(x, y, button)
 			end
 		end
 	end
+	for _, buttons in ipairs(mtobjectbuttons) do
+		for _, element in ipairs(buttons) do
+			element:unclick(x, y, button)
+		end
+	end
 end
 
 function editor_keypressed(key, textinput)
@@ -7344,6 +7344,9 @@ function editor_keypressed(key, textinput)
 		elseif key == "m" and not changemapwidthmenu then
 			editor_set_minimap_visible(not minimapmoving)
 		end
+		return
+	end
+	if editorMenuAnimation and not editormenuopen then
 		return
 	end
 
@@ -7774,6 +7777,37 @@ function loadmtobjects()
 			end
 		end
 	end
+
+	mtobjectbuttons = {}
+	for i = 1, #multitileobjects do
+		local objectindex = i
+		local buttons = {}
+		buttons[1] = guielement:new("button", 0, 0, "↑", function()
+			editor_mtobject_action(objectindex, "up")
+		end, 0, nil, 1.3, 11, true)
+		buttons[2] = guielement:new("button", 0, 0, "↓", function()
+			editor_mtobject_action(objectindex, "down")
+		end, 0, nil, 1.3, 11, true)
+		buttons[3] = guielement:new("button", 0, 0, "x", function()
+			editor_mtobject_action(objectindex, "delete")
+		end, 0, nil, 1.3, 11, true)
+		buttons[3].textcolor = {200, 0, 0}
+		mtobjectbuttons[i] = buttons
+	end
+end
+
+editor_mtobject_action = function(index, action)
+	local path = mappackfolder .. "/" .. mappack .. "/objects.txt"
+	if action == "up" then
+		moveline(path, index, "up")
+	elseif action == "down" then
+		moveline(path, index, "down")
+	elseif action == "delete" then
+		deleteline(path, index)
+	else
+		error("Unknown multitile object action: " .. tostring(action))
+	end
+	loadmtobjects()
 end
 
 --check box shtuffs
@@ -8406,7 +8440,7 @@ function getlistpos(x, y)
 		y = y + tilesoffset
 		y = (y - 38*scale)/scale
 		
-		out = math.floor(y/17)
+		local out = math.floor(y/17)
 		if out <= #multitileobjects-1 then
 			return out
 		end
@@ -8415,19 +8449,22 @@ function getlistpos(x, y)
 	return false
 end
 
-function getmtbutton(x)
-	local button = 0
-	if (not guielements["mtobjectrename"].active) then
-		if x >= 333*scale and x < 347*scale then
-			button = 1
-		elseif x >= 348*scale and x < 362*scale then
-			button = 2
-		elseif x >= 363*scale and x < 377*scale then
-			button = 3
+function getmtbutton(entry, x, y)
+	if guielements["mtobjectrename"].active then
+		return 0
+	end
+
+	local buttons = mtobjectbuttons[entry+1]
+	if not buttons then
+		return 0
+	end
+	editor_position_mtobjectbuttons(entry)
+	for i, button in ipairs(buttons) do
+		if button:inhighlight(x, y) then
+			return i
 		end
 	end
-	
-	return button
+	return 0
 end
 
 function gettilelistpos(x, y)
@@ -8445,6 +8482,16 @@ function gettilelistpos(x, y)
 	end
 	
 	return false
+end
+
+editor_position_mtobjectbuttons = function(entry)
+	local buttons = mtobjectbuttons[entry+1]
+	if buttons then
+		for i, button in ipairs(buttons) do
+			button.x = 333+(i-1)*15
+			button.y = 39+(17*entry)-(tilesoffset/scale)
+		end
+	end
 end
 
 function getentitylistpos(x, y)
