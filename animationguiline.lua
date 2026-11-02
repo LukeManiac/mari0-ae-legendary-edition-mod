@@ -1996,9 +1996,6 @@ function animationguiline:init(tabl, t2)
 	self.upbutton.textcolor = {255, 255, 255}
 	
 	self.elements[1].gui = guielement:new("dropdown", 0, 0, animdropwidth, function(val) self:changemainthing(val) end, start, unpack(animnames))
-	if self.type ~= "action" then
-		self.elements[1].gui.maxvisibleentries = 16
-	end
 	self.elements[1].width = animdropwidth*8+14
 	
 	if not self.t[1] then
@@ -2134,9 +2131,6 @@ function animationguiline:init(tabl, t2)
 
 					temp.gui = guielement:new("dropdown", 0, 0, dropwidth, function(val) self:submenuchange(val, j) end, starti, unpack(args))
 					temp.gui.displayentries = displayargs
-					if self.type ~= "action" then
-						temp.gui.maxvisibleentries = 16
-					end
 					temp.width = dropwidth*8+14
 					if coloredtext then
 						temp.gui.coloredtext = true
@@ -2189,9 +2183,7 @@ function animationguiline:draw(x, y)
 			if not self.elements[i].gui.extended then
 				self.elements[i].gui.x = x+xadd
 				self.elements[i].gui.y = y
-			end
-			if self.elements[i].gui.scrollbar then
-				self.elements[i].gui.scrollbar.x = (self.elements[i].gui.width*8+13)+x+xadd
+				self.elements[i].gui:updatePos()
 			end
 			xadd = xadd + self.elements[i].width
 		end

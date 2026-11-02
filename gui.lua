@@ -288,7 +288,19 @@ function guielement:update(dt)
 			end
 			if self.scrollbar then
 				self.scrollbar:update(dt)
-				self.scroll = self.scrollbar.value*self.scrollrange
+				if self.scrollbar.dragging then
+					self.scrolltarget = self.scrollbar.value*self.scrollrange
+					self.scroll = self.scrolltarget
+				elseif self.cutoff then
+					self.scrolltarget = self.scrolltarget or self.scroll or 0
+					self.scroll = self.scroll + (self.scrolltarget-self.scroll)*math.min(1, dt*12)
+					if math.abs(self.scrolltarget-self.scroll) < 0.05 then
+						self.scroll = self.scrolltarget
+					end
+					self.scrollbar.value = self.scroll/self.scrollrange
+				else
+					self.scroll = self.scrollbar.value*self.scrollrange
+				end
 			end
 		end
 	end
@@ -479,15 +491,10 @@ function guielement:draw(a, offx, offy)
 			local oldx, oldy, oldw, oldh
 			if animating then
 				local clipx, clipy, clipw, cliph, slide
-				clipw = (14+self.width*8)*scale
+				clipw = ((self.cutoff and 21 or 14)+self.width*8)*scale
 				if self.cutoff then
-					--the list covers the whole screen, so grow it outward from the header
-					--instead of from the top of the screen
-					local fullh = height*16
-					local top = self.y*(1-p)
-					local bottom = (self.y+11) + (fullh-(self.y+11))*p
-					clipx, clipy, cliph = self.x*scale, top*scale, (bottom-top)*scale
-					slide = 0
+					clipx, clipy, cliph = self.x*scale, self.scrolltop*scale, self.scrollheight*p*scale
+					slide = -(1-p)*self.scrollheight*scale
 				elseif self.dropup then
 					clipx, clipy, cliph = self.x*scale, (self.y-listheight*p)*scale, listheight*p*scale
 					slide = (1-p)*listheight*scale
@@ -502,67 +509,38 @@ function guielement:draw(a, offx, offy)
 			end
 			
 			if self.cutoff then --have a scrollbar
-				local clipx, clipy, clipw, cliph = love.graphics.getScissor()
+				local oldx, oldy, oldw, oldh = love.graphics.getScissor()
 				love.graphics.intersectScissor(
 					math.floor(self.x*scale),
-					0,
+					math.floor(self.scrolltop*scale),
 					math.ceil((21+self.width*8)*scale),
 					math.ceil(self.scrollheight*scale)
 				)
-				love.graphics.rectangle("fill", self.x*scale, -self.scroll*scale, (13+self.width*8)*scale, (10*(#self.entries+1)+1)*scale, listr)
-				
 				love.graphics.setColor(127, 127, 127)
-				if high then
-					love.graphics.setColor(255, 255, 255)
-				end
-				local ax = (self.x+2+self.width*8+4)*scale
-				local ay = (-self.scroll+5.5)*scale
-				local s = scale
-				love.graphics.polygon("fill", ax-3*s, ay-2*s, ax+3*s, ay-2*s, ax, ay+3*s)
-				love.graphics.setColor(0, 0, 0)
-				love.graphics.rectangle("fill", (self.x+1)*scale, (-self.scroll+1)*scale, (1+self.width*8)*scale, 9*scale)
-				love.graphics.setColor(255, 255, 255)
-				if ext then
-					love.graphics.setColor(127, 127, 127)
-				end
-				local s = self.entries[self.var]
-				if self.displayentries then s = self.displayentries[self.var];
-					if s and s:sub(1, 6) == "_ENEMY" then s = " " .. s:sub(7, -1); love.graphics.draw(customenemyiconimg, (self.x+1)*scale, (-self.scroll+2)*scale, 0, scale, scale) end end
-				if type(s) == "string" then s = s:sub(1, self.width) end
-				properprint(s, (self.x+1)*scale, (-self.scroll+2)*scale)
-				
-				love.graphics.setColor(127, 127, 127)
-				if high then
-					love.graphics.setColor(255, 255, 255)
-				end
-				
+				love.graphics.rectangle("fill", self.x*scale, self.listtop*scale, (13+self.width*8)*scale, #self.entries*10*scale, listr)
+
 				for i = 1, #self.entries do
-					local y = ((2+10*i)-self.scroll)
-					if y+10 > 0 and y < self.scrollheight then
-						if high ~= i then
-							love.graphics.setColor(0, 0, 0)
-							love.graphics.rectangle("fill", (self.x+1)*scale, ((1+i*10)-self.scroll)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
-							love.graphics.setColor(255, 255, 255)
-									
-							local s = self.entries[i]
-							if self.displayentries then s = self.displayentries[i];
-								if s:sub(1, 6) == "_ENEMY" then s = " " .. s:sub(7, -1); love.graphics.draw(customenemyiconimg, (self.x+1)*scale, ((2+10*i)-self.scroll)*scale, 0, scale, scale) end end
-							if type(s) == "string" then s = s:sub(1, self.width+1) end
-							properprint(s, (self.x+1)*scale, y*scale)
-						else
-							love.graphics.setColor(0, 0, 0)
-							local s = self.entries[i]
-							if self.displayentries then s = self.displayentries[i];
-								if s:sub(1, 6) == "_ENEMY" then s = " " .. s:sub(7, -1); love.graphics.draw(customenemyiconimg, (self.x+1)*scale, ((2+10*i)-self.scroll)*scale, 0, scale, scale) end end
-							if type(s) == "string" then s = s:sub(1, self.width+1) end
-							properprint(s, (self.x+1)*scale, y*scale)
-						end
+					local rowy = self.listtop+(i-1)*10-self.scroll
+					if high ~= i then
+						love.graphics.setColor(0, 0, 0)
+						love.graphics.rectangle("fill", (self.x+1)*scale, (rowy+1)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
+						love.graphics.setColor(255, 255, 255)
+					else
+						love.graphics.setColor(0, 0, 0)
 					end
+					local entry = self.entries[i]
+					if self.displayentries then
+						entry = self.displayentries[i]
+					end
+					if type(entry) == "string" then
+						entry = entry:sub(1, self.width+1)
+					end
+					properprint(entry, (self.x+1)*scale, (rowy+2)*scale)
 				end
-				
+
 				self.scrollbar:draw()
-				if clipx then
-					love.graphics.setScissor(clipx, clipy, clipw, cliph)
+				if oldx then
+					love.graphics.setScissor(oldx, oldy, oldw, oldh)
 				else
 					love.graphics.setScissor()
 				end
@@ -999,6 +977,17 @@ function guielement:click(x, y, button)
 					self:open()
 				end
 			else
+				if self.cutoff and (button == "wu" or button == "wd") then
+					local inlist = x >= self.x*scale and x < (self.x+13+self.width*8)*scale
+						and y >= self.scrolltop*scale and y < (self.scrolltop+self.scrollheight)*scale
+					local inScrollbar = self.scrollbar and x >= self.scrollbar.x*scale and x < (self.scrollbar.x+self.scrollbar.width)*scale
+						and y >= self.scrolltop*scale and y < (self.scrolltop+self.scrollheight)*scale
+					if inlist or inScrollbar then
+						local direction = button == "wd" and 1 or -1
+						self.scrolltarget = math.max(0, math.min(self.scrollrange, (self.scrolltarget or self.scroll or 0)+direction*30))
+						return true
+					end
+				end
 				if self.scrollbar then
 					self.scrollbar:click(x, y, button)
 					if x > (self.x+(13+self.width*8))*scale and x < (self.x+(13+self.width*8)+8)*scale then
@@ -1539,16 +1528,17 @@ end
 function guielement:scrolltocursor()
 	if self.cutoff and self.scrollbar and self.keycursor then
 		local range = self.scrollrange
-		local top = 10*self.keycursor
+		local top = 10*(self.keycursor-1)
 		local bottom = top + 11
-		local scroll = self.scroll or 0
+		local scroll = self.scrolltarget or self.scroll or 0
 		if top < scroll then
 			scroll = top
 		elseif bottom > scroll + self.scrollheight then
 			scroll = bottom - self.scrollheight
 		end
 		self.scrollbar.value = math.max(0, math.min(1, scroll/range))
-		self.scroll = self.scrollbar.value*range
+		self.scrolltarget = self.scrollbar.value*range
+		self.scroll = self.scrolltarget
 	end
 end
 
@@ -1650,9 +1640,13 @@ function guielement:inhighlight(x, y)
 			end
 		else
 			if self.cutoff then
-				if x >= self.x*scale and x < (self.x+13+self.width*8)*scale and y >= 0 and y < self.scrollheight*scale then
-					--get which entry
-					return math.max(0, math.min(#self.entries, math.floor((y+self.scroll*scale) / (10*scale))))
+				if x >= self.x*scale and x < (self.x+13+self.width*8)*scale
+					and y >= self.scrolltop*scale and y < (self.scrolltop+self.scrollheight)*scale then
+					local entry = math.floor((y/scale-self.listtop+self.scroll)/10)+1
+					if entry >= 1 and entry <= #self.entries then
+						return entry
+					end
+					return 0
 				end
 			elseif self.dropup then
 				--(11+))
@@ -1713,27 +1707,25 @@ end
 function guielement:updatePos()
 	if self.type == "dropdown" then
 		local listheight = 10*#self.entries
-		self.scrollheight = height*16
-		if self.maxvisibleentries then
-			self.scrollheight = math.min(self.scrollheight, (self.maxvisibleentries+1)*10)
-		end
-		self.dropup = self.y+11+listheight > height*16 and self.y >= listheight
-
-		local fullheight = 10*(#self.entries+1)
-		self.cutoff = fullheight > self.scrollheight
+		local screenheight = height*16
+		self.dropup = self.y+11+listheight > screenheight and self.y >= listheight
+		self.listtop = self.dropup and self.y-listheight or self.y+11
+		self.scrolltop = math.max(0, self.listtop)
+		local listbottom = math.min(screenheight, self.listtop+listheight)
+		self.scrollheight = math.max(0, listbottom-self.scrolltop)
+		self.cutoff = self.scrollheight < listheight
 		if self.cutoff then
-			local yrange = fullheight-self.scrollheight+1
-			self.scrollrange = yrange
-			self.cutoff = true
-			self.scroll = 0
-			self.scrollbar = guielement:new("scrollbar", self.x+(self.width*8+13), 0, self.scrollheight, 8, 40, 0, "ver")
+			self.scrollrange = listheight-self.scrollheight
+			self.scroll = math.max(0, math.min(self.scrollrange, self.scroll or 0))
+			self.scrolltarget = math.max(0, math.min(self.scrollrange, self.scrolltarget or self.scroll))
+			local scrollbarheight = math.min(self.scrollheight, math.max(20, self.scrollheight*self.scrollheight/listheight))
+			self.scrollbar = guielement:new("scrollbar", self.x+(self.width*8+13), self.scrolltop, self.scrollheight, 8, scrollbarheight, self.scroll/self.scrollrange, "ver")
 			self.scrollbar.active = false
-			self.scrollbar.yrange = self.scrollbar.yrange + self.scrollbar.height
-			self.scrollbar.height = math.max(30, math.min(1, self.scrollheight/(yrange+self.scrollheight))*self.scrollheight)
-			self.scrollbar.yrange = self.scrollbar.yrange - self.scrollbar.height
-			self.scrollbar.scrollstep = math.max(0.0001, 73/yrange)
+			self.scrollbar.scrollstepdisabled = true
 		else
 			self.scrollrange = 0
+			self.scroll = 0
+			self.scrolltarget = 0
 			self.scrollbar = nil
 		end
 	elseif self.type == "rightclick" then
