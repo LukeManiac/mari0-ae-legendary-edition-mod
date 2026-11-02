@@ -1160,6 +1160,10 @@ rightclicktype["enemytool"] = {
 			end
 		end
 		rightclickobjects[2].width = getlongeststring(displaynames)
+		local dropdown = rightclickobjects[2]
+		local backgroundleft = rightclickobjects[1].x - 4
+		local dropdownright = dropdown.x + 13 + dropdown.width * 8
+		rightclickobjects.width = math.max(rightclickobjects.width, dropdownright + 4 - backgroundleft)
 		rightclickobjects[2]:updatePos()
 	end,
 	savefunc = function()
