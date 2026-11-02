@@ -1161,10 +1161,40 @@ rightclicktype["enemytool"] = {
 		end
 		rightclickobjects[2].width = getlongeststring(displaynames)
 		local dropdown = rightclickobjects[2]
-		local backgroundleft = rightclickobjects[1].x - 4
-		local dropdownright = dropdown.x + 13 + dropdown.width * 8
-		rightclickobjects.width = math.max(rightclickobjects.width, dropdownright + 4 - backgroundleft)
+		local controlright = dropdown.x + 13 + dropdown.width * 8
 		rightclickobjects[2]:updatePos()
+
+		local linkbutton, resetbutton
+		for i = 1, #rightclickobjects do
+			local obj = rightclickobjects[i]
+			if obj.type == "button" then
+				if obj.text == "link trigger " then
+					linkbutton = obj
+				elseif obj.text == "x" then
+					resetbutton = obj
+				end
+			end
+		end
+
+		if linkbutton and resetbutton then
+			controlright = math.max(controlright, linkbutton.x + linkbutton.width + 19)
+			resetbutton.x = controlright - 13
+			linkbutton.width = math.max(linkbutton.width, resetbutton.x - linkbutton.x - 6)
+		end
+
+		for i = 1, #rightclickobjects do
+			local obj = rightclickobjects[i]
+			if obj.type == "dropdown" and obj ~= dropdown then
+				obj.width = dropdown.width
+				obj:updatePos()
+			elseif obj.type == "scrollbar" and obj.dir == "hor" then
+				obj.range = controlright - obj.x
+				obj.xrange = obj.range - obj.width
+			end
+		end
+
+		local backgroundleft = rightclickobjects[1].x - 4
+		rightclickobjects.width = math.max(rightclickobjects.width, controlright + 4 - backgroundleft)
 	end,
 	savefunc = function()
 		if rightclicktype["enemytool"].t[rightclickvalues2[1]] then
