@@ -571,14 +571,67 @@ local function optionscontrols_draw_page(page, offset)
 	love.graphics.pop()
 end
 
+local function optionscontrols_resettooltip()
+	if keybindpage == 1 then
+		if skinningplayer == 1 then
+			return "press ctrl+f6 to", "reset keybinds"
+		end
+		return "press ctrl+f6 to reset", "keybinds to player " .. (skinningplayer - 1)
+	end
+	return "press ctrl+f6 to", "clear keybinds"
+end
+
+local function optionscontrols_resetbindings()
+	local controlset = getcontrolset(keybindpage)
+	if not controlset then
+		return false
+	end
+	if not controlset[skinningplayer] then
+		controlset[skinningplayer] = {}
+	end
+
+	if keybindpage == 1 then
+		if skinningplayer == 1 then
+			controlset[1]["left"] = {"a"}
+			controlset[1]["right"] = {"d"}
+			controlset[1]["up"] = {"w"}
+			controlset[1]["down"] = {"s"}
+			controlset[1]["run"] = {"lshift"}
+			controlset[1]["jump"] = {" "}
+			controlset[1]["reload"] = {"r"}
+			controlset[1]["use"] = {"e"}
+			controlset[1]["pause"] = {""}
+			controlset[1]["aimx"] = {""}
+			controlset[1]["aimy"] = {""}
+			controlset[1]["portal1"] = {""}
+			controlset[1]["portal2"] = {""}
+		else
+			local source = controlset[skinningplayer - 1]
+			if source then
+				for _, name in ipairs(controlstable) do
+					controlset[skinningplayer][name] = deepcopy(source[name] or {})
+				end
+			end
+		end
+	else
+		for _, name in ipairs(controlstable) do
+			controlset[skinningplayer][name] = {}
+		end
+	end
+
+	optionscontrols_sync()
+	saveconfig()
+	return true
+end
+
 --where the pause menu's controls popup is on screen, and how far its widgets are shifted from where the options menu draws them
 local function controlspopup_geometry()
 	local winwidth, winheight = getproperwindowsize()
 	local popupw = 240 * scale
-	local popuph = 208 * scale
+	local popuph = 226 * scale
 	local popupx = (winwidth - popupw) / 2
 	local popupy = (winheight - popuph) / 2
-	return popupx, popupy, popupw, popuph, popupx - 20*scale, popupy - 20*scale
+	return popupx, popupy, popupw, popuph, popupx - 20*scale, popupy - 2*scale
 end
 
 function optionscontrols_transformmouse(x, y)
@@ -2380,16 +2433,7 @@ function menu_draw()
 			love.graphics.setScissor()
 			optionscontrols_draw(nil, false, true)
 
-			local tooltipline1, tooltipline2
-			if keybindpage == 1 then
-				if skinningplayer == 1 then
-					tooltipline1, tooltipline2 = "press ctrl+f6 to", "reset keybinds"
-				else
-					tooltipline1, tooltipline2 = "press ctrl+f6 to reset", "keybinds to player " .. (skinningplayer - 1)
-				end
-			else
-				tooltipline1, tooltipline2 = "press ctrl+f6 to", "clear keybinds"
-			end
+			local tooltipline1, tooltipline2 = optionscontrols_resettooltip()
 			local tooltipwidth = math.max(utf8.len(tooltipline1), utf8.len(tooltipline2)) * 8
 			local tooltipx = 130 - tooltipwidth / 2
 			love.graphics.setColor(0, 0, 0, 200)
@@ -3545,48 +3589,7 @@ function menu_keypressed(key, unicode)
 
 		-- Ctrl+F6: reset / clear / copy the current player's keybind page
 		if optionstab == 1 and not keyprompt and key == "f6" and (love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl")) then
-			local controlset = getcontrolset(keybindpage)
-			if not controlset then
-				return
-			end
-			if not controlset[skinningplayer] then
-				controlset[skinningplayer] = {}
-			end
-
-			if keybindpage == 1 then
-				if skinningplayer == 1 then
-					-- player 1 page 1 → factory keyboard defaults
-					controlset[1]["left"] = {"a"}
-					controlset[1]["right"] = {"d"}
-					controlset[1]["up"] = {"w"}
-					controlset[1]["down"] = {"s"}
-					controlset[1]["run"] = {"lshift"}
-					controlset[1]["jump"] = {" "}
-					controlset[1]["reload"] = {"r"}
-					controlset[1]["use"] = {"e"}
-					controlset[1]["pause"] = {""}
-					controlset[1]["aimx"] = {""}
-					controlset[1]["aimy"] = {""}
-					controlset[1]["portal1"] = {""}
-					controlset[1]["portal2"] = {""}
-				else
-					-- player n page 1 → exact copy of player n-1's page 1
-					local source = controlset[skinningplayer - 1]
-					if source then
-						for _, name in ipairs(controlstable) do
-							controlset[skinningplayer][name] = deepcopy(source[name] or {})
-						end
-					end
-				end
-			else
-				-- any other page → clear every binding for this player
-				for _, name in ipairs(controlstable) do
-					controlset[skinningplayer][name] = {}
-				end
-			end
-
-			optionscontrols_sync()
-			saveconfig()
+			optionscontrols_resetbindings()
 			return
 		end
 
@@ -4669,15 +4672,19 @@ function drawcontrolsoverlay()
 	love.graphics.rectangle("line", popupx, popupy, popupw, popuph, popupradius)
 	love.graphics.setLineWidth(previouslinewidth)
 
-	-- Title
-	properprintF("controls:", (winwidth/2 - 36*scale), popupy + 8*scale)
+	-- Title and keybind reset hint
+	properprintF("controls:", (winwidth/2 - 36*scale), popupy + 3*scale)
+	local tooltipline1, tooltipline2 = optionscontrols_resettooltip()
+	local tooltipwidth = math.max(utf8.len(tooltipline1), utf8.len(tooltipline2)) * 8
+	love.graphics.setColor(255, 255, 255, 255)
+	properprintF(tooltipline1 .. "\n" .. tooltipline2, winwidth/2 - tooltipwidth*scale/2, popupy + 13*scale)
 
 	-- Draw the controls content (repositioned, the widgets are laid out like in the options menu)
 	love.graphics.push()
 	love.graphics.translate(offsetx, offsety)
 
 	-- the key bindings (clipped, they slide sideways when the page changes)
-	love.graphics.setScissor(popupx + 4*scale, popupy + 20*scale, popupw - 8*scale, popuph - 28*scale)
+	love.graphics.setScissor(popupx + 4*scale, popupy + 38*scale, popupw - 8*scale, popuph - 46*scale)
 	local pageviews = optionscontrols_pageviews()
 	for i = 1, #pageviews do
 		optionscontrols_draw_page(pageviews[i].page, pageviews[i].offset)
@@ -4808,6 +4815,11 @@ function controlspopup_keypressed(key)
 	if dropdown then
 		--keys that skip love.keypressed (controller buttons) still belong to an open dropdown
 		dropdown:keypress(key)
+		return
+	end
+
+	if key == "f6" and (love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl")) then
+		optionscontrols_resetbindings()
 		return
 	end
 
