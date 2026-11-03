@@ -2180,10 +2180,11 @@ function animationguiline:draw(x, y)
 			properprintF(self.elements[i].value, (x+xadd-1)*scale, (y+2)*scale)
 			xadd = xadd + self.elements[i].width
 		else
-			if not self.elements[i].gui.extended then
-				self.elements[i].gui.x = x+xadd
-				self.elements[i].gui.y = y
-				self.elements[i].gui:updatePos()
+			local gui = self.elements[i].gui
+			if not gui.extended and gui:getlistprogress() == 0 then
+				gui.x = x+xadd
+				gui.y = y
+				gui:updatePos()
 			end
 			xadd = xadd + self.elements[i].width
 		end
