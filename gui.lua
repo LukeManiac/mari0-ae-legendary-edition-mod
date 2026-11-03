@@ -596,13 +596,13 @@ function guielement:draw(a, offx, offy)
 						drawdropdownentry(s, self.x+1, listtop+1+(i-1)*10, self.width+1)
 					end
 				end
-				if animating then
-					love.graphics.pop()
-					if oldx then
-						love.graphics.setScissor(oldx, oldy, oldw, oldh)
-					else
-						love.graphics.setScissor()
-					end
+			end
+			if animating then
+				love.graphics.pop()
+				if oldx then
+					love.graphics.setScissor(oldx, oldy, oldw, oldh)
+				else
+					love.graphics.setScissor()
 				end
 			end
 		end
