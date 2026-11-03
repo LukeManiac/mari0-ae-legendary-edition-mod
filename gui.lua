@@ -281,10 +281,8 @@ function guielement:update(dt)
 			end
 		elseif self.type == "dropdown" then
 			self:getlistprogress() --keeps the open/close animation (and priority) up to date
-			if self.opened_y and not self.extended and self.listvalue == 0 then
-				self.y = self.opened_y
-				self.opened_y = nil
-				self.opened_dropup = nil
+			if self.listoffsety and not self.extended and self.listvalue == 0 then
+				self.listoffsety = nil
 				self:updatePos()
 			end
 			if opened_dropdown == self and not self.extended and self.listvalue == 0 then
@@ -1503,22 +1501,14 @@ function guielement:open(keyboard)
 	if self.type ~= "dropdown" then
 		return
 	end
-	if self.opened_y then
-		self.y = self.opened_y
-		self.opened_y = nil
-		self.opened_dropup = nil
-	end
 	if opened_dropdown and opened_dropdown ~= self then
 		opened_dropdown:close()
 	end
 	self:updatePos()
-	self.opened_y = self.y
-	self.opened_dropup = self.dropup
 	local screenheight = height*16
 	local targetbottom = screenheight-math.floor(screenheight/4)-1
-	local listbottom = self.dropup and self.y+11 or self.y+11+10*#self.entries
-	local offset = math.min(math.max(0, listbottom-targetbottom), self.y)
-	self.y = self.y-offset
+	local listbottom = self.y+11+10*#self.entries
+	self.listoffsety = math.min(math.max(0, listbottom-targetbottom), self.y+11)
 	self:updatePos()
 	self.extended = true
 	opened_dropdown = self
@@ -1750,10 +1740,8 @@ function guielement:updatePos()
 	if self.type == "dropdown" then
 		local listheight = 10*#self.entries
 		local screenheight = height*16
-		local bottommargin = math.floor(screenheight/4)
-		local targetbottom = screenheight-bottommargin-1
-		self.dropup = self.opened_dropup or (self.y+11+listheight > targetbottom and self.y >= listheight)
-		self.listtop = self.dropup and self.y-listheight or self.y+11
+		self.dropup = false
+		self.listtop = self.y+11-(self.listoffsety or 0)
 		self.scrolltop = math.max(0, self.listtop)
 		local listbottom = math.min(screenheight, self.listtop+listheight)
 		self.scrollheight = math.max(0, listbottom-self.scrolltop)
