@@ -2181,7 +2181,8 @@ function animationguiline:draw(x, y)
 			xadd = xadd + self.elements[i].width
 		else
 			local gui = self.elements[i].gui
-			if not gui.extended and gui:getlistprogress() == 0 then
+			local listprogress = gui.type == "dropdown" and gui:getlistprogress() or 0
+			if gui.type ~= "dropdown" or (not gui.extended and listprogress == 0) then
 				gui.x = x+xadd
 				gui.y = y
 				gui:updatePos()
