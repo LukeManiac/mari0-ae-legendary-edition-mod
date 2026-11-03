@@ -947,7 +947,7 @@ function editor_gui_interaction_enabled(element)
 	end
 
 	if editor_is_rightclick_element(element) then
-		return true
+		return editorRCOpen and not editorRCAnimation
 	end
 
 	if not editormenuopen or editorMenuAnimation then
