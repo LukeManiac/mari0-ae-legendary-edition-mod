@@ -317,4 +317,9 @@
 		"portal gun": "portalpafilo",
 		"selection tool": "elektilo",
 		"power line draw": "potenc-liniilo",
+
+"^_Notices":"",
+	"Map saved!": "Mapo konservita!",
+	"game saved!": "Ludo konservita!",
+	"game suspended!": "Ludo prokrastita!"
 }

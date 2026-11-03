@@ -5474,11 +5474,8 @@ function game_keypressed(key, textinput)
 					suspendprompt = false
 				elseif pausemenuselected2 == 1 then
 					renderoverlay("saving game...")
-					stopmusic()
-					love.audio.stop()
 					suspendgame()
 					suspendprompt = false
-					pausemenuopen = false
 				else
 					suspendprompt = false
 				end

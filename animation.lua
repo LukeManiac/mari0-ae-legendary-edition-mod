@@ -783,11 +783,15 @@ function animation:update(dt)
 				if not (CLIENT or SERVER or dcplaying) then
 					-- don't save if the game is being played in the editor
 					if not testlevel then
-						writesuspendfile()
-					end
-					-- show notice regardless of whether player is in editor or not, to prove the function works while testing
-					if v[2] == true then
-						notice.new(TEXT["game saved!"], nil, 3)
+						local success, message = writesuspendfile()
+						if not success then
+							print("Failed to autosave suspend file: " .. tostring(message))
+							if v[2] == true then
+								notice.new("Failed to save game.\n" .. tostring(message), notice.red, 6)
+							end
+						elseif v[2] == true then
+							notice.new(TEXT["game saved!"], nil, 3)
+						end
 					end
 				end
 			elseif v[1] == "changebackground" then

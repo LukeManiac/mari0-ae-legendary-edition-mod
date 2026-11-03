@@ -662,5 +662,10 @@
 	"^_Conflict Resolution":"^_Resolução de Conflitos",
 	"^_(because the game grabs the last item with the same label)":"^_(pois o jogo pega o último item com a mesma descrição)",
 		"custom":"custom",
-		"by": " de"
+		"by": " de",
+
+	"^_Notices":"",
+		"Map saved!": "Mapa salvo!",
+		"game saved!": "Jogo salvo!",
+		"game suspended!": "Jogo suspenso!"
 }

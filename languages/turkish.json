@@ -323,4 +323,9 @@
 		"portal gun": "portal silahı",
 		"selection tool": "seçili araç",
 		"power line draw": "kablo çiz",
+
+	"^_Notices":"",
+		"Map saved!": "Harita kaydedildi!",
+		"game saved!": "Oyun kaydedildi!",
+		"game suspended!": "Oyun askıya alındı!"
 }

@@ -323,4 +323,9 @@
 			"portal gun": "портальная пушка",
 			"selection tool": "инструмент выбора",
 			"power line draw": "рисовать линию",
+
+	"^_Notices":"",
+		"Map saved!": "Карта сохранена!",
+		"game saved!": "Игра сохранена!",
+		"game suspended!": "Игра приостановлена!"
 }

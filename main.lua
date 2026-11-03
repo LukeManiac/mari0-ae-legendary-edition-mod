@@ -1719,6 +1719,82 @@ function defaultconfig()
 	reachedworlds = {}
 end
 
+local function writesuspenddata(path, data)
+	local success, message = love.filesystem.createDirectory(savesfolder)
+	if not success then
+		return false, message
+	end
+
+	local temporaryfile = path .. ".tmp"
+	local backupfile = path .. ".bak"
+	local savepath = love.filesystem.getSaveDirectory() .. "/" .. path
+	local backuppath = love.filesystem.getSaveDirectory() .. "/" .. backupfile
+	local hadsave = love.filesystem.getInfo(path) ~= nil
+
+	if not hadsave and love.filesystem.getInfo(backupfile) then
+		success, message = os.rename(backuppath, savepath)
+		if not success then
+			return false, message
+		end
+		hadsave = true
+	end
+
+	success, message = love.filesystem.write(temporaryfile, data)
+	if not success then
+		return false, message
+	end
+
+	local written, readmessage = love.filesystem.read(temporaryfile)
+	if not written then
+		love.filesystem.remove(temporaryfile)
+		return false, readmessage
+	end
+	if written ~= data then
+		love.filesystem.remove(temporaryfile)
+		return false, "The temporary save could not be verified."
+	end
+
+	if love.filesystem.getInfo(backupfile) then
+		success, message = love.filesystem.remove(backupfile)
+		if not success then
+			love.filesystem.remove(temporaryfile)
+			return false, message
+		end
+	end
+
+	if hadsave then
+		success, message = os.rename(savepath, backuppath)
+		if not success then
+			love.filesystem.remove(temporaryfile)
+			return false, message
+		end
+	end
+
+	success, message = os.rename(
+		love.filesystem.getSaveDirectory() .. "/" .. temporaryfile,
+		savepath
+	)
+	if not success then
+		if hadsave then
+			local restored, restoremessage = os.rename(backuppath, savepath)
+			if not restored then
+				message = tostring(message) .. "; the previous save remains at " .. backupfile .. ": " .. tostring(restoremessage)
+			end
+		end
+		love.filesystem.remove(temporaryfile)
+		return false, message
+	end
+
+	if hadsave then
+		success, message = love.filesystem.remove(backupfile)
+		if not success then
+			print("Could not remove suspend save backup: " .. tostring(message))
+		end
+	end
+
+	return true
+end
+
 function writesuspendfile()
 	local st = {}
 	if marioworld == "M" then
@@ -1769,13 +1845,20 @@ function writesuspendfile()
 	st.mappackfolder = mappackfolder
 
 	local s = JSON:encode_pretty(st)
-	love.filesystem.write(savesfolder .. "/" .. mappack .. ".suspend", s)
+	return writesuspenddata(savesfolder .. "/" .. mappack .. ".suspend", s)
 end
 
 function suspendgame()
-	writesuspendfile()
-	love.audio.stop()
-	menu_load()
+	local success, message = writesuspendfile()
+	if not success then
+		print("Failed to save suspend file: " .. tostring(message))
+		notice.new("Failed to save game.\n" .. tostring(message), notice.red, 6)
+		return false
+	end
+
+	local noticekey = alwaysdeletesuspend and "game suspended!" or "game saved!"
+	notice.new(TEXT[noticekey], nil, 3)
+	return true
 end
 
 function continuegame()
@@ -3394,8 +3477,15 @@ function convertoldsuspendfile()
 	-- *ahem* sus. [crowd cheering]
 	local suspendedmappackfolder = st.mappackfolder
 	local suspendedmappack = st.mappack
-	love.filesystem.write(suspendedmappackfolder:gsub("mappacks", "saves") .. "/" .. suspendedmappack .. ".suspend", s)
-	love.filesystem.remove("suspend")
+	local success, message = writesuspenddata(
+		suspendedmappackfolder:gsub("mappacks", "saves") .. "/" .. suspendedmappack .. ".suspend",
+		s
+	)
+	if success then
+		love.filesystem.remove("suspend")
+	else
+		print("Failed to migrate suspend file: " .. tostring(message))
+	end
 end
 
 --sausage (don't ask)
