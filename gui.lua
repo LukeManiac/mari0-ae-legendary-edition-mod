@@ -444,6 +444,7 @@ function guielement:draw(a, offx, offy)
 		local ext = self.extended or p > 0
 		local listheight = 10*#self.entries
 		local listtop = self.y+11
+		local animating = p < 1
 		local listr = math.min((3+self.width*8)*scale, 11*scale) * 0.2 --same corner radius as the header
 		
 		if ext and not self.cutoff then
@@ -513,15 +514,16 @@ function guielement:draw(a, offx, offy)
 			
 			--scroll the list in/out: clip it to the part that is revealed and slide it along
 			--(only while it is animating, a fully open list is drawn normally)
-			local animating = p < 1
 			local oldx, oldy, oldw, oldh
 			if animating then
 				local clipx, clipy, clipw, cliph, slide
 				local listbottomlimit = height*16-math.floor(height*16/4)-1
 				clipw = ((self.cutoff and 21 or 14)+self.width*8)*scale
 				if self.cutoff then
-					clipx, clipy = self.x*scale, math.max(0, listtop)*scale
-					cliph = math.min(self.scrollheight, math.max(0, listbottomlimit-math.max(0, listtop)))*p*scale
+					local cliptop = math.max(0, listtop)
+					local visibleheight = math.min(self.scrollheight, math.max(0, listbottomlimit-cliptop))
+					clipx, clipy = self.x*scale, cliptop*scale
+					cliph = visibleheight*p*scale
 				elseif self.dropup then
 					clipx, clipy, cliph = self.x*scale, (self.y-listheight*p)*scale, listheight*p*scale
 					slide = (1-p)*listheight*scale
@@ -538,16 +540,18 @@ function guielement:draw(a, offx, offy)
 			
 			if self.cutoff then --have a scrollbar
 				local listbottomlimit = height*16-math.floor(height*16/4)-1
-				local visibleheight = math.min(self.scrollheight, math.max(0, listbottomlimit-math.max(0, listtop)))
+				local cliptop = math.max(0, listtop)
+				local visibleheight = math.min(self.scrollheight, math.max(0, listbottomlimit-cliptop))
+				local overlayheight = visibleheight*(animating and p or 1)
 				local oldx, oldy, oldw, oldh = love.graphics.getScissor()
 				love.graphics.intersectScissor(
 					math.floor(self.x*scale),
-					math.floor(math.max(0, listtop)*scale),
+					math.floor(cliptop*scale),
 					math.ceil((21+self.width*8)*scale),
-					math.ceil(visibleheight*scale)
+					math.ceil(overlayheight*scale)
 				)
 				love.graphics.setColor(127, 127, 127)
-				love.graphics.rectangle("fill", self.x*scale, listtop*scale, (13+self.width*8)*scale, visibleheight*scale, listr)
+				love.graphics.rectangle("fill", self.x*scale, cliptop*scale, (13+self.width*8)*scale, overlayheight*scale, listr)
 
 				for i = 1, #self.entries do
 					local rowy = listtop+(i-1)*10-self.scroll
