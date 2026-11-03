@@ -968,6 +968,16 @@ function editor_gui_interaction_enabled(element)
 	return true
 end
 
+function editor_gui_hover_enabled(element)
+	if editorRCAnimation or editor_is_rightclick_element(element) then
+		return editor_gui_interaction_enabled(element)
+	end
+	if guielement.getopendropdown() then
+		return true
+	end
+	return editor_gui_interaction_enabled(element)
+end
+
 function editor_update(dt)
 	----------
 	--EDITOR--

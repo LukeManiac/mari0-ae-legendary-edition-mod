@@ -1460,11 +1460,13 @@ end
 
 --true when the mouse is over the element, or when it is made to look hovered (forcehover, e.g. selected with the keyboard)
 function guielement:hovered()
+	local dropdown_open = opened_dropdown and opened_dropdown.active and opened_dropdown.extended
+	local hover_only = editormode and dropdown_open and opened_dropdown ~= self and editor_gui_hover_enabled(self)
 	if editormode and not self.alwaysinteractable and
-		(not editor_gui_interaction_enabled(self) or (opened_dropdown and opened_dropdown.active and opened_dropdown ~= self and opened_dropdown.extended)) then
+		(not editor_gui_interaction_enabled(self) or (dropdown_open and opened_dropdown ~= self)) and not hover_only then
 		return false
 	end
-	if self:inhighlight(love.mouse.getPosition()) then
+	if self:inhighlight(love.mouse.getPosition(), hover_only) then
 		return true
 	end
 	return self.forcehover and not self.nohover
@@ -1610,9 +1612,11 @@ function guielement:smoothcursor(x, y)
 	return self.cursordx, self.cursordy
 end
 
-function guielement:inhighlight(x, y)
+function guielement:inhighlight(x, y, allow_dropdown_hover)
+	local dropdown_open = opened_dropdown and opened_dropdown.active and opened_dropdown.extended
+	local hover_only = editormode and allow_dropdown_hover and dropdown_open and opened_dropdown ~= self and editor_gui_hover_enabled(self)
 	if editormode and not self.alwaysinteractable and
-		(not editor_gui_interaction_enabled(self) or (opened_dropdown and opened_dropdown.active and opened_dropdown ~= self and opened_dropdown.extended)) then
+		(not editor_gui_interaction_enabled(self) or (dropdown_open and opened_dropdown ~= self)) and not hover_only then
 		return false
 	end
 	if (self.controlbindpage or (self.controlspopup and gamestate == "game")) and optionscontrols_transformmouse then
