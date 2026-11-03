@@ -946,12 +946,12 @@ function editor_gui_interaction_enabled(element)
 		return false
 	end
 
-	if not editormenuopen or editorMenuAnimation then
-		return false
-	end
-	
 	if editor_is_rightclick_element(element) then
 		return true
+	end
+
+	if not editormenuopen or editorMenuAnimation then
+		return false
 	end
 
 	if element and changemapwidthmenu then
