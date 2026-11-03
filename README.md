@@ -207,6 +207,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Pause menu and prompts are now scaled instead of scissored.
 * You can now change controls midgame.
 * Added custom categories for custom enemies. Set donotcategoriseenemyfolders to true to disable enemies being categorised by folders.
+* Saving the game via pause menu no longer quits to menu.
 
 ### 🐛 Bug Fixes
 
@@ -216,6 +217,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Fixed an issue where the rightclick menu was unable to interact with.
 * Fixed the rising water graphic glitch.
 * Fixed a confusing mechanic where autodelete-able enemies would instantly vanish when a player died in multiplayer splitscreen.
+* Fixed an issue where game saving would sometimes be counted as successful, even if it doesn't save successfully.
 
 ### ✨ Improvements
 

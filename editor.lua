@@ -945,6 +945,10 @@ function editor_gui_interaction_enabled(element)
 	if not editormode then
 		return false
 	end
+
+	if not editormenuopen or editorMenuAnimation then
+		return false
+	end
 	
 	if editor_is_rightclick_element(element) then
 		return true
@@ -961,7 +965,7 @@ function editor_gui_interaction_enabled(element)
 		end
 	end
 	
-	return editormenuopen and not editorMenuAnimation
+	return true
 end
 
 function editor_update(dt)
@@ -3777,6 +3781,24 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 			--guielements["confirmcancel"]:draw()
 			editor_confirm_end(confirmprogress)
 		end
+
+		for _, element in pairs(guielements) do
+			if element.active and element.type == "dropdown" and element:getlistprogress() > 0 then
+				element:draw()
+			end
+		end
+		if animationguilines then
+			for _, line in pairs(animationguilines) do
+				for _, action in pairs(line) do
+					for _, item in pairs(action.elements) do
+						local element = item.gui
+						if element and element.active and element.type == "dropdown" and element:getlistprogress() > 0 then
+							element:draw()
+						end
+					end
+				end
+			end
+		end
 	end
 end
 
@@ -5356,6 +5378,10 @@ function updatelatesttiles()
 end
 
 function editorclose()
+	local dropdown = guielement.getopendropdown()
+	if dropdown then
+		dropdown:close()
+	end
 	editor_set_menu_view(false)
 	if not editorMenuAnimation then
 		for i, v in pairs(guielements) do

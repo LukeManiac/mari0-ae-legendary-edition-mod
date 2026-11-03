@@ -5,6 +5,7 @@ guielement = class:new()
 --picked at the moment the animation starts. Animations are time based (love.timer) so they
 --keep working even if an element is only drawn and never updated.
 local GUI_ANIM_TIME = 0.25
+local opened_dropdown = false
 
 local function gui_anim_start(from, to, curve_in, curve_out)
 	--default to ease-out (curve_in=true, curve_out=false)
@@ -280,6 +281,15 @@ function guielement:update(dt)
 			end
 		elseif self.type == "dropdown" then
 			self:getlistprogress() --keeps the open/close animation (and priority) up to date
+			if self.opened_y and not self.extended and self.listvalue == 0 then
+				self.y = self.opened_y
+				self.opened_y = nil
+				self.opened_dropup = nil
+				self:updatePos()
+			end
+			if opened_dropdown == self and not self.extended and self.listvalue == 0 then
+				opened_dropdown = false
+			end
 			if self.keycursor and self.keymouse then
 				local mx, my = love.mouse.getPosition()
 				if mx ~= self.keymouse[1] or my ~= self.keymouse[2] then
@@ -319,6 +329,18 @@ local function drawdropdownentry(entry, x, y, maxchars)
 		entry = entry:sub(1, maxchars)
 	end
 	properprint(entry, x*scale, y*scale)
+end
+
+local function setdropdownentrycolor(self, entry)
+	if self.coloredtext then
+		if entry == "black" then
+			love.graphics.setColor(80, 80, 80)
+		else
+			love.graphics.setColor(textcolors[entry])
+		end
+	else
+		love.graphics.setColor(255, 255, 255)
+	end
 end
 
 function guielement:draw(a, offx, offy)
@@ -508,7 +530,7 @@ function guielement:draw(a, offx, offy)
 					clipx, clipy, cliph = self.x*scale, (self.y-listheight*p)*scale, listheight*p*scale
 					slide = (1-p)*listheight*scale
 				else
-					clipx, clipy, cliph = self.x*scale, (self.y+11)*scale, listheight*p*scale
+					clipx, clipy, cliph = self.x*scale, self.listtop*scale, listheight*p*scale
 					slide = -(1-p)*listheight*scale
 				end
 				oldx, oldy, oldw, oldh = love.graphics.getScissor()
@@ -538,6 +560,11 @@ function guielement:draw(a, offx, offy)
 						love.graphics.setColor(0, 0, 0)
 					end
 					local entry = self.entries[i]
+					if high == i then
+						love.graphics.setColor(0, 0, 0)
+					else
+						setdropdownentrycolor(self, entry)
+					end
 					if self.displayentries then
 						entry = self.displayentries[i]
 					end
@@ -557,40 +584,32 @@ function guielement:draw(a, offx, offy)
 					if high ~= i then
 						love.graphics.setColor(0, 0, 0)
 						love.graphics.rectangle("fill", (self.x+1)*scale, ((self.y+2+i*10)-(11+(10*#self.entries)))*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
-						love.graphics.setColor(255, 255, 255)
 						local s = self.entries[i]
+						setdropdownentrycolor(self, s)
 						if self.displayentries then s = self.displayentries[i] end
 						drawdropdownentry(s, self.x+1, (self.y+3+10*i)-(11+(10*#self.entries)), self.width+1)
 					else
-						love.graphics.setColor(0, 0, 0)
 						local s = self.entries[i]
+						love.graphics.setColor(0, 0, 0)
 						if self.displayentries then s = self.displayentries[i] end
 						drawdropdownentry(s, self.x+1, (self.y+3+10*i)-(11+(10*#self.entries)), self.width+1)
 					end
 				end
 			else
-				love.graphics.rectangle("fill", self.x*scale, (self.y+11)*scale, (13+self.width*8)*scale, (10*#self.entries)*scale, listr)
+				love.graphics.rectangle("fill", self.x*scale, self.listtop*scale, (13+self.width*8)*scale, (10*#self.entries)*scale, listr)
 				
 				for i = 1, #self.entries do
+					local s = self.entries[i]
 					if high ~= i then
 						love.graphics.setColor(0, 0, 0)
-						love.graphics.rectangle("fill", (self.x+1)*scale, (self.y+1+i*10)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
-						love.graphics.setColor(255, 255, 255)
-						local s = self.entries[i]
-						if self.coloredtext then
-							if s == "black" then
-								love.graphics.setColor(80,80,80)
-							else
-								love.graphics.setColor(textcolors[s])
-							end
-						end
+						love.graphics.rectangle("fill", (self.x+1)*scale, (self.listtop+(i-1)*10)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
+						setdropdownentrycolor(self, s)
 						if self.displayentries then s = self.displayentries[i] end
-						drawdropdownentry(s, self.x+1, self.y+2+10*i, self.width+1)
+						drawdropdownentry(s, self.x+1, self.listtop+1+(i-1)*10, self.width+1)
 					else
 						love.graphics.setColor(0, 0, 0)
-						local s = self.entries[i]
 						if self.displayentries then s = self.displayentries[i] end
-						drawdropdownentry(s, self.x+1, self.y+2+10*i, self.width+1)
+						drawdropdownentry(s, self.x+1, self.listtop+1+(i-1)*10, self.width+1)
 					end
 				end
 			end
@@ -999,10 +1018,7 @@ function guielement:click(x, y, button)
 				
 				if button ~= "wu" and button ~= "wd" then
 					local high = self:inhighlight(x, y)
-					self.extended = false
-					if self.scrollbar then
-						self.scrollbar.active = false
-					end
+					self:close()
 					
 					if high then
 						if high ~= 0 then
@@ -1472,7 +1488,8 @@ end
 
 --true when the mouse is over the element, or when it is made to look hovered (forcehover, e.g. selected with the keyboard)
 function guielement:hovered()
-	if editormode and not self.alwaysinteractable and not editor_gui_interaction_enabled(self) then
+	if editormode and not self.alwaysinteractable and
+		(not editor_gui_interaction_enabled(self) or (opened_dropdown and opened_dropdown.active and opened_dropdown ~= self and opened_dropdown.extended)) then
 		return false
 	end
 	if self:inhighlight(love.mouse.getPosition()) then
@@ -1486,8 +1503,25 @@ function guielement:open(keyboard)
 	if self.type ~= "dropdown" then
 		return
 	end
+	if self.opened_y then
+		self.y = self.opened_y
+		self.opened_y = nil
+		self.opened_dropup = nil
+	end
+	if opened_dropdown and opened_dropdown ~= self then
+		opened_dropdown:close()
+	end
+	self:updatePos()
+	self.opened_y = self.y
+	self.opened_dropup = self.dropup
+	local screenheight = height*16
+	local targetbottom = screenheight-math.floor(screenheight/4)-1
+	local listbottom = self.dropup and self.y+11 or self.y+11+10*#self.entries
+	local offset = math.min(math.max(0, listbottom-targetbottom), self.y)
+	self.y = self.y-offset
 	self:updatePos()
 	self.extended = true
+	opened_dropdown = self
 	self.priority = true
 	if self.scrollbar then
 		self.scrollbar.active = true
@@ -1508,6 +1542,9 @@ function guielement:close()
 		return
 	end
 	self.extended = false
+	if opened_dropdown == self then
+		opened_dropdown = false
+	end
 	self.keycursor = nil
 	if self.scrollbar then
 		self.scrollbar.active = false
@@ -1546,10 +1583,8 @@ end
 
 --returns the dropdown that is currently open (or false), so other code can tell when keys belong to it
 function guielement.getopendropdown()
-	for i, v in pairs(guielements) do
-		if v.type == "dropdown" and v.active and v.extended then
-			return v
-		end
+	if opened_dropdown and opened_dropdown.active and opened_dropdown.extended then
+		return opened_dropdown
 	end
 	return false
 end
@@ -1618,7 +1653,8 @@ function guielement:smoothcursor(x, y)
 end
 
 function guielement:inhighlight(x, y)
-	if editormode and not self.alwaysinteractable and not editor_gui_interaction_enabled(self) then
+	if editormode and not self.alwaysinteractable and
+		(not editor_gui_interaction_enabled(self) or (opened_dropdown and opened_dropdown.active and opened_dropdown ~= self and opened_dropdown.extended)) then
 		return false
 	end
 	if (self.controlbindpage or (self.controlspopup and gamestate == "game")) and optionscontrols_transformmouse then
@@ -1661,9 +1697,13 @@ function guielement:inhighlight(x, y)
 					return i
 				end
 			else
-				if x >= self.x*scale and x < (self.x+13+self.width*8)*scale and y >= self.y*scale and y < (self.y+10*#self.entries+11)*scale then
-					--get which entry
-					return math.max(0, math.floor((y-(self.y+1)*scale) / (10*scale)))
+				if x >= self.x*scale and x < (self.x+13+self.width*8)*scale
+					and y >= math.min(self.y, self.listtop)*scale
+					and y < math.max(self.y+11, self.listtop+10*#self.entries)*scale then
+					if y < self.listtop*scale then
+						return 0
+					end
+					return math.floor((y-self.listtop*scale)/(10*scale))+1
 				end
 			end
 		end
@@ -1710,7 +1750,9 @@ function guielement:updatePos()
 	if self.type == "dropdown" then
 		local listheight = 10*#self.entries
 		local screenheight = height*16
-		self.dropup = self.y+11+listheight > screenheight and self.y >= listheight
+		local bottommargin = math.floor(screenheight/4)
+		local targetbottom = screenheight-bottommargin-1
+		self.dropup = self.opened_dropup or (self.y+11+listheight > targetbottom and self.y >= listheight)
 		self.listtop = self.dropup and self.y-listheight or self.y+11
 		self.scrolltop = math.max(0, self.listtop)
 		local listbottom = math.min(screenheight, self.listtop+listheight)
