@@ -40,6 +40,7 @@ local editorRCAnimation
 local editorRCCanvas
 local editorRCCanvasWidth, editorRCCanvasHeight
 local editorRCOpen = false
+local editorRCClosingDropdown
 local editorRCAnchorX, editorRCAnchorY = 0, 0
 local editor_rc_progress
 local editor_rc_track
@@ -90,6 +91,7 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	editorRCCanvas = nil
 	editorRCCanvasWidth, editorRCCanvasHeight = nil, nil
 	editorRCOpen = false
+	editorRCClosingDropdown = nil
 	editorConfirmAnimation = nil
 	editorConfirmCanvas = nil
 	editorConfirmCanvasWidth, editorConfirmCanvasHeight = nil, nil
@@ -845,6 +847,7 @@ editor_rc_track = function()
 	if editorRCOpen and not open then
 		local dropdown = guielement.getopendropdown()
 		if dropdown then
+			editorRCClosingDropdown = dropdown
 			dropdown:close()
 		end
 	end
@@ -858,6 +861,7 @@ editor_rc_track = function()
 			curve_in = open
 		}
 		if open then
+			editorRCClosingDropdown = nil
 			editorRCAnchorX, editorRCAnchorY = love.mouse.getPosition()
 		end
 		editorRCOpen = open
@@ -1688,6 +1692,13 @@ local function editor_draw_dropdown_overlays()
 	for _, element in pairs(guielements) do
 		if element.active and element.type == "dropdown" and element:getlistprogress() > 0 then
 			element:draw()
+		end
+	end
+	if rightclickobjects then
+		for _, element in ipairs(rightclickobjects) do
+			if element and element.active and element.type == "dropdown" and element:getlistprogress() > 0 then
+				element:draw()
+			end
 		end
 	end
 	if animationguilines then
@@ -3818,7 +3829,6 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 			editor_confirm_end(confirmprogress)
 		end
 
-		editor_draw_dropdown_overlays()
 	end
 end
 
@@ -4025,10 +4035,14 @@ function editor_draw()
 	if editorRCAnimation and not rightclickmenuopen and not editormenuopen then
 		editor_draw_cursor_preview((1 - editor_rc_progress()) * cursorAlpha)
 	end
-	local rightclickClosing = editorRCAnimation and not rightclickmenuopen and not editormenuopen
 	editor_rc_draw_closing()
-	if rightclickClosing then
-		editor_draw_dropdown_overlays()
+	editor_draw_dropdown_overlays()
+	if editorRCClosingDropdown then
+		if editorRCClosingDropdown:getlistprogress() > 0 then
+			editorRCClosingDropdown:draw()
+		else
+			editorRCClosingDropdown = nil
+		end
 	end
 end
 
