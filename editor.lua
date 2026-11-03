@@ -1684,6 +1684,26 @@ function editor_update(dt)
 	end
 end
 
+local function editor_draw_dropdown_overlays()
+	for _, element in pairs(guielements) do
+		if element.active and element.type == "dropdown" and element:getlistprogress() > 0 then
+			element:draw()
+		end
+	end
+	if animationguilines then
+		for _, line in pairs(animationguilines) do
+			for _, action in pairs(line) do
+				for _, item in pairs(action.elements) do
+					local element = item.gui
+					if element and element.active and element.type == "dropdown" and element:getlistprogress() > 0 then
+						element:draw()
+					end
+				end
+			end
+		end
+	end
+end
+
 local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, cursorAlpha)
 	cursorAlpha = cursorAlpha or 1
 	love.graphics.setColor(255, 255, 255)
@@ -3798,23 +3818,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 			editor_confirm_end(confirmprogress)
 		end
 
-		for _, element in pairs(guielements) do
-			if element.active and element.type == "dropdown" and element:getlistprogress() > 0 then
-				element:draw()
-			end
-		end
-		if animationguilines then
-			for _, line in pairs(animationguilines) do
-				for _, action in pairs(line) do
-					for _, item in pairs(action.elements) do
-						local element = item.gui
-						if element and element.active and element.type == "dropdown" and element:getlistprogress() > 0 then
-							element:draw()
-						end
-					end
-				end
-			end
-		end
+		editor_draw_dropdown_overlays()
 	end
 end
 
@@ -4021,7 +4025,11 @@ function editor_draw()
 	if editorRCAnimation and not rightclickmenuopen and not editormenuopen then
 		editor_draw_cursor_preview((1 - editor_rc_progress()) * cursorAlpha)
 	end
+	local rightclickClosing = editorRCAnimation and not rightclickmenuopen and not editormenuopen
 	editor_rc_draw_closing()
+	if rightclickClosing then
+		editor_draw_dropdown_overlays()
+	end
 end
 
 --TABS
