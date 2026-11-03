@@ -493,24 +493,28 @@ function mario:update(dt)
 			self:setquad()
 		end
 	end
-	if (self.size == 6 or self.size == 9 or self.size == 10) and self.animationstate == "running" then --be able to fly when runing for whatever seconds
-		if math.abs(self.speedx) >= 8.9 then
-			self.planetimer = self.planetimer + dt
-			if self.planetimer > 1.1 then
-				if self.playraccoonplanesound and self.size ~= 10 then
-					playsound(raccoonplanesound)
-					self.playraccoonplanesound = false
+	if self.size == 6 or self.size == 9 or self.size == 10 then --be able to fly when runing for whatever seconds
+		if self.animationstate == "running" then
+			if math.abs(self.speedx) >= 8.9 then
+				self.planetimer = self.planetimer + dt
+				if self.planetimer > 1.1 then
+					if self.playraccoonplanesound and self.size ~= 10 then
+						playsound(raccoonplanesound)
+						self.playraccoonplanesound = false
+					end
+					self.planemode = true
 				end
-				self.planemode = true
 			end
+		else
+			if self.animationstate ~= "jumping" and self.raccoonfly == false then
+				raccoonplanesound:stop()
+				self.planemode = false
+			end
+			self.playraccoonplanesound = true
+			self.planetimer = math.max(0, self.planetimer - dt * 1.5)
 		end
 	else
-		if self.animationstate ~= "jumping" and self.raccoonfly == false then
-			raccoonplanesound:stop()
-			self.planemode = false
-		end
-		self.playraccoonplanesound = true
-		self.planetimer = math.max(0, self.planetimer - dt * 1.5)
+		self.planetimer = 0
 	end
 	
 	if self.raccoonfly then

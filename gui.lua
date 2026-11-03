@@ -447,6 +447,7 @@ function guielement:draw(a, offx, offy)
 		local p = self:getlistprogress()
 		local ext = self.extended or p > 0
 		local listheight = 10*#self.entries
+		local listtop = self.y+11-(self.listoffsety or 0)*p
 		local listr = math.min((3+self.width*8)*scale, 11*scale) * 0.2 --same corner radius as the header
 		
 		if ext and not self.cutoff then
@@ -520,36 +521,39 @@ function guielement:draw(a, offx, offy)
 			local oldx, oldy, oldw, oldh
 			if animating then
 				local clipx, clipy, clipw, cliph, slide
+				local listbottomlimit = height*16-math.floor(height*16/4)-1
 				clipw = ((self.cutoff and 21 or 14)+self.width*8)*scale
 				if self.cutoff then
-					clipx, clipy, cliph = self.x*scale, self.scrolltop*scale, self.scrollheight*p*scale
-					slide = -(1-p)*self.scrollheight*scale
+					clipx, clipy = self.x*scale, math.max(0, listtop)*scale
+					cliph = math.min(self.scrollheight, math.max(0, listbottomlimit-math.max(0, listtop)))*p*scale
 				elseif self.dropup then
 					clipx, clipy, cliph = self.x*scale, (self.y-listheight*p)*scale, listheight*p*scale
 					slide = (1-p)*listheight*scale
 				else
-					clipx, clipy, cliph = self.x*scale, self.listtop*scale, listheight*p*scale
-					slide = -(1-p)*listheight*scale
+					clipx, clipy, cliph = self.x*scale, listtop*scale, listheight*p*scale
 				end
 				oldx, oldy, oldw, oldh = love.graphics.getScissor()
 				love.graphics.intersectScissor(math.floor(clipx), math.floor(clipy), math.ceil(clipw), math.max(0, math.ceil(cliph)))
 				love.graphics.push()
-				love.graphics.translate(0, slide)
+				if slide then
+					love.graphics.translate(0, slide)
+				end
 			end
 			
 			if self.cutoff then --have a scrollbar
+				local listbottomlimit = height*16-math.floor(height*16/4)-1
 				local oldx, oldy, oldw, oldh = love.graphics.getScissor()
 				love.graphics.intersectScissor(
 					math.floor(self.x*scale),
-					math.floor(self.scrolltop*scale),
+					math.floor(math.max(0, listtop)*scale),
 					math.ceil((21+self.width*8)*scale),
-					math.ceil(self.scrollheight*scale)
+					math.ceil(math.min(self.scrollheight, math.max(0, listbottomlimit-math.max(0, listtop)))*scale)
 				)
 				love.graphics.setColor(127, 127, 127)
-				love.graphics.rectangle("fill", self.x*scale, self.listtop*scale, (13+self.width*8)*scale, #self.entries*10*scale, listr)
+				love.graphics.rectangle("fill", self.x*scale, listtop*scale, (13+self.width*8)*scale, #self.entries*10*scale, listr)
 
 				for i = 1, #self.entries do
-					local rowy = self.listtop+(i-1)*10-self.scroll
+					local rowy = listtop+(i-1)*10-self.scroll
 					if high ~= i then
 						love.graphics.setColor(0, 0, 0)
 						love.graphics.rectangle("fill", (self.x+1)*scale, (rowy+1)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
@@ -594,20 +598,20 @@ function guielement:draw(a, offx, offy)
 					end
 				end
 			else
-				love.graphics.rectangle("fill", self.x*scale, self.listtop*scale, (13+self.width*8)*scale, (10*#self.entries)*scale, listr)
+				love.graphics.rectangle("fill", self.x*scale, listtop*scale, (13+self.width*8)*scale, (10*#self.entries)*scale, listr)
 				
 				for i = 1, #self.entries do
 					local s = self.entries[i]
 					if high ~= i then
 						love.graphics.setColor(0, 0, 0)
-						love.graphics.rectangle("fill", (self.x+1)*scale, (self.listtop+(i-1)*10)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
+						love.graphics.rectangle("fill", (self.x+1)*scale, (listtop+(i-1)*10)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
 						setdropdownentrycolor(self, s)
 						if self.displayentries then s = self.displayentries[i] end
-						drawdropdownentry(s, self.x+1, self.listtop+1+(i-1)*10, self.width+1)
+						drawdropdownentry(s, self.x+1, listtop+1+(i-1)*10, self.width+1)
 					else
 						love.graphics.setColor(0, 0, 0)
 						if self.displayentries then s = self.displayentries[i] end
-						drawdropdownentry(s, self.x+1, self.listtop+1+(i-1)*10, self.width+1)
+						drawdropdownentry(s, self.x+1, listtop+1+(i-1)*10, self.width+1)
 					end
 				end
 			end
@@ -1662,15 +1666,19 @@ function guielement:inhighlight(x, y)
 			return true
 		end
 	elseif self.type == "dropdown" then
+		local listtop = self.y+11-(self.listoffsety or 0)*self:getlistprogress()
 		if self.extended == false then
 			if x >= self.x*scale and x < (self.x+13+self.width*8)*scale and y >= self.y*scale and y < (self.y+11)*scale then
 				return true
 			end
 		else
 			if self.cutoff then
+				local cliptop = math.max(0, listtop)
+				local listbottomlimit = height*16-math.floor(height*16/4)-1
+				local clipheight = math.min(self.scrollheight, math.max(0, listbottomlimit-cliptop))
 				if x >= self.x*scale and x < (self.x+13+self.width*8)*scale
-					and y >= self.scrolltop*scale and y < (self.scrolltop+self.scrollheight)*scale then
-					local entry = math.floor((y/scale-self.listtop+self.scroll)/10)+1
+					and y >= cliptop*scale and y < (cliptop+clipheight)*scale then
+					local entry = math.floor((y/scale-listtop+self.scroll)/10)+1
 					if entry >= 1 and entry <= #self.entries then
 						return entry
 					end
@@ -1688,12 +1696,12 @@ function guielement:inhighlight(x, y)
 				end
 			else
 				if x >= self.x*scale and x < (self.x+13+self.width*8)*scale
-					and y >= math.min(self.y, self.listtop)*scale
-					and y < math.max(self.y+11, self.listtop+10*#self.entries)*scale then
-					if y < self.listtop*scale then
+					and y >= math.min(self.y, listtop)*scale
+					and y < math.max(self.y+11, listtop+10*#self.entries)*scale then
+					if y < listtop*scale then
 						return 0
 					end
-					return math.floor((y-self.listtop*scale)/(10*scale))+1
+					return math.floor((y-listtop*scale)/(10*scale))+1
 				end
 			end
 		end
@@ -1740,10 +1748,11 @@ function guielement:updatePos()
 	if self.type == "dropdown" then
 		local listheight = 10*#self.entries
 		local screenheight = height*16
+		local listbottomlimit = screenheight-math.floor(screenheight/4)-1
 		self.dropup = false
 		self.listtop = self.y+11-(self.listoffsety or 0)
 		self.scrolltop = math.max(0, self.listtop)
-		local listbottom = math.min(screenheight, self.listtop+listheight)
+		local listbottom = math.min(listbottomlimit, self.listtop+listheight)
 		self.scrollheight = math.max(0, listbottom-self.scrolltop)
 		self.cutoff = self.scrollheight < listheight
 		if self.cutoff then
