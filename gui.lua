@@ -542,15 +542,16 @@ function guielement:draw(a, offx, offy)
 			
 			if self.cutoff then --have a scrollbar
 				local listbottomlimit = height*16-math.floor(height*16/4)-1
+				local visibleheight = math.min(self.scrollheight, math.max(0, listbottomlimit-math.max(0, listtop)))
 				local oldx, oldy, oldw, oldh = love.graphics.getScissor()
 				love.graphics.intersectScissor(
 					math.floor(self.x*scale),
 					math.floor(math.max(0, listtop)*scale),
 					math.ceil((21+self.width*8)*scale),
-					math.ceil(math.min(self.scrollheight, math.max(0, listbottomlimit-math.max(0, listtop)))*scale)
+					math.ceil(visibleheight*scale)
 				)
 				love.graphics.setColor(127, 127, 127)
-				love.graphics.rectangle("fill", self.x*scale, listtop*scale, (13+self.width*8)*scale, #self.entries*10*scale, listr)
+				love.graphics.rectangle("fill", self.x*scale, listtop*scale, (13+self.width*8)*scale, visibleheight*scale, listr)
 
 				for i = 1, #self.entries do
 					local rowy = listtop+(i-1)*10-self.scroll
