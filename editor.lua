@@ -842,6 +842,12 @@ end
 
 editor_rc_track = function()
 	local open = rightclickmenuopen and customrcopen ~= "link"
+	if editorRCOpen and not open then
+		local dropdown = guielement.getopendropdown()
+		if dropdown then
+			dropdown:close()
+		end
+	end
 	if open ~= editorRCOpen then
 		local progress = editor_rc_progress()
 		editorRCAnimation = {
