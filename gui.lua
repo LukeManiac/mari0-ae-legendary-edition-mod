@@ -1466,7 +1466,8 @@ function guielement:hovered()
 		(not editor_gui_interaction_enabled(self) or (dropdown_open and opened_dropdown ~= self)) and not hover_only then
 		return false
 	end
-	if self:inhighlight(love.mouse.getPosition(), hover_only) then
+	local x, y = love.mouse.getPosition()
+	if self:inhighlight(x, y, hover_only) then
 		return true
 	end
 	return self.forcehover and not self.nohover
