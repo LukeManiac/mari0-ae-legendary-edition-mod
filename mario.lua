@@ -486,7 +486,7 @@ function mario:update(dt)
 			self.float = false
 			self.ignoregravity = false
 
-			if self.size == 11 then
+			if self.size ~= 10 then
 				if self.characterdata.fallframes > 0 and self.falling and self.speedy > 0 then
 					self.animationstate = "falling"
 				else
