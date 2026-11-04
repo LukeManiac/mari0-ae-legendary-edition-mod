@@ -3711,6 +3711,7 @@ function serialise(value)
 end
 
 function randomitem(t)
+	print(t)
 	return t[math.random(#t)]
 end
 
