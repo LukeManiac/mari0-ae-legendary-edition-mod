@@ -470,7 +470,7 @@ function enemy:init(x, y, t, a, properties)
 		self.bouncetimer = 0
 		if self.bouncedelays then
 			if self.bouncedelaysrandoms then
-				self.bouncedelay = randomitem(self.bouncedelaysrandoms)
+				self.bouncedelay = randomitem(self.bouncedelays)
 			else
 				self.bouncetimerstage = 1
 				self.bouncedelay = self.bouncedelays[self.bouncetimerstage]

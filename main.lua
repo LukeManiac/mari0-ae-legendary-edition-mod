@@ -3711,11 +3711,7 @@ function serialise(value)
 end
 
 function randomitem(t)
-	if type(t) == "table" then
-		return t[math.random(#t)]
-	else
-		return t
-	end
+	return t[math.random(#t)]
 end
 
 function print(...)
