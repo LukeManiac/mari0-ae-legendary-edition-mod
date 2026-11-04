@@ -481,16 +481,19 @@ function mario:update(dt)
 		self.animationstate = "floating"
 		self:setquad()
 		self.floattimer = self.floattimer + dt
-		if self.size ~= 11 and self.floattimer > 0.25 then
+		if (self.size ~= 11 and self.floattimer > 0.25) or (self.size == 11 and self.floattimer > 0.3) then
 			self.floattimer = 0
 			self.float = false
 			self.ignoregravity = false
-			if self.characterdata.fallframes > 0 and self.falling and self.speedy > 0 then
-				self.animationstate = "falling"
-			else
-				self.animationstate = "jumping"
+
+			if self.size == 11 then
+				if self.characterdata.fallframes > 0 and self.falling and self.speedy > 0 then
+					self.animationstate = "falling"
+				else
+					self.animationstate = "jumping"
+				end
+				self:setquad()
 			end
-			self:setquad()
 		end
 	end
 	if self.size == 6 or self.size == 9 or self.size == 10 then --be able to fly when runing for whatever seconds
