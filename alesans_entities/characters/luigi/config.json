@@ -35,7 +35,7 @@
 	"iceflowercolor": [[127,217,255], [0,168,0], [252,152,58]],
 	"tanookisuitcolor": [[200,76,12], [0,0,0], [252,152,58]],
 	"superballcolor": [[160,160,100], [100,100,50], [230,230,180]],
-	
+
 	"walkacceleration": 6,
 	"runacceleration": 12,
 	"minspeed": 0.1,
