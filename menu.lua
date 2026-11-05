@@ -3414,7 +3414,9 @@ function menu_keypressed(key, unicode)
 			if players > 1 then
 				players = players - 1
 			elseif players == 1 then
-				onlinemenu_load()
+				if net_try_online_menu() then
+					onlinemenu_load()
+				end
 			end
 		elseif (key == "right" or key == "d") then
 			players = players + 1

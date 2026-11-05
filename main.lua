@@ -1095,7 +1095,6 @@ function love.load()
 
 	intro_load()
 	disablecheats()
-	net_start_local_relay()
 end
 
 function love.update(dt)

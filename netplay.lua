@@ -30,6 +30,7 @@ local local_relay_start_attempted = false
 local local_relay_heartbeat_timer = 0
 local local_relay_start_timer = 0
 local local_relay_spawned = false
+local local_relay_thread
 
 local spamtimer = 0 --stop "funny" kids from spamming
 local spamtime = 0.2
@@ -70,42 +71,10 @@ local function current_process_id()
 	end
 end
 
-local function find_relay_python()
-	local command
-	if love.system.getOS() == "Windows" then
-		command = "where.exe pythonw.exe 2>NUL"
-	else
-		command = "command -v python3 2>/dev/null"
-	end
-
-	local pipe = io.popen(command, "r")
-	if not pipe then
-		return nil
-	end
-	local executable = pipe:read("*l")
-	pipe:close()
-	if executable and executable ~= "" then
-		return executable
-	end
-end
-
-local function shell_quote(value)
-	if love.system.getOS() == "Windows" then
-		return '"' .. value:gsub('"', '""') .. '"'
-	end
-	return "'" .. value:gsub("'", "'\\''") .. "'"
-end
-
 local function start_local_relay()
 	local process_id = current_process_id()
 	if not process_id then
 		notice.new("Could not identify this game process to start the relay", notice.red, 6)
-		return false
-	end
-
-	local executable = find_relay_python()
-	if not executable then
-		notice.new("Local relay needs Python 3.10 or newer", notice.red, 6)
 		return false
 	end
 
@@ -126,45 +95,53 @@ local function start_local_relay()
 	end
 
 	local script_path = love.filesystem.getSaveDirectory() .. "/relay/server.py"
-	local command
-	if love.system.getOS() == "Windows" then
-		command = "start \"\" /B " .. shell_quote(executable) .. " " .. shell_quote(script_path)
-			.. " --host 127.0.0.1 --port " .. tostring(relay_port)
-			.. " --managed --owner-pid " .. process_id .. " >NUL 2>&1"
-	else
-		command = shell_quote(executable) .. " " .. shell_quote(script_path)
-			.. " --host 127.0.0.1 --port " .. tostring(relay_port)
-			.. " --managed --owner-pid " .. process_id .. " >/dev/null 2>&1 &"
-	end
-
-	local launched, _, code = os.execute(command)
-	if launched ~= true and launched ~= 0 and code ~= 0 then
-		notice.new("Could not start the local relay", notice.red, 6)
-		return false
-	end
-	local_relay_spawned = true
+	local_relay_thread = love.thread.newThread("relaythread.lua")
+	local_relay_thread:start()
+	love.thread.getChannel("relayin"):push({
+		osname = love.system.getOS(),
+		script_path = script_path,
+		port = relay_port,
+		process_id = process_id,
+	})
 	return true
 end
 
-function net_start_local_relay()
-	if not is_local_relay() then
-		return
+local conn_state = "idle" --idle, connecting or connected
+local conn_id = 0
+local conn_in
+local conn_out
+local conn_start = 0
+local conn_timeout = 30 --seconds
+
+local function format_connect_time(seconds)
+	local text = string.format("%.3f", seconds)
+	text = text:gsub("%.?0+$", "")
+	return text .. "s"
+end
+
+local function conn_stop()
+	conn_state = "idle"
+	if conn_in then
+		conn_in:push("stop")
+	end
+end
+
+local function open_local_relay_monitor()
+	if local_relay_socket then
+		return true
 	end
 
 	local process_id = current_process_id()
 	if not process_id then
 		notice.new("Could not identify this game process to start the relay", notice.red, 6)
-		return
-	end
-	if relay_host == "localhost" then
-		relay_host = "127.0.0.1"
+		return false
 	end
 
 	local_relay_instance_id = process_id .. "-" .. tostring(math.random(2147483647))
 	local_relay_socket = socket.udp()
 	if not local_relay_socket then
 		notice.new("Could not create the relay monitor socket", notice.red, 6)
-		return
+		return false
 	end
 	local_relay_socket:settimeout(0)
 	local bound, binderr = local_relay_socket:setsockname("0.0.0.0", 0)
@@ -172,54 +149,106 @@ function net_start_local_relay()
 		local_relay_socket:close()
 		local_relay_socket = nil
 		notice.new("Could not open the relay monitor socket: " .. tostring(binderr), notice.red, 6)
-		return
+		return false
 	end
 
-	local_relay_start_pending = true
-	local_relay_start_attempted = false
 	local_relay_heartbeat_timer = 0
-	local_relay_start_timer = 0
-	local_relay_socket:sendto("RELAY~PING", relay_host, relay_port)
 	local_relay_socket:sendto(
 		"RELAY~INSTANCE~" .. local_relay_instance_id .. "~HEARTBEAT",
 		relay_host,
 		relay_port
 	)
+	return true
+end
+
+--returns true if the online menu may open
+function net_try_online_menu()
+	if conn_state == "connected" then
+		return true
+	end
+
+	if conn_state == "connecting" then
+		notice.new("Please wait for the\ngame to try\nconnecting to the\nserver.", notice.red, 4)
+		return false
+	end
+
+	if relay_host == "localhost" then
+		relay_host = "127.0.0.1"
+	end
+	if is_local_relay() and not open_local_relay_monitor() then
+		return false
+	end
+
+	conn_id = conn_id + 1
+	conn_in = love.thread.getChannel("connin" .. conn_id)
+	conn_out = love.thread.getChannel("connout" .. conn_id)
+	conn_start = love.timer.getTime()
+	conn_state = "connecting"
+	love.thread.newThread("connectthread.lua"):start(conn_id, relay_host, relay_port, is_local_relay())
+
+	notice.new("Connecting to\nthe internet...")
+	return false
 end
 
 function net_update_local_relay(dt)
-	if not local_relay_socket then
+	if local_relay_socket then
+		local_relay_heartbeat_timer = local_relay_heartbeat_timer + dt
+		if local_relay_heartbeat_timer >= 3 then
+			local_relay_heartbeat_timer = local_relay_heartbeat_timer - 3
+			local_relay_socket:sendto(
+				"RELAY~INSTANCE~" .. local_relay_instance_id .. "~HEARTBEAT",
+				relay_host,
+				relay_port
+			)
+		end
+	end
+
+	local spawnresult = love.thread.getChannel("relayout"):pop()
+	if spawnresult then
+		if spawnresult[1] == "ok" then
+			local_relay_spawned = true
+		else
+			local_relay_start_attempted = false
+			notice.new(spawnresult[2], notice.red, 6)
+			conn_stop()
+		end
+	end
+
+	if conn_state ~= "connecting" then
 		return
 	end
 
-	local data = local_relay_socket:receivefrom()
-	if data == "RELAY~PONG" then
-		local_relay_start_pending = false
-	end
-
-	local_relay_start_timer = local_relay_start_timer + dt
-	if local_relay_start_pending and not local_relay_start_attempted and local_relay_start_timer >= 0.5 then
-		local_relay_start_attempted = true
-		if not start_local_relay() then
-			local_relay_start_pending = false
+	local message = conn_out:pop()
+	while message do
+		if message[1] == "ok" then
+			conn_state = "connected"
+			notice.new("Connection successful! " .. format_connect_time(message[2]), {0, 255, 0})
+			return
+		elseif message[1] == "spawn" then
+			if not local_relay_start_attempted then
+				local_relay_start_attempted = true
+				if not start_local_relay() then
+					local_relay_start_attempted = false
+					conn_stop()
+					return
+				end
+			end
+		elseif message[1] == "timeout" then
+			conn_stop()
+			notice.new("Connection failed.\nTry opening the\nonline menu again.", notice.red, 5)
+			return
 		end
-	elseif local_relay_spawned and local_relay_start_timer >= 10 and local_relay_start_pending then
-		local_relay_start_pending = false
-		notice.new("Local relay did not respond. Check Python and relay settings.", notice.red, 6)
+		message = conn_out:pop()
 	end
 
-	local_relay_heartbeat_timer = local_relay_heartbeat_timer + dt
-	if local_relay_heartbeat_timer >= 3 then
-		local_relay_heartbeat_timer = local_relay_heartbeat_timer - 3
-		local_relay_socket:sendto(
-			"RELAY~INSTANCE~" .. local_relay_instance_id .. "~HEARTBEAT",
-			relay_host,
-			relay_port
-		)
+	if love.timer.getTime() - conn_start >= conn_timeout then
+		conn_stop()
+		notice.new("Connection failed.\nTry opening the\nonline menu again.", notice.red, 5)
 	end
 end
 
 function net_stop_local_relay()
+	conn_stop()
 	if not local_relay_socket then
 		return
 	end
@@ -231,6 +260,8 @@ function net_stop_local_relay()
 	local_relay_socket = nil
 	local_relay_instance_id = nil
 	local_relay_start_pending = false
+	local_relay_start_attempted = false
+	local_relay_spawned = false
 end
 
 local function relay_error_text(code)
