@@ -106,6 +106,7 @@ local function start_local_relay()
 		script_path = script_path,
 		port = relay_port,
 		process_id = process_id,
+		bundled_dir = love.filesystem.getSourceBaseDirectory(),
 	})
 	return true
 end
