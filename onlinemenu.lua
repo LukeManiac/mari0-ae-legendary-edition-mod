@@ -80,7 +80,7 @@ function onlinemenu_draw()
 	properprintF(TEXT["room code"], 36*scale, 77*scale)
 	guielements.roomentry:draw()
 	love.graphics.setColor(150, 150, 150)
-	properprintF(TEXT["enter room code"], 24*scale, 107*scale)
+	properprintF(TEXT["enter room code"], 5*scale, 107*scale)
 	
 	guielements.joinbutton:draw()
 	
@@ -93,7 +93,7 @@ function onlinemenu_draw()
 	properprintF(TEXT["no port forwarding"], 240*scale, 82*scale)
 	
 	love.graphics.setColor(150, 150, 150)
-	properprintF(TEXT["share room code"], 218*scale, 107*scale)
+	properprintF(TEXT["share room code"], 223*scale, 107*scale)
 	
 	guielements.hostbutton:draw()
 end

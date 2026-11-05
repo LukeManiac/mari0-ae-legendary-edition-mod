@@ -126,7 +126,7 @@
 		"enter room code": "enter the 8-character\ncode shared by the host.",
 		"connecting to relay": "connecting to relay...",
 		"no port forwarding": "no port forwarding",
-		"share room code": "share the room code shown\nin the lobby with your friend.",
+		"share room code": "share the room code\nshown in the lobby\nwith your friend.",
 		"address/magicdns": "address/magicdns",
 		"join game instructons": "enter ip, hostname\ndomain or magicdns\nwords to connect.",
 		"optional port:": "optional port",
