@@ -34,7 +34,7 @@ local osname = job.osname
 
 local executable = find_relay_python(osname)
 if not executable then
-	channelout:push({"error", "Local relay needs Python 3.10 or newer"})
+	channelout:push({"error", "net needs python"})
 	return
 end
 
@@ -51,7 +51,7 @@ end
 
 local launched, _, code = os.execute(command)
 if launched ~= true and launched ~= 0 and code ~= 0 then
-	channelout:push({"error", "Could not start the local relay"})
+	channelout:push({"error", "net relay start error"})
 	return
 end
 channelout:push({"ok"})

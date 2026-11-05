@@ -37,6 +37,10 @@ local spamtime = 0.2
 local spamcounter = 0
 local spammercount = 10
 
+local function nt(key)
+	return TEXT[key] or key
+end
+
 local lobbytimeout = 12 --kick player if ping is higher than this (a ping this high means they've disconnected)
 
 local function is_local_relay()
@@ -80,7 +84,7 @@ local function start_local_relay()
 
 	local source, readerr = love.filesystem.read("relay/server.py")
 	if not source then
-		notice.new("Could not read the bundled relay: " .. tostring(readerr), notice.red, 6)
+		notice.new(nt("net relay read error") .. tostring(readerr), notice.red, 6)
 		return false
 	end
 	local made_directory, directory_err = love.filesystem.createDirectory("relay")
@@ -168,7 +172,7 @@ function net_try_online_menu()
 	end
 
 	if conn_state == "connecting" then
-		notice.new("Please wait for the\ngame to try\nconnecting to the\nserver.", notice.red, 4)
+		notice.new("Please wait for\nthe game to\ntry connecting to\nthe server.", notice.red, 4)
 		return false
 	end
 
@@ -209,7 +213,7 @@ function net_update_local_relay(dt)
 			local_relay_spawned = true
 		else
 			local_relay_start_attempted = false
-			notice.new(spawnresult[2], notice.red, 6)
+			notice.new(nt(spawnresult[2]), notice.red, 6)
 			conn_stop()
 		end
 	end
@@ -222,7 +226,7 @@ function net_update_local_relay(dt)
 	while message do
 		if message[1] == "ok" then
 			conn_state = "connected"
-			notice.new("Connection successful! " .. format_connect_time(message[2]), {0, 255, 0})
+			notice.new(nt("net connected") .. " " .. format_connect_time(message[2]), {0, 255, 0})
 			return
 		elseif message[1] == "spawn" then
 			if not local_relay_start_attempted then
@@ -266,17 +270,17 @@ end
 
 local function relay_error_text(code)
 	if code == "room_not_found" then
-		return "Room code not found"
+		return nt("net room not found")
 	elseif code == "room_full" then
-		return "That room already has a guest"
+		return nt("net room full")
 	elseif code == "room_exists" then
-		return "Room code collision, please try again"
+		return nt("net room exists")
 	elseif code == "server_full" then
-		return "Relay is full, please try again later"
+		return nt("net server full")
 	elseif code == "endpoint_in_use" then
-		return "This connection is already in a room"
+		return nt("net endpoint in use")
 	end
-	return "Relay connection failed"
+	return nt("net relay failed")
 end
 
 local function relay_update(dt)
@@ -614,7 +618,7 @@ function server_update(dt)
 			server_infinitelives(infinitelives, clients[entity])
 			server_infinitetime(infinitetime, clients[entity])
 			server_setmappack(mappack, clients[entity])
-			notice.new(playerlist[players].nick .. " connected", nil, 3)
+			notice.new(playerlist[players].nick .. nt("net player connected"), nil, 3)
 		elseif cmd == 'pong' and safe then
 			--get ping
 			if clients[entity] and clients[entity].i and playerlist[clients[entity].i] then
