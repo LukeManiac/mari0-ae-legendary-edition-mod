@@ -163,7 +163,7 @@ function server_load(roomcode)
 	entity = nil
 	clients = {}
 	
-	local bound, binderr = udp:setsockname("*", 0)
+	local bound, binderr = udp:setsockname("0.0.0.0", 0)
 	if not bound then
 		udp:close()
 		udp = nil
