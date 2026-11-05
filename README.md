@@ -209,6 +209,14 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Added custom categories for custom enemies. Set donotcategoriseenemyfolders to true to disable enemies being categorised by folders.
 * Saving the game via pause menu no longer quits to menu.
 
+### 🌟 Best Features
+
+* Reworked online multiplayer to use room-code matchmaking through a UDP relay. Hosts share an eight-character code for guests to join.
+* Players no longer need to configure router port forwarding.
+* Multiple game instances can connect through one relay, so you can test online multiplayer with two instances on the same computer.
+* Added a self-hostable relay. Local testing uses `127.0.0.1`; playing across the internet requires a publicly reachable relay configured in `Legendary Edition\relayconfig.lua`.
+* See [Online Multiplayer](#online-multiplayer) for local testing steps and the [relay guide](./Legendary%20Edition/relay/README.md) for deployment.
+
 ### 🐛 Bug Fixes
 
 * Fixed keyboard navigation in the controls menu so the Pause binding is reachable when moving through controls with mouse aiming on or off.

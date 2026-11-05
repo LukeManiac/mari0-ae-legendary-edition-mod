@@ -18,12 +18,7 @@ function onlinemenu_load()
 	guielements.configincrease = guielement:new("button", 214, 31, "}", configincrease, 0)
 	
 	
-	guielements.ipentry = guielement:new("input", 6, 87, 23, joingame, "", 23, 1)
-	guielements.portentry2 = guielement:new("input", 131, 145, 5, nil, "27020", 5, 1, true)
-	
-	guielements.portentry = guielement:new("input", 274, 87, 5, function() notice.new(TEXT["port notice"], notice.red, 12) end, "27020", 5, 1, true)
-	
-	guielements.magiccheckbox = guielement:new("checkbox", 220, 147, togglemagic, false, TEXT["use magicdns words"])
+	guielements.roomentry = guielement:new("input", 6, 87, 23, joingame, "", 8, 1)
 	
 	guielements.hostbutton = guielement:new("button", 247, 199, TEXT["create game"], creategame, 2)
 	guielements.hostbutton.bordercolor = {255, 0, 0}
@@ -39,11 +34,6 @@ function onlinemenu_load()
 	
 	playerconfig = 1
 	
-	usemagic = false--true
-	
-	magictimer = 0
-	magicdelay = 0.15
-	magics = {}
 end
 
 function onlinemenu_update(dt)
@@ -54,28 +44,6 @@ function onlinemenu_update(dt)
 		if runanimationframe == 0 then
 			runanimationframe = 3
 		end
-	end
-	
-	magictimer = magictimer + dt
-	while magictimer > magicdelay do
-		magictimer = magictimer - magicdelay
-		if checkmagic(guielements.ipentry.value) then
-			table.insert(magics, magic:new())
-		end
-	end
-	
-	local delete = {}
-	
-	for i, v in pairs(magics) do
-		if v:update(dt) == true then
-			table.insert(delete, i)
-		end
-	end
-	
-	table.sort(delete, function(a,b) return a>b end)
-	
-	for i, v in pairs(delete) do
-		table.remove(magics, v) --remove
 	end
 	
 	localnick = guielements.nickentry.value
@@ -109,21 +77,10 @@ function onlinemenu_draw()
 	love.graphics.setColor(255, 255, 255)
 	properprintF(TEXT["join game"], 64*scale, 60*scale)
 	
-	properprintF(TEXT["address/magicdns"], 36*scale, 77*scale)
-	guielements.ipentry:draw()
+	properprintF(TEXT["room code"], 36*scale, 77*scale)
+	guielements.roomentry:draw()
 	love.graphics.setColor(150, 150, 150)
-	properprintF(TEXT["join game instructons"], 24*scale, 107*scale)
-	
-	love.graphics.setColor(255, 255, 255)
-	properprintF(TEXT["optional port:"], 21*scale, 148*scale)
-	if guielements.portentry2.inputting then
-		guielements.portentry2:draw()
-	else
-		properprintF(guielements.portentry2.value, 133*scale, 148*scale)
-	end
-	
-	love.graphics.setColor(150, 150, 150)
-	properprintF(TEXT["optional port instructions"], 24*scale, 162*scale)
+	properprintF(TEXT["enter room code"], 24*scale, 107*scale)
 	
 	guielements.joinbutton:draw()
 	
@@ -133,26 +90,12 @@ function onlinemenu_draw()
 	
 	love.graphics.setColor(255, 255, 255)
 	properprintF(TEXT["host game"], 260*scale, 60*scale)
-	properprintF(TEXT["port:"], 278*scale, 77*scale)
-	
-	if guielements.portentry.inputting then
-		guielements.portentry:draw()
-	else
-		properprintF(guielements.portentry.value, 276*scale, 90*scale)
-	end
+	properprintF(TEXT["no port forwarding"], 240*scale, 82*scale)
 	
 	love.graphics.setColor(150, 150, 150)
-	properprintF(TEXT["host game instructions"], 218*scale, 107*scale)
-	
-	guielements.magiccheckbox:draw()
-	love.graphics.setColor(150, 150, 150)
-	properprintF(TEXT["magicdns instructions"], 238*scale, 162*scale)
+	properprintF(TEXT["share room code"], 218*scale, 107*scale)
 	
 	guielements.hostbutton:draw()
-	
-	for i, v in pairs(magics) do
-		v:draw()
-	end
 end
 
 
@@ -234,123 +177,25 @@ function configincrease()
 	playerconfig = math.min(4, playerconfig+1)
 end
 
-function togglemagic()
-	usemagic = not usemagic
-	guielements.magiccheckbox.var = usemagic
-end
-
-function checkmagic(s)
-	return string.find(s, " ")
-end
-
 function creategame()
-	port = tonumber(guielements.portentry.value)
-	if server_load(port) then
-		lobby_load()
-	else
-		--menu_load()
+	local roomcode = net_create_room_code()
+	if not server_load(roomcode) then
 		return
-	end
-	if usemagic then
-		adjective, noun = magicdns_make()
 	end
 	
 	playerlist = {}
 	playerlist[1] = {connected=true, hats=mariohats[playerconfig], colors=mariocolors[playerconfig], nick=localnick, id="host", ping=0, character=mariocharacter[playerconfig]}
+	lobby_load()
 end
 
 function joingame()
-	local ip, port = "", tonumber(guielements.portentry2.value)
-	local s = guielements.ipentry.value
-	if checkmagic(s) then
-		usemagic = true
-		local split = s:split(" ")
-		adjective, noun = split[1], split[2]
-		ip, port = magicdns_find(adjective, noun)
-		
-		if ip == nil then
-			notice.new(TEXT["INVALID MAGICDNS\nTHE HOST NEEDS TO PORT FORWARD!"], notice.red, 6 )
-			return
-		end
-	else
-		usemagic = false
-		ip = guielements.ipentry.value
-	end
+	local roomcode = guielements.roomentry.value:upper():gsub("%s", "")
 	
 	playerlist = {}
 	playerlist[1] = {connected=true, hats=mariohats[playerconfig], colors=mariocolors[playerconfig], nick=localnick, id="self", ping=0, character=mariocharacter[playerconfig]}
 	
-	if client_load(ip, port) then
-		lobby_load()
-	else
-		--menu_load()
+	if not client_load(roomcode) then
+		return
 	end
-end
-
-magicdns_validresponses = {"MADE", "KEPT", "REMOVED", "FOUND", "NOTFOUND", "ERROR"}
-
-function magicdns_make()
-	http.PORT = port
-	s = http.request("http://dns.stabyourself.net/MAKE/" .. magicdns_identity .. "/" .. magicdns_session .. "/" .. port)
-	result = (s or ""):split("/")
-	magicdns_error(result)
-	
-	if result[1] == "MADE" then
-		return string.lower(result[2]), string.lower(result[3])
-	else
-		notice.new("MAGICDNS MAKE FAILED HORRIBLY", notice.red, 3)
-		print("MAGICDNS MAKE FAILED HORRIBLY");
-		usemagic = false
-		return;
-	end
-end
-
-function magicdns_keep()
-	s = http.request("http://dns.stabyourself.net/KEEP/"..magicdns_identity.."/"..magicdns_session)
-	result = (s or ""):split("/")
-	magicdns_error(result)
-	if result[1] ~= "KEPT" then
-		print("MAGICDNS KEEP FAILED! RETURNED: " .. (s or ""))
-	elseif result[2] ~= "" then
-		print("MAGICDNS EXTERNAL PORT KNOWN = " .. result[2])
-	end
-end
-
-function magicdns_remove()
-	s = http.request("http://dns.stabyourself.net/REMOVE/"..magicdns_identity.."/"..magicdns_session)
-	result = (s or ""):split("/")
-	magicdns_error(result)
-	if result[1] ~= "REMOVED" then
-		print("MAGICDNS REMOVE FAILED! RETURNED: " .. (s or ""))
-	end
-end
-	
-function magicdns_find(adjective, noun)
-	s = http.request("http://dns.stabyourself.net/FIND/" .. magicdns_identity .. "/" .. string.upper(adjective) .. "/" .. string.upper(noun))
-	
-	local result = (s or ""):split("/")
-	magicdns_error(result)
-	if result[1] == "FOUND" then
-		if result[4] == "" then
-		print("MAGICDNS Server external port is not known!")
-		
-		notice.new("MAGICDNS Server external port is not known!", notice.red, 3)
-		end		
-		return result[2], result[3], result[4]
-	else
-		return nil
-	end
-end
-
-function magicdns_error(result)
-	if result[1] == "ERROR" then
-		print("MAGICDNS ERROR: "..result[2])
-		notice.new("MAGICDNS ERROR: "..result[2], notice.red, 3)
-		return true
-	elseif not tablecontains(magicdns_validresponses, result[1]) then
-		print("MAGICDNS: nonstandard response: "..result[1])
-		notice.new("MAGICDNS: nonstandard response: "..result[1], notice.red, 3)
-		return true
-	end
-	return false
+	lobby_load()
 end

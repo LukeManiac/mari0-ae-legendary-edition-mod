@@ -1,5 +1,3 @@
-local onlinenotice = false
-
 function lobby_load()
 	collectables = {} --[marioworld-mariolevel-mariosublevel][x-y]
 	collectableslist = {{},{},{},{},{},{},{},{},{},{}}
@@ -52,21 +50,6 @@ function lobby_load()
 	end
 	guielements.quitbutton = guielement:new("button", 131, 80, "quit to menu", net_quit, 1)
 	
-	magicdns_timer = 0
-	magicdns_delay = 30
-
-	if SERVER and not onlinenotice then
-		notice.new("online multiplayer\nwill not work if\nyou don't port forward!\nlook up a tutorial!!!", nil, 12)
-		onlinenotice = true
-		--[[
-			Hi alexan99 i cant play multiplayer on android. Can you help me?	
-			How to play multiplayer on two android devices.
-			Ui: i wriate the addres (macicen or something the name that)
-			and i try joined to secon device and on the second device
-			i not showing up and i started the game on my device,
-			on the second device not started. Can you help me to fix ?
-		]]
-	end
 end
 
 function lobby_update(dt)
@@ -79,14 +62,6 @@ function lobby_update(dt)
 		end
 	end
 	
-	if SERVER and usemagic then
-		magicdns_timer = magicdns_timer + dt
-		while magicdns_timer > magicdns_delay do
-			magicdns_timer = magicdns_timer - magicdns_delay
-			--this needs to be changed so the delay is like 2 seconds until the external port is known
-			magicdns_keep()
-		end
-	end
 end
 
 function lobby_draw()
@@ -103,10 +78,15 @@ function lobby_draw()
 	guielements.mappackleft:draw()
 	guielements.mappackright:draw()
 	
-	if usemagic and adjective and noun then
-		properprintFbackground("magicdns: " .. adjective .. " " .. noun, 4*scale, 98*scale, true)
+	if SERVER then
+		local roomcode = net_getroomcode()
+		if roomcode then
+			properprintFbackground(TEXT["room code"] .. ": " .. roomcode, 4*scale, 98*scale, true)
+		else
+			properprintFbackground(TEXT["connecting to relay"], 4*scale, 98*scale, true)
+		end
 	else
-		properprintFbackground("port: " .. net_getport(), 4*scale, 98*scale, true)
+		properprintFbackground("connected through relay", 4*scale, 98*scale, true)
 	end
 	if SERVER then
 		guielements.startbutton:draw()

@@ -1,8 +1,9 @@
 local socket = require "socket"
+local relayconfig = require "relayconfig"
 
 local udp
  
-local address, port = "localhost", 27020
+local relay_host, relay_port = relayconfig.host, relayconfig.port
  
 local entity
 local clients
@@ -16,6 +17,12 @@ local enemyspawnx
 local clientconnecttimer = 0
 local clientconnected = false
 local clientconnecttime = 4
+local clientjoinpending = false
+local relay_room_code
+local relay_room_ready = false
+local relay_keepalive_timer = 0
+local relay_setup_timer = 0
+local relay_retry_timer = 0
 
 local spamtimer = 0 --stop "funny" kids from spamming
 local spamtime = 0.2
@@ -24,33 +31,94 @@ local spammercount = 10
 
 local lobbytimeout = 12 --kick player if ping is higher than this (a ping this high means they've disconnected)
 
-function client_load(a, p)
-	address, port = a or "localhost", p or 27020
+local function relay_error_text(code)
+	if code == "room_not_found" then
+		return "Room code not found"
+	elseif code == "room_full" then
+		return "That room already has a guest"
+	elseif code == "room_exists" then
+		return "Room code collision, please try again"
+	elseif code == "server_full" then
+		return "Relay is full, please try again later"
+	elseif code == "endpoint_in_use" then
+		return "This connection is already in a room"
+	end
+	return "Relay connection failed"
+end
 
-	udp = socket.udp()
-	udp:settimeout(0)
- 
-	udp:setpeername(address, port)
-	if tostring(udp) and not (tostring(udp):sub(1, 14) == "udp{connected}") then
-		udp:close()
-		notice.new("server not found", notice.red, 3)
+local function relay_update(dt)
+	relay_keepalive_timer = relay_keepalive_timer + dt
+	if relay_room_code and relay_room_ready and relay_keepalive_timer >= 15 then
+		relay_keepalive_timer = 0
+		local message = "RELAY~KEEPALIVE~" .. relay_room_code
+		if SERVER then
+			udp:sendto(message, relay_host, relay_port)
+		elseif CLIENT then
+			udp:send(message)
+		end
+	end
+
+	if SERVER and not relay_room_ready then
+		relay_setup_timer = relay_setup_timer + dt
+		relay_retry_timer = relay_retry_timer + dt
+		if relay_setup_timer >= 10 then
+			notice.new("Relay did not create the room", notice.red, 5)
+			net_quit()
+			return true
+		elseif relay_retry_timer >= 1 then
+			relay_retry_timer = relay_retry_timer - 1
+			udp:sendto("RELAY~CREATE~" .. relay_room_code, relay_host, relay_port)
+		end
+	elseif CLIENT and clientjoinpending then
+		relay_setup_timer = relay_setup_timer + dt
+		relay_retry_timer = relay_retry_timer + dt
+		if relay_setup_timer >= 10 then
+			notice.new("Could not reach the room", notice.red, 5)
+			net_quit()
+			return true
+		elseif relay_retry_timer >= 1 then
+			relay_retry_timer = relay_retry_timer - 1
+			udp:send("RELAY~JOIN~" .. relay_room_code)
+		end
+	end
+	return false
+end
+
+function net_create_room_code()
+	local chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+	local code = {}
+	for i = 1, 8 do
+		local index = math.random(#chars)
+		code[i] = chars:sub(index, index)
+	end
+	return table.concat(code)
+end
+
+function client_load(roomcode)
+	if type(roomcode) ~= "string" or not roomcode:match("^[A-Z2-9]+$") or #roomcode ~= 8 then
+		notice.new("Enter the 8-character room code", notice.red, 3)
 		return false
 	end
- 
-	math.randomseed(os.time()) 
+
+	relay_room_code = roomcode
+	udp = socket.udp()
+	if not udp then
+		notice.new("Could not create network socket", notice.red, 3)
+		return false
+	end
+	udp:settimeout(0)
+
+	local connected, err = udp:setpeername(relay_host, relay_port)
+	if not connected then
+		udp:close()
+		udp = nil
+		notice.new("Could not connect to relay: " .. tostring(err), notice.red, 3)
+		return false
+	end
  
 	entity = tostring(math.random(99999))
 	clients = {}
 	playerlist[1].id = entity
- 
-	local s = "" --colors
-	for i = 1, #mariocolors[playerconfig] do
-		s = s .. mariocolors[playerconfig][i][1] .. "|" .. mariocolors[playerconfig][i][2] .. "|" .. mariocolors[playerconfig][i][3] .. "|"
-	end
-	s = s:sub(1, -2)
-	
-	local dg = string.format("%s~%s~%s~%s~%s~%s", entity, 'connect', localnick, s, mariohats[playerconfig][1], tostring(mariocharacter[playerconfig]))
-	udp:send(dg)
 	updatetimer = 0
 	actions = {}
 	levelscreensync = false
@@ -58,35 +126,80 @@ function client_load(a, p)
 
 	clientconnected = false
 	clientconnecttimer = 0
+	clientjoinpending = true
+	relay_room_ready = false
+	relay_keepalive_timer = 0
+	relay_setup_timer = 0
+	relay_retry_timer = 0
 	
 	SERVER = false
 	CLIENT = true
+
+	local sent, senderr = udp:send("RELAY~JOIN~" .. relay_room_code)
+	if not sent then
+		udp:close()
+		udp = nil
+		CLIENT = false
+		clientjoinpending = false
+		notice.new("Could not contact relay: " .. tostring(senderr), notice.red, 3)
+		return false
+	end
 	
 	return true
 end
 
-function server_load(p)
-	port = p or 27020
-	
+function server_load(roomcode)
+	if type(roomcode) ~= "string" or not roomcode:match("^[A-Z2-9]+$") or #roomcode ~= 8 then
+		notice.new("Could not create a room code", notice.red, 3)
+		return false
+	end
+
+	relay_room_code = roomcode
 	udp = socket.udp()
+	if not udp then
+		notice.new("Could not create network socket", notice.red, 3)
+		return false
+	end
 	entity = nil
 	clients = {}
 	
-	udp:setsockname("*", port)
+	local bound, binderr = udp:setsockname("*", 0)
+	if not bound then
+		udp:close()
+		udp = nil
+		notice.new("Could not open network socket: " .. tostring(binderr), notice.red, 3)
+		return false
+	end
 	udp:settimeout(0)
 	
 	updatetimer = 0
 	actions = {}
 	enemyspawnx = 0
+	relay_keepalive_timer = 0
+	relay_setup_timer = 0
+	relay_retry_timer = 0
 	
 	SERVER = true
 	CLIENT = false
+	relay_room_ready = false
+
+	local sent, senderr = udp:sendto("RELAY~CREATE~" .. relay_room_code, relay_host, relay_port)
+	if not sent then
+		udp:close()
+		udp = nil
+		SERVER = false
+		notice.new("Could not contact relay: " .. tostring(senderr), notice.red, 3)
+		return false
+	end
 	
 	return true
 end
 
 function server_update(dt)
 	-- SERVER CODE --
+	if relay_update(dt) then
+		return
+	end
 	
 	--send
 	if gamestate == "lobby" then
@@ -169,7 +282,26 @@ function server_update(dt)
 	
 	--recieve
 	local data, msg_or_ip, port_or_nil = udp:receivefrom()
-	if data then
+	if data and data:sub(1, 6) == "RELAY~" then
+		local relaymessage = data:split("~")
+		if relaymessage[2] == "CREATED" then
+			relay_room_ready = true
+			relay_setup_timer = 0
+			relay_retry_timer = 0
+		elseif relaymessage[2] == "PEER_LEFT" then
+			for clientid, client in pairs(clients) do
+				if client.i then
+					server_disconnect(client.i)
+					clients[clientid] = nil
+					break
+				end
+			end
+		elseif relaymessage[2] == "ERROR" then
+			notice.new(relay_error_text(relaymessage[3]), notice.red, 5)
+			net_quit()
+			return
+		end
+	elseif data then
 		print(data)
 		
 		--add player to list
@@ -321,6 +453,9 @@ end
 
 function client_update(dt)
 	-- CLIENT CODE --
+	if relay_update(dt) then
+		return
+	end
 
 	if spamtimer > 0 then--this is why we can't have nice things
 		spamtimer = spamtimer - dt
@@ -370,6 +505,31 @@ function client_update(dt)
 	repeat
 		local data, msg = udp:receive()
 		if data then
+			if data:sub(1, 6) == "RELAY~" then
+				local relaymessage = data:split("~")
+				if relaymessage[2] == "JOINED" and clientjoinpending then
+					clientjoinpending = false
+					relay_room_ready = true
+					relay_setup_timer = 0
+					relay_retry_timer = 0
+					clientconnecttimer = 0
+					local s = ""
+					for i = 1, #mariocolors[playerconfig] do
+						s = s .. mariocolors[playerconfig][i][1] .. "|" .. mariocolors[playerconfig][i][2] .. "|" .. mariocolors[playerconfig][i][3] .. "|"
+					end
+					s = s:sub(1, -2)
+					local dg = string.format("%s~%s~%s~%s~%s~%s", entity, 'connect', localnick, s, mariohats[playerconfig][1], tostring(mariocharacter[playerconfig]))
+					udp:send(dg)
+				elseif relaymessage[2] == "ERROR" then
+					net_quit()
+					notice.new(relay_error_text(relaymessage[3]), notice.red, 5)
+					return
+				elseif relaymessage[2] == "CLOSED" then
+					net_quit()
+					notice.new("The host closed the room", notice.red, 5)
+					return
+				end
+			else
 			print(data)
 			local t = data:split("~")
 			local cmd = t[1]
@@ -549,6 +709,7 @@ function client_update(dt)
 			else
 				print("unrecognised command:", cmd)
 			end
+			end
 		elseif msg ~= 'timeout' then 
 			print("Network error: "..tostring(msg))
 			notice.new("Network error: "..tostring(msg), notice.red, 3)
@@ -557,7 +718,7 @@ function client_update(dt)
 	until not data
 
 	--make sure client is actually connected
-	if not clientconnected then
+	if not clientconnected and not clientjoinpending then
 		clientconnecttimer = clientconnecttimer + dt
 		if clientconnecttimer > clientconnecttime then
 			net_quit()
@@ -592,17 +753,36 @@ end
 
 function net_quit()
 	if CLIENT then
-		udp:send(string.format("%s~%s", entity, 'disconnect'))
+		if udp then
+			if not clientjoinpending then
+				udp:send(string.format("%s~%s", entity, 'disconnect'))
+			end
+			if relay_room_code then
+				udp:send("RELAY~DETACH~" .. relay_room_code)
+			end
+		end
 	elseif SERVER then
 		for i, t in pairs(clients) do
 			udp:sendto("kick", t[1], t[2])
+		end
+		if udp and relay_room_code then
+			udp:sendto("RELAY~LEAVE~" .. relay_room_code, relay_host, relay_port)
 		end
 	end
 	
 	players = 1
 	gamestate = "menu"
 	menu_load()
-	udp:close()
+	if udp then
+		udp:close()
+	end
+	udp = nil
+	relay_room_code = nil
+	clientjoinpending = false
+	relay_keepalive_timer = 0
+	relay_room_ready = false
+	relay_setup_timer = 0
+	relay_retry_timer = 0
 	SERVER = false
 	CLIENT = false
 	
@@ -908,6 +1088,8 @@ function server_setmappack(m, t)
 	end
 end
 
-function net_getport()
-	return port
+function net_getroomcode()
+	if relay_room_ready then
+		return relay_room_code
+	end
 end
