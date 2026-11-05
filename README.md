@@ -218,6 +218,7 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Fixed the rising water graphic glitch.
 * Fixed a confusing mechanic where autodelete-able enemies would instantly vanish when a player died in multiplayer splitscreen.
 * Fixed an issue where game saving would sometimes be counted as successful, even if it doesn't save successfully.
+* Fixed editor scrolling staying blocked after renaming a saved object and closing the editor.
 
 ### ✨ Improvements
 
