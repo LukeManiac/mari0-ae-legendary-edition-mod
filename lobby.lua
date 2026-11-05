@@ -24,6 +24,10 @@ function lobby_load()
 			break
 		end
 	end
+	if mappacklist[mappackselection] == "custom_mappack" then --can't be played online, so don't offer it
+		mappackselection = 1
+		mappack = mappacklist[1]
+	end
 	guielements.mappack = guielement:new("button", 21, 57, mappacklist[mappackselection]:lower(),
 		function()
 			--if mappack ~= mappacklist[mappackselection] then
@@ -34,7 +38,7 @@ function lobby_load()
 	guielements.mappackleft = guielement:new("button", 7, 57, "{",
 		function() mappackselection = math.max(1, mappackselection-1); guielements.mappack.text = mappacklist[mappackselection]:lower(); guielements.mappack.textcolor = {127, 127, 127} end, 1)
 	guielements.mappackright = guielement:new("button", 219, 57, "}",
-		function() mappackselection = math.min(#mappacklist, mappackselection+1); guielements.mappack.text = mappacklist[mappackselection]:lower(); guielements.mappack.textcolor = {127, 127, 127} end, 1)
+		function() mappackselection = math.min(#mappacklist-1, mappackselection+1); guielements.mappack.text = mappacklist[mappackselection]:lower(); guielements.mappack.textcolor = {127, 127, 127} end, 1)
 	if CLIENT then
 		guielements.infinitelives.active = false
 		guielements.infinitetime.active = false
@@ -77,10 +81,6 @@ function lobby_draw()
 	guielements.mappack:draw()
 	guielements.mappackleft:draw()
 	guielements.mappackright:draw()
-	local progress = net_mappack_progress()
-	if progress then
-		properprintF("receiving mappack " .. progress .. "%", 9*scale, 69*scale)
-	end
 	
 	if SERVER then
 		local roomcode = net_getroomcode()

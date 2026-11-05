@@ -168,7 +168,6 @@ end
 
 --returns true if the online menu may open
 function net_try_online_menu()
-	net_restore_mappacks()
 	if conn_state == "connected" then
 		return true
 	end
@@ -331,402 +330,6 @@ function net_create_room_code()
 		code[i] = chars:sub(index, index)
 	end
 	return table.concat(code)
-end
-
---MAPPACK TRANSFER (the host sends its mappack to players that are missing it or have a different version)
-local MP_CHUNK = 900 --raw bytes per packet
-local MP_BATCH = 16 --chunks requested at once
-local MP_MAX_BYTES = 8*1024*1024 --largest (compressed) mappack that will be sent
-local MP_ALLOWED = {txt=true, png=true, jpg=true, jpeg=true, ogg=true, mp3=true, wav=true, flac=true, json=true}
-local MP_JOURNAL = "mappack_session.txt" --lists files changed by the host's mappack, so they can be restored
-
-local mp_cache = {} --host: [id] = prepared mappack
-local mp_receive --player: mappack that is currently being downloaded
-
-local function mp_hash(data)
-	return love.data.encode("string", "hex", love.data.hash("sha1", data))
-end
-
-local function mp_safe_name(name)
-	return type(name) == "string" and name ~= "" and #name <= 64
-		and name:find("^[%w_%-%. ]+$") ~= nil and name:sub(1, 1) ~= "."
-		and not name:find("..", 1, true)
-end
-
-local function mp_safe_path(path) --relative path inside a mappack
-	if type(path) ~= "string" or path == "" or #path > 200 then
-		return false
-	end
-	if not path:find("^[%w_%-%. %(%)/]+$") or path:find("..", 1, true) or path:find("//", 1, true) then
-		return false
-	end
-	if path:sub(1, 1) == "/" or path:sub(-1) == "/" then
-		return false
-	end
-	local extension = path:match("%.(%w+)$")
-	return extension ~= nil and MP_ALLOWED[extension:lower()] == true
-end
-
-local function mp_exists(name)
-	return love.filesystem.getInfo(mappackfolder .. "/" .. name .. "/settings.txt") ~= nil
-end
-
-local function mp_scan(folder, relative, found)
-	local items = love.filesystem.getDirectoryItems(folder)
-	table.sort(items)
-	for i = 1, #items do
-		local rel = items[i]
-		if relative ~= "" then
-			rel = relative .. "/" .. items[i]
-		end
-		local full = folder .. "/" .. items[i]
-		local info = love.filesystem.getInfo(full)
-		if info and info.type == "directory" then
-			mp_scan(full, rel, found)
-		elseif info and info.type == "file" and mp_safe_path(rel) then
-			table.insert(found, rel)
-		end
-	end
-	return found
-end
-
-local function mp_read_pack(name) --returns the files of a mappack, sorted by path
-	local base = mappackfolder .. "/" .. name
-	local paths = mp_scan(base, "", {})
-	table.sort(paths)
-	local files = {}
-	for i = 1, #paths do
-		local data = love.filesystem.read(base .. "/" .. paths[i])
-		if data then
-			table.insert(files, {path = paths[i], data = data})
-		end
-	end
-	return files
-end
-
-local function mp_pack_hash(files) --one hash that covers every file name and its contents
-	local summary = {}
-	for i = 1, #files do
-		summary[i] = files[i].path .. "\n" .. mp_hash(files[i].data)
-	end
-	return mp_hash(table.concat(summary, "\n"))
-end
-
-local function mp_makedirs(path)
-	local directory = path:match("^(.*)/[^/]*$")
-	if directory and directory ~= "" then
-		love.filesystem.createDirectory(directory)
-	end
-end
-
---HOST
-local function mp_prepare(name)
-	if not mp_safe_name(name) or not mp_exists(name) then
-		return nil
-	end
-	local files = mp_read_pack(name)
-	if #files == 0 then
-		return nil
-	end
-	local parts = {}
-	for i = 1, #files do
-		parts[i] = files[i].path .. "\n" .. #files[i].data .. "\n" .. files[i].data
-	end
-	local blob = love.data.compress("string", "zlib", table.concat(parts), 9)
-	if #blob > MP_MAX_BYTES then
-		return nil, "toolarge"
-	end
-	local id = mp_hash(blob):sub(1, 12)
-	local entry = {
-		name = name,
-		packhash = mp_pack_hash(files),
-		id = id,
-		blob = blob,
-		size = #blob,
-		total = math.ceil(#blob / MP_CHUNK),
-	}
-	mp_cache = {}
-	mp_cache[id] = entry
-	return entry
-end
-
-local function mp_send_info(name, t) --tell players which mappack the host uses (t = one client, or everyone)
-	if not t and not next(clients) then
-		return
-	end
-	local entry, reason = mp_prepare(name)
-	if not entry then
-		if reason == "toolarge" then
-			notice.new("this mappack is too big\nto send to other players", notice.red, 4)
-		end
-		return
-	end
-	local s = string.format("%s~%s~%s~%s~%d~%d", 'mpinfo', entry.name, entry.packhash, entry.id, entry.total, entry.size)
-	if t then
-		udp:sendto(s, t[1], t[2])
-	else
-		for i, c in pairs(clients) do
-			udp:sendto(s, c[1], c[2])
-		end
-	end
-end
-
-local function mp_serve(t, client) --a player asked for some chunks: {entity, 'mpget', id, first, count}
-	local entry = mp_cache[t[3]]
-	local first, count = tonumber(t[4]), tonumber(t[5])
-	if not entry or not first or not count then
-		return
-	end
-	first = math.max(1, math.floor(first))
-	local last = math.min(first + math.min(math.floor(count), MP_BATCH) - 1, entry.total)
-	for index = first, last do
-		local raw = entry.blob:sub((index-1)*MP_CHUNK + 1, index*MP_CHUNK)
-		udp:sendto(string.format("%s~%s~%d~%s", 'mpchunk', entry.id, index, love.data.encode("string", "base64", raw)), client[1], client[2])
-	end
-end
-
---PLAYER
-local function mp_request()
-	local r = mp_receive
-	while r.chunks[r.first] do
-		r.first = r.first + 1
-	end
-	local count = math.min(MP_BATCH, r.total - r.first + 1)
-	r.batchend = r.first + count - 1
-	r.lastrequest = love.timer.getTime()
-	udp:send(string.format("%s~%s~%s~%d~%d", entity, 'mpget', r.id, r.first, count))
-end
-
-local function mp_fail(reason)
-	local name = mp_receive and mp_receive.name or "?"
-	mp_receive = nil
-	notice.new("could not get the mappack\n" .. reason, notice.red, 5)
-	if udp then
-		udp:send(string.format("%s~%s~%s", entity, 'mpfail', name))
-	end
-end
-
-local function mp_register_mappack(name) --make sure the mappack shows up in the lobby's list and select it
-	if not mappacklist then
-		return
-	end
-	for i = 1, #mappacklist do
-		if mappacklist[i] == name then
-			mappackselection = i
-			return
-		end
-	end
-	local last = #mappacklist --"custom_mappack" is always the last entry
-	local function shift(list, value)
-		if list then
-			list[last+1] = list[last]
-			list[last] = value
-		end
-	end
-	mappacklist[last+1] = mappacklist[last]
-	mappacklist[last] = name
-	shift(mappackname, name)
-	shift(mappackauthor, "host")
-	shift(mappackdescription, "received from the host")
-	shift(mappackbackground, "1-1")
-	shift(mappackdropshadow, false)
-	shift(mappackicon, nil)
-	mappackselection = last
-end
-
-local function mp_install(r, files)
-	local base = mappackfolder .. "/" .. r.name
-	if r.existing then
-		--the player has a different version: use the host's, but remember how to undo it when the session ends
-		local lines = {}
-		local source = love.filesystem.getSource():gsub("\\", "/")
-		for i = 1, #files do
-			local path = base .. "/" .. files[i].path
-			if not love.filesystem.getInfo(path) then
-				lines[#lines+1] = "R|" .. path
-			else
-				local realdir = love.filesystem.getRealDirectory(path)
-				if realdir and realdir:gsub("\\", "/") == source then
-					lines[#lines+1] = "R|" .. path --original lives inside the game, removing the copy restores it
-				else
-					local backup = "mappack_backups/" .. r.name .. "/" .. files[i].path
-					local original = love.filesystem.read(path)
-					mp_makedirs(backup)
-					if not original or not love.filesystem.write(backup, original) then
-						return false, "could not back up files"
-					end
-					lines[#lines+1] = "B|" .. path .. "|" .. backup
-				end
-			end
-		end
-		local old = love.filesystem.read(MP_JOURNAL) or ""
-		if not love.filesystem.write(MP_JOURNAL, old .. table.concat(lines, "\n") .. "\n") then
-			return false, "could not save session info"
-		end
-	end
-	for i = 1, #files do
-		local path = base .. "/" .. files[i].path
-		mp_makedirs(path)
-		if not love.filesystem.write(path, files[i].data) then
-			return false, "could not write " .. files[i].path
-		end
-	end
-	return true
-end
-
-function net_restore_mappacks() --put back any mappack files that were replaced by a host's version
-	local text = love.filesystem.read(MP_JOURNAL)
-	if not text then
-		return
-	end
-	for line in text:gmatch("[^\n]+") do
-		local kind, path, backup = line:match("^(%a)|([^|]+)|?([^|]*)$")
-		if kind == "B" and backup ~= "" then
-			local data = love.filesystem.read(backup)
-			if data then
-				love.filesystem.write(path, data)
-				love.filesystem.remove(backup)
-			end
-		elseif kind == "R" then
-			love.filesystem.remove(path)
-		end
-	end
-	love.filesystem.remove(MP_JOURNAL)
-end
-
-function net_mappack_progress() --percentage of the mappack that has been downloaded, or nil
-	if mp_receive then
-		return math.floor(mp_receive.got / mp_receive.total * 100)
-	end
-end
-
-local function mp_finish()
-	local r = mp_receive
-	local parts = {}
-	for i = 1, r.total do
-		parts[i] = r.chunks[i]
-	end
-	local blob = table.concat(parts)
-	if mp_hash(blob):sub(1, 12) ~= r.id then
-		return mp_fail("data was corrupted")
-	end
-	local ok, text = pcall(love.data.decompress, "string", "zlib", blob)
-	if not ok or type(text) ~= "string" then
-		return mp_fail("data was corrupted")
-	end
-
-	local files, position = {}, 1
-	while position <= #text do
-		local newline1 = text:find("\n", position, true)
-		local newline2 = newline1 and text:find("\n", newline1 + 1, true)
-		if not newline2 then
-			return mp_fail("invalid data")
-		end
-		local path = text:sub(position, newline1 - 1)
-		local length = tonumber(text:sub(newline1 + 1, newline2 - 1))
-		if not length or length < 0 or math.floor(length) ~= length or newline2 + length > #text
-			or not mp_safe_path(path) or #files >= 2000 then
-			return mp_fail("invalid data")
-		end
-		files[#files+1] = {path = path, data = text:sub(newline2 + 1, newline2 + length)}
-		position = newline2 + length + 1
-	end
-	table.sort(files, function(a, b) return a.path < b.path end)
-	if mp_pack_hash(files) ~= r.packhash then
-		return mp_fail("files did not match")
-	end
-
-	local installed, reason = mp_install(r, files)
-	if not installed then
-		return mp_fail(reason)
-	end
-	mp_receive = nil
-
-	mp_register_mappack(r.name)
-	mappack = r.name
-	if mappackbackground and mappackbackground[mappackselection] then
-		loadbackground(mappackbackground[mappackselection] .. ".txt")
-	else
-		loadbackground("1-1.txt")
-	end
-	if guielements and guielements.mappack then
-		guielements.mappack.text = r.name:lower()
-		guielements.mappack.textcolor = {127, 127, 127}
-	end
-	udp:send(string.format("%s~%s~%s", entity, 'mpready', r.name))
-	notice.new("got the mappack from the host", {0, 255, 0}, 4)
-end
-
-local function mp_handle_chunk(t) --{'mpchunk', id, index, data}
-	local r = mp_receive
-	if not r or t[2] ~= r.id then
-		return
-	end
-	local index = tonumber(t[3])
-	if not index or index < 1 or index > r.total or r.chunks[index] or not t[4] then
-		return
-	end
-	local ok, raw = pcall(love.data.decode, "string", "base64", t[4])
-	if not ok or type(raw) ~= "string" then
-		return
-	end
-	r.chunks[index] = raw
-	r.got = r.got + 1
-	r.lastprogress = love.timer.getTime()
-	if r.got >= r.total then
-		mp_finish()
-	elseif index >= r.batchend then
-		mp_request()
-	end
-end
-
-local function mp_handle_info(t) --{'mpinfo', name, packhash, id, total, size}
-	local name, packhash, id = t[2], t[3], t[4]
-	local total, size = tonumber(t[5]), tonumber(t[6])
-	if not (mp_safe_name(name) and packhash and id and total and size) then
-		return
-	end
-	if size < 1 or size > MP_MAX_BYTES or total ~= math.ceil(size / MP_CHUNK) then
-		return
-	end
-	if mp_receive and mp_receive.id == id then
-		return --already downloading this one
-	end
-	mp_receive = nil
-
-	local existing = mp_exists(name)
-	if existing and mp_pack_hash(mp_read_pack(name)) == packhash then
-		--same files as the host, nothing to download
-		udp:send(string.format("%s~%s~%s", entity, 'mpready', name))
-		return
-	end
-
-	local now = love.timer.getTime()
-	mp_receive = {
-		name = name, packhash = packhash, id = id, total = total, size = size,
-		chunks = {}, got = 0, first = 1, batchend = 0, existing = existing,
-		lastrequest = now, lastprogress = now,
-	}
-	udp:send(string.format("%s~%s~%s", entity, 'mpneed', name))
-	if existing then
-		notice.new("your mappack is different,\nusing the host's version", nil, 4)
-	else
-		notice.new("getting the mappack\nfrom the host...", nil, 4)
-	end
-	mp_request()
-end
-
-local function mp_update() --resend requests when packets get lost
-	local r = mp_receive
-	if not r then
-		return
-	end
-	local now = love.timer.getTime()
-	if now - r.lastprogress > 20 then
-		mp_fail("timed out")
-	elseif now - r.lastprogress > 1 and now - r.lastrequest > 1 then
-		mp_request()
-	end
 end
 
 function client_load(roomcode)
@@ -1075,23 +678,6 @@ function server_update(dt)
 				guielements.mappack.textcolor = {127, 0, 0}
 				notice.new(playerlist[clients[entity].i].nick .. " is missing the mappack!", notice.red, 5)
 			end
-		elseif cmd == 'mpneed' and safe then
-			--player doesn't have the mappack (or has a different version) and will download it from us
-			clients[entity].mpbusy = true
-			notice.new(tostring(clients[entity].nick) .. " needs the mappack,\nsending it now...", nil, 4)
-		elseif cmd == 'mpget' and safe then
-			mp_serve(t, clients[entity])
-		elseif cmd == 'mpready' and safe then
-			if clients[entity].mpbusy then
-				clients[entity].mpbusy = false
-				notice.new(tostring(clients[entity].nick) .. " got the mappack", {0, 255, 0}, 3)
-			end
-			if guielements.mappack then
-				guielements.mappack.textcolor = {255, 255, 255}
-			end
-		elseif cmd == 'mpfail' and safe then
-			clients[entity].mpbusy = false
-			notice.new(tostring(clients[entity].nick) .. " could not get the mappack", notice.red, 4)
 		elseif cmd == 'quit' then
 			
 		else
@@ -1108,8 +694,6 @@ function client_update(dt)
 	if relay_update(dt) then
 		return
 	end
-
-	mp_update()
 
 	if spamtimer > 0 then--this is why we can't have nice things
 		spamtimer = spamtimer - dt
@@ -1184,9 +768,6 @@ function client_update(dt)
 					return
 				end
 			else
-			if data:sub(1, 7) ~= "mpchunk" then
-				print(data)
-			end
 			local t = data:split("~")
 			local cmd = t[1]
 			if cmd == 'connect' then
@@ -1339,10 +920,6 @@ function client_update(dt)
 						end
 					end
 				end
-			elseif cmd == 'mpinfo' then
-				mp_handle_info(t)
-			elseif cmd == 'mpchunk' then
-				mp_handle_chunk(t)
 			elseif cmd == 'disablecheats' then
 				playertype = "portal"
 				playertypei = 1
@@ -1389,12 +966,6 @@ function client_update(dt)
 end
 
 function server_start()
-	for i, t in pairs(clients) do
-		if t.mpbusy then
-			notice.new(tostring(t.nick) .. " is still getting\nthe mappack", notice.red, 3)
-			return
-		end
-	end
 	for i = 1, players do
 		if playerlist[i] then
 			if playerlist[i].character then
@@ -1435,10 +1006,6 @@ function net_quit()
 			udp:sendto("RELAY~LEAVE~" .. relay_room_code, relay_host, relay_port)
 		end
 	end
-	
-	mp_receive = nil
-	mp_cache = {}
-	net_restore_mappacks()
 	
 	players = 1
 	gamestate = "menu"
@@ -1744,7 +1311,6 @@ end
 function server_setmappack(m, t)
 	if t then
 		udp:sendto(string.format("%s~%s", 'mappack', m), t[1], t[2])
-		mp_send_info(m, t)
 	else
 		mappack = mappacklist[mappackselection]
 		if mappackbackground and mappackbackground[mappackselection] then
@@ -1756,7 +1322,6 @@ function server_setmappack(m, t)
 		for i, t in pairs(clients) do
 			udp:sendto(s, t[1], t[2])
 		end
-		mp_send_info(m)
 	end
 end
 
