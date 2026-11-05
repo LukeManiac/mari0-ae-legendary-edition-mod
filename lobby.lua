@@ -77,6 +77,10 @@ function lobby_draw()
 	guielements.mappack:draw()
 	guielements.mappackleft:draw()
 	guielements.mappackright:draw()
+	local progress = net_mappack_progress()
+	if progress then
+		properprintF("receiving mappack " .. progress .. "%", 9*scale, 69*scale)
+	end
 	
 	if SERVER then
 		local roomcode = net_getroomcode()
