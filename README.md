@@ -19,7 +19,6 @@ The project expands Mari0 AE with new gameplay systems, playable characters, ene
 * [Installation](#installation)
   * [Option 1: Using the .exe File](#option-1-using-the-exe-file)
   * [Option 2: Using the .love File](#option-2-using-the-love-file)
-* [Online Multiplayer](#online-multiplayer)
 
 * [Features](#features)
   * [Gameplay](#gameplay)
@@ -209,16 +208,6 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * You can now change controls midgame.
 * Added custom categories for custom enemies. Set donotcategoriseenemyfolders to true to disable enemies being categorised by folders.
 * Saving the game via pause menu no longer quits to menu.
-
-### 🌟 Best Features
-
-* Reworked online multiplayer to use room-code matchmaking through a UDP relay. Hosts share an eight-character code for guests to join.
-* Players no longer need to configure router port forwarding.
-* Multiple game instances can connect through one relay, so you can test online multiplayer with two instances on the same computer.
-* Added a self-hostable relay. Local testing uses `127.0.0.1`; playing across the internet requires a publicly reachable relay configured in `Legendary Edition\relayconfig.lua`.
-* See [Online Multiplayer](#online-multiplayer) for local testing steps and the [relay guide](./Legendary%20Edition/relay/README.md) for deployment.
-
-**Online Multiplayer Note:** You need to install the latest usable build of Python.
 
 ### 🐛 Bug Fixes
 
@@ -546,14 +535,6 @@ Use this option if you already have LÖVE installed, or if you are on macOS or L
      ```
 
      Replace `LegendaryEdition.love` with the actual name of the file you downloaded.
-
-# Online Multiplayer
-
-When `Legendary Edition\relayconfig.lua` uses the default local address,
-the game starts the relay automatically. Python 3.10 or newer must be
-installed. The game stops the relay after the last instance exits, including
-after a forced termination. See the [relay guide](./Legendary%20Edition/relay/README.md)
-for local multiplayer testing and public relay setup.
 
 # Features
 
