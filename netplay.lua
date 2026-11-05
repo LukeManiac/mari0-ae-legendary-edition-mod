@@ -76,11 +76,37 @@ local function current_process_id()
 end
 
 local function start_local_relay()
-	-- Pure Lua relay runs inside a LÖVE thread; no Python required.
+	local process_id = current_process_id()
+	if not process_id then
+		notice.new("Could not identify this game process to start the relay", notice.red, 6)
+		return false
+	end
+
+	local source, readerr = love.filesystem.read("relay/server.py")
+	if not source then
+		notice.new(nt("net relay read error") .. tostring(readerr), notice.red, 6)
+		return false
+	end
+	local made_directory, directory_err = love.filesystem.createDirectory("relay")
+	if not made_directory then
+		notice.new("Could not prepare the relay: " .. tostring(directory_err), notice.red, 6)
+		return false
+	end
+	local written, writeerr = love.filesystem.write("relay/server.py", source)
+	if not written then
+		notice.new("Could not install the relay: " .. tostring(writeerr), notice.red, 6)
+		return false
+	end
+
+	local script_path = love.filesystem.getSaveDirectory() .. "/relay/server.py"
 	local_relay_thread = love.thread.newThread("relaythread.lua")
 	local_relay_thread:start()
 	love.thread.getChannel("relayin"):push({
+		osname = love.system.getOS(),
+		script_path = script_path,
 		port = relay_port,
+		process_id = process_id,
+		bundled_dir = love.filesystem.getSourceBaseDirectory(),
 	})
 	return true
 end
@@ -110,8 +136,12 @@ local function open_local_relay_monitor()
 		return true
 	end
 
-	-- Prefer real PID when available, otherwise a random id is enough for heartbeats.
-	local process_id = current_process_id() or ("pid" .. tostring(math.random(2147483647)))
+	local process_id = current_process_id()
+	if not process_id then
+		notice.new("Could not identify this game process to start the relay", notice.red, 6)
+		return false
+	end
+
 	local_relay_instance_id = process_id .. "-" .. tostring(math.random(2147483647))
 	local_relay_socket = socket.udp()
 	if not local_relay_socket then
