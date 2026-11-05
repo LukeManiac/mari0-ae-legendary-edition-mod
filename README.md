@@ -19,6 +19,7 @@ The project expands Mari0 AE with new gameplay systems, playable characters, ene
 * [Installation](#installation)
   * [Option 1: Using the .exe File](#option-1-using-the-exe-file)
   * [Option 2: Using the .love File](#option-2-using-the-love-file)
+* [Online Multiplayer](#online-multiplayer)
 
 * [Features](#features)
   * [Gameplay](#gameplay)
@@ -543,6 +544,14 @@ Use this option if you already have LÖVE installed, or if you are on macOS or L
      ```
 
      Replace `LegendaryEdition.love` with the actual name of the file you downloaded.
+
+# Online Multiplayer
+
+When `Legendary Edition\relayconfig.lua` uses the default local address,
+the game starts the relay automatically. Python 3.10 or newer must be
+installed. The game stops the relay after the last instance exits, including
+after a forced termination. See the [relay guide](./Legendary%20Edition/relay/README.md)
+for local multiplayer testing and public relay setup.
 
 # Features
 

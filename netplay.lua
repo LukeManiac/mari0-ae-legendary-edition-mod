@@ -23,6 +23,13 @@ local relay_room_ready = false
 local relay_keepalive_timer = 0
 local relay_setup_timer = 0
 local relay_retry_timer = 0
+local local_relay_socket
+local local_relay_instance_id
+local local_relay_start_pending = false
+local local_relay_start_attempted = false
+local local_relay_heartbeat_timer = 0
+local local_relay_start_timer = 0
+local local_relay_spawned = false
 
 local spamtimer = 0 --stop "funny" kids from spamming
 local spamtime = 0.2
@@ -30,6 +37,201 @@ local spamcounter = 0
 local spammercount = 10
 
 local lobbytimeout = 12 --kick player if ping is higher than this (a ping this high means they've disconnected)
+
+local function is_local_relay()
+	return relay_host == "localhost" or relay_host == "127.0.0.1"
+end
+
+local function current_process_id()
+	local ok, ffi = pcall(require, "ffi")
+	if not ok then
+		return nil
+	end
+
+	local osname = love.system.getOS()
+	local declaration
+	local function_name
+	if osname == "Windows" then
+		declaration = "unsigned long __stdcall GetCurrentProcessId(void);"
+		function_name = "GetCurrentProcessId"
+	elseif osname == "Linux" or osname == "OS X" then
+		declaration = "int getpid(void);"
+		function_name = "getpid"
+	else
+		return nil
+	end
+
+	pcall(ffi.cdef, declaration)
+	local success, process_id = pcall(function()
+		return ffi.C[function_name]()
+	end)
+	if success then
+		return tostring(process_id)
+	end
+end
+
+local function find_relay_python()
+	local command
+	if love.system.getOS() == "Windows" then
+		command = "where.exe pythonw.exe 2>NUL"
+	else
+		command = "command -v python3 2>/dev/null"
+	end
+
+	local pipe = io.popen(command, "r")
+	if not pipe then
+		return nil
+	end
+	local executable = pipe:read("*l")
+	pipe:close()
+	if executable and executable ~= "" then
+		return executable
+	end
+end
+
+local function shell_quote(value)
+	if love.system.getOS() == "Windows" then
+		return '"' .. value:gsub('"', '""') .. '"'
+	end
+	return "'" .. value:gsub("'", "'\\''") .. "'"
+end
+
+local function start_local_relay()
+	local process_id = current_process_id()
+	if not process_id then
+		notice.new("Could not identify this game process to start the relay", notice.red, 6)
+		return false
+	end
+
+	local executable = find_relay_python()
+	if not executable then
+		notice.new("Local relay needs Python 3.10 or newer", notice.red, 6)
+		return false
+	end
+
+	local source, readerr = love.filesystem.read("relay/server.py")
+	if not source then
+		notice.new("Could not read the bundled relay: " .. tostring(readerr), notice.red, 6)
+		return false
+	end
+	local made_directory, directory_err = love.filesystem.createDirectory("relay")
+	if not made_directory then
+		notice.new("Could not prepare the relay: " .. tostring(directory_err), notice.red, 6)
+		return false
+	end
+	local written, writeerr = love.filesystem.write("relay/server.py", source)
+	if not written then
+		notice.new("Could not install the relay: " .. tostring(writeerr), notice.red, 6)
+		return false
+	end
+
+	local script_path = love.filesystem.getSaveDirectory() .. "/relay/server.py"
+	local command
+	if love.system.getOS() == "Windows" then
+		command = "start \"\" /B " .. shell_quote(executable) .. " " .. shell_quote(script_path)
+			.. " --host 127.0.0.1 --port " .. tostring(relay_port)
+			.. " --managed --owner-pid " .. process_id .. " >NUL 2>&1"
+	else
+		command = shell_quote(executable) .. " " .. shell_quote(script_path)
+			.. " --host 127.0.0.1 --port " .. tostring(relay_port)
+			.. " --managed --owner-pid " .. process_id .. " >/dev/null 2>&1 &"
+	end
+
+	local launched, _, code = os.execute(command)
+	if launched ~= true and launched ~= 0 and code ~= 0 then
+		notice.new("Could not start the local relay", notice.red, 6)
+		return false
+	end
+	local_relay_spawned = true
+	return true
+end
+
+function net_start_local_relay()
+	if not is_local_relay() then
+		return
+	end
+
+	local process_id = current_process_id()
+	if not process_id then
+		notice.new("Could not identify this game process to start the relay", notice.red, 6)
+		return
+	end
+	if relay_host == "localhost" then
+		relay_host = "127.0.0.1"
+	end
+
+	local_relay_instance_id = process_id .. "-" .. tostring(math.random(2147483647))
+	local_relay_socket = socket.udp()
+	if not local_relay_socket then
+		notice.new("Could not create the relay monitor socket", notice.red, 6)
+		return
+	end
+	local_relay_socket:settimeout(0)
+	local bound, binderr = local_relay_socket:setsockname("0.0.0.0", 0)
+	if not bound then
+		local_relay_socket:close()
+		local_relay_socket = nil
+		notice.new("Could not open the relay monitor socket: " .. tostring(binderr), notice.red, 6)
+		return
+	end
+
+	local_relay_start_pending = true
+	local_relay_start_attempted = false
+	local_relay_heartbeat_timer = 0
+	local_relay_start_timer = 0
+	local_relay_socket:sendto("RELAY~PING", relay_host, relay_port)
+	local_relay_socket:sendto(
+		"RELAY~INSTANCE~" .. local_relay_instance_id .. "~HEARTBEAT",
+		relay_host,
+		relay_port
+	)
+end
+
+function net_update_local_relay(dt)
+	if not local_relay_socket then
+		return
+	end
+
+	local data = local_relay_socket:receivefrom()
+	if data == "RELAY~PONG" then
+		local_relay_start_pending = false
+	end
+
+	local_relay_start_timer = local_relay_start_timer + dt
+	if local_relay_start_pending and not local_relay_start_attempted and local_relay_start_timer >= 0.5 then
+		local_relay_start_attempted = true
+		if not start_local_relay() then
+			local_relay_start_pending = false
+		end
+	elseif local_relay_spawned and local_relay_start_timer >= 10 and local_relay_start_pending then
+		local_relay_start_pending = false
+		notice.new("Local relay did not respond. Check Python and relay settings.", notice.red, 6)
+	end
+
+	local_relay_heartbeat_timer = local_relay_heartbeat_timer + dt
+	if local_relay_heartbeat_timer >= 3 then
+		local_relay_heartbeat_timer = local_relay_heartbeat_timer - 3
+		local_relay_socket:sendto(
+			"RELAY~INSTANCE~" .. local_relay_instance_id .. "~HEARTBEAT",
+			relay_host,
+			relay_port
+		)
+	end
+end
+
+function net_stop_local_relay()
+	if not local_relay_socket then
+		return
+	end
+	local message = "RELAY~INSTANCE~" .. local_relay_instance_id .. "~STOP"
+	for i = 1, 3 do
+		local_relay_socket:sendto(message, relay_host, relay_port)
+	end
+	local_relay_socket:close()
+	local_relay_socket = nil
+	local_relay_instance_id = nil
+	local_relay_start_pending = false
+end
 
 local function relay_error_text(code)
 	if code == "room_not_found" then

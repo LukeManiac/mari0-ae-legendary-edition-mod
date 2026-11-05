@@ -28,15 +28,20 @@ expires rooms after ten minutes without host traffic.
 
 ## Test
 
-For a local multiplayer test, keep the default `relayconfig.lua` address
-(`127.0.0.1`), start the relay on the same computer, then launch the game
-twice as two separate processes. Create a room in the first window and enter
-its code in the second. Each game instance gets its own ephemeral UDP port,
-so both can connect to the same relay on the same machine.
+When the game uses the default local address (`127.0.0.1`), it starts the
+relay automatically. Python 3.10 or newer must be installed. For a local
+multiplayer test, launch the game twice as separate processes, create a room
+in the first window, then enter its code in the second. Each game instance
+gets its own ephemeral UDP port.
 
 For testing on other devices, set the relay address in `relayconfig.lua` to
 the relay machine's public hostname or IPv4 address before launching either
-game instance.
+game instance, and run the relay separately on that machine. Remote relay
+processes are not managed by the game and remain available after a game quits.
+
+The local managed relay shuts down shortly after the last game exits normally.
+If a game is force-terminated, the relay detects the missing heartbeat and
+shuts down within about 13 seconds.
 
 The relay protocol tests can be run with:
 

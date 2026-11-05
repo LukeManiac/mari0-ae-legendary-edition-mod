@@ -1095,6 +1095,7 @@ function love.load()
 
 	intro_load()
 	disablecheats()
+	net_start_local_relay()
 end
 
 function love.update(dt)
@@ -1102,6 +1103,7 @@ function love.update(dt)
 		music:update()
 	end
 	dt = math.min(0.01666667, dt)
+	net_update_local_relay(dt)
 	
 	--speed
 	if speed ~= speedtarget then
@@ -3337,6 +3339,7 @@ function love.quit()
     if CLIENT or SERVER then
 		net_quit()
 	end
+	net_stop_local_relay()
 	logdump()
     return false
 end
