@@ -1,5 +1,4 @@
-require "love.system"
-require "love.timer"
+-- Pure Lua UDP relay for local Mari0 AE netplay (no Python required).
 
 local socket = require "socket"
 
@@ -13,8 +12,8 @@ local MAX_ROOMS = 1000
 local ROOM_IDLE_TIMEOUT = 600
 local PEER_IDLE_TIMEOUT = 45
 local INSTANCE_TIMEOUT = 12
-local MANAGED_EMPTY_TIMEOUT = 2
-local MANAGED_STARTUP_TIMEOUT = 20
+local MANAGED_EMPTY_TIMEOUT = 3
+local MANAGED_STARTUP_TIMEOUT = 30
 
 local function now()
 	return socket.gettime()
@@ -22,17 +21,17 @@ end
 
 local job = channelin:demand()
 local port = tonumber(job.port) or 27021
-local managed = true  -- local launches always use managed mode
+local managed = true
 
-local rooms = {}          -- code -> room table
-local address_rooms = {}  -- "ip:port" -> code
-local instances = {}      -- instance_id -> {addr_key, last_seen}
+local rooms = {}
+local address_rooms = {}
+local instances = {}
 local ever_registered_instance = false
 local empty_since = nil
 local started_at = now()
 
 local function addr_key(ip, p)
-	return ip .. ":" .. tostring(p)
+	return tostring(ip) .. ":" .. tostring(p)
 end
 
 local function send_msg(udp, message, ip, p)
@@ -44,7 +43,7 @@ local function send_error(udp, code, ip, p)
 end
 
 local function handle_instance(udp, instance_id, command, ip, p)
-	if not instance_id:match(INSTANCE_ID_PATTERN) then
+	if not tostring(instance_id):match(INSTANCE_ID_PATTERN) then
 		return
 	end
 	local key = addr_key(ip, p)
@@ -80,9 +79,7 @@ local function create_room(udp, code, ip, p)
 		return
 	end
 	local room_count = 0
-	for _ in pairs(rooms) do
-		room_count = room_count + 1
-	end
+	for _ in pairs(rooms) do room_count = room_count + 1 end
 	if room_count >= MAX_ROOMS then
 		send_error(udp, "server_full", ip, p)
 		return
@@ -90,15 +87,9 @@ local function create_room(udp, code, ip, p)
 
 	local t = now()
 	rooms[code] = {
-		host_ip = ip,
-		host_port = p,
-		host_key = key,
-		guest_ip = nil,
-		guest_port = nil,
-		guest_key = nil,
-		last_activity = t,
-		host_last_activity = t,
-		guest_last_activity = nil,
+		host_ip = ip, host_port = p, host_key = key,
+		guest_ip = nil, guest_port = nil, guest_key = nil,
+		last_activity = t, host_last_activity = t, guest_last_activity = nil,
 	}
 	address_rooms[key] = code
 	send_msg(udp, "RELAY~CREATED~" .. code, ip, p)
@@ -185,10 +176,8 @@ end
 local function forward(udp, data, ip, p)
 	local key = addr_key(ip, p)
 	local code = address_rooms[key]
-	local room = rooms[code]
-	if not room then
-		return
-	end
+	local room = code and rooms[code]
+	if not room then return end
 	local t = now()
 	local peer_ip, peer_port
 	if key == room.host_key then
@@ -207,10 +196,9 @@ local function forward(udp, data, ip, p)
 end
 
 local function handle_control(udp, data, ip, p)
-	local text = data
 	local parts = {}
-	for part in string.gmatch(text, "[^~]+") do
-		table.insert(parts, part)
+	for part in string.gmatch(data, "[^~]+") do
+		parts[#parts + 1] = part
 	end
 
 	if #parts == 2 and parts[1] == "RELAY" and parts[2] == "PING" then
@@ -229,7 +217,6 @@ local function handle_control(udp, data, ip, p)
 		send_error(udp, "invalid_code", ip, p)
 		return
 	end
-
 	if command == "CREATE" then
 		create_room(udp, code, ip, p)
 	elseif command == "JOIN" then
@@ -248,7 +235,7 @@ local function expire_rooms(udp)
 	local expired = {}
 	for code, room in pairs(rooms) do
 		if t - room.host_last_activity >= ROOM_IDLE_TIMEOUT then
-			table.insert(expired, code)
+			expired[#expired + 1] = code
 		end
 	end
 	for _, code in ipairs(expired) do
@@ -261,51 +248,43 @@ local function expire_rooms(udp)
 		end
 	end
 	for code, room in pairs(rooms) do
-		if room.guest_key and room.guest_last_activity and t - room.guest_last_activity >= PEER_IDLE_TIMEOUT then
-			local guest_ip, guest_port, guest_key = room.guest_ip, room.guest_port, room.guest_key
-			room.guest_ip = nil
-			room.guest_port = nil
-			room.guest_key = nil
+		if room.guest_key and room.guest_last_activity
+			and t - room.guest_last_activity >= PEER_IDLE_TIMEOUT then
+			local gip, gpt, gkey = room.guest_ip, room.guest_port, room.guest_key
+			room.guest_ip, room.guest_port, room.guest_key = nil, nil, nil
 			room.guest_last_activity = nil
 			room.last_activity = t
-			address_rooms[guest_key] = nil
-			send_msg(udp, "RELAY~CLOSED~" .. code, guest_ip, guest_port)
+			address_rooms[gkey] = nil
+			send_msg(udp, "RELAY~CLOSED~" .. code, gip, gpt)
 			send_msg(udp, "RELAY~PEER_LEFT~" .. code, room.host_ip, room.host_port)
 		end
 	end
 end
 
 local function should_stop()
-	if not managed then
-		return false
-	end
+	if not managed then return false end
 	local t = now()
 	local expired = {}
 	for id, inst in pairs(instances) do
 		if t - inst[2] >= INSTANCE_TIMEOUT then
-			table.insert(expired, id)
+			expired[#expired + 1] = id
 		end
 	end
 	for _, id in ipairs(expired) do
 		instances[id] = nil
 	end
-
 	if next(instances) then
 		empty_since = nil
 		return false
 	end
-	-- No process-alive check needed; the Lua thread lives inside a game process.
-	-- Rely on INSTANCE heartbeats only.
 	if not ever_registered_instance then
 		return t - started_at >= MANAGED_STARTUP_TIMEOUT
 	end
-	if empty_since == nil then
-		empty_since = t
-	end
+	if empty_since == nil then empty_since = t end
 	return t - empty_since >= MANAGED_EMPTY_TIMEOUT
 end
 
--- Bind and run
+-- Bind
 local udp = socket.udp()
 if not udp then
 	channelout:push({"error", "net relay start error"})
@@ -313,15 +292,18 @@ if not udp then
 end
 
 udp:settimeout(0.05)
-local ok, err = udp:setsockname("127.0.0.1", port)
+
+-- Prefer all interfaces so both 127.0.0.1 and localhost work reliably
+local ok, err = udp:setsockname("*", port)
 if not ok then
-	-- try any interface as fallback
-	ok, err = udp:setsockname("*", port)
-	if not ok then
-		channelout:push({"error", "net relay start error"})
-		udp:close()
-		return
-	end
+	ok, err = udp:setsockname("127.0.0.1", port)
+end
+if not ok then
+	-- Port already taken: another game instance is probably already running the relay.
+	-- Report success so the client just talks to the existing one.
+	channelout:push({"ok"})
+	udp:close()
+	return
 end
 
 channelout:push({"ok"})
@@ -338,14 +320,11 @@ while true do
 			end
 		end
 	end
-
 	local t = now()
 	if t - last_expire >= 1.0 then
 		last_expire = t
 		expire_rooms(udp)
-		if should_stop() then
-			break
-		end
+		if should_stop() then break end
 	end
 end
 

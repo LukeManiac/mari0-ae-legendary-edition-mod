@@ -110,12 +110,8 @@ local function open_local_relay_monitor()
 		return true
 	end
 
-	local process_id = current_process_id()
-	if not process_id then
-		notice.new("Could not identify this game process to start the relay", notice.red, 6)
-		return false
-	end
-
+	-- Prefer real PID when available, otherwise a random id is enough for heartbeats.
+	local process_id = current_process_id() or ("pid" .. tostring(math.random(2147483647)))
 	local_relay_instance_id = process_id .. "-" .. tostring(math.random(2147483647))
 	local_relay_socket = socket.udp()
 	if not local_relay_socket then
