@@ -218,6 +218,8 @@ All notable releases and updates to **Legendary Edition** are documented here.
 * Added a self-hostable relay. Local testing uses `127.0.0.1`; playing across the internet requires a publicly reachable relay configured in `Legendary Edition\relayconfig.lua`.
 * See [Online Multiplayer](#online-multiplayer) for local testing steps and the [relay guide](./Legendary%20Edition/relay/README.md) for deployment.
 
+**Online Multiplayer Note:** You need to install the latest usable build of Python.
+
 ### 🐛 Bug Fixes
 
 * Fixed keyboard navigation in the controls menu so the Pause binding is reachable when moving through controls with mouse aiming on or off.

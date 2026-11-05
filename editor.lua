@@ -543,7 +543,6 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	function() 
 		multitileobjectnames[guielements["mtobjectrename"].i] = guielements["mtobjectrename"].value
 		guielements["mtobjectrename"].active = false
-		guielements["mtobjectrename"].inputting = false
 		changemtname(guielements["mtobjectrename"].i)
 	end, "", 30)
 	
@@ -5420,18 +5419,6 @@ function editorclose()
 	local dropdown = guielement.getopendropdown()
 	if dropdown then
 		dropdown:close()
-	end
-	local textinputactive = typingintextinput
-	for _, element in pairs(guielements) do
-		if element.inputting then
-			element.inputting = false
-			textinputactive = true
-		end
-	end
-	typingintextinput = false
-	love.keyboard.setKeyRepeat(false)
-	if android and textinputactive then
-		love.keyboard.setTextInput(false)
 	end
 	editor_set_menu_view(false)
 	if not editorMenuAnimation then

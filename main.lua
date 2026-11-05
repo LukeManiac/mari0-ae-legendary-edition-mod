@@ -198,6 +198,16 @@ function love.load()
 	shaderlist = love.filesystem.getDirectoryItems( "shaders/" )
 	dlclist = {"dlc_a_portal_tribute", "dlc_acid_trip", "dlc_escape_the_lab", "dlc_scienceandstuff", "dlc_smb2J", "dlc_the_untitled_game"}
 	
+	magicdns_session_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	magicdns_session = ""
+	for i = 1, 8 do
+		rand = math.random(string.len(magicdns_session_chars))
+		magicdns_session = magicdns_session .. string.sub(magicdns_session_chars, rand, rand)
+	end
+	--use love.filesystem.getIdentity() when it works
+	magicdns_identity = love.filesystem.getSaveDirectory():split("/")
+	magicdns_identity = string.upper(magicdns_identity[#magicdns_identity])
+	
 	local rem
 	for i, v in pairs(shaderlist) do
 		if v == "init.lua" then
@@ -1102,7 +1112,6 @@ function love.update(dt)
 		music:update()
 	end
 	dt = math.min(0.01666667, dt)
-	net_update_local_relay(dt)
 	
 	--speed
 	if speed ~= speedtarget then
@@ -3338,7 +3347,6 @@ function love.quit()
     if CLIENT or SERVER then
 		net_quit()
 	end
-	net_stop_local_relay()
 	logdump()
     return false
 end
