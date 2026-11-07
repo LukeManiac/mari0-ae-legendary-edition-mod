@@ -961,10 +961,7 @@ function editor_gui_interaction_enabled(element)
 		return editorRCOpen and not editorRCAnimation
 	end
 
-	if not editormenuopen or editorMenuAnimation then
-		return false
-	end
-
+	-- Allow map-resize controls even while the main editor menu is closed
 	if element and changemapwidthmenu then
 		local resizeProgress, resizeAnimationDone = editor_resize_progress()
 		if resizeProgress >= 1 and resizeAnimationDone then
@@ -974,6 +971,11 @@ function editor_gui_interaction_enabled(element)
 				end
 			end
 		end
+		return false
+	end
+
+	if not editormenuopen or editorMenuAnimation then
+		return false
 	end
 	
 	return true
