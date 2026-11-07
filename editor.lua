@@ -3961,6 +3961,14 @@ function editor_draw()
 				for _, element in pairs(guielements) do
 					element.active = false
 				end
+				-- Keep the map-resize buttons alive while the resize overlay is open
+				if changemapwidthmenu then
+					for _, name in ipairs(editorResizeGuiElementNames) do
+						if guielements[name] then
+							guielements[name].active = true
+						end
+					end
+				end
 			end
 		end
 	else
