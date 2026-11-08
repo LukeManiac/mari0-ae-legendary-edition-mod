@@ -7299,6 +7299,9 @@ function mario:startfall()
 			self.swimanimationprogress = 1
 			self.swimframe = 1
 			self.swimpush = false
+			if self.ducking then
+				self:duck(false)
+			end
 		end
 		self:setquad()
 	end
