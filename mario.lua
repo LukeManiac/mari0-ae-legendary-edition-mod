@@ -8995,7 +8995,9 @@ end
 
 function mario:dive(water)
 	if water then
-		self:duck(false)
+		if self.ducking then
+			self:duck(false)
+		end
 		self.gravity = self.characterdata.uwyacceleration
 		self.water = true
 		self.speedx = self.speedx*waterdamping
