@@ -4546,18 +4546,11 @@ function returntomenu()
 end
 
 function openconfirmmenu(menutype, args)
-	if NoExitConfirmation or love.keyboard.isDown("lshift") or levelmodified ~= true then
+	if NoExitConfirmation or levelmodified ~= true then
 		if menutype == "exit" then
 			createeditorsavedata("menu")
 			returntomenu()
 		elseif menutype == "maps" then
-			oldworld, oldlevel, oldsublevel = unpack(args)
-
-			if oldworld == marioworld and oldlevel == mariolevel and oldsublevel == mariosublevel and not love.keyboard.isDown("lshift") then
-				notice.new("Hold lshift to reload level", nil, 3)
-				return
-			end
-
 			createeditorsavedata("changelevel")
 			mapnumberclick(unpack(args))
 		end
