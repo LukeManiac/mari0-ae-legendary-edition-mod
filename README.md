@@ -184,6 +184,7 @@ The first release of **Legendary Edition**, a community-made expansion and modif
   * The camera can now be set to "forward only".
   * The coin limit can now be toggled.
   * You can now use only one-time save files (aka suspend files).
+  * **Note:** You will be warned for using the features mentioned as it *could* ruin your mappack gameplay.
 
 ### 🐛 Bug Fixes
 
@@ -278,8 +279,6 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 * The dropdown arrow and the checkbox are now drawn with LÖVE's native graphics instead of image files.
 
 **Note:** The four-keybind system remains compatible with original Mari0 AE save data and does not negatively affect it. Running Mari0 AE may remove the secondary, tertiary, and quaternary keybinds from your save data so make sure to backup your data.
-
-**Important Note:** You will be warned for using the features mentioned as it *could* ruin your mappack gameplay.
 
 **Mod Production Note:** These changes were made with Claude, Grok, and GitHub Copilot.
 
