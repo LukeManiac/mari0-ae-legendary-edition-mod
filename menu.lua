@@ -3465,10 +3465,7 @@ function menu_keypressed(key, unicode)
 				--download mappack
 				downloadingmappack = true
 				love.graphics.clear(love.graphics.getBackgroundColor())
-				if resizable then
-					love.graphics.scale(winwidth/(width*16*scale), winheight/(224*scale))
-				end
-				menu_draw()
+				love.draw()
 				love.graphics.present()
 				
 				if asset.download then
