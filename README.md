@@ -281,7 +281,7 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 **Important Note:** You will be warned for using the features mentioned as it *could* ruin your mappack gameplay.
 
-**Note:** These changes were made with Claude, Grok, and GitHub Copilot.
+**Mod Production Note:** These changes were made with Claude, Grok, and GitHub Copilot.
 
 ---
 
