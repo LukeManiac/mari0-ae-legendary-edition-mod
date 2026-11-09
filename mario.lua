@@ -5046,8 +5046,8 @@ function mario:floorcollide(a, b)
 		local previousObject = self._inertiaPreviousObject
 		local previousSpeedX = self._inertiaPreviousSpeedX or 0
 		local previousSpeedY = self._inertiaPreviousSpeedY or 0
-		local objectSpeedX = b and b.speedx or 0
-		local objectSpeedY = b and b.speedy or 0
+		local objectSpeedX = b and (b.trackvelocityx or b.speedx) or 0
+		local objectSpeedY = b and (b.trackvelocityy or b.speedy) or 0
 		local movingObject = b and (b.static == false or b.activestatic == true or b.trackplatform == true or b.moving == true or objectSpeedX ~= 0 or objectSpeedY ~= 0)
 
 		if previousObject and previousObject ~= b and (previousSpeedX ~= 0 or previousSpeedY ~= 0) and not self._inertiaTransferredThisFrame then

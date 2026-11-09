@@ -505,6 +505,10 @@ function trackcontroller:update(dt)
 		end
 		local xdiff = b.x-oldx
 		local ydiff = b.y-oldy
+		-- Track-mounted objects have positional velocity rather than ordinary physics velocity.
+		-- Keep it separate so inertia can inherit the exact movement without changing track motion.
+		b.trackvelocityx = dt > 0 and xdiff/dt or 0
+		b.trackvelocityy = dt > 0 and ydiff/dt or 0
 		local condition = false
 		if ydiff < 0 then
 			condition = "ignoreplatforms"
@@ -521,6 +525,11 @@ function trackcontroller:update(dt)
 									w.oldxplatform = w.x
 									w.x = w.x + xdiff
 									w.trackplatformcarriedx = xdiff
+								end
+								if InertiaPhysics and w.playernumber then
+									w.inertiaobject = b
+									w.inertiaspeedx = b.trackvelocityx or 0
+									w.inertiaspeedy = b.trackvelocityy or 0
 								end
 								if (not b.leavemarioalone) then
 									w.y = b.y-w.height

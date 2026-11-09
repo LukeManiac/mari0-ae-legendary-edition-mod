@@ -59,8 +59,8 @@ function physicsupdate(dt)
 				local inertiaPreviousSpeedY
 				if j == "player" and InertiaPhysics then
 					inertiaPreviousObject = v.inertiaobject
-					inertiaPreviousSpeedX = (v.inertiaobject and v.inertiaobject.speedx) or v.inertiaspeedx or 0
-					inertiaPreviousSpeedY = (v.inertiaobject and v.inertiaobject.speedy) or v.inertiaspeedy or 0
+					inertiaPreviousSpeedX = (v.inertiaobject and (v.inertiaobject.trackvelocityx or v.inertiaobject.speedx)) or v.inertiaspeedx or 0
+					inertiaPreviousSpeedY = (v.inertiaobject and (v.inertiaobject.trackvelocityy or v.inertiaobject.speedy)) or v.inertiaspeedy or 0
 					v._inertiaPreviousObject = inertiaPreviousObject
 					v._inertiaPreviousSpeedX = inertiaPreviousSpeedX
 					v._inertiaPreviousSpeedY = inertiaPreviousSpeedY
