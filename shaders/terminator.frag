@@ -1,8 +1,8 @@
 /*
     Terminator
     T-800 vision: everything goes red, with scanlines, a sweeping scan
-    bar, a flickering targeting ring, corner brackets and a column of
-    jumping readout bars down the left side.
+    bar, corner brackets and a column of jumping readout bars down the
+    left side.
     Drop into shaders/ and pick "terminator" from the shader menu.
 */
 
@@ -36,15 +36,6 @@ vec4 effect(vec4 vcolor, Image tex, vec2 uv, vec2 pixel_coords)
     float armH = step(8.0, q.y) * step(q.y, 9.2) * step(8.0, q.x) * step(q.x, 24.0);
     float armV = step(8.0, q.x) * step(q.x, 9.2) * step(8.0, q.y) * step(q.y, 24.0);
     float hud = max(armH, armV);
-
-    // targeting ring with gaps at the compass points, plus ticks
-    vec2 c = gp - inputSize * 0.5;
-    float ring = 1.0 - smoothstep(0.0, 0.8, abs(length(c) - 26.0));
-    ring *= step(5.0, abs(c.x)) * step(5.0, abs(c.y));
-    float tickH = step(abs(c.y), 0.5) * step(20.0, abs(c.x)) * step(abs(c.x), 32.0);
-    float tickV = step(abs(c.x), 0.5) * step(20.0, abs(c.y)) * step(abs(c.y), 32.0);
-    float lockOn = 0.7 + 0.3 * step(0.5, fract(t * 2.0));
-    hud = max(hud, max(ring, max(tickH, tickV)) * lockOn);
 
     // readout bars, seven rows of 10px
     float ry = (gp.y - 36.0) / 10.0;
