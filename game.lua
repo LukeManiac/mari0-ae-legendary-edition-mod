@@ -348,7 +348,8 @@ function game_update(dt)
 		end
 
 		--only usable and hoverable once the menu is fully open and no prompt (or the controls popup) is showing
-		volumeslider.active = (pausemenuopentimer >= pausemenuopenduration and menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 and not controlspopupvisible())
+		local pause_gui_active = (pausemenuopentimer >= pausemenuopenduration and menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 and not controlspopupvisible())
+		volumeslider.active = pause_gui_active
 		volumeslider.nohover = not volumeslider.active
 
 		if volumeslider.dragging and not volumeslider.active then
@@ -366,8 +367,57 @@ function game_update(dt)
 			volumeslider.value = volume
 			volumeslider.savedvalue = volume
 		end
-	elseif guielements["pause_volume"] then
-		guielements["pause_volume"] = nil
+
+		--shader dropdowns (same pattern as options menu)
+		if shaderssupported ~= false then
+			local shaderwidth = 1
+			for i = 1, #shaderlist do
+				shaderwidth = math.max(shaderwidth, utf8.len(shaderlist[i]))
+			end
+
+			for slot = 1, 2 do
+				local name = "pause_shader" .. slot
+				local dd = guielements[name]
+				if not dd then
+					local start = (slot == 1) and currentshaderi1 or currentshaderi2
+					dd = guielement:new("dropdown", (width*8)+5, 112 + (slot == 1 and 5 or 35), shaderwidth, function(i)
+						if slot == 1 then
+							currentshaderi1 = i
+						else
+							currentshaderi2 = i
+						end
+						if shaderlist[i] == "none" then
+							shaders:set(slot, nil)
+						else
+							shaders:set(slot, shaderlist[i])
+						end
+						guielements[name].var = i
+						saveconfig()
+					end, start, unpack(shaderlist))
+					guielements[name] = dd
+				end
+				dd.x = (width*8)+5
+				dd.y = 112 + (slot == 1 and 5 or 35)
+				dd.width = shaderwidth
+				dd.active = pause_gui_active
+				dd.nohover = not pause_gui_active
+				--keep selection in sync if it changed via keypress
+				local want = (slot == 1) and currentshaderi1 or currentshaderi2
+				if dd.var ~= want and not dd.extended then
+					dd.var = want
+				end
+			end
+		end
+	else
+		if guielements["pause_volume"] then
+			guielements["pause_volume"] = nil
+		end
+		if guielements["pause_shader1"] then
+			guielements["pause_shader1"] = nil
+		end
+		if guielements["pause_shader2"] then
+			guielements["pause_shader2"] = nil
+		end
 	end
 
 	if pausemenuopen and not (SERVER or CLIENT) then
@@ -3248,8 +3298,8 @@ function game_draw()
 
 		if shaderssupported == false then
 			properprintF(TEXT["unsupported"], (width*8*scale)+5*scale, (112*scale)+5*scale)
-		else
-			properprintF(string.lower(shaderlist[currentshaderi1]), (width*8*scale)+5*scale, (112*scale)+5*scale)
+		elseif guielements["pause_shader1"] then
+			guielements["pause_shader1"]:draw()
 		end
 
 		love.graphics.setColor(100, 100, 100, 255)
@@ -3262,8 +3312,8 @@ function game_draw()
 
 		if shaderssupported == false then
 			properprintF(TEXT["unsupported"], (width*8*scale)+5*scale, (112*scale)+35*scale)
-		else
-			properprintF(string.lower(shaderlist[currentshaderi2]), (width*8*scale)+5*scale, (112*scale)+35*scale)
+		elseif guielements["pause_shader2"] then
+			guielements["pause_shader2"]:draw()
 		end
 
 		love.graphics.pop()
@@ -5549,6 +5599,9 @@ function game_keypressed(key, textinput)
 					else
 						shaders:set(1, shaderlist[currentshaderi1])
 					end
+					if guielements["pause_shader1"] then
+						guielements["pause_shader1"].var = currentshaderi1
+					end
 					saveconfig()
 				elseif pausemenuselected == #pausemenuoptions + 3 then
 					currentshaderi2 = currentshaderi2 + 1
@@ -5559,6 +5612,9 @@ function game_keypressed(key, textinput)
 						shaders:set(2, nil)
 					else
 						shaders:set(2, shaderlist[currentshaderi2])
+					end
+					if guielements["pause_shader2"] then
+						guielements["pause_shader2"].var = currentshaderi2
 					end
 					saveconfig()
 				end
@@ -5576,6 +5632,9 @@ function game_keypressed(key, textinput)
 					else
 						shaders:set(1, shaderlist[currentshaderi1])
 					end
+					if guielements["pause_shader1"] then
+						guielements["pause_shader1"].var = currentshaderi1
+					end
 					saveconfig()
 				elseif pausemenuselected == #pausemenuoptions + 3 then
 					currentshaderi2 = currentshaderi2 - 1
@@ -5586,6 +5645,9 @@ function game_keypressed(key, textinput)
 						shaders:set(2, nil)
 					else
 						shaders:set(2, shaderlist[currentshaderi2])
+					end
+					if guielements["pause_shader2"] then
+						guielements["pause_shader2"].var = currentshaderi2
 					end
 					saveconfig()
 				end
