@@ -572,13 +572,17 @@ local function optionscontrols_draw_page(page, offset)
 end
 
 local function optionscontrols_resettooltip()
-	if keybindpage == 1 then
-		if skinningplayer == 1 then
-			return "press ctrl+f6 to", "reset keybinds"
+	local ctrlheld = love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl")
+	if ctrlheld then
+		if keybindpage == 1 then
+			if skinningplayer == 1 then
+				return "press ctrl+f6 to", "reset keybinds"
+			end
+			return "press ctrl+f6 to reset", "keybinds to player " .. (skinningplayer - 1)
 		end
-		return "press ctrl+f6 to reset", "keybinds to player " .. (skinningplayer - 1)
+		return "press ctrl+f6 to", "clear keybinds"
 	end
-	return "press ctrl+f6 to", "clear keybinds"
+	return "press f6 on a keybind", "to reset it to default"
 end
 
 local function optionscontrols_resetbindings()
@@ -619,6 +623,68 @@ local function optionscontrols_resetbindings()
 		end
 	end
 
+	optionscontrols_sync()
+	saveconfig()
+	return true
+end
+
+local function optionscontrols_defaultbinding(player, name, page)
+	page = page or keybindpage
+	if page ~= 1 then
+		return {}
+	end
+	if player == 1 then
+		local defaults = {
+			left = {"a"},
+			right = {"d"},
+			up = {"w"},
+			down = {"s"},
+			run = {"lshift"},
+			jump = {" "},
+			reload = {"r"},
+			use = {"e"},
+			pause = {"escape"},
+			aimx = {""},
+			aimy = {""},
+			portal1 = {""},
+			portal2 = {""},
+		}
+		return deepcopy(defaults[name] or {})
+	end
+	-- players 2-4 default to the joystick layout from main.lua
+	local i = player
+	local joydefaults = {
+		right = {"joy", i-1, "hat", 1, "r"},
+		left = {"joy", i-1, "hat", 1, "l"},
+		down = {"joy", i-1, "hat", 1, "d"},
+		up = {"joy", i-1, "hat", 1, "u"},
+		run = {"joy", i-1, "but", 3},
+		jump = {"joy", i-1, "but", 1},
+		aimx = {"joy", i-1, "axe", 5, "neg"},
+		aimy = {"joy", i-1, "axe", 4, "neg"},
+		portal1 = {"joy", i-1, "but", 5},
+		portal2 = {"joy", i-1, "but", 6},
+		reload = {"joy", i-1, "but", 4},
+		use = {"joy", i-1, "but", 2},
+		pause = {""},
+	}
+	return deepcopy(joydefaults[name] or {})
+end
+
+local function optionscontrols_reset_selected_binding()
+	local controlindex = optionsselection - 4
+	if controlindex < 1 or controlindex > #optionscontrols_controlnames then
+		return false
+	end
+	local name = optionscontrols_controlnames[controlindex]
+	local controlset = getcontrolset(keybindpage)
+	if not controlset then
+		return false
+	end
+	if not controlset[skinningplayer] then
+		controlset[skinningplayer] = {}
+	end
+	controlset[skinningplayer][name] = optionscontrols_defaultbinding(skinningplayer, name, keybindpage)
 	optionscontrols_sync()
 	saveconfig()
 	return true
@@ -3584,9 +3650,17 @@ function menu_keypressed(key, unicode)
 			return
 		end
 
-		-- Ctrl+F6: reset / clear / copy the current player's keybind page
-		if optionstab == 1 and not keyprompt and key == "f6" and (love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl")) then
-			optionscontrols_resetbindings()
+		-- F6: selected keybind to default; Ctrl+F6: full page reset / clear / copy
+		if optionstab == 1 and not keyprompt and key == "f6" then
+			if love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl") then
+				optionscontrols_resetbindings()
+			elseif optionsselection >= 5 then
+				if optionscontrols_reset_selected_binding() then
+					notice.new("keybind reset to default", nil, 2)
+				end
+			else
+				notice.new("select a keybind first\nthen press f6 to reset it", nil, 3)
+			end
 			return
 		end
 
@@ -4809,8 +4883,16 @@ function controlspopup_keypressed(key)
 		return
 	end
 
-	if key == "f6" and (love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl")) then
-		optionscontrols_resetbindings()
+	if key == "f6" then
+		if love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl") then
+			optionscontrols_resetbindings()
+		elseif optionsselection >= 5 then
+			if optionscontrols_reset_selected_binding() then
+				notice.new("keybind reset to default", nil, 2)
+			end
+		else
+			notice.new("select a keybind first\nthen press f6 to reset it", nil, 3)
+		end
 		return
 	end
 
