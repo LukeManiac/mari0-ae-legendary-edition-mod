@@ -260,6 +260,40 @@ local function overlayanim_progress(anim)
 	return motion_curve(t, anim.curve, anim.want, not anim.want, true, true)
 end
 
+function getFilesRecursive(folder, extension, includeext, basename_only)
+    local files = {}
+	if includeext == nil then includeext = true end
+
+    local function scan(directory)
+        local items = love.filesystem.getDirectoryItems(directory)
+
+        for _, item in ipairs(items) do
+            local path = directory .. "/" .. item
+            local info = love.filesystem.getInfo(path)
+
+            if info.type == "directory" then
+                scan(path)
+
+			elseif info.type == "file" then
+                local ext = item:match("%.([^%.]+)$")
+
+                if not extension or (ext and ext:lower() == extension:lower()) then
+                    local result = basename_only and item or path
+
+                    if not includeext then
+                        result = result:gsub("%.[^%.]+$", "")
+                    end
+
+                    table.insert(files, result)
+                end
+            end
+        end
+    end
+
+    scan(folder)
+    return files
+end
+
 function love.load()
 	marioversion = 1006
 	versionstring = "version 1.6"
@@ -422,7 +456,6 @@ function love.load()
 	print("done loading .luas!")
 
 	love.graphics.clear(0, 0, 0)
-	intro_textdraw()
 	love.graphics.present()
 
 	local enemyluas = love.filesystem.getDirectoryItems("enemies")
@@ -1026,7 +1059,6 @@ function love.load()
 	konamisound = newsound("konami")
 	pausesound = newsound("pause")
 	bulletbillsound = newsound("bulletbill")
-	introsound = newsound("intro")
 	dialogsound = newsound("dialog")
 	beepsound = newsound("beep")
 	iciclesound = newsound("icicle")
@@ -1099,25 +1131,12 @@ function love.load()
 	lowtimesound = newsound("lowtime")
 	
 	updatesoundlist = function()
-		soundlist = {jumpsound, jumpbigsound, stompsound, shotsound, errorsound, blockhitsound, blockbreaksound, coinsound, pipesound, boomsound, mushroomappearsound, mushroomeatsound, shrinksound, deathsound, deathstingsound, gameoversound,
-					turretshotsound, oneupsound, levelendsound, castleendsound, scoreringsound, intermissionsound, firesound, fireballsound, meltsound, freezesound, iceballsound, iceballhitsound, iceblockbreaksound, bridgebreaksound, bowserfallsound, vinesound, swimsound, rainboomsound, 
-					portal1opensound, portal2opensound, portalentersound, portalfizzlesound, lowtimesound, pausesound, introsound, dialogsound, beepsound, bulletbillsound, iciclesound, thwompsound, boomerangsound, raccoonswingsound,
-					raccoonplanesound, skidsound, jumptinysound, pbuttonsound, windsound, suitsound, magicsound, koopalingendsound, bowserendsound, dooropensound, doorclosesound, keysound, keyopensound, weirdmushroomsound, jumpskinnysound,
-					energybouncesound, shufflesound, grabsound, throwsound, collectable1sound, collectable2sound, collectable3sound, collectable4sound, collectable5sound, collectable6sound, collectable7sound, 
-					collectable8sound, collectable9sound, collectable10sound, switchsound, iciclefallsound, helmetsound, helmetspikesound, helmethitsound, helmetremovesound, drybonesshellsound, propellersound, clearpipesound, megamushroomsound, stompbigsound, thwompbigsound,
-					superballeatsound, superballsound, capeflysound, mushroombigeatsound, bumperhitsound, bumperjumpsound, cannonfastsound, powblocksound, checkpointsound, groundpoundsound, glados1sound, glados2sound}
-		soundliststring = {"jump", "jumpbig", "stomp", "shot", "error", "blockhit", "blockbreak", "coin", "pipe", "boom", "mushroomappear", "mushroomeat", "shrink", "death", "deathsting", "gameover",
-			"turretshot", "oneup", "levelend", "castleend", "scorering", "intermission", "fire", "fireball", "melt", "freeze", "iceball", "iceballhit", "iceblockbreak", "bridgebreak", "bowserfall", "vine", "swim", "rainboom",
-			"portal1open", "portal2open", "portalenter", "portalfizzle", "lowtime", "pause", "intro", "dialog", "beep", "bulletbill", "icicle", "thwomp", "boomerang", "raccoonswing",
-			"raccoonplane", "skid", "jumptiny", "pbutton", "wind", "suit", "magic", "koopalingend", "bowserend", "dooropen", "doorclose", "key", "keyopen", "weirdmushroom", "jumpskinny",
-			"energybounce", "shuffle", "grab", "throw", "collectable1","collectable2","collectable3","collectable4","collectable5","collectable6","collectable7","collectable8", "collectable9", "collectable10",
-			"switch", "iciclefall", "helmet", "helmetspike", "helmethit", "helmetremove", "drybonesshell", "propeller", "clearpipe", "megamushroom", "stompbig", "thwompbig", "superballeat", "superball", "capefly", "mushroombigeat", "bumperhit",
-			"bumperjump", "cannonfast", "powblock", "checkpoint", "groundpound", "glados1", "glados2"}
+		soundlist = {jumpsound, jumpbigsound, stompsound, shotsound, errorsound, blockhitsound, blockbreaksound, coinsound, pipesound, boomsound, mushroomappearsound, mushroomeatsound, shrinksound, deathsound, deathstingsound, gameoversound, turretshotsound, oneupsound, levelendsound, castleendsound, scoreringsound, intermissionsound, firesound, fireballsound, meltsound, freezesound, iceballsound, iceballhitsound, iceblockbreaksound, bridgebreaksound, bowserfallsound, vinesound, swimsound, rainboomsound,  portal1opensound, portal2opensound, portalentersound, portalfizzlesound, lowtimesound, pausesound, dialogsound, beepsound, bulletbillsound, iciclesound, thwompsound, boomerangsound, raccoonswingsound, raccoonplanesound, skidsound, jumptinysound, pbuttonsound, windsound, suitsound, magicsound, koopalingendsound, bowserendsound, dooropensound, doorclosesound, keysound, keyopensound, weirdmushroomsound, jumpskinnysound, energybouncesound, shufflesound, grabsound, throwsound, collectable1sound, collectable2sound, collectable3sound, collectable4sound, collectable5sound, collectable6sound, collectable7sound,  collectable8sound, collectable9sound, collectable10sound, switchsound, iciclefallsound, helmetsound, helmetspikesound, helmethitsound, helmetremovesound, drybonesshellsound, propellersound, clearpipesound, megamushroomsound, stompbigsound, thwompbigsound, superballeatsound, superballsound, capeflysound, mushroombigeatsound, bumperhitsound, bumperjumpsound, cannonfastsound, powblocksound, checkpointsound, groundpoundsound, glados1sound, glados2sound}
+		soundliststring = {"jump", "jumpbig", "stomp", "shot", "error", "blockhit", "blockbreak", "coin", "pipe", "boom", "mushroomappear", "mushroomeat", "shrink", "death", "deathsting", "gameover", "turretshot", "oneup", "levelend", "castleend", "scorering", "intermission", "fire", "fireball", "melt", "freeze", "iceball", "iceballhit", "iceblockbreak", "bridgebreak", "bowserfall", "vine", "swim", "rainboom", "portal1open", "portal2open", "portalenter", "portalfizzle", "lowtime", "pause", "dialog", "beep", "bulletbill", "icicle", "thwomp", "boomerang", "raccoonswing", "raccoonplane", "skid", "jumptiny", "pbutton", "wind", "suit", "magic", "koopalingend", "bowserend", "dooropen", "doorclose", "key", "keyopen", "weirdmushroom", "jumpskinny", "energybounce", "shuffle", "grab", "throw", "collectable1","collectable2","collectable3","collectable4","collectable5","collectable6","collectable7","collectable8", "collectable9", "collectable10", "switch", "iciclefall", "helmet", "helmetspike", "helmethit", "helmetremove", "drybonesshell", "propeller", "clearpipe", "megamushroom", "stompbig", "thwompbig", "superballeat", "superball", "capefly", "mushroombigeat", "bumperhit", "bumperjump", "cannonfast", "powblock", "checkpoint", "groundpound", "glados1", "glados2"}
 		local temptable = {} --sort the sounds
 
 		for i, t in pairs(soundlist) do
 			table.insert(temptable, {t, soundliststring[i]})
-
 		end
 
 		table.sort(temptable, function(a, b) return a[2] < b[2] end)
@@ -1128,6 +1147,11 @@ function love.load()
 		end
 	end
 	updatesoundlist()
+	introsoundpaths = {}
+
+	for i, path in ipairs(getFilesRecursive("sounds/intro", "ogg", false)) do
+		introsoundpaths[i] = path:gsub("^sounds/", "")
+	end
 	
 	print("done loading all " .. #soundlist .. " sounds!")
 	
