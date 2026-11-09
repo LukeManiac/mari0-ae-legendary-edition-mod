@@ -114,6 +114,12 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 * Added the `infinitefireballs` nitpick, which removes the limit on active fireballs, hammers, superballs, iceballs, boomerangs, and custom powerup projectiles.
 * Added four keybind slots for each control, so keyboard and controller inputs can be mixed and matched.
 * Maximised controller support, including joystick buttons, hats, and axes.
+* Press **F6** on a selected keybind to reset that binding. Player 1 restores the default input; players 2–4 copy the same binding from the previous player on the current keybind page. A notice appears if **F6** is pressed in the controls menu while no keybind is selected.
+* **Ctrl+F6** still resets, clears, or copies the full keybind page for the current player, matching the previous behaviour.
+* The controls tooltip switches when **Ctrl** is held: without **Ctrl** it describes single-keybind **F6** reset (or copy-from-previous-player for players 2–4); with **Ctrl** it describes the full-page **Ctrl+F6** action.
+* Each keybind page has its own mouse setting: `mouseowner` for page 1, `mouseowner2` for page 2, `mouseowner3` for page 3, and `mouseowner4` for page 4. The "uses the mouse" checkbox applies to the page you are editing. Aim and portal binds remain hidden on a page when that page's mouse owner is the selected player.
+* These controls changes apply in both the options Controls tab and the pause menu controls popup.
+* The game doesn't require you to press escape to pause the game, it now uses player-dependent controls.
 * Added a new "Generate Nitpicks File" button to the menu's misc tab.
 * Added animations for confirmations in editor, and a three-stage warning to confirm resetting all settings.
 * Added downscaling for viewports (may look funny when window scale is 3).
@@ -234,7 +240,6 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 ### ✨ Improvements
 
-* The game doesn't require you to press escape to pause the game, it now uses player-dependent controls.
 * Changed the invincibility blinking animation so it is partially akin to the animation in the **New Super Mario Bros.** series.
 * Quick testing from the Course Maker plays the last half of the invincibility animation.
 * Compressed the logic for handling dropdowns.
