@@ -18,6 +18,9 @@ function mario:init(x, y, i, animation, size, t, properties)
 	--PHYSICS STUFF
 	self.speedx = 0
 	self.speedy = 0
+	self.inertiaspeedx = 0
+	self.inertiaobject = nil
+	self._inertiaPreviousObject = nil
 	self.x = x
 	self.width = 12/16
 	self.height = 12/16
@@ -2670,7 +2673,7 @@ function mario:update(dt)
 		end
 		
 		--vine tiles
-		if (not self.vine) and (not self.yoshi) and (not self.shoe) and self.shoe ~= "drybonesshell" and self.size ~= 8 and self.size ~= 16 then
+		if (not self.vine) and (not self.yoshi) and self.size ~= 8 and self.size ~= 16 then
 			local x = math.floor(self.x+self.width/2)+1
 			local y = math.floor(self.y+self.height/2)+1
 			if inmap(x, y) and tilequads[map[x][y][1]].vine then
@@ -3780,16 +3783,6 @@ function mario:jump(force)
 		end
 		if self.shoe == "cloud" then
 			return
-		end
-		if InertiaPhysics and self.movingobjectsupport and not self.falling then
-			if not self.movingobjectvelocityapplied then
-				self.speedx = self.speedx + (self.movingobjectsupport.speedx or 0)
-				self.speedy = self.speedy + (self.movingobjectsupport.speedy or 0)
-			end
-			self.inertiaspeedx = self.movingobjectsupport.speedx or 0
-			self.inertiaspeedy = self.movingobjectsupport.speedy or 0
-			self.movingobjectsupport = nil
-			self.movingobjectvelocityapplied = nil
 		end
 		if self.raccoonfly and (self.size == 6 or self.size == 9) then --fly as raccoon Mario (SMB3 style discrete flaps)
 			self.speedy = math.min(-self.characterdata.raccoonflyjumpforce, self.speedy)
@@ -5048,6 +5041,16 @@ function mario:floorcollide(a, b)
 		self:setquad()
 	end
 	
+	if InertiaPhysics then
+		local objectSpeedX = b and b.speedx or 0
+		local movingObject = b and (b.static == false or objectSpeedX ~= 0 or b.moving or b.track)
+		if self.inertiaspeedx ~= 0 and self._inertiaPreviousObject ~= b and movingObject then
+			self.speedx = objectSpeedX - self.inertiaspeedx
+		end
+		self.inertiaspeedx = 0
+		self.inertiaobject = b
+	end
+
 	self.combo = 1
 end
 
@@ -6438,10 +6441,10 @@ function mario:globalcollide(a, b)
 	elseif a == "regiontrigger" then
 		return false
 	elseif a == "vine" then
-		if self.vine == false and (not self.yoshi) and (not self.shoe) and self.shoe ~= "drybonesshell" and self.size ~= 8 and self.size ~= 16 then
+		if self.vine == false and (not self.yoshi) and self.size ~= 8 and self.size ~= 16 then
 			self:grabvine(b)
 		end
-
+		
 		return true
 	elseif a == "cappy" then
 		if b.thrown and b.holdtimer > 0 and self.speedy > 0 then
@@ -6741,6 +6744,9 @@ function mario:dropvine(dir)
 end
 
 function mario:grabvine(b)
+	if self.shoe or self.cloudtimer then
+		return
+	end
 	if self.ducking then
 		local intile = checkintile(self.x, self.y, self.width, self.height, tileentities, self, "ignoreplatforms")
 		local oldy = self.y

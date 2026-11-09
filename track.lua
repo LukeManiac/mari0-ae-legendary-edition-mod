@@ -520,11 +520,10 @@ function trackcontroller:update(dt)
 								if (not w.trackplatformcarriedx) or math.abs(xdiff) > math.abs(w.trackplatformcarriedx) then --don't move if already moved by another platform
 									w.oldxplatform = w.x
 									w.x = w.x + xdiff
-									if w.playernumber and InertiaPhysics then w.movingobjectsupport = b end
 									w.trackplatformcarriedx = xdiff
 								end
 								if (not b.leavemarioalone) then
-									if w.playernumber and w.shoe then w.y = w.y + ydiff else w.y = b.y-w.height end
+									w.y = b.y-w.height
 									w.falling = false
 									w.jumping = false
 									w.speedy = 0

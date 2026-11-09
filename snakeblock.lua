@@ -522,8 +522,7 @@ function snakeblock:update(dt)
 								end
 								pass = (#checkrect(w.x, self.y - w.height, w.width, w.height, {"exclude", w}, true, condition) == 0)
 								if pass then
-									if not (w.playernumber and w.shoe) then w.y = self.y - w.height end
-									if w.playernumber and InertiaPhysics then w.movingobjectsupport = self end
+									w.y = self.y - w.height
 									--w.falling = false
 									--w.falloverride = true
 									w.speedy = self.speedy
