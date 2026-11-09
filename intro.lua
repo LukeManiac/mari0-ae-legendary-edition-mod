@@ -8,6 +8,7 @@ function intro_load()
 	introtypewriteduration = 1
 
 	introtimer = 0
+	introduration = 5
 	introscaletimer = 0
 	introscaleduration = 1
 	introtypewritetimer = 0
@@ -31,7 +32,7 @@ function intro_update(dt)
 	introtypewritetimer = math.min(introtypewritetimer + dt, introtypewriteduration)
 
 	-- Transition once the sound finishes.
-	if not (introtransition or introsound:isPlaying()) then
+	if introtimer >= introduration and not (introtransition or introsound:isPlaying()) then
 		introtransition = true
 		startwarpfade(intro_finish_menu, false, true)
 	end
