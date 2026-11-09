@@ -1263,17 +1263,86 @@ function lovedraw(donotupdate)
 	warptransition_draw()
 	notice.draw()
 	
-	if showfps then
-		love.graphics.setColor(255, 255, 255, 180)
-		properprintfast(love.timer.getFPS(), 2*scale, 2*scale)
+	if ShowFPS then
+		if FPS < 0 then
+			love.graphics.setColor(255, 0, 0)
+		elseif FPS < 30 then
+			love.graphics.setColor(unpack(hsv_lerp({255, 0, 0}, {255, 255, 0}, FPS / 30)))
+		elseif FPS < 60 then
+			love.graphics.setColor(unpack(hsv_lerp({255, 255, 0}, {0, 255, 0}, (FPS - 30) / 30)))
+		elseif FPS < 144 then
+			love.graphics.setColor(unpack(hsv_lerp({0, 255, 0}, rainbow(dt), (FPS - 60) / 84)))
+		else
+			love.graphics.setColor(unpack(rainbow(dt)))
+		end
+		properprintFbackground(love.timer.getFPS(), 8*scale, 8*scale)
 	end
 
 	if ShowBattery then
-		drawbattery()
+		local batterytext
+		local state, percent = love.system.getPowerInfo()
+		love.graphics.setColor(255, 255, 255)
+
+		if state ~= "nobattery" then
+			if percent <= 50 then
+				love.graphics.setColor(unpack(hsv_lerp({255, 0, 0}, {255, 255, 0}, percent / 50)))
+			else
+				love.graphics.setColor(unpack(hsv_lerp({255, 255, 0}, {0, 255, 0}, (percent - 50) / 50)))
+			end
+		end
+
+		if percent then
+			batterytext = ("Battery: %d%%"):format(percent)
+		elseif state == "nobattery" then
+			batterytext = "Battery: AC power"
+		else
+			batterytext = "Battery: unavailable"
+		end
+
+		properprintFbackground(batterytext, 8*scale, 212*scale)
 	end
 
 	if ShowTime then
-		drawtime()
+		local sky_colors = {
+			{35, 45, 100},     -- 00:00  Deep blue
+			{70, 80, 160},     -- 03:00  Indigo
+			{240, 170, 120},   -- 06:00  Warm dawn
+			{100, 190, 235},   -- 09:00  Light blue
+			{60, 180, 220},    -- 12:00  Cyan blue
+			{90, 150, 220},    -- 15:00  Afternoon blue
+			{235, 125, 75},    -- 18:00  Orange sunset
+			{100, 55, 130},    -- 21:00  Purple dusk
+		}
+
+		local time = ("Time: %s"):format(os.date("%H:%M:%S"))
+		local time2 = os.date("*t")
+
+		-- Convert the current time into hours as a decimal.
+		local hours = time2.hour + (time2.min / 60) + (time2.sec / 3600)
+
+		-- Convert 0-24 hours into a position from 0-8.
+		local position = hours / 3
+
+		-- The two colours we're interpolating between.
+		local index1 = math.floor(position) + 1
+		local index2 = index1 + 1
+
+		-- Wrap around at midnight.
+		if index2 > #sky_colors then
+			index2 = 1
+		end
+
+		-- Fraction between the two colours.
+		local step = position - math.floor(position)
+
+		love.graphics.setColor(unpack(hsv_lerp(sky_colors[index1], sky_colors[index2], step)))
+		texty = 212
+
+		if ShowBattery then
+			texty = 204
+		end
+
+		properprintFbackground(time, 8*scale, texty*scale)
 	end
 
 	if jsonerrorwindow.opened then
@@ -2149,7 +2218,7 @@ function love.keypressed(key, scancode, isrepeat, textinput)
 			HITBOXDEBUG = not HITBOXDEBUG
 		end
 	elseif key == "f11" then
-		showfps = not showfps
+		ShowFPS = not ShowFPS
 	elseif key == "f12" then
 		love.mouse.setGrabbed(not love.mouse.isGrabbed())
 	end
@@ -3403,9 +3472,7 @@ function loadnitpicks()
 		NeverCustomEnemyBG = t.alwaysnocustomenemybg
 		ShowTime = t.showtime
 		ShowBattery = t.showbattery
-		if t.showfps then
-			showfps = t.showfps
-		end
+		ShowFPS = t.showfps
 		InfiniteLivesMultiplayer = t.infinitelivesmultiplayer
 		SlowBackgrounds = t.slowbackgrounds
 		NoMusic = t.nomusic
@@ -3730,100 +3797,6 @@ function print(...)
 	logstring = logstring .. value
 
 	io.write(value)
-end
-
-function drawbattery()
-	local batterycolor = {0, 255, 0}
-	local state, percent = love.system.getPowerInfo()
-
-	local function gettext()
-		if percent then
-			return ("Battery: %d%%"):format(percent)
-		end
-
-		if state == "nobattery" then
-			return "Battery: AC power"
-		end
-
-		return "Battery: unavailable"
-	end
-
-	local function getcolor()
-		if percent <= 50 then
-			return hsv_lerp(
-				{255, 0, 0},
-				{255, 255, 0},
-				percent / 50
-			)
-		else
-			return hsv_lerp(
-				{255, 255, 0},
-				{0, 255, 0},
-				(percent - 50) / 50
-			)
-		end
-	end
-
-	if state ~= "nobattery" then
-		local batterycolor = getcolor()
-	end
-
-	local batterytext = gettext()
-	love.graphics.setColor(getcolor())
-	properprintFbackground(batterytext, 8*scale, 212*scale)
-end
-
-function drawtime()
-	local sky_colors = {
-		{35, 45, 100},     -- 00:00  Deep blue
-		{70, 80, 160},     -- 03:00  Indigo
-		{240, 170, 120},   -- 06:00  Warm dawn
-		{100, 190, 235},   -- 09:00  Light blue
-		{60, 180, 220},    -- 12:00  Cyan blue
-		{90, 150, 220},    -- 15:00  Afternoon blue
-		{235, 125, 75},    -- 18:00  Orange sunset
-		{100, 55, 130},    -- 21:00  Purple dusk
-	}
-
-	local function getcolor()
-		local time = os.date("*t")
-
-		-- Convert the current time into hours as a decimal.
-		local hours = time.hour
-			+ time.min / 60
-			+ time.sec / 3600
-
-		-- Convert 0-24 hours into a position from 0-8.
-		local position = hours / 3
-
-		-- The two colours we're interpolating between.
-		local index1 = math.floor(position) + 1
-		local index2 = index1 + 1
-
-		-- Wrap around at midnight.
-		if index2 > #sky_colors then
-			index2 = 1
-		end
-
-		-- Fraction between the two colours.
-		local step = position - math.floor(position)
-
-		return hsv_lerp(
-			sky_colors[index1],
-			sky_colors[index2],
-			step
-		)
-	end
-
-	local time = ("Time: %s"):format(os.date("%H:%M:%S"))
-	love.graphics.setColor(getcolor())
-	texty = 212
-
-	if ShowBattery then
-		texty = 204
-	end
-
-	properprintFbackground(time, 8*scale, texty*scale)
 end
 
 -- without this, the game would lag on cropping many images
