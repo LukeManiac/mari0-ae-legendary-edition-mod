@@ -516,23 +516,8 @@ function love.load()
 	
 	--nitpicks
 	loadnitpicks()
-	--snap overlay anim timers if nitpicks already enabled these
-	if ShowFPS then
-		overlayanim.fps.timer = OVERLAY_ANIM_DURATION
-		overlayanim.fps.want = true
-	end
-	if ShowBattery then
-		overlayanim.battery.timer = OVERLAY_ANIM_DURATION
-		overlayanim.battery.want = true
-	end
-	if ShowTime then
-		overlayanim.time.timer = OVERLAY_ANIM_DURATION
-		overlayanim.time.want = true
-	end
-	if ShowPlayerCoords then
-		overlayanim.coords.timer = OVERLAY_ANIM_DURATION
-		overlayanim.coords.want = true
-	end
+	--leave overlay timers at 0 so enabled nitpicks (showfps/showbattery/showtime/showplayercoords)
+	--still play their entrance animation on launch instead of snapping in fully visible
 
 	loadcustomplayers()
 	
