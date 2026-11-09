@@ -8727,7 +8727,7 @@ function mario:fire()
 		if self.fireenemy or self.characterdata.fireenemy then
 			
 		elseif (self.size == 6 or self.size == 9 or self.size == 10) and self.animation ~= "grow2" and not self.fence and not self.vine then
-			if self.spinanimationtimer >= raccoonspintime and (not (self.speedy ~= 0 and self.raccoonfly)) and not downkey(self.playernumber) then
+			if self.spinanimationtimer >= raccoonspintime and (not (self.speedy ~= 0 and self.raccoonfly)) and (self.size ~= 9 or not downkey(self.playernumber)) then
 				local dir = "right"
 				if self.animationdirection == "left" then
 					dir = "left"
