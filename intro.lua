@@ -28,7 +28,7 @@ end
 
 function intro_update(dt)
 	introtimer = introtimer + dt
-	introscaletimer = introscaletimer + dt
+	introscaletimer = introscaletimer + dt --not clamped here, each character clamps its own progress in intro_draw
 	introtypewritetimer = math.min(introtypewritetimer + dt, introtypewriteduration)
 
 	-- Transition once the sound finishes.
@@ -54,6 +54,7 @@ local function intro_printcolour(text, x, y, scalemult, spacingmult)
 		if not charscale then
 			goto continue
 		end
+
 		--full cycle every 2 seconds: second 1 = authorcolour, second 2 = authorcolour / 2
 		local p = (1 - math.cos(math.pi * (introtimer - (i - 1) * introcolouroffset))) / 2
 
@@ -65,9 +66,10 @@ local function intro_printcolour(text, x, y, scalemult, spacingmult)
 		)
 
 		--centre of this character's cell (game pixels), spacing stays fixed while the character itself scales
+		--the glyph's own centre is (5, 5), so that is the point anchored to centerx / y
 		local centerx = x + ((i - 0.5) - length / 2) * 8 * spacingmult
-		local charx = (centerx - (8 * charscale) / 2) * scale
-		local chary = (y - (10 * charscale) / 2) * scale
+		local charx = (centerx - 5 * charscale) * scale
+		local chary = (y - 5 * charscale) * scale
 
 		if hudoutline then
 			properprintFbackground(char, charx, chary, nil, nil, charscale)
