@@ -770,7 +770,7 @@ function horcollision(v, t, h, g, j, i, dt, dontpush)
 					v.speedx = 0
 				end
 				if not dontpush then
-					v.x = t.x + t.width
+					v.x = t.x + t.width + 0.25
 				end
 				return true
 			end
@@ -779,7 +779,7 @@ function horcollision(v, t, h, g, j, i, dt, dontpush)
 				v.speedx = 0
 			end
 			if not dontpush then
-				v.x = t.x + t.width
+				v.x = t.x + t.width + 0.25
 			end
 			return true
 		end
@@ -812,7 +812,7 @@ function horcollision(v, t, h, g, j, i, dt, dontpush)
 					v.speedx = 0
 				end
 				if not dontpush then
-					v.x = t.x - v.width
+					v.x = t.x - v.width - 0.25
 				end
 				return true
 			end
@@ -821,7 +821,7 @@ function horcollision(v, t, h, g, j, i, dt, dontpush)
 				v.speedx = 0
 			end
 			if not dontpush then
-				v.x = t.x - v.width
+				v.x = t.x - v.width - 0.25
 			end
 			return true
 		end
