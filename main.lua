@@ -356,8 +356,6 @@ function love.load()
 	
 	love.graphics.setBackgroundColor(0, 0, 0)
 	
-	intro_image = love.graphics.newImage("graphics/intro.png")
-
 	--UTF8 Font
 	fontimage = love.graphics.newImage("graphics/SMB/font.png")
 	fontbackimage = love.graphics.newImage("graphics/SMB/fontback.png")

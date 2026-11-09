@@ -58,26 +58,11 @@ function intro_update(dt)
 end
 
 function intro_draw()
-	local a = 255
-
-	if introfade then
-		a = 255 * (1 - math.min(introfadeprogress / introfadetime, 1))
-	end
-
-	-- Intro image.
-	love.graphics.setColor(255, 255, 255, a)
-
-	local introscale = motion_curve(introscaletimer / introscaleduration, introcurve, true, false, true) * scale
-	local originx = intro_image:getWidth() / 2
-	local originy = intro_image:getHeight() / 2
-
-	if not intro_loading then
-		love.graphics.draw(intro_image, 200 * scale, 112 * scale, 0, introscale, introscale, originx, originy)
-	end
-
 	-- Loading text.
-	love.graphics.setColor(150, 150, 150, a)
-	centerprint("loading mari0...", 200, 20)
+	local introscale = motion_curve(introscaletimer / introscaleduration, introcurve, true, false, true) * 2.5
+
+	love.graphics.setColor(150, 150, 150)
+	centerprint("loading mari0...", 200, 112, introscale)
 
 	-- Typewriter effect.
 	local charcount = utf8.len(loadingtext) or #loadingtext
@@ -86,7 +71,7 @@ function intro_draw()
 
 	local visibletext = visiblechars >= charcount and loadingtext or loadingtext:sub(1, (byteend or (#loadingtext + 1)) - 1)
 
-	love.graphics.setColor(50, 50, 50, a)
+	love.graphics.setColor(50, 50, 50)
 	centerprint(visibletext, 200, 204)
 end
 
