@@ -2373,8 +2373,6 @@ function love.keypressed(key, scancode, isrepeat, textinput)
 		game_keypressed(key, textinput)
 	elseif gamestate == "levelscreen" or gamestate == "gameover" then
 		levelscreen_keypressed(key)
-	elseif gamestate == "intro" then
-		intro_keypressed()
 	elseif gamestate == "filebrowser" then
 		filebrowser_keypressed(key, textinput)
 	end
@@ -2425,8 +2423,6 @@ function love.mousepressed(x, y, button, istouch)
 		menu_mousepressed(x, y, button)
 	elseif gamestate == "game" then
 		game_mousepressed(x, y, button)
-	elseif gamestate == "intro" then
-		intro_mousepressed()
 	elseif gamestate == "filebrowser" then
 		filebrowser_mousepressed(x, y, button)
 	end
