@@ -56,6 +56,11 @@ The project covers a broad range of Mari0 AE systems, including:
 
 # What's New?
 
+* 🎬 Replaced the intro graphic with the author's name (`authorname` in `variables.lua`), which scales in using a random motion curve
+* 🌈 Intro text is now drawn per character with an oscillating colour based on `authorcolour`, offset by character index
+* ⏭️ New `skipintro` nitpick, which skips the intro completely
+* 🚫 Removed intro skipping and the intro fade-out; the intro now always plays to the end of its sound before transitioning to the menu
+* 〰️ Strengthened the `drift_pull`, `arch`, `tidal`, `dip`, `crest` and `hook` motion curves, which were previously almost indistinguishable from linear
 * 🧭 Toggleable player coordinate display with F9 and `showplayercoords`
 * 🐛 In-game hitbox debugging outside the editor
 * 📢 Loading overlays for specific game operations
@@ -154,7 +159,7 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 * Buttons grow slightly when hovered, their border colour fades toward the highlight colour, and they zoom in and back out when pressed.
 * Dropdown lists now animate open and close instead of appearing instantly. The list is clipped to the revealed part and slides along with the animation.
 * The scroll factor sliders in the Course Maker now push-zoom when you press them and retract when you let go, like buttons.
-* The intro graphic, pause menu, and prompts now scale in using a random motion curve.
+* The intro text, pause menu, and prompts now scale in using a random motion curve.
 * Checkboxes use a tickmark now.
 * One player's death only plays the death sting, unless that's the last player standing.
 * Added daily challenge fanfares.
@@ -275,7 +280,6 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 * Vertical scrolling is no longer dependent on the x-furthest player.
 * Sometimes, flying as a bunny could keep your sprite on jumping because of `self.falling and self.speedy >= 0` so it's been changed to `self.falling and self.speedy > 0`.
 * If the character has fall frames and was fluttering as Raccoon/Tanooki Mario, it would use the fall frames instead of jump frames.
-* Updated the intro graphic.
 * Added an icon to the `.exe` using rcedit.
 * The enemy death roll animation only plays when the mappack uses Super Mario Maker physics **and** drop shadow.
 * Pausing the game resets the selected option state.
@@ -352,6 +356,8 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `hurrymodeskipfanfare`: Skips the low-time sound cue and uses fast music at 99 instead of waiting until the timer drops below 99. Requires `hurrymode`.
 - `disabletransitions`: Skips fade and vignette transitions.
 - `infinitefireballs`: Removes the limit on how many fireballs, hammers, superballs, iceballs, boomerangs, and custom powerup projectiles the player can have active.
+- `smwwaterphysics`: Uses Super Mario World-style swimming. Holding Down while swimming halves the strength of each swim stroke, and holding Up increases it by 50%. Frog Mario is unaffected.
+- `skipintro`: Skips the intro completely and loads the main menu straight away.
 
 ---
 

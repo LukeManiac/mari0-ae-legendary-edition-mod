@@ -7,6 +7,8 @@ bulletbilllifetime = 20
 bigbilllifetime = 20
 kingbilllifetime = 50
 playertypelist = {"portal", "minecraft", "gelcannon", "cappy", "classic"}
+authorname = "lukemaniac"
+authorcolour = {33, 173, 16}
 
 joystickdeadzone = 0.25
 joystickdiagonalzone = 0.25

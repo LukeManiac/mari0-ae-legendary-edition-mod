@@ -10705,12 +10705,12 @@ function truncatedecimal(number, decplaces)
 	return makewhole(newnumber)
 end
 
-function centerprint(text, x, y, scalemult)
+function centerprint(text, x, y, scalemult, hudoutlineoverride)
 	if scalemult == nil then scalemult = 1 end
 	local text = tostring(text)
 	local textx = (x-(8*scalemult*#(text))/2)*scale
 	local texty = (y-(10*scalemult*countlines(text))/2)*scale
-	if hudoutline then
+	if hudoutline or hudoutlineoverride then
 		properprintFbackground(text, textx, texty, nil, nil, scalemult)
 	else
 		properprintF(text, textx, texty, scalemult)

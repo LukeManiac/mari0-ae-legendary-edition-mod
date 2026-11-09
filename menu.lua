@@ -1173,7 +1173,9 @@ local nitpickkeys = {
 	"hurrymode",
 	"hurrymodeskipfanfare",
 	"disabletransitions",
-	"infinitefireballs"
+	"infinitefireballs",
+	"smwwaterphysics",
+	"skipintro"
 }
 
 function generatenitpicksfile()

@@ -3643,6 +3643,7 @@ function loadnitpicks()
 		INFINITEFIREBALLS = t.infinitefireballs
 		SMWSwimming = t.smwwaterphysics
 		NoLogDumping = t.nologdumping
+		SkipIntro = t.skipintro
 	end
 end
 
