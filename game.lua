@@ -5561,16 +5561,9 @@ function game_keypressed(key, textinput)
 			return
 		end
 
-		if pausemenuopentimer >= pausemenuopenduration and menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 then
-			if (key == "down" or key == "s") then
-				if pausemenuselected < #pausemenuoptions + 3 then
-					pausemenuselected = pausemenuselected + 1
-				end
-			elseif (key == "up" or key == "w") then
-				if pausemenuselected > 1 then
-					pausemenuselected = pausemenuselected - 1
-				end
-			elseif (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
+		if menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 then
+			-- Allow confirm and pause-key close immediately, even while the open animation is still playing
+			if (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
 				if pausemenuoptions[pausemenuselected] == "resume" then
 					pausemenuopen = false
 					if pausedaudio then
@@ -5598,13 +5591,25 @@ function game_keypressed(key, textinput)
 				elseif pausemenuselected == #pausemenuoptions + 1 then
 					setmenupopupvisible("controls", true)
 				end
-			elseif key == "escape" then
+			elseif isPauseKey(key) then
 				pausemenuopen = false
 				if pausedaudio then
 					love.audio.play(pausedaudio)
 					pausedaudio = nil
 				else
 					playmusic()
+				end
+			end
+		end
+
+		if pausemenuopentimer >= pausemenuopenduration and menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 then
+			if (key == "down" or key == "s") then
+				if pausemenuselected < #pausemenuoptions + 3 then
+					pausemenuselected = pausemenuselected + 1
+				end
+			elseif (key == "up" or key == "w") then
+				if pausemenuselected > 1 then
+					pausemenuselected = pausemenuselected - 1
 				end
 			elseif (key == "right" or key == "d") then
 				if pausemenuoptions[pausemenuselected] == "volume" then
