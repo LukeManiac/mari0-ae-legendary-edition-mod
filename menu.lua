@@ -1175,7 +1175,9 @@ local nitpickkeys = {
 	"disabletransitions",
 	"infinitefireballs",
 	"smwwaterphysics",
-	"skipintro"
+	"nologdumping",
+	"skipintro",
+	"consistentvinespeed"
 }
 
 function generatenitpicksfile()

@@ -3644,6 +3644,7 @@ function loadnitpicks()
 		SMWSwimming = t.smwwaterphysics
 		NoLogDumping = t.nologdumping
 		SkipIntro = t.skipintro
+		ConsistentVineSpeed = t.consistentvinespeed
 	end
 end
 

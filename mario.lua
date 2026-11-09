@@ -2129,10 +2129,16 @@ function mario:update(dt)
 			
 			self.climbframe = math.ceil(math.fmod(self.vinemovetimer, self.characterdata.vineframedelay*self.characterdata.climbframes)/self.characterdata.vineframedelay)
 			self.climbframe = math.max(self.climbframe, 1)
+
+			local vinespeed = vinemovedownspeed
+
+			if ConsistentVineSpeed then
+				vinespeed = vinemovespeed
+			end
 			
-			checkportalHOR(self, self.y+vinemovedownspeed*dt)
+			checkportalHOR(self, self.y+vinespeed*dt)
 			
-			self.y = self.y+vinemovedownspeed*dt
+			self.y = self.y+vinespeed*dt
 			
 			local t = checkrect(self.x, self.y, self.width, self.height, {"tile", "portalwall"}, nil, "ignoreplatforms")
 			if #t ~= 0 then

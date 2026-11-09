@@ -357,7 +357,9 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `disabletransitions`: Skips fade and vignette transitions.
 - `infinitefireballs`: Removes the limit on how many fireballs, hammers, superballs, iceballs, boomerangs, and custom powerup projectiles the player can have active.
 - `smwwaterphysics`: Uses Super Mario World-style swimming. Holding Down while swimming halves the strength of each swim stroke, and holding Up increases it by 50%. Frog Mario is unaffected.
+- `nologdumping`: You can guess what this does.
 - `skipintro`: Skips the intro completely and loads the main menu straight away.
+- `consistentvinespeed`: Moving down vines are now in the same speed as moving up vines.
 
 ---
 
