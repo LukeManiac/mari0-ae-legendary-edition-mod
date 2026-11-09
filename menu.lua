@@ -331,8 +331,35 @@ local optionscontrols_controlnames = {
 	"pause", "aimx", "aimy", "portal1", "portal2"
 }
 
+local function getmouseownerforpage(page)
+	page = page or keybindpage
+	if page == 1 then
+		return mouseowner or 0
+	elseif page == 2 then
+		return mouseowner2 or 0
+	elseif page == 3 then
+		return mouseowner3 or 0
+	elseif page == 4 then
+		return mouseowner4 or 0
+	end
+	return 0
+end
+
+local function setmouseownerforpage(page, player)
+	page = page or keybindpage
+	if page == 1 then
+		mouseowner = player
+	elseif page == 2 then
+		mouseowner2 = player
+	elseif page == 3 then
+		mouseowner3 = player
+	elseif page == 4 then
+		mouseowner4 = player
+	end
+end
+
 local function optionscontrols_lastselection()
-	local visiblecontrols = mouseowner == skinningplayer and 9 or #optionscontrols_controlnames
+	local visiblecontrols = getmouseownerforpage(keybindpage) == skinningplayer and 9 or #optionscontrols_controlnames
 	return 4 + visiblecontrols
 end
 
@@ -380,16 +407,16 @@ function optionscontrols_create()
 		guielements["ctrl_bindpage"].var = i
 	end, keybindpage, "1", "2", "3", "4")
 
-	--Uses The Mouse checkbox
+	--Uses The Mouse checkbox (per keybind page: mouseowner, mouseowner2, ...)
 	guielements["ctrl_mouse"] = guielement:new("checkbox", right - 9, 52, function(v)
 		if v then
-			mouseowner = skinningplayer
+			setmouseownerforpage(keybindpage, skinningplayer)
 		else
-			mouseowner = 0
+			setmouseownerforpage(keybindpage, 0)
 		end
 		guielements["ctrl_mouse"].var = v
 		saveconfig()
-	end, mouseowner == skinningplayer)
+	end, getmouseownerforpage(keybindpage) == skinningplayer)
 
 	--Control scheme buttons (all 13, visibility handled in sync)
 	for i, name in ipairs(optionscontrols_controlnames) do
@@ -426,9 +453,9 @@ function optionscontrols_sync()
 
 	guielements["ctrl_player"].var = skinningplayer
 	guielements["ctrl_bindpage"].var = keybindpage
-	guielements["ctrl_mouse"].var = (mouseowner == skinningplayer)
+	guielements["ctrl_mouse"].var = (getmouseownerforpage(keybindpage) == skinningplayer)
 
-	local showextra = (mouseowner ~= skinningplayer)
+	local showextra = (getmouseownerforpage(keybindpage) ~= skinningplayer)
 
 	for i, name in ipairs(optionscontrols_controlnames) do
 		local el = guielements["ctrl_" .. name]
@@ -476,7 +503,7 @@ end
 
 local function optionscontrols_draw(page, bindingsonly, staticonly)
 	local ontop = {}
-	local showextra = (mouseowner ~= skinningplayer)
+	local showextra = (getmouseownerforpage(page or keybindpage) ~= skinningplayer)
 
 	for i = 1, #optionscontrolsgui do
 		local v = guielements[optionscontrolsgui[i]]
@@ -521,6 +548,9 @@ optionscontrols_change_page = function(delta)
 		curve = random_motion_curve()
 	}
 	keybindpage = page
+	if guielements["ctrl_mouse"] then
+		guielements["ctrl_mouse"].var = (getmouseownerforpage(keybindpage) == skinningplayer)
+	end
 	for _, name in ipairs(optionscontrols_controlnames) do
 		local el = guielements["ctrl_" .. name]
 		if el then
@@ -556,7 +586,7 @@ local function optionscontrols_draw_page(page, offset)
 	love.graphics.push()
 	love.graphics.translate(offset*scale, 0)
 
-	local showextra = (mouseowner ~= skinningplayer)
+	local showextra = (getmouseownerforpage(page) ~= skinningplayer)
 	for i, name in ipairs(optionscontrols_controlnames) do
 		if i <= 9 or showextra then
 			if optionsselection == 4+i then

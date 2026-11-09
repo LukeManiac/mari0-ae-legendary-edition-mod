@@ -2826,7 +2826,7 @@ function mario:updateangle()
 		return false
 	end
 	
-	if self.playernumber == mouseowner then
+	if playermouses(self.playernumber) then
 		local scale = scale
 		if shaders and shaders.scale then scale = shaders.scale end
 		self.pointingangle = math.atan2(self.x+self.portalsourcex-xscroll-(love.mouse.getX()/screenzoom/16/scale), (self.y+self.portalsourcey-yscroll-.5)-(love.mouse.getY()/screenzoom/16/scale))

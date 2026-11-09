@@ -1555,6 +1555,9 @@ function saveconfig()
 	
 	s = s .. "volume:" .. volume .. ";"
 	s = s .. "mouseowner:" .. mouseowner .. ";"
+	s = s .. "mouseowner2:" .. (mouseowner2 or 0) .. ";"
+	s = s .. "mouseowner3:" .. (mouseowner3 or 0) .. ";"
+	s = s .. "mouseowner4:" .. (mouseowner4 or 0) .. ";"
 	
 	if mappackfolder == "alesans_entities/mappacks" then
 		s = s .. "modmappacks;"
@@ -1713,6 +1716,12 @@ function loadconfig(nodefaultconfig)
 			love.audio.setVolume( volume )
 		elseif s2[1] == "mouseowner" then
 			mouseowner = tonumber(s2[2])
+		elseif s2[1] == "mouseowner2" then
+			mouseowner2 = tonumber(s2[2])
+		elseif s2[1] == "mouseowner3" then
+			mouseowner3 = tonumber(s2[2])
+		elseif s2[1] == "mouseowner4" then
+			mouseowner4 = tonumber(s2[2])
 		elseif s2[1] == "mappack" then
 			if love.filesystem.getInfo(mappackfolder .. "/" .. s2[2] .. "/") then
 				mappack = s2[2]
@@ -1781,6 +1790,9 @@ function defaultconfig()
 	-- You cannot set Hats and Axes as the jump button. Bummer.
 	
 	mouseowner = 1
+	mouseowner2 = 0
+	mouseowner3 = 0
+	mouseowner4 = 0
 	
 	controls = {}
 	

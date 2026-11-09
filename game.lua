@@ -8619,6 +8619,28 @@ function getcontrolset(page)
 	return _G["controls" .. page]
 end
 
+function getmouseownerforpage(page)
+	page = page or 1
+	if page == 1 then
+		return mouseowner or 0
+	elseif page == 2 then
+		return mouseowner2 or 0
+	elseif page == 3 then
+		return mouseowner3 or 0
+	elseif page == 4 then
+		return mouseowner4 or 0
+	end
+	return 0
+end
+
+-- true if this player uses the mouse on any keybind page
+function playermouses(player)
+	return (mouseowner or 0) == player
+		or (mouseowner2 or 0) == player
+		or (mouseowner3 or 0) == player
+		or (mouseowner4 or 0) == player
+end
+
 function clearadditionalcontrolbindings(player)
 	for page = 2, 4 do
 		local controlset = getcontrolset(page)
