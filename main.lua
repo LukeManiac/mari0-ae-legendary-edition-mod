@@ -1270,15 +1270,15 @@ function lovedraw(donotupdate)
 		if FPS < 0 then
 			love.graphics.setColor(255, 0, 0)
 		elseif FPS < 30 then
-			love.graphics.setColor(unpack(hsv_lerp({255, 0, 0}, {255, 255, 0}, FPS / 30)))
+			love.graphics.setColor(hsv_lerp({255, 0, 0}, {255, 255, 0}, FPS / 30))
 		elseif FPS < 60 then
-			love.graphics.setColor(unpack(hsv_lerp({255, 255, 0}, {0, 255, 0}, (FPS - 30) / 30)))
+			love.graphics.setColor(hsv_lerp({255, 255, 0}, {0, 255, 0}, (FPS - 30) / 30))
 		elseif FPS < 144 then
-			love.graphics.setColor(unpack(hsv_lerp({0, 255, 0}, rainbow(gamedt), (FPS - 60) / 84)))
+			love.graphics.setColor(hsv_lerp({0, 255, 0}, rainbow(gamedt), (FPS - 60) / 84))
 		else
-			love.graphics.setColor(unpack(rainbow(gamedt)))
+			love.graphics.setColor(rainbow(gamedt))
 		end
-		properprintFbackground(FPS, 8*scale, 8*scale)
+		properprintFbackground("FPS: " .. FPS, 8*scale, 8*scale)
 	end
 
 	if ShowBattery then
@@ -1288,9 +1288,9 @@ function lovedraw(donotupdate)
 
 		if state ~= "nobattery" then
 			if percent <= 50 then
-				love.graphics.setColor(unpack(hsv_lerp({255, 0, 0}, {255, 255, 0}, percent / 50)))
+				love.graphics.setColor(hsv_lerp({255, 0, 0}, {255, 255, 0}, percent / 50))
 			else
-				love.graphics.setColor(unpack(hsv_lerp({255, 255, 0}, {0, 255, 0}, (percent - 50) / 50)))
+				love.graphics.setColor(hsv_lerp({255, 255, 0}, {0, 255, 0}, (percent - 50) / 50))
 			end
 		end
 
@@ -1338,7 +1338,7 @@ function lovedraw(donotupdate)
 		-- Fraction between the two colours.
 		local step = position - math.floor(position)
 
-		love.graphics.setColor(unpack(hsv_lerp(sky_colors[index1], sky_colors[index2], step)))
+		love.graphics.setColor(hsv_lerp(sky_colors[index1], sky_colors[index2], step))
 		texty = 212
 
 		if ShowBattery then
