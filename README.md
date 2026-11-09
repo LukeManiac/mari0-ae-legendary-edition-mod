@@ -158,23 +158,33 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 * Added new shaders:
   * Anamorphic: Cinema lens look with 2.39 bars, a teal-and-orange grade, horizontal streaks from bright pixels and fine grain.
   * Bullet Time: Cold, desaturated slow-motion grade with a radial zoom smear and a dark vignette.
+  * Cyberpunk: Night City grade: teal shadows, hot pink and yellow highlights, neon bloom, lens colour fringing and a rare glitch where a few bands of the picture tear sideways for a third of a second.
   * Dragan: Crushed portrait grade that sharpens, then overlays a high-pass layer for hard contrast.
   * Dreamy Glow: Soft bloom that blurs bright areas outward and adds them back, with a light pastel lift.
   * Drunk: The screen sways and breathes, with layered double vision and a slow wave rolling up the picture.
+  * Dune: Arrakis grade: the picture becomes a single burnt-orange gradient from deep brown shadows to pale sand highlights, with a hazy lifted black, soft bloom, a slow heat ripple and windblown sand streaks.
+  * FlipX: Flips the whole picture mirroring it left to right. Up and down stay the same, so the controls still feel normal.
+  * FlipY: Flips the whole picture mirroring it top to bottom. Left and right stay the same, so the controls still feel normal.
   * Gameboy: Four-shade green LCD look with Bayer dither, snapped to the pixel grid, plus a faint LCD grid.
   * Glitch: Mild tearing and colour split, plus vivid random squares that jump to a new layout every frame burst.
   * Heat Haze: Rising shimmer that strengthens toward the bottom, with a warm grade and a pulsing ember glow.
   * Hologram: Holoprojector look with a cyan cast, rolling scan bands, horizontal jitter and a little RGB split.
+  * Hotline: Hotline Miami trip: the whole screen sways, zooms on a ~130bpm beat, splits its colours on every hit and floods with shifting pink and cyan neon over boosted saturation and contrast.
   * Lightning: Rare full-frame storm flashes, a jagged bolt down the screen, and a small UV kick on each strike.
+  * Limbo: Soft grey silhouettes in a cold fog: heavy shadows, light falling from above, ground mist, strong film grain and a dark vignette.
   * Matrix: Digital rain over a green grade, with the head, trail and glyphs scrolling at the display rate.
   * Neon-chase: Wet neon night with teal shadows, magenta highlights, pixel rain and a few anamorphic bokeh specks.
   * Old-film: Sepia silent-movie look with gate weave, lamp flicker, grain, vignette, scratches and dust.
+  * Pip-Boy: Fallout terminal: bulging green phosphor tube with rounded black corners, banded tones, heavy scanlines, a slow rolling refresh band, glow and flicker.
   * Pixel Grain: Posterises each channel to a few levels and hides the banding with ordered Bayer dither.
   * Poison: Sickly grade with a slow pulse and pixel bubbles rising through the frame.
   * Posterize: Photoshop-style posterize, splitting each 8-bit channel into equal tone ranges.
+  * Sin City: Crushed blacks, blown whites and one colour left alive: red. Everything else is pushed to hard black and white, with a faint halo around the brights, film grain and a heavy vignette.
   * Snowfall: Three layers of pixel-sized flakes drifting down at different speeds over a cold blue grade.
+  * Terminator: T-800 vision: everything goes red, with scanlines, a sweeping scan bar, corner brackets and a column of jumping readout bars down the left side.
   * Thermal: Brightness mapped from cold black-blue through purple, red and orange to hot yellow-white, plus sensor noise.
   * Tilt Shift: Toy-world look; the middle band stays sharp while the top and bottom blur, with extra saturation.
+  * Tron: Tron: Legacy look. The picture drops to near black, edges light up as glowing neon lines (cyan, or orange on warm colours) and a faint circuit grid pulses across the dark areas.
   * Underwater: Wave distortion, a deep blue-green tint, depth fade and drifting caustic light.
   * Vaporwave: Brightness mapped onto a navy-to-pink gradient, blended back in, with chromatic offset and scanlines.
   * VHS: Worn tape look with colour bleed, line jitter, a rolling tracking band, tape noise and soft scanlines.
