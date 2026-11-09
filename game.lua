@@ -2852,14 +2852,33 @@ function game_draw()
 			w:draw()
 		end
 
-		if ShowPlayerCoords then
-			for i = 1, players do
-				v = objects["player"][i]
+		--player coords: scale in/out from bottom-centre of each label
+		local coords_p = 0
+		if overlayanim and overlayanim.coords then
+			local anim = overlayanim.coords
+			if OVERLAY_ANIM_DURATION and OVERLAY_ANIM_DURATION > 0 then
+				coords_p = motion_curve(anim.timer / OVERLAY_ANIM_DURATION, anim.curve, anim.want, not anim.want, true, true)
+			else
+				coords_p = bool2int(anim.want)
+			end
+		end
+		if overlayanim and overlayanim.coords and overlayanim.coords.timer > 0 then
+			local s = coords_p
+			if s > 0 then
+				love.graphics.setColor(255, 255, 255, 255 * s)
+				for i = 1, players do
+					v = objects["player"][i]
 
-				if v.drawable and (not splitviews or i == split) then
-					centerprint("x: " .. truncatedecimal(v.x, 3), (v.x-xscroll)*16, (v.y-yscroll-2)*16)
-					centerprint("y: " .. truncatedecimal(v.y, 3), (v.x-xscroll)*16, (v.y-yscroll-1.375)*16)
+					if v.drawable and (not splitviews or i == split) then
+						--bottom-centred scale: shift y so the bottom of the glyph stays fixed as s changes
+						local x1 = (v.x-xscroll)*16
+						local y1 = (v.y-yscroll-2)*16
+						local y2 = (v.y-yscroll-1.375)*16
+						centerprint("x: " .. truncatedecimal(v.x, 3), x1, y1 + 5*(1-s), s)
+						centerprint("y: " .. truncatedecimal(v.y, 3), x1, y2 + 5*(1-s), s)
+					end
 				end
+				love.graphics.setColor(255, 255, 255, 255)
 			end
 		end
 		

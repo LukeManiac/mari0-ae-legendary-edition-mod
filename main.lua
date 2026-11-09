@@ -225,6 +225,41 @@ function writenumberedfile(dir, limit, content)
 	love.filesystem.write(dir .. "/" .. (count + 1) .. ".txt", content or "")
 end
 
+--HUD overlay show/hide animation (FPS, battery, time)
+OVERLAY_ANIM_DURATION = 0.25
+overlayanim = {
+	fps = {timer = 0, curve = "quad", want = false},
+	battery = {timer = 0, curve = "quad", want = false},
+	time = {timer = 0, curve = "quad", want = false},
+	coords = {timer = 0, curve = "quad", want = false},
+}
+
+local function overlayanim_update(dt)
+	local pairs_list = {
+		{overlayanim.fps, ShowFPS},
+		{overlayanim.battery, ShowBattery},
+		{overlayanim.time, ShowTime},
+		{overlayanim.coords, ShowPlayerCoords},
+	}
+	for _, item in ipairs(pairs_list) do
+		local anim, want = item[1], not not item[2]
+		if want ~= anim.want then
+			anim.want = want
+			anim.curve = random_motion_curve()
+		end
+		local dir = want and 1 or -1
+		anim.timer = math.max(0, math.min(anim.timer + dt * dir, OVERLAY_ANIM_DURATION))
+	end
+end
+
+local function overlayanim_progress(anim)
+	if OVERLAY_ANIM_DURATION <= 0 then
+		return bool2int(anim.want)
+	end
+	local t = anim.timer / OVERLAY_ANIM_DURATION
+	return motion_curve(t, anim.curve, anim.want, not anim.want, true, true)
+end
+
 function love.load()
 	marioversion = 1006
 	versionstring = "version 1.6"
@@ -481,6 +516,23 @@ function love.load()
 	
 	--nitpicks
 	loadnitpicks()
+	--snap overlay anim timers if nitpicks already enabled these
+	if ShowFPS then
+		overlayanim.fps.timer = OVERLAY_ANIM_DURATION
+		overlayanim.fps.want = true
+	end
+	if ShowBattery then
+		overlayanim.battery.timer = OVERLAY_ANIM_DURATION
+		overlayanim.battery.want = true
+	end
+	if ShowTime then
+		overlayanim.time.timer = OVERLAY_ANIM_DURATION
+		overlayanim.time.want = true
+	end
+	if ShowPlayerCoords then
+		overlayanim.coords.timer = OVERLAY_ANIM_DURATION
+		overlayanim.coords.want = true
+	end
 
 	loadcustomplayers()
 	
@@ -1213,7 +1265,9 @@ function love.update(dt)
 		androidUpdate(dt)
 	end
 	
+	overlayanim_update(dt)
 	notice.update(dt)
+
 	if jsonerrorwindow.opened then
 		jsonerrorwindow:update(dt)
 	end
@@ -1296,33 +1350,48 @@ function lovedraw(donotupdate)
 	warptransition_draw()
 	notice.draw()
 	
-	if ShowFPS then
+	--FPS: slides in from the top-left corner
+	local fps_p = overlayanim_progress(overlayanim.fps)
+	if overlayanim.fps.timer > 0 then
 		FPS = love.timer.getFPS()
 		GAMETIMER = love.timer.getTime()
+		local r, g, b
 		if FPS < 0 then
-			love.graphics.setColor(255, 0, 0)
+			r, g, b = 255, 0, 0
 		elseif FPS < 30 then
-			love.graphics.setColor(hsv_lerp({255, 0, 0}, {255, 255, 0}, FPS / 30))
+			local c = hsv_lerp({255, 0, 0}, {255, 255, 0}, FPS / 30)
+			r, g, b = c[1], c[2], c[3]
 		elseif FPS < 60 then
-			love.graphics.setColor(hsv_lerp({255, 255, 0}, {0, 255, 0}, (FPS - 30) / 30))
+			local c = hsv_lerp({255, 255, 0}, {0, 255, 0}, (FPS - 30) / 30)
+			r, g, b = c[1], c[2], c[3]
 		elseif FPS < 144 then
-			love.graphics.setColor(hsv_lerp({0, 255, 0}, {rainbow(GAMETIMER)}, (FPS - 60) / 84))
+			local rr, gg, bb = rainbow(GAMETIMER)
+			local c = hsv_lerp({0, 255, 0}, {rr, gg, bb}, (FPS - 60) / 84)
+			r, g, b = c[1], c[2], c[3]
 		else
-			love.graphics.setColor(rainbow(GAMETIMER))
+			r, g, b = rainbow(GAMETIMER)
 		end
-		properprintFbackground("FPS: " .. FPS, 4*scale, 5*scale)
+		love.graphics.setColor(r, g, b, 255 * fps_p)
+		--from off-screen top-left into resting position
+		local fx = lerp(-36, 4, fps_p)
+		local fy = lerp(-14, 5, fps_p)
+		properprintFbackground("FPS: " .. FPS, fx*scale, fy*scale)
 	end
 
-	if ShowBattery then
+	--Battery: slides in from the bottom-left corner
+	local battery_p = overlayanim_progress(overlayanim.battery)
+	if overlayanim.battery.timer > 0 then
 		local batterytext
 		local state, percent = love.system.getPowerInfo()
-		love.graphics.setColor(255, 255, 255)
+		local r, g, b = 255, 255, 255
 
-		if state ~= "nobattery" then
+		if state ~= "nobattery" and percent then
 			if percent <= 50 then
-				love.graphics.setColor(hsv_lerp({255, 0, 0}, {255, 255, 0}, percent / 50))
+				local c = hsv_lerp({255, 0, 0}, {255, 255, 0}, percent / 50)
+				r, g, b = c[1], c[2], c[3]
 			else
-				love.graphics.setColor(hsv_lerp({255, 255, 0}, {0, 255, 0}, (percent - 50) / 50))
+				local c = hsv_lerp({255, 255, 0}, {0, 255, 0}, (percent - 50) / 50)
+				r, g, b = c[1], c[2], c[3]
 			end
 		end
 
@@ -1334,10 +1403,15 @@ function lovedraw(donotupdate)
 			batterytext = "Battery: unavailable"
 		end
 
-		properprintFbackground(batterytext, 4*scale, 212*scale)
+		love.graphics.setColor(r, g, b, 255 * battery_p)
+		local bx = lerp(-48, 4, battery_p)
+		local by = lerp(230, 212, battery_p)
+		properprintFbackground(batterytext, bx*scale, by*scale)
 	end
 
-	if ShowTime then
+	--Time: slides in from the bottom-left corner (stacks above battery when both are visible)
+	local time_p = overlayanim_progress(overlayanim.time)
+	if overlayanim.time.timer > 0 then
 		local sky_colors = {
 			{35, 45, 100},     -- 00:00  Deep blue
 			{70, 80, 160},     -- 03:00  Indigo
@@ -1370,14 +1444,14 @@ function lovedraw(donotupdate)
 		-- Fraction between the two colours.
 		local step = position - math.floor(position)
 
-		love.graphics.setColor(hsv_lerp(sky_colors[index1], sky_colors[index2], step))
-		texty = 212
+		local c = hsv_lerp(sky_colors[index1], sky_colors[index2], step)
+		love.graphics.setColor(c[1], c[2], c[3], 255 * time_p)
 
-		if ShowBattery then
-			texty = texty - 8
-		end
-
-		properprintFbackground(time, 4*scale, texty*scale)
+		--resting y shifts up when battery is (partially) on screen
+		local texty = 212 - 8 * battery_p
+		local tx = lerp(-48, 4, time_p)
+		local ty = lerp(230, texty, time_p)
+		properprintFbackground(time, tx*scale, ty*scale)
 	end
 
 	if jsonerrorwindow.opened then
