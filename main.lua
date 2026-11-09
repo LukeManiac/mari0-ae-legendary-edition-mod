@@ -1799,7 +1799,7 @@ function defaultconfig()
 	controls[i]["portal2"] = {""}
 	controls[i]["reload"] = {"r"}
 	controls[i]["use"] = {"e"}
-	controls[i]["pause"] = {""}
+	controls[i]["pause"] = {"escape"}
 	
 	for i = 2, 4 do
 		controls[i] = {}

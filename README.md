@@ -234,6 +234,7 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 ### ✨ Improvements
 
+* The game doesn't require you to press escape to pause the game, it now uses player-dependent controls.
 * Changed the invincibility blinking animation so it is partially akin to the animation in the **New Super Mario Bros.** series.
 * Quick testing from the Course Maker plays the last half of the invincibility animation.
 * Compressed the logic for handling dropdowns.

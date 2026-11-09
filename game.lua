@@ -5818,7 +5818,7 @@ function game_keypressed(key, textinput)
 		end
 	end
 	
-	if key == "escape" then
+	if isPauseKey(key) then
 		if not editormode and testlevel then
 			stoptestinglevel()
 			return
@@ -8640,6 +8640,15 @@ end
 function controlbindingmatcheskey(player, name, key)
 	for _, binding in ipairs(getcontrolbindings(player, name)) do
 		if binding[1] ~= "joy" and binding[1] == key then
+			return true
+		end
+	end
+	return false
+end
+
+function isPauseKey(key)
+	for i = 1, players do
+		if controlbindingmatcheskey(i, "pause", key) then
 			return true
 		end
 	end

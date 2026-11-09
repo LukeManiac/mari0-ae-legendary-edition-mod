@@ -600,7 +600,7 @@ local function optionscontrols_resetbindings()
 			controlset[1]["jump"] = {" "}
 			controlset[1]["reload"] = {"r"}
 			controlset[1]["use"] = {"e"}
-			controlset[1]["pause"] = {""}
+			controlset[1]["pause"] = {"escape"}
 			controlset[1]["aimx"] = {""}
 			controlset[1]["aimy"] = {""}
 			controlset[1]["portal1"] = {""}
