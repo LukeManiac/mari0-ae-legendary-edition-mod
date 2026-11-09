@@ -245,6 +245,7 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 ### ✨ Improvements
 
+* Yoshi now faces the same direction as the player.
 * Changed the invincibility blinking animation so it is partially akin to the animation in the **New Super Mario Bros.** series.
 * Quick testing from the Course Maker plays the last half of the invincibility animation.
 * Compressed the logic for handling dropdowns.

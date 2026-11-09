@@ -3672,15 +3672,7 @@ function drawplayer(i, x, y, r, pad, drop)
 
 	--yoshi
 	if v.shoe == "yoshi" then
-		local dirscale
-		if v.animationdirection == "left" then
-			dirscale = -scale
-		else
-			dirscale = scale
-		end
-		if pad and pad ~= v.animationdirection then --portal duplication
-			dirscale = -dirscale
-		end
+		local dirscale = dirscale < 0 and -scale or scale
 		local y = -offsetY - (v.height*16) + v.characterdata.yoshiimgoffsetY
 		if v.animationscaley then
 			y = -offsetY - (v.height*16) + v.characterdata.yoshiimghugeoffsetY
