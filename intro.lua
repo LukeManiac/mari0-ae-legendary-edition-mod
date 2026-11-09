@@ -77,7 +77,7 @@ function intro_draw()
 
 	local visibletext = visiblechars >= charcount and loadingtext or loadingtext:sub(1, (byteend or (#loadingtext + 1)) - 1)
 
-	intro_printcolour(visibletext, 200, 204, 1)
+	intro_printcolour(visibletext, 200, 168, 1)
 end
 
 function intro_finish_menu()
