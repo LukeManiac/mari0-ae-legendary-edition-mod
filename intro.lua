@@ -28,7 +28,7 @@ end
 
 function intro_update(dt)
 	introtimer = introtimer + dt
-	introscaletimer = math.min(introscaletimer + dt, introscaleduration)
+	introscaletimer = introscaletimer + dt
 	introtypewritetimer = math.min(introtypewritetimer + dt, introtypewriteduration)
 
 	-- Transition once the sound finishes.
@@ -39,11 +39,21 @@ function intro_update(dt)
 end
 
 --prints a single line of text centered on x, y (game pixels), every character has its own oscillating colour
+--scalemult can be a number (same scale for every character) or a function(i) returning the scale of character i, or nil to skip it entirely
 local function intro_printcolour(text, x, y, scalemult, spacingmult)
 	spacingmult = spacingmult or scalemult
 	local length = utf8.len(text) or #text
 
 	for i, char in utf8.chars(text) do
+		local charscale = scalemult
+		if type(scalemult) == "function" then
+			charscale = scalemult(i)
+		end
+
+		--character is still waiting for its turn, skip it (no colour calculation, no print)
+		if not charscale then
+			goto continue
+		end
 		--full cycle every 2 seconds: second 1 = authorcolour, second 2 = authorcolour / 2
 		local p = (1 - math.cos(math.pi * (introtimer - (i - 1) * introcolouroffset))) / 2
 
@@ -56,22 +66,32 @@ local function intro_printcolour(text, x, y, scalemult, spacingmult)
 
 		--centre of this character's cell (game pixels), spacing stays fixed while the character itself scales
 		local centerx = x + ((i - 0.5) - length / 2) * 8 * spacingmult
-		local charx = (centerx - (8 * scalemult) / 2) * scale
-		local chary = (y - (10 * scalemult) / 2) * scale
+		local charx = (centerx - (8 * charscale) / 2) * scale
+		local chary = (y - (10 * charscale) / 2) * scale
 
 		if hudoutline then
-			properprintFbackground(char, charx, chary, nil, nil, scalemult)
+			properprintFbackground(char, charx, chary, nil, nil, charscale)
 		else
-			properprintF(char, charx, chary, scalemult)
+			properprintF(char, charx, chary, charscale)
 		end
+
+		::continue::
 	end
 end
 
 function intro_draw()
 	-- Author name.
-	local introscale = motion_curve(introscaletimer / introscaleduration, introcurve, true, false, true) * 2.5
+	-- Each character zooms in on its own, one after another, introcolouroffset seconds apart.
+	local function authorcharscale(i)
+		local chartimer = introscaletimer - (i - 1) * introcolouroffset
+		if chartimer <= 0 then
+			return nil --not its turn yet
+		end
 
-	intro_printcolour(authorname, 200, 112, introscale, 2.5)
+		return motion_curve(math.min(chartimer / introscaleduration, 1), introcurve, true, false, true) * 2.5
+	end
+
+	intro_printcolour(authorname, 200, 112, authorcharscale, 2.5)
 
 	-- Typewriter effect.
 	local charcount = utf8.len(loadingtext) or #loadingtext
