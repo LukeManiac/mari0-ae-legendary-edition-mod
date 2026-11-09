@@ -19,6 +19,7 @@ function mario:init(x, y, i, animation, size, t, properties)
 	self.speedx = 0
 	self.speedy = 0
 	self.inertiaspeedx = 0
+	self.inertiaspeedy = 0
 	self.inertiaobject = nil
 	self._inertiaPreviousObject = nil
 	self.x = x
@@ -5040,15 +5041,38 @@ function mario:floorcollide(a, b)
 		end
 		self:setquad()
 	end
-	
+
 	if InertiaPhysics then
+		local previousObject = self._inertiaPreviousObject
+		local previousSpeedX = self._inertiaPreviousSpeedX or 0
+		local previousSpeedY = self._inertiaPreviousSpeedY or 0
 		local objectSpeedX = b and b.speedx or 0
-		local movingObject = b and (b.static == false or objectSpeedX ~= 0 or b.moving or b.track)
-		if self.inertiaspeedx ~= 0 and self._inertiaPreviousObject ~= b and movingObject then
-			self.speedx = objectSpeedX - self.inertiaspeedx
+		local objectSpeedY = b and b.speedy or 0
+		local movingObject = b and (b.static == false or b.activestatic == true or b.trackplatform == true or b.moving == true or objectSpeedX ~= 0 or objectSpeedY ~= 0)
+
+		if previousObject and previousObject ~= b and (previousSpeedX ~= 0 or previousSpeedY ~= 0) and not self._inertiaTransferredThisFrame then
+			self.speedx = self.speedx + previousSpeedX
+			self.speedy = self.speedy + previousSpeedY
+			self.inertiaspeedx = previousSpeedX
+			self.inertiaspeedy = previousSpeedY
+			self._inertiaTransferredThisFrame = true
 		end
-		self.inertiaspeedx = 0
-		self.inertiaobject = b
+
+		if movingObject then
+			if self.inertiaspeedx ~= 0 or self.inertiaspeedy ~= 0 then
+				if previousObject ~= b then
+					self.speedx = objectSpeedX - self.inertiaspeedx
+					self.speedy = objectSpeedY - self.inertiaspeedy
+				end
+			end
+			self.inertiaobject = b
+			self.inertiaspeedx = objectSpeedX
+			self.inertiaspeedy = objectSpeedY
+		else
+			self.inertiaobject = nil
+			self.inertiaspeedx = 0
+			self.inertiaspeedy = 0
+		end
 	end
 
 	self.combo = 1

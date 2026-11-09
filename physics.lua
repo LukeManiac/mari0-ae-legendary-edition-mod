@@ -55,9 +55,16 @@ function physicsupdate(dt)
 		if j ~= "tile" and j ~= "buttonblock" and j ~= "tracksegment" then
 			for i, v in pairs(w) do
 				local inertiaPreviousObject
+				local inertiaPreviousSpeedX
+				local inertiaPreviousSpeedY
 				if j == "player" and InertiaPhysics then
 					inertiaPreviousObject = v.inertiaobject
+					inertiaPreviousSpeedX = (v.inertiaobject and v.inertiaobject.speedx) or v.inertiaspeedx or 0
+					inertiaPreviousSpeedY = (v.inertiaobject and v.inertiaobject.speedy) or v.inertiaspeedy or 0
 					v._inertiaPreviousObject = inertiaPreviousObject
+					v._inertiaPreviousSpeedX = inertiaPreviousSpeedX
+					v._inertiaPreviousSpeedY = inertiaPreviousSpeedY
+					v._inertiaTransferredThisFrame = false
 					v.inertiaobject = nil
 				end
 				local oldspeedx = v.speedx
@@ -392,12 +399,14 @@ function physicsupdate(dt)
 						end
 					end
 					
-					if j == "player" and InertiaPhysics and inertiaPreviousObject and not v.inertiaobject then
-						local inheritedSpeedX = inertiaPreviousObject.speedx or 0
-						if inheritedSpeedX ~= 0 then
-							v.speedx = v.speedx + inheritedSpeedX
-							v.inertiaspeedx = inheritedSpeedX
+					if j == "player" and InertiaPhysics and inertiaPreviousObject and not v.inertiaobject and not v._inertiaTransferredThisFrame then
+						if inertiaPreviousSpeedX ~= 0 or inertiaPreviousSpeedY ~= 0 then
+							v.speedx = v.speedx + inertiaPreviousSpeedX
+							v.speedy = v.speedy + inertiaPreviousSpeedY
+							v.inertiaspeedx = inertiaPreviousSpeedX
+							v.inertiaspeedy = inertiaPreviousSpeedY
 						end
+						v._inertiaTransferredThisFrame = true
 					end
 
 					--check if object is inside portal

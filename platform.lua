@@ -158,9 +158,13 @@ function platform:update(dt)
 								(w.y+w.height >= self.y-0.4 and w.y+w.height < self.y+0.4))
 								and (not w.jumping) and not (self.speedy > 0 and w.speedy < 0) then --and w.speedy >= self.speedy
 								if #checkrect(w.x+xdiff, self.y-w.height, w.width, w.height, {"exclude", w}, true, condition) == 0 then
+									local carryoffsety = 0
+									if w.playernumber and w.shoe then
+										carryoffsety = w.y - (self.oldy - w.height)
+									end
 									w.oldxplatform = w.x
 									w.x = w.x + xdiff
-									w.y = self.y-w.height
+									w.y = self.y-w.height+carryoffsety
 									w.falling = false
 									w.speedy = self.speedy
 								end
@@ -216,7 +220,11 @@ function platform:update(dt)
 								elseif (inmap(x2, y2) and checkfortileincoord(x2, y2)) then
 									maxy = y2-1-w.height
 								end
-								w.y = math.min(maxy, self.y - w.height + self.speedy*dt)
+								local carryoffsety = 0
+								if w.playernumber and w.shoe then
+									carryoffsety = w.y - (self.y - w.height)
+								end
+								w.y = math.min(maxy, self.y - w.height + carryoffsety + self.speedy*dt)
 								if clip_past_platform then
 									w.speedy = 0
 								end
