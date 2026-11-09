@@ -5059,15 +5059,12 @@ function mario:floorcollide(a, b)
 		end
 
 		if movingObject then
-			if self.inertiaspeedx ~= 0 or self.inertiaspeedy ~= 0 then
-				if previousObject ~= b then
-					self.speedx = objectSpeedX - self.inertiaspeedx
-					self.speedy = objectSpeedY - self.inertiaspeedy
-				end
+			if previousObject ~= b and (self.inertiaspeedx ~= 0 or self.inertiaspeedy ~= 0) then
+				-- Keep the player's actual velocity; store only the velocity relative to the new platform.
+				self.inertiaspeedx = self.inertiaspeedx - objectSpeedX
+				self.inertiaspeedy = self.inertiaspeedy - objectSpeedY
 			end
 			self.inertiaobject = b
-			self.inertiaspeedx = objectSpeedX
-			self.inertiaspeedy = objectSpeedY
 		else
 			self.inertiaobject = nil
 			self.inertiaspeedx = 0

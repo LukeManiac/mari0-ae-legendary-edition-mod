@@ -528,8 +528,6 @@ function trackcontroller:update(dt)
 								end
 								if InertiaPhysics and w.playernumber then
 									w.inertiaobject = b
-									w.inertiaspeedx = b.trackvelocityx or 0
-									w.inertiaspeedy = b.trackvelocityy or 0
 								end
 								if (not b.leavemarioalone) then
 									w.y = b.y-w.height
