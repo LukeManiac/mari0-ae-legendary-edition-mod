@@ -3298,27 +3298,27 @@ local motion_curves = {
     end,
 
     drift_pull = function(t)
-        return t + 0.22 * t * (1 - t) * math.sin(2.5 * math.pi * t)
+        return t + 0.8 * t * (1 - t) * math.sin(2.5 * math.pi * t)
     end,
 
     arch = function(t)
-        return t + 0.9 * t * (1 - t) * (0.5 - t)
+        return t + 3.5 * t * (1 - t) * (0.5 - t)
     end,
 
     tidal = function(t)
-        return t + 0.14 * math.sin(math.pi * t) * (1 - 2 * t) ^ 2
+        return t + 0.45 * math.sin(math.pi * t) * (1 - 2 * t) ^ 2
     end,
 
     dip = function(t)
-        return t - 0.16 * math.sin(math.pi * t) * (1 - t)
+        return t - 0.35 * math.sin(math.pi * t) * (1 - t)
     end,
 
     crest = function(t)
-        return t + 0.16 * math.sin(math.pi * t) * t
+        return t + 0.35 * math.sin(math.pi * t) * t
     end,
 
     hook = function(t)
-        return t + 0.25 * (t - t * t) * (0.3 - t)
+        return t + 1.2 * (t - t * t) * (0.3 - t)
     end
 }
 

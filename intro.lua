@@ -1,4 +1,3 @@
-
 local intro_finish_menu
 local intro_loading
 
@@ -9,7 +8,7 @@ function intro_load()
 	introtypewriteduration = 1
 
 	introscaletimer = 0
-	introscaleduration = 2.5
+	introscaleduration = 1
 	introtypewritetimer = 0
 	introfadeprogress = 0
 
