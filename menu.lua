@@ -660,45 +660,32 @@ end
 
 local function optionscontrols_defaultbinding(player, name, page)
 	page = page or keybindpage
+	-- players 2+ copy the same binding from the previous player on this page
+	if player >= 2 then
+		local controlset = getcontrolset(page)
+		local source = controlset and controlset[player - 1] and controlset[player - 1][name]
+		return deepcopy(source or {})
+	end
+	-- player 1 on page 1: keyboard defaults; other pages: unbound
 	if page ~= 1 then
 		return {}
 	end
-	if player == 1 then
-		local defaults = {
-			left = {"a"},
-			right = {"d"},
-			up = {"w"},
-			down = {"s"},
-			run = {"lshift"},
-			jump = {" "},
-			reload = {"r"},
-			use = {"e"},
-			pause = {"escape"},
-			aimx = {""},
-			aimy = {""},
-			portal1 = {""},
-			portal2 = {""},
-		}
-		return deepcopy(defaults[name] or {})
-	end
-	-- players 2-4 default to the joystick layout from main.lua
-	local i = player
-	local joydefaults = {
-		right = {"joy", i-1, "hat", 1, "r"},
-		left = {"joy", i-1, "hat", 1, "l"},
-		down = {"joy", i-1, "hat", 1, "d"},
-		up = {"joy", i-1, "hat", 1, "u"},
-		run = {"joy", i-1, "but", 3},
-		jump = {"joy", i-1, "but", 1},
-		aimx = {"joy", i-1, "axe", 5, "neg"},
-		aimy = {"joy", i-1, "axe", 4, "neg"},
-		portal1 = {"joy", i-1, "but", 5},
-		portal2 = {"joy", i-1, "but", 6},
-		reload = {"joy", i-1, "but", 4},
-		use = {"joy", i-1, "but", 2},
-		pause = {""},
+	local defaults = {
+		left = {"a"},
+		right = {"d"},
+		up = {"w"},
+		down = {"s"},
+		run = {"lshift"},
+		jump = {" "},
+		reload = {"r"},
+		use = {"e"},
+		pause = {"escape"},
+		aimx = {""},
+		aimy = {""},
+		portal1 = {""},
+		portal2 = {""},
 	}
-	return deepcopy(joydefaults[name] or {})
+	return deepcopy(defaults[name] or {})
 end
 
 local function optionscontrols_reset_selected_binding()
