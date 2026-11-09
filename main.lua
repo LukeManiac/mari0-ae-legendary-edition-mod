@@ -1374,7 +1374,7 @@ function lovedraw(donotupdate)
 		texty = 215
 
 		if ShowBattery then
-			texty = 207
+			texty = texty - 10
 		end
 
 		properprintFbackground(time, 1*scale, texty*scale)
