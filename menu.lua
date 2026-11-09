@@ -1177,7 +1177,8 @@ local nitpickkeys = {
 	"smwwaterphysics",
 	"nologdumping",
 	"skipintro",
-	"consistentvinespeed"
+	"consistentvinespeed",
+	"inertiaphysics"
 }
 
 function generatenitpicksfile()

@@ -700,6 +700,19 @@ function checkcollisionslope(v, t, h, g, j, i, dt, passed) --v: b1table | t: b2t
 	return hadhorcollision, hadvercollision
 end
 
+local function setmovingobjectsupport(v, t, dt)
+	if v.playernumber and InertiaPhysics then
+		local objectSpeedX = t.speedx or 0
+		local objectSpeedY = t.speedy or 0
+		if objectSpeedX ~= 0 or objectSpeedY ~= 0 then
+			v.speedx = objectSpeedX - (v.inertiaspeedx or 0)
+			v.speedy = objectSpeedY - (v.inertiaspeedy or 0)
+			v.movingobjectsupport = t
+			v.movingobjectvelocityapplied = true
+		end
+	end
+end
+
 function passivecollision(v, t, h, g, j, i, dt)
 	if not cancollideside(t,"passive",v) then
 		return false
@@ -710,7 +723,8 @@ function passivecollision(v, t, h, g, j, i, dt)
 				if v.speedy > 0 then
 					v.speedy = 0
 				end
-				v.y = t.y - v.height
+				if not (v.playernumber and v.shoe) then v.y = t.y - v.height end
+				setmovingobjectsupport(v, t, dt)
 				return true
 			end
 		end
@@ -724,14 +738,16 @@ function passivecollision(v, t, h, g, j, i, dt)
 					if v.speedy > 0 then
 						v.speedy = 0
 					end
-					v.y = t.y - v.height
+					if not (v.playernumber and v.shoe) then v.y = t.y - v.height end
+					setmovingobjectsupport(v, t, dt)
 					return true
 				end
 			else
 				if v.speedy > 0 then
 					v.speedy = 0
 				end
-				v.y = t.y - v.height
+				if not (v.playernumber and v.shoe) then v.y = t.y - v.height end
+				setmovingobjectsupport(v, t, dt)
 				return true
 			end
 		end
@@ -902,8 +918,9 @@ function vercollision(v, t, h, g, j, i, dt, dontpush, ydir)
 					v.speedy = 0
 				end
 				if not dontpush then
-					v.y = t.y - v.height
+					if not (v.playernumber and v.shoe) then v.y = t.y - v.height end
 				end
+				setmovingobjectsupport(v, t, dt)
 				return true
 			end
 		else
@@ -911,8 +928,9 @@ function vercollision(v, t, h, g, j, i, dt, dontpush, ydir)
 				v.speedy = 0
 			end
 			if not dontpush then
-				v.y = t.y - v.height
+				if not (v.playernumber and v.shoe) then v.y = t.y - v.height end
 			end
+			setmovingobjectsupport(v, t, dt)
 			return true
 		end
 	end
