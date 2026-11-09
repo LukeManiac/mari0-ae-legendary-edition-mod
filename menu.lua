@@ -1205,11 +1205,12 @@ function generatenitpicksfile()
 	end
 
 	if not existed or edited then
-		local out = {}
+		--JSON:encode_pretty sorts object keys alphabetically, so write the file in nitpickkeys order instead
+		local lines = {}
 		for _, key in ipairs(nitpickkeys) do
-			out[key] = t[key:lower()]
+			table.insert(lines, "    " .. JSON:encode_pretty(key) .. ": " .. JSON:encode_pretty(t[key:lower()]))
 		end
-		love.filesystem.write(path, JSON:encode_pretty(out))
+		love.filesystem.write(path, "{\n" .. table.concat(lines, ",\n") .. "\n}")
 	end
 
 	if not existed then
