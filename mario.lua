@@ -6819,6 +6819,9 @@ function mario:grabfence()
 	self.falling = true
 	self.falloverride = true
 
+	self.floattimer = 0
+	self.float = false
+
 	net_action(self.playernumber, "grabfence")
 end
 
