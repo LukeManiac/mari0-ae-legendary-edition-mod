@@ -4630,13 +4630,7 @@ function searchmappacks()
 end
 
 function brprint(text, y)
-	if not (custombackground or customforeground) or hudoutline then
-		love.graphics.setColor(0, 0, 0)
-		properprint(text, (width*16-#(text)*8-7)*scale, (y + 1)*scale)
-		love.graphics.setColor(255, 255, 255)
-	end
-
-	properprint(text, (width*16-#(text)*8-8)*scale, y*scale)
+	properprintFbackground(text, (width*16-#(text)*8-8)*scale, y*scale)
 end
 
 function drawcontrolsoverlay()
