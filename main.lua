@@ -1310,7 +1310,7 @@ function lovedraw(donotupdate)
 		else
 			love.graphics.setColor(rainbow(GAMETIMER))
 		end
-		properprintFbackground("FPS: " .. FPS, 2*scale, 2*scale)
+		properprintFbackground("FPS: " .. FPS, 1*scale, 2*scale)
 	end
 
 	if ShowBattery then
@@ -1334,7 +1334,7 @@ function lovedraw(donotupdate)
 			batterytext = "Battery: unavailable"
 		end
 
-		properprintFbackground(batterytext, 2*scale, 216*scale)
+		properprintFbackground(batterytext, 1*scale, 215*scale)
 	end
 
 	if ShowTime then
@@ -1371,13 +1371,13 @@ function lovedraw(donotupdate)
 		local step = position - math.floor(position)
 
 		love.graphics.setColor(hsv_lerp(sky_colors[index1], sky_colors[index2], step))
-		texty = 216
+		texty = 215
 
 		if ShowBattery then
-			texty = 208
+			texty = 207
 		end
 
-		properprintFbackground(time, 2*scale, texty*scale)
+		properprintFbackground(time, 1*scale, texty*scale)
 	end
 
 	if jsonerrorwindow.opened then
