@@ -1273,7 +1273,7 @@ function lovedraw(donotupdate)
 		elseif FPS < 60 then
 			love.graphics.setColor(hsv_lerp({255, 255, 0}, {0, 255, 0}, (FPS - 30) / 30))
 		elseif FPS < 144 then
-			love.graphics.setColor(hsv_lerp({0, 255, 0}, rainbow(GAMETIMER), (FPS - 60) / 84))
+			love.graphics.setColor(hsv_lerp({0, 255, 0}, {rainbow(GAMETIMER)}, (FPS - 60) / 84))
 		else
 			love.graphics.setColor(rainbow(GAMETIMER))
 		end
