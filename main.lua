@@ -192,6 +192,39 @@ androidtest = false--testing android on pc
 logstring = ""
 nologdump = false
 
+CRASHLIMIT = 25
+LOGLIMIT = 25
+
+function writenumberedfile(dir, limit, content)
+	love.filesystem.createDirectory(dir)
+	local numbers = {}
+	for _, name in ipairs(love.filesystem.getDirectoryItems(dir) or {}) do
+		local n = string.match(name, "^(%d+)%.txt$")
+		if n then
+			table.insert(numbers, tonumber(n))
+		end
+	end
+	table.sort(numbers)
+
+	local excess = math.max(#numbers - limit + 1, 0)
+	for i = 1, excess do
+		love.filesystem.remove(dir .. "/" .. numbers[i] .. ".txt")
+	end
+
+	local count = 0
+	for i = excess + 1, #numbers do
+		count = count + 1
+		if numbers[i] ~= count then
+			local old = dir .. "/" .. numbers[i] .. ".txt"
+			local data = love.filesystem.read(old)
+			love.filesystem.write(dir .. "/" .. count .. ".txt", data or "")
+			love.filesystem.remove(old)
+		end
+	end
+
+	love.filesystem.write(dir .. "/" .. (count + 1) .. ".txt", content or "")
+end
+
 function love.load()
 	marioversion = 1006
 	versionstring = "version 1.6"
@@ -3361,7 +3394,7 @@ function love.errorhandler(msg)
 		for _, w in pairs(traceback) do s = s .. w .. "\r\n" end
 		if VERSION then s = s .. "version: " .. VERSION end
 
-		love.filesystem.write(dir .. "/" .. (#items + 1) .. ".txt", s)
+		writenumberedfile(dir, CRASHLIMIT, s)
 	end
 	
     local function draw()
@@ -3423,15 +3456,14 @@ function love.quit()
 end
 
 function logdump()
-	if nologdump or logstring == "" then
+	if nologdump or NoLogDumping or logstring == "" then
 		return
 	end
 
     local dir = "alesans_entities/logs"
     if love.filesystem then
         love.filesystem.createDirectory(dir)
-        local items = love.filesystem.getDirectoryItems(dir) or {}
-        love.filesystem.write(dir .. "/" .. (#items + 1) .. ".txt", logstring or "")
+        writenumberedfile(dir, LOGLIMIT, logstring)
 		logstring = ""
     end
 end
@@ -3521,6 +3553,7 @@ function loadnitpicks()
 		NoTransitions = t.disabletransitions
 		INFINITEFIREBALLS = t.infinitefireballs
 		SMWSwimming = t.smwwaterphysics
+		NoLogDumping = t.nologdumping
 	end
 end
 
