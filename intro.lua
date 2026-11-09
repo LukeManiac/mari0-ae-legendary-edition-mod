@@ -1,6 +1,5 @@
 local intro_finish_menu
-
-local introcolouroffset = 0.125 --seconds of oscillation offset added per character index
+local introoffsetmult = 0.125 --offset seconds added per character index
 
 function intro_load()
 	gamestate = "intro"
@@ -56,7 +55,7 @@ local function intro_printcolour(text, x, y, scalemult, spacingmult)
 		end
 
 		--full cycle every 2 seconds: second 1 = authorcolour, second 2 = authorcolour / 2
-		local p = (1 - math.cos(math.pi * (introtimer - (i - 1) * introcolouroffset))) / 2
+		local p = (1 - math.cos(math.pi * (introtimer - (i - 1) * introoffsetmult))) / 2
 
 		love.graphics.setColor(
 			lerp(authorcolour[1], authorcolour[1] / 2, p),
@@ -83,9 +82,9 @@ end
 
 function intro_draw()
 	-- Author name.
-	-- Each character zooms in on its own, one after another, introcolouroffset seconds apart.
+	-- Each character zooms in on its own, one after another, introoffsetmult seconds apart.
 	local function authorcharscale(i)
-		local chartimer = introscaletimer - (i - 1) * introcolouroffset
+		local chartimer = introscaletimer - (i - 1) * introoffsetmult
 		if chartimer <= 0 then
 			return nil --not its turn yet
 		end
