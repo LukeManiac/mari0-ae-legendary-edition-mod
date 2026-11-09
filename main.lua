@@ -1301,7 +1301,7 @@ function lovedraw(donotupdate)
 			batterytext = "Battery: unavailable"
 		end
 
-		properprintFbackground(batterytext, 2*scale, 218*scale)
+		properprintFbackground(batterytext, 2*scale, 216*scale)
 	end
 
 	if ShowTime then
@@ -1338,10 +1338,10 @@ function lovedraw(donotupdate)
 		local step = position - math.floor(position)
 
 		love.graphics.setColor(hsv_lerp(sky_colors[index1], sky_colors[index2], step))
-		texty = 218
+		texty = 216
 
 		if ShowBattery then
-			texty = 210
+			texty = 208
 		end
 
 		properprintFbackground(time, 2*scale, texty*scale)
