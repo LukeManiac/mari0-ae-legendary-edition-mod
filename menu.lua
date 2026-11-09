@@ -612,6 +612,9 @@ local function optionscontrols_resettooltip()
 		end
 		return "press ctrl+f6 to", "clear keybinds"
 	end
+	if skinningplayer >= 2 then
+		return "press f6 on a keybind", "to copy from player " .. (skinningplayer - 1)
+	end
 	return "press f6 on a keybind", "to reset it to default"
 end
 
