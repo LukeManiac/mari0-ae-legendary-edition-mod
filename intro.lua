@@ -46,7 +46,7 @@ local function intro_printcolour(text, x, y, scalemult)
 
 	for i, char in utf8.chars(text) do
 		--full cycle every 2 seconds: second 1 = authorcolour, second 2 = authorcolour / 2
-		local p = (1 - math.cos(math.pi * (introtimer + (i - 1) * -introcolouroffset))) / 2
+		local p = (1 - math.cos(math.pi * (introtimer - (i - 1) * introcolouroffset))) / 2
 
 		love.graphics.setColor(
 			lerp(authorcolour[1], authorcolour[1] / 2, p),
