@@ -191,7 +191,6 @@ android = (love.system.getOS() == "Android" or love.system.getOS() == "iOS") --[
 androidtest = false--testing android on pc
 logstring = ""
 nologdump = false
-gamedt = 0
 
 function love.load()
 	marioversion = 1006
@@ -1139,7 +1138,6 @@ function love.update(dt)
 	
 	dt = dt * speed
 	gdt = dt
-	gamedt = gamedt + dt
 	warptransition_update(dt)
 
 	if frameadvance == 1 then
@@ -1267,6 +1265,7 @@ function lovedraw(donotupdate)
 	
 	if ShowFPS then
 		FPS = love.timer.getFPS()
+		GAMETIMER = love.timer.getTime()
 		if FPS < 0 then
 			love.graphics.setColor(255, 0, 0)
 		elseif FPS < 30 then
@@ -1274,9 +1273,9 @@ function lovedraw(donotupdate)
 		elseif FPS < 60 then
 			love.graphics.setColor(hsv_lerp({255, 255, 0}, {0, 255, 0}, (FPS - 30) / 30))
 		elseif FPS < 144 then
-			love.graphics.setColor(hsv_lerp({0, 255, 0}, rainbow(gamedt), (FPS - 60) / 84))
+			love.graphics.setColor(hsv_lerp({0, 255, 0}, rainbow(GAMETIMER), (FPS - 60) / 84))
 		else
-			love.graphics.setColor(rainbow(gamedt))
+			love.graphics.setColor(rainbow(GAMETIMER))
 		end
 		properprintFbackground("FPS: " .. FPS, 8*scale, 8*scale)
 	end
