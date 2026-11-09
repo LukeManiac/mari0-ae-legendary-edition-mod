@@ -705,7 +705,7 @@ local function setmovingobjectsupport(v, t, dt)
 		local objectSpeedX = t.speedx or 0
 		local objectSpeedY = t.speedy or 0
 		if objectSpeedX ~= 0 or objectSpeedY ~= 0 then
-			v.speedx = objectSpeedX - (v.inertiaspeedx or 0)
+			v.speedx = (v.inertiaspeedx or 0) - objectSpeedX
 			v.speedy = objectSpeedY - (v.inertiaspeedy or 0)
 			v.movingobjectsupport = t
 			v.movingobjectvelocityapplied = true
