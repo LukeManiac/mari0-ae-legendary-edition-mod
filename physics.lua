@@ -740,25 +740,6 @@ function passivecollision(v, t, h, g, j, i, dt)
 	return false
 end
 
---Corner-clip test for horizontal tile faces:
---clip when distance(player edge, tile face) > distance(player centre, tile face).
---side "right" = hitting the tile's right face (object moving left)
---side "left"  = hitting the tile's left face  (object moving right)
-local function should_corner_clip_hor(v, t, side)
-	local center = v.x + v.width / 2
-	if side == "right" then
-		local tileright = t.x + t.width
-		local edge_dist = math.abs(v.x - tileright)
-		local center_dist = math.abs(center - tileright)
-		return edge_dist > center_dist
-	else
-		local tileleft = t.x
-		local edge_dist = math.abs((v.x + v.width) - tileleft)
-		local center_dist = math.abs(center - tileleft)
-		return edge_dist > center_dist
-	end
-end
-
 function horcollision(v, t, h, g, j, i, dt, dontpush)
 	if v.speedx < 0 then
 		--move object RIGHT (because it was moving left)
@@ -780,14 +761,7 @@ function horcollision(v, t, h, g, j, i, dt, dontpush)
 
 		if not cancollideside(t, "right", v) then
 			return false
-		end
-
-		--tile right face: only horizontal-push (corner clip) when edge-to-face dist > centre-to-face dist
-		if h == "tile" and not should_corner_clip_hor(v, t, "right") then
-			return false
-		end
-
-		if v.leftcollide then
+		elseif v.leftcollide then
 			if v:leftcollide(h, t) ~= false then
 				if v.postleftcollide then
 					v:postleftcollide(h,t)
@@ -829,14 +803,7 @@ function horcollision(v, t, h, g, j, i, dt, dontpush)
 		
 		if not cancollideside(t, "left", v) then
 			return false
-		end
-
-		--tile left face: only horizontal-push (corner clip) when edge-to-face dist > centre-to-face dist
-		if h == "tile" and not should_corner_clip_hor(v, t, "left") then
-			return false
-		end
-
-		if v.rightcollide then
+		elseif v.rightcollide then
 			if v:rightcollide(h, t) ~= false then
 				if v.postrightcollide then
 					v:postrightcollide(h,t)
