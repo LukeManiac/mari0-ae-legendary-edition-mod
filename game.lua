@@ -2852,7 +2852,7 @@ function game_draw()
 			w:draw()
 		end
 
-		--player coords: scale in/out from bottom-centre of each label
+		--player coords: scale the whole two-line block from its bottom centre
 		local coords_p = 0
 		if overlayanim and overlayanim.coords then
 			local anim = overlayanim.coords
@@ -2870,12 +2870,15 @@ function game_draw()
 					v = objects["player"][i]
 
 					if v.drawable and (not splitviews or i == split) then
-						--bottom-centred scale: shift y so the bottom of the glyph stays fixed as s changes
 						local x1 = (v.x-xscroll)*16
 						local y1 = (v.y-yscroll-2)*16
 						local y2 = (v.y-yscroll-1.375)*16
-						centerprint("x: " .. truncatedecimal(v.x, 3), x1, y1 + 5*(1-s), s)
-						centerprint("y: " .. truncatedecimal(v.y, 3), x1, y2 + 5*(1-s), s)
+						--shared bottom-centre anchor of the full block (bottom of the lower line at s=1)
+						local anchor_y = y2 + 5
+						local line_spacing = y2 - y1
+						--line centres sit line_spacing+5 and 5 above the anchor at full size; scale those offsets together
+						centerprint("x: " .. truncatedecimal(v.x, 3), x1, anchor_y - (line_spacing + 5)*s, s)
+						centerprint("y: " .. truncatedecimal(v.y, 3), x1, anchor_y - 5*s, s)
 					end
 				end
 				love.graphics.setColor(255, 255, 255, 255)
