@@ -1266,6 +1266,7 @@ function lovedraw(donotupdate)
 	notice.draw()
 	
 	if ShowFPS then
+		FPS = love.timer.getFPS()
 		if FPS < 0 then
 			love.graphics.setColor(255, 0, 0)
 		elseif FPS < 30 then
@@ -1277,7 +1278,7 @@ function lovedraw(donotupdate)
 		else
 			love.graphics.setColor(unpack(rainbow(gamedt)))
 		end
-		properprintFbackground(love.timer.getFPS(), 8*scale, 8*scale)
+		properprintFbackground(FPS, 8*scale, 8*scale)
 	end
 
 	if ShowBattery then
