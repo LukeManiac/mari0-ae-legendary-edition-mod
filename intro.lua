@@ -39,10 +39,9 @@ function intro_update(dt)
 end
 
 --prints a single line of text centered on x, y (game pixels), every character has its own oscillating colour
-local function intro_printcolour(text, x, y, scalemult)
+local function intro_printcolour(text, x, y, scalemult, spacingmult)
+	spacingmult = spacingmult or scalemult
 	local length = utf8.len(text) or #text
-	local textx = (x - (8 * scalemult * length) / 2) * scale
-	local texty = (y - (10 * scalemult) / 2) * scale
 
 	for i, char in utf8.chars(text) do
 		--full cycle every 2 seconds: second 1 = authorcolour, second 2 = authorcolour / 2
@@ -55,12 +54,15 @@ local function intro_printcolour(text, x, y, scalemult)
 			introalpha
 		)
 
-		local charx = textx + ((i - 1) * 8 * scalemult) * scale
+		--centre of this character's cell (game pixels), spacing stays fixed while the character itself scales
+		local centerx = x + ((i - 0.5) - length / 2) * 8 * spacingmult
+		local charx = (centerx - (8 * scalemult) / 2) * scale
+		local chary = (y - (10 * scalemult) / 2) * scale
 
 		if hudoutline then
-			properprintFbackground(char, charx, texty, nil, nil, scalemult)
+			properprintFbackground(char, charx, chary, nil, nil, scalemult)
 		else
-			properprintF(char, charx, texty, scalemult)
+			properprintF(char, charx, chary, scalemult)
 		end
 	end
 end
@@ -69,7 +71,7 @@ function intro_draw()
 	-- Author name.
 	local introscale = motion_curve(introscaletimer / introscaleduration, introcurve, true, false, true) * 2.5
 
-	intro_printcolour(authorname, 200, 112, introscale)
+	intro_printcolour(authorname, 200, 112, introscale, 2.5)
 
 	-- Typewriter effect.
 	local charcount = utf8.len(loadingtext) or #loadingtext
