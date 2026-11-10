@@ -3645,7 +3645,6 @@ function loadnitpicks()
 		NoLogDumping = t.nologdumping
 		SkipIntro = t.skipintro
 		ConsistentVineSpeed = t.consistentvinespeed
-		InertiaPhysics = t.inertiaphysics
 	end
 end
 

@@ -18,10 +18,6 @@ function mario:init(x, y, i, animation, size, t, properties)
 	--PHYSICS STUFF
 	self.speedx = 0
 	self.speedy = 0
-	self.inertiaspeedx = 0
-	self.inertiaspeedy = 0
-	self.inertiaobject = nil
-	self._inertiaPreviousObject = nil
 	self.x = x
 	self.width = 12/16
 	self.height = 12/16
@@ -5041,37 +5037,7 @@ function mario:floorcollide(a, b)
 		end
 		self:setquad()
 	end
-
-	if InertiaPhysics then
-		local previousObject = self._inertiaPreviousObject
-		local previousSpeedX = self._inertiaPreviousSpeedX or 0
-		local previousSpeedY = self._inertiaPreviousSpeedY or 0
-		local objectSpeedX = b and (b.trackvelocityx or b.speedx) or 0
-		local objectSpeedY = b and (b.trackvelocityy or b.speedy) or 0
-		local movingObject = b and (b.static == false or b.activestatic == true or b.trackplatform == true or b.moving == true or objectSpeedX ~= 0 or objectSpeedY ~= 0)
-
-		if previousObject and previousObject ~= b and (previousSpeedX ~= 0 or previousSpeedY ~= 0) and not self._inertiaTransferredThisFrame then
-			self.speedx = self.speedx + previousSpeedX
-			self.speedy = self.speedy + previousSpeedY
-			self.inertiaspeedx = previousSpeedX
-			self.inertiaspeedy = previousSpeedY
-			self._inertiaTransferredThisFrame = true
-		end
-
-		if movingObject then
-			if previousObject ~= b and (self.inertiaspeedx ~= 0 or self.inertiaspeedy ~= 0) then
-				-- Keep the player's actual velocity; store only the velocity relative to the new platform.
-				self.inertiaspeedx = self.inertiaspeedx - objectSpeedX
-				self.inertiaspeedy = self.inertiaspeedy - objectSpeedY
-			end
-			self.inertiaobject = b
-		else
-			self.inertiaobject = nil
-			self.inertiaspeedx = 0
-			self.inertiaspeedy = 0
-		end
-	end
-
+	
 	self.combo = 1
 end
 
@@ -6765,9 +6731,6 @@ function mario:dropvine(dir)
 end
 
 function mario:grabvine(b)
-	if self.shoe or self.cloudtimer then
-		return
-	end
 	if self.ducking then
 		local intile = checkintile(self.x, self.y, self.width, self.height, tileentities, self, "ignoreplatforms")
 		local oldy = self.y
