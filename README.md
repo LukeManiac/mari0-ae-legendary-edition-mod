@@ -392,13 +392,18 @@ Legendary Edition can be installed using either the **.exe** file or the **.love
 Use this option if you are on Windows and want to run the game without installing LÖVE separately.
 
 1. Open the repository's **Releases** page.
-2. Download **Windows.zip**.
-3. **Extract the entire contents of `Windows.zip` into any game folder.**
+2. Download **`mari0_le.exe`**.
+3. Place the EXE in any safe, writable folder you prefer. For example:
+   * Your game's AppData folder.
+   * A dedicated folder for your games.
+   * The same folder as `mari0_ae.exe`.
+
+   You can move the EXE wherever you like, provided the location is safe and you have permission to run files from it.
 4. Double-click `mari0_le.exe` to launch the game.
 
-Alternatively, you can copy `mari0_le.exe` and all the other contents of `Windows.zip` into the same folder that contains `mari0_ae.exe`, then launch `mari0_le.exe`.
-
-> **Important:** Extracting `Windows.zip` is mandatory for the game to run correctly. Do not attempt to launch `mari0_le.exe` directly from inside the ZIP archive. Failure to extract the files will result in a DLL error. The Windows release already includes the required LÖVE DLLs, so you do not need to install LÖVE separately.
+> **Important:** The Windows release is a standalone executable, not a ZIP archive. The required LÖVE runtime DLLs are already packaged inside the EXE, so you do not need to download or extract any additional files, install LÖVE separately, or keep the EXE in a particular folder.
+>
+> For the best results, use a normal, trusted folder that you can write to. Avoid temporary folders, protected Windows system directories, and other locations where Windows or security software may restrict execution.
 
 ## Option 2: Using the Source Release
 
