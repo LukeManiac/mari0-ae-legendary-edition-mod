@@ -17,8 +17,8 @@ The project expands Mari0 AE with new gameplay systems, playable characters, ene
 * [Changelog](#changelog)
 * [Requirements](#requirements)
 * [Installation](#installation)
-  * [Option 1: Using the .exe File](#option-1-using-the-exe-file)
-  * [Option 2: Using the .love File](#option-2-using-the-love-file)
+  * [Option 1: Using the Windows Release](#option-1-using-the-windows-release)
+  * [Option 2: Using the Source Release](#option-2-using-the-source-release)
 
 * [Features](#features)
   * [Gameplay](#gameplay)
@@ -387,18 +387,20 @@ A clean Mari0 AE v13.2 installation is recommended as the base for Legendary Edi
 
 Legendary Edition can be installed using either the **.exe** file or the **.love** file. Both are available from the project's **Releases** page.
 
-## Option 1: Using the .exe File
+## Option 1: Using the Windows Release
 
-Use this option if you are on Windows and want to run the game without installing LÖVE.
+Use this option if you are on Windows and want to run the game without installing LÖVE separately.
 
 1. Open the repository's **Releases** page.
-2. Download the Legendary Edition `.exe` file.
-3. Place the `.exe` file in the **same directory as your original [Mari0 AE](https://forum.stabyourself.net/viewtopic.php?t=3636) game folder**.
-4. Double-click the `.exe` file to launch the game.
+2. Download **Windows.zip**.
+3. **Extract the entire contents of `Windows.zip` into any game folder.**
+4. Double-click `mari0_le.exe` to launch the game.
 
-> **Important:** Do **not** place the `.exe` file in the AppData folder (`C:/Users/<YOUR_USERNAME>/AppData/Roaming/mari0`). It must sit next to the original Mari0 AE game folder, not inside the AppData folder.
+Alternatively, you can copy `mari0_le.exe` and all the other contents of `Windows.zip` into the same folder that contains `mari0_ae.exe`, then launch `mari0_le.exe`.
 
-## Option 2: Using the .love File
+> **Important:** Extracting `Windows.zip` is mandatory for the game to run correctly. Do not attempt to launch `mari0_le.exe` directly from inside the ZIP archive. Failure to extract the files will result in a DLL error. The Windows release already includes the required LÖVE DLLs, so you do not need to install LÖVE separately.
+
+## Option 2: Using the Source Release
 
 Use this option if you already have LÖVE installed, or if you are on macOS or Linux.
 
@@ -410,7 +412,7 @@ Use this option if you already have LÖVE installed, or if you are on macOS or L
    * Dragging the `.love` file onto the LÖVE executable, or
    * Running it from a terminal:
 
-     ```
+     ```bash
      love LegendaryEdition.love
      ```
 
