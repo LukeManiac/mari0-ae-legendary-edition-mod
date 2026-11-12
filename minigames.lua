@@ -42,6 +42,7 @@ local GRAPHIC_W, GRAPHIC_H = OPTION_W-8, OPTION_H-8 --192x50
 local DESC_X, DESC_Y, DESC_W = 241, 16, 150 --where the search bar is on the local tab
 local DESC_LINE = 10 --the value added to the text y on a new line
 local DESC_CHARS = math.floor((DESC_W-6)/8)
+local SCROLLBAR_SPACE = 10 --room the description and highscores scrollbars take on the right
 local GUI_PADDING = 2 --between the bottom of the text and the top of a game mode GUI element
 local CHECKBOX_LABEL_X = DESC_X+16
 local CHECKBOX_LABEL_CHARS = math.floor((DESC_X+DESC_W-3-CHECKBOX_LABEL_X)/8)
@@ -90,21 +91,77 @@ local function centerprintline(s, cx, y, color)
 	shadowprint(s, cx - textwidth(s)/2, y, color)
 end
 
---wrap the text by splitting spaces
+--score units: 1.23K, 45.6M, 789B, 1T... up to the biggest number Lua can hold (about 179UCe, 1.8*10^308)
+--K, M, B, T, Qa, Qi, Sx, Sp, Oc, No, then U/D/T/Qa/Qi/Sx/Sp/Oc/No + Dc, Vg, Tg, Qag, Qig, Sxg, Spg, Ocg, Nog, then Ce
+local SCORE_UNITS = {"K", "M", "B", "T"}
+do
+	local ones = {"", "U", "D", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No"}
+	local tens = {"", "Dc", "Vg", "Tg", "Qag", "Qig", "Sxg", "Spg", "Ocg", "Nog"}
+	for n = 4, 9 do --quadrillion to nonillion
+		SCORE_UNITS[n+1] = ones[n+1]
+	end
+	for n = 10, 99 do --decillion to novemnonagintillion
+		SCORE_UNITS[n+1] = ones[n%10+1] .. tens[math.floor(n/10)+1]
+	end
+	SCORE_UNITS[101] = "Ce" --centillion, 10^303
+	SCORE_UNITS[102] = "UCe" --10^306
+end
+
+function minigame_formatscore(n)
+	n = tonumber(n) or 0
+	if n ~= n then
+		return "0"
+	end
+	local sign = (n < 0) and "-" or ""
+	n = math.abs(n)
+	if n < 1000 then
+		return sign .. tostring(math.floor(n))
+	end
+	if n == math.huge then
+		return sign .. "INF"
+	end
+	local unit = 0
+	while n >= 1000 - 1e-6 and unit < #SCORE_UNITS do --a hair under 1000 counts (dividing big numbers isn't exact)
+		n = n/1000
+		unit = unit + 1
+	end
+	n = n*(1 + 1e-12) --dividing can land just under a whole number
+	--3 significant digits, cut off instead of rounded so 999.9K never shows as 1000K
+	local text
+	if n >= 100 then
+		text = tostring(math.floor(n))
+	elseif n >= 10 then
+		text = string.format("%.1f", math.floor(n*10)/10)
+	else
+		text = string.format("%.2f", math.floor(n*100)/100)
+	end
+	if text:find("%.") then
+		text = text:gsub("0+$", ""):gsub("%.$", "")
+	end
+	return sign .. text .. SCORE_UNITS[unit]
+end
+local formatscore = minigame_formatscore
+
+--"Score: " .. score, centered on the screen
+local function drawscorehud(S)
+	centerprintline("Score: " .. formatscore(S.score or 0), width*8, 8)
+end
+
+--wrap the text by splitting spaces, "\n" starts a new line
 function minigame_wraptext(s, maxchars)
 	local lines = {}
-	local line = ""
-	for word in tostring(s):gmatch("[^ ]+") do
-		if line == "" then
-			line = word
-		elseif utf8.len(line) + 1 + utf8.len(word) <= maxchars then
-			line = line .. " " .. word
-		else
-			table.insert(lines, line)
-			line = word
+	for paragraph in (tostring(s) .. "\n"):gmatch("(.-)\n") do
+		local line = ""
+		for word in paragraph:gmatch("[^ ]+") do
+			if line == "" then
+				line = word
+			elseif utf8.len(line) + 1 + utf8.len(word) <= maxchars then
+				line = line .. " " .. word
+			else
+				table.insert(lines, line)
+				line = word
+			end
 		end
-	end
-	if line ~= "" then
 		table.insert(lines, line)
 	end
 	if #lines == 0 then
@@ -316,26 +373,47 @@ function minigame_updatescroll()
 	minigamescroll = math.max(0, minigamescroll)
 end
 
-local function panellayout(def)
-	local layout = {lines = wraptext(T(def.description), DESC_CHARS), items = {}}
-	--the height is 10 times the number of lines of the description
+--a long description (with its settings) gets a scrollbar
+local function descmaxheight()
+	return math.floor((height or 14)*16/2/DESC_LINE)*DESC_LINE
+end
+
+--lays out the description and the game mode settings as one block (content y, not scrolled)
+local function layoutcontent(def, layout, narrow)
+	local space = narrow and SCROLLBAR_SPACE or 0
+	layout.lines = wraptext(def.description, math.floor((DESC_W-6-space)/8))
+	layout.items = {}
 	local y = DESC_Y + DESC_LINE*#layout.lines
 	if #def.options > 0 then
 		y = y + GUI_PADDING
 		for _, opt in ipairs(def.options) do
 			local item = {opt = opt, y = y}
 			if opt.type == "checkbox" then
-				item.labellines = wraptext(T(opt.label), CHECKBOX_LABEL_CHARS)
+				item.labellines = wraptext(opt.label, CHECKBOX_LABEL_CHARS - math.ceil(space/8))
 				item.height = math.max(9, DESC_LINE*#item.labellines-1)
 			else --dropdown, the label sits above it
-				item.labellines = wraptext(T(opt.label), DESC_CHARS)
+				item.labellines = wraptext(opt.label, math.floor((DESC_W-6-space)/8))
 				item.height = DESC_LINE*#item.labellines + 11
 			end
 			table.insert(layout.items, item)
 			y = y + item.height + GUI_PADDING
 		end
 	end
-	layout.bottom = y
+	layout.contenth = y - DESC_Y
+end
+
+local function panellayout(def)
+	local layout = {}
+	--the description and the settings together never take more than half of the game height
+	local maxh = descmaxheight()
+	layoutcontent(def, layout, false)
+	if layout.contenth > maxh then
+		--narrower, so nothing runs under the scrollbar
+		layoutcontent(def, layout, true)
+	end
+	layout.viewh = math.min(layout.contenth, maxh)
+	layout.maxscroll = layout.contenth - layout.viewh --in pixels
+	layout.bottom = DESC_Y + layout.viewh
 	return layout
 end
 
@@ -375,6 +453,7 @@ function minigame_buildgui(force)
 		end
 		if el then
 			el.active = false
+			el.basey = el.y --where it sits before the panel is scrolled
 			table.insert(minigamegui, el)
 		end
 	end
@@ -396,24 +475,27 @@ function minigame_menu_update(dt)
 			minigamescrollsmooth = minigamescroll
 		end
 	end
-	if minigamescorescrollsmooth ~= minigamescorescroll then
-		minigamescorescrollsmooth = minigamescorescrollsmooth + (minigamescorescroll-minigamescorescrollsmooth)*math.min(1, dt*15)
-		if math.abs(minigamescorescrollsmooth-minigamescorescroll) < 0.01 then
-			minigamescorescrollsmooth = minigamescorescroll
+	for _, st in pairs(minigamepanelscroll) do
+		if st.smooth ~= st.pos then
+			st.smooth = st.smooth + (st.pos-st.smooth)*math.min(1, dt*15)
+			if math.abs(st.smooth-st.pos) < 0.01 then
+				st.smooth = st.pos
+			end
 		end
 	end
 	local settled = menusettled()
+	minigame_updatescrollbars(dt, settled)
 	for _, el in ipairs(minigamegui) do
-		el.active = settled
-		if not settled and el.extended then
+		el.active = settled and el.panelvisible ~= false
+		if not el.active and el.extended then
 			el:close()
 		end
 		el:update(dt)
 	end
 end
 
-minigamescorescroll = 0
-minigamescorescrollsmooth = 0
+--scroll position (in lines) of the description and the highscores, smooth follows pos
+minigamepanelscroll = {desc = {pos = 0, smooth = 0}, score = {pos = 0, smooth = 0}}
 local SCOREBOX_BOTTOM = 216 --bottom of the mappack menu area
 
 --the highscores box fills the space left under the description
@@ -429,6 +511,100 @@ local function scorebox(def, layout)
 	return box
 end
 
+--the two scrollable areas of the panel (game pixels), each gets a gui scrollbar when it doesn't fit
+local SCROLLBAR_W = 8
+local function panelareas(def, layout, box)
+	layout = layout or panellayout(def)
+	box = box or scorebox(def, layout)
+	return {
+		--description and settings: scrolled in pixels, one line per wheel notch
+		{key = "desc", top = DESC_Y, bottom = layout.bottom, tracky = DESC_Y+1, trackh = layout.viewh-2,
+			visible = layout.viewh, total = layout.contenth, max = layout.maxscroll, step = DESC_LINE},
+		--highscores: scrolled in lines
+		{key = "score", top = box.y, bottom = box.y+box.h, tracky = box.listy+1, trackh = box.listh-2,
+			visible = box.visible, total = #box.scores, max = box.maxscroll, step = 1},
+	}
+end
+
+minigamescrollbars = {} --gui scrollbars by area key
+
+--make (or remake when the area changed) the gui scrollbar of an area, nil when everything fits
+local function syncscrollbar(area)
+	if area.max <= 0 then
+		minigamescrollbars[area.key] = nil
+		return nil
+	end
+	local el = minigamescrollbars[area.key]
+	local x = DESC_X+DESC_W-SCROLLBAR_W-1
+	local handle = math.max(10, math.floor(area.trackh*area.visible/area.total))
+	local sig = x .. "," .. area.tracky .. "," .. area.trackh .. "," .. handle
+	if not (el and el.sig == sig) then
+		local value = el and el.value or minigamepanelscroll[area.key].smooth/area.max
+		el = guielement:new("scrollbar", x, area.tracky, area.trackh, SCROLLBAR_W, handle, value, "ver")
+		el.sig = sig
+		el.scrollstepdisabled = true --the mouse wheel is handled by the area (one line per notch)
+		el.releasefunc = function()
+			--settle on a whole line
+			local st = minigamepanelscroll[area.key]
+			st.pos = math.max(0, math.min(area.max, round(st.pos/area.step)*area.step))
+		end
+		minigamescrollbars[area.key] = el
+	end
+	return el
+end
+
+--keep the scrollbars and the scroll positions in step (called from minigame_menu_update)
+function minigame_updatescrollbars(dt, settled)
+	local def = minigamelist[minigameselection]
+	if settled and def then
+		for _, area in ipairs(panelareas(def)) do
+			local el = syncscrollbar(area)
+			if el then
+				el.active = true
+				el:update(dt)
+				local st = minigamepanelscroll[area.key]
+				if el.dragging then
+					st.pos = el.value*area.max
+					st.smooth = st.pos
+				else
+					el.value = st.smooth/area.max
+				end
+			end
+		end
+	else
+		for _, el in pairs(minigamescrollbars) do
+			el.active = false
+			el.dragging = false
+		end
+	end
+	minigame_placegui()
+end
+
+--move the settings with the scrolled panel
+function minigame_placegui()
+	local def = minigamelist[minigameselection]
+	if not def then
+		return
+	end
+	local layout = panellayout(def)
+	local offset = minigamepanelscroll.desc.smooth
+	for _, el in ipairs(minigamegui) do
+		el.y = (el.basey or el.y) - offset
+		--hidden above or below the panel: can't be clicked
+		local h = (el.type == "dropdown") and 11 or 9
+		el.panelvisible = el.y + h > DESC_Y and el.y < layout.bottom
+	end
+end
+
+local function scrollbardragging()
+	for _, el in pairs(minigamescrollbars) do
+		if el.dragging then
+			return true
+		end
+	end
+	return false
+end
+
 local function drawpanel()
 	local def = minigamelist[minigameselection]
 	if not def then
@@ -436,23 +612,46 @@ local function drawpanel()
 	end
 	local layout = panellayout(def)
 
-	--description (and game modes)
+	--description and game modes, scrolled together inside a box of at most half the game height
 	love.graphics.setColor(0, 0, 0, 200)
 	love.graphics.rectangle("fill", DESC_X*scale, DESC_Y*scale, DESC_W*scale, (layout.bottom-DESC_Y)*scale)
+	local sx, sy, sw, sh = love.graphics.getScissor()
+	love.graphics.setScissor(DESC_X*scale, DESC_Y*scale, DESC_W*scale, layout.viewh*scale)
+	local offset = minigamepanelscroll.desc.smooth
 	love.graphics.setColor(255, 255, 255)
 	for i, line in ipairs(layout.lines) do
-		properprintF(line, (DESC_X+3)*scale, (DESC_Y+1+(i-1)*DESC_LINE)*scale)
+		local y = DESC_Y+1+(i-1)*DESC_LINE-offset
+		if y > DESC_Y-DESC_LINE and y < layout.bottom then
+			properprintF(line, (DESC_X+3)*scale, round(y*scale))
+		end
 	end
 	love.graphics.setColor(200, 200, 200)
 	for _, item in ipairs(layout.items) do
 		local x = (item.opt.type == "checkbox") and CHECKBOX_LABEL_X or DESC_X+3
 		for j, line in ipairs(item.labellines) do
-			properprintF(line, x*scale, (item.y+1+(j-1)*DESC_LINE)*scale)
+			properprintF(line, x*scale, round((item.y+1+(j-1)*DESC_LINE-offset)*scale))
 		end
 	end
+	--gui elements (an open dropdown is drawn later, on top of everything)
+	local ontop
+	for _, el in ipairs(minigamegui) do
+		if el.extended or (el.listvalue and el.listvalue > 0) then
+			ontop = el
+		else
+			el:draw()
+		end
+	end
+	if sx then
+		love.graphics.setScissor(sx, sy, sw, sh)
+	else
+		love.graphics.setScissor()
+	end
+	if minigamescrollbars.desc then
+		minigamescrollbars.desc:draw()
+	end
+	local box = scorebox(def, layout)
 
 	--highscores: every score, best first, scrollable with the mouse wheel
-	local box = scorebox(def, layout)
 	love.graphics.setColor(0, 0, 0, 200)
 	love.graphics.rectangle("fill", DESC_X*scale, box.y*scale, DESC_W*scale, box.h*scale)
 	love.graphics.setColor(255, 255, 255)
@@ -463,11 +662,12 @@ local function drawpanel()
 	if #box.scores == 0 then
 		properprintF("1. -", (DESC_X+3)*scale, box.listy*scale)
 	else
-		local first = math.max(1, math.floor(minigamescorescrollsmooth)+1)
+		local scroll = minigamepanelscroll.score.smooth
+		local first = math.max(1, math.floor(scroll)+1)
 		local last = math.min(#box.scores, first+box.visible)
 		for i = first, last do
-			local y = box.listy + (i-1-minigamescorescrollsmooth)*DESC_LINE
-			properprintF(i .. ". " .. tostring(box.scores[i]), (DESC_X+3)*scale, round(y*scale))
+			local y = box.listy + (i-1-scroll)*DESC_LINE
+			properprintF(i .. ". " .. formatscore(box.scores[i]), (DESC_X+3)*scale, round(y*scale))
 		end
 	end
 	if sx then
@@ -476,25 +676,10 @@ local function drawpanel()
 		love.graphics.setScissor()
 	end
 	--scrollbar when there are more scores than fit
-	if box.maxscroll > 0 then
-		local trackh = box.listh-2
-		local barh = math.max(4, trackh*box.visible/#box.scores)
-		local bary = box.listy+1 + (trackh-barh)*(minigamescorescrollsmooth/box.maxscroll)
-		love.graphics.setColor(255, 255, 255, 60)
-		love.graphics.rectangle("fill", (DESC_X+DESC_W-4)*scale, (box.listy+1)*scale, 2*scale, trackh*scale)
-		love.graphics.setColor(255, 255, 255, 200)
-		love.graphics.rectangle("fill", (DESC_X+DESC_W-4)*scale, bary*scale, 2*scale, barh*scale)
+	if minigamescrollbars.score then
+		minigamescrollbars.score:draw()
 	end
 
-	--gui elements (an open dropdown goes on top)
-	local ontop
-	for _, el in ipairs(minigamegui) do
-		if el.extended or (el.listvalue and el.listvalue > 0) then
-			ontop = el
-		else
-			el:draw()
-		end
-	end
 	if ontop then
 		ontop:draw()
 	end
@@ -578,8 +763,8 @@ local function changeselection(i)
 		minigameselection = i
 		minigame_updatescroll()
 		minigame_buildgui()
-		minigamescorescroll = 0
-		minigamescorescrollsmooth = 0
+		minigamepanelscroll = {desc = {pos = 0, smooth = 0}, score = {pos = 0, smooth = 0}}
+		minigamescrollbars = {}
 	end
 end
 
@@ -591,24 +776,30 @@ local function openminigamedropdown()
 	end
 end
 
---mouse wheel over the highscores box scrolls it (x, y in scaled pixels)
+--mouse wheel over the description or the highscores scrolls it (x, y in scaled pixels)
 function minigame_menu_wheel(x, y, button)
 	local def = minigamelist[minigameselection]
-	if not (def and menusettled()) or openminigamedropdown() then
+	if not (def and menusettled()) or openminigamedropdown() or scrollbardragging() then
 		return false
 	end
-	local box = scorebox(def)
 	--wheel events can arrive with converted coordinates, so read the cursor directly
 	x, y = love.mouse.getPosition()
-	if x < DESC_X*scale or x > (DESC_X+DESC_W)*scale or y < box.y*scale or y > (box.y+box.h)*scale then
+	if x < DESC_X*scale or x > (DESC_X+DESC_W)*scale then
 		return false
 	end
-	if button == "wu" then
-		minigamescorescroll = math.max(0, minigamescorescroll-1)
-	elseif button == "wd" then
-		minigamescorescroll = math.min(box.maxscroll, minigamescorescroll+1)
+	for _, area in ipairs(panelareas(def)) do
+		if y >= area.top*scale and y <= area.bottom*scale then
+			local st = minigamepanelscroll[area.key]
+			local step = area.step
+			if button == "wu" then
+				st.pos = math.max(0, (math.ceil(st.pos/step)-1)*step)
+			elseif button == "wd" then
+				st.pos = math.min(area.max, (math.floor(st.pos/step)+1)*step)
+			end
+			return true --the wheel belongs to the area while the cursor is on it
+		end
 	end
-	return true --the wheel belongs to the box while the cursor is on it
+	return false
 end
 
 function minigame_menu_keypressed(key)
@@ -653,10 +844,21 @@ function minigame_menu_mousepressed(x, y, button)
 			dd:click(x, y, button)
 			return true
 		end
+		local def = minigamelist[minigameselection]
+		local inpanel = def and y >= DESC_Y*scale and y < panellayout(def).bottom*scale --settings scrolled out of view can't be clicked
 		for _, el in ipairs(minigamegui) do
-			if el:inhighlight(x, y) then
+			if inpanel and el.active and el:inhighlight(x, y) then
 				el:click(x, y, button)
 				return true
+			end
+		end
+		--description and highscores scrollbars
+		if button == "l" then
+			for _, el in pairs(minigamescrollbars) do
+				if el.active and el:inhighlight(x, y) then
+					el:click(x, y, button)
+					return true
+				end
 			end
 		end
 	end
@@ -674,12 +876,18 @@ function minigame_menu_mousepressed(x, y, button)
 end
 
 function minigame_menu_mousereleased(x, y, button)
+	for _, el in pairs(minigamescrollbars) do
+		el:unclick(x, y)
+	end
 	for _, el in ipairs(minigamegui) do
 		el:unclick(x, y)
 	end
 end
 
 function minigame_menu_mousemoved(x, y)
+	if scrollbardragging() then
+		return --the gui scrollbar follows the mouse by itself
+	end
 	if android or openminigamedropdown() then
 		return
 	end
@@ -719,6 +927,35 @@ function minigame_start(i)
 	warpfadeoutnow()
 	game_load("minigame")
 	return true
+end
+
+--fade to black, then go back to the minigame menu (used by the pause menu)
+function minigame_exit()
+	if warpfade then
+		return false
+	end
+	return startwarpfade(function()
+		pausemenuopen = false
+		menuprompt = false
+		pausedaudio = nil
+		stopmusic()
+		love.audio.stop()
+		minigame_returntomenu()
+	end, false, true)
+end
+
+--fade to black, then restart the current minigame (used by the pause menu)
+function minigame_restart()
+	if warpfade then
+		return false
+	end
+	return startwarpfade(function()
+		pausemenuopen = false
+		pausedaudio = nil
+		stopmusic()
+		love.audio.stop()
+		levelscreen_load("minigame")
+	end, false, true)
 end
 
 function minigame_stopsounds()
@@ -816,6 +1053,10 @@ function minigame_createmap()
 	startx = math.floor(mapwidth/2)+0.5
 	starty = 13
 
+	--minigame physics are always mario maker (a minigame can switch to mari0-maker, see jumping juggle jamboree)
+	currentphysics = 6
+	setphysics(currentphysics)
+
 	minigamestate = {score = 0, time = 0, popups = {}, options = minigameoptions[def.id] or {}}
 	if def.createmap then
 		def.createmap(minigamestate, minigamestate.options)
@@ -896,8 +1137,14 @@ function minigame_drawHUD()
 	if not (S and def) then
 		return
 	end
+	if def.drawhud then
+		--custom HUD
+		def.drawhud(S)
+		love.graphics.setColor(255, 255, 255)
+		return
+	end
 	--by default there is a score element, minigames can add more
-	local items = {{label = T("score"), value = S.score or 0}}
+	local items = {{label = "score", value = formatscore(S.score or 0)}}
 	if def.hud then
 		def.hud(S, items)
 	end
@@ -940,8 +1187,29 @@ function minigame_mousepressed(x, y, button)
 	end
 end
 
+--a minigame can lock every control except jump (Jumping Juggle Jamboree, until the player jumps off the blocks)
+function minigame_controlslocked(i)
+	local S, def = minigamestate, minigamecurrent
+	if not (minigameplaying and gamestate == "game" and S and def and def.lockcontrols) or S.finish or (i and i ~= 1) then
+		return false
+	end
+	local p = objects and objects["player"] and objects["player"][1]
+	if not p or p.dead or p.jumping then
+		return false
+	end
+	return def.lockcontrols(S) == true
+end
+
+--controller buttons other than jump do nothing while the controls are locked
+function minigame_joystickblocked(joystick, button)
+	return minigame_controlslocked(1) and not controlbindingmatchesjoy(1, "jump", joystick, button)
+end
+
 function minigame_keypressed(key)
 	local S, def = minigamestate, minigamecurrent
+	if minigame_controlslocked(1) and not controlbindingmatcheskey(1, "jump", key) then
+		return true --swallow the key (turning, ducking, running, using...)
+	end
 	if S and def and def.keypressed and not S.finish then
 		return def.keypressed(S, key) == true
 	end
@@ -981,6 +1249,19 @@ if jumpkey then
 			return true
 		end
 		return originaljumpkey(i)
+	end
+end
+
+--held directions and buttons read every frame are released while the controls are locked
+for _, name in ipairs({"leftkey", "rightkey", "upkey", "downkey", "runkey", "usekey", "reloadkey"}) do
+	local original = _G[name]
+	if original then
+		_G[name] = function(i, ...)
+			if minigame_controlslocked(i) then
+				return false
+			end
+			return original(i, ...)
+		end
 	end
 end
 
@@ -1076,8 +1357,10 @@ function minigame_levelscreen_load(reason)
 			confetti_start()
 		else --"minigamelose" or the player's death
 			minigamescreen = "lose"
-			blacktime = dclosesound:getDuration("seconds") + warpfadetime
-			playsound(dclosesound)
+			--a new highscore gets the victory sound even on a loss
+			local sound = (minigameresult and minigameresult.highscore) and dcwin2sound or dclose2sound
+			blacktime = sound:getDuration("seconds") + warpfadetime
+			playsound(sound)
 		end
 	end
 
@@ -1117,7 +1400,7 @@ function minigame_levelscreen_draw()
 		end
 		centerprintline(name, cx, 104, {200, 200, 200})
 		local score = minigameresult and minigameresult.score or (minigamestate and minigamestate.score) or 0
-		centerprintline(T("score: ") .. score, cx, 128)
+		centerprintline("score: " .. formatscore(score), cx, 128)
 		local y = 144
 		if minigameresult and minigameresult.title then
 			centerprintline(T("title: ") .. T(minigameresult.title), cx, y, {140, 230, 255})
@@ -1138,12 +1421,13 @@ local BOO_ANIM_TIME = 0.1 --the whole animation (column 1, column 2)
 local BOO_START_TIME = 10
 local BOO_INCREMENT_INTERVAL = 0.0625
 local BOO_WAIT = 0.5
-local BOO_WAVE_AMPLITUDE = 4/16 --4 pixels
-local BOO_BOUNCE_SPEED = 2 --32 pixels per second
 local BOO_FADE_TIME = 0.5
 local BOO_ROTATE_TIME = 0.25
 local BOO_CROSS_TIME = 0.5
-local BOO_ROUNDTYPES = {"roam", "wrap", "bounce"}
+local BOO_ROUNDTYPES = {"shy", "circle", "chain", "wave", "lanes", "spiral", "flock", "shuffle", "teleport", "flee", "phase", "swing", "superrandom"}
+local BOO_SPEEDUP = 0.025 --boos move this much faster every round...
+local BOO_SPEEDUP_MAX = 0.5 --...up to 50% faster
+local BOO_TOP = 2.5 --boos stay under the HUD (tiles)
 local BOO_BONUS_STEP = 3 --found in less than n*3 seconds: add 6-n seconds
 local BOO_BONUS_MAX = 5
 local BOO_METER_W, BOO_METER_H = 40, 4 --bonus meter under the boo to find
@@ -1201,24 +1485,706 @@ local function boo_frame(b)
 end
 
 local function boo_position(b)
-	local x, y = b.x, b.y
-	if b.mode == "roam" and not b.stopped then
-		local offset = math.sin(b.wavephase)*BOO_WAVE_AMPLITUDE
-		if b.waveaxis == "x" then
-			x = x + offset
-		else
-			y = y + offset
-		end
-	end
-	return x, y
+	return b.x, b.y
 end
 
 local function boo_stop(b)
 	if not b.stopped then
 		b.x, b.y = boo_position(b)
 		b.stopped = true
+		b.alpha = 255 --shy and phasing boos are see-through
 	end
 end
+
+--------------------------
+--  BOO MOVEMENT TYPES  --
+--------------------------
+--positions are the top left of the boo in tiles, S.movetime is the round's time (already sped up)
+
+local function boo_area()
+	return 0, BOO_TOP, width-1, height-1 --smallest and largest top left position
+end
+
+local function boo_clamp(b)
+	local x0, y0, x1, y1 = boo_area()
+	b.x = math.max(x0, math.min(x1, b.x))
+	b.y = math.max(y0, math.min(y1, b.y))
+end
+
+local function boo_mouse()
+	local x, y = love.mouse.getPosition()
+	return x/scale/16, y/scale/16
+end
+
+local function boo_shufflelist(t)
+	for i = #t, 2, -1 do
+		local j = math.random(i)
+		t[i], t[j] = t[j], t[i]
+	end
+	return t
+end
+
+--n spread out positions (a jittered grid), so the boos start readable
+local function boo_spots(n)
+	local x0, y0, x1, y1 = boo_area()
+	local w, h = x1-x0, y1-y0
+	local cols = math.max(1, math.ceil(math.sqrt(n*w/h)))
+	local rows = math.max(1, math.ceil(n/cols))
+	local spots = {}
+	for r = 0, rows-1 do
+		for c = 0, cols-1 do
+			table.insert(spots, {x = x0 + (c + rnd(0.15, 0.85))*w/cols, y = y0 + (r + rnd(0.15, 0.85))*h/rows})
+		end
+	end
+	return boo_shufflelist(spots)
+end
+
+local function boo_placespread(boos)
+	local spots = boo_spots(#boos)
+	for i, b in ipairs(boos) do
+		b.x, b.y = spots[i].x, spots[i].y
+	end
+end
+
+--a random direction that slowly turns (used by flee and phase)
+local function boo_wander(b, dt, speed)
+	b.heading = b.heading + b.turn*dt
+	if math.random() < dt*0.5 then
+		b.turn = rnd(-1.5, 1.5)
+	end
+	local x0, y0, x1, y1 = boo_area()
+	local vx, vy = math.cos(b.heading)*speed, math.sin(b.heading)*speed
+	--turn back at the edges
+	if (b.x <= x0 and vx < 0) or (b.x >= x1 and vx > 0) then
+		b.heading = math.pi - b.heading
+	end
+	if (b.y <= y0 and vy < 0) or (b.y >= y1 and vy > 0) then
+		b.heading = -b.heading
+	end
+	return math.cos(b.heading)*speed, math.sin(b.heading)*speed
+end
+
+local function boo_wanderinit(b)
+	b.heading = rnd(0, math.pi*2)
+	b.turn = rnd(-1.5, 1.5)
+end
+
+--a closed lissajous curve over the play area, walked by arc length
+local function boo_newcurve()
+	local x0, y0, x1, y1 = boo_area()
+	local p = randomitem({{1, 2}, {2, 1}, {2, 3}, {3, 2}, {1, 3}, {3, 4}})
+	local ax, ay = (x1-x0)/2*rnd(0.75, 1), (y1-y0)/2*rnd(0.75, 1)
+	local cx, cy = (x0+x1)/2, (y0+y1)/2
+	local phi = rnd(0, math.pi*2)
+	local c = {pts = {}, len = {0}}
+	local samples = 720
+	for i = 0, samples do
+		local t = math.pi*2*i/samples
+		c.pts[i+1] = {cx + ax*math.sin(p[1]*t + phi), cy + ay*math.sin(p[2]*t)}
+		if i > 0 then
+			local a, b = c.pts[i], c.pts[i+1]
+			c.len[i+1] = c.len[i] + math.sqrt((b[1]-a[1])^2 + (b[2]-a[2])^2)
+		end
+	end
+	c.total = c.len[#c.len]
+	return c
+end
+
+local function boo_curvepoint(c, s)
+	s = s % c.total
+	local lo, hi = 1, #c.len
+	while hi - lo > 1 do
+		local mid = math.floor((lo+hi)/2)
+		if c.len[mid] <= s then
+			lo = mid
+		else
+			hi = mid
+		end
+	end
+	local seg = c.len[hi] - c.len[lo]
+	local f = (seg > 0) and (s - c.len[lo])/seg or 0
+	local a, b = c.pts[lo], c.pts[hi]
+	return a[1] + (b[1]-a[1])*f, a[2] + (b[2]-a[2])*f
+end
+
+local BOO_SHY_RADIUS = 3.5 --boos this close to the cursor hide
+local BOO_FLEE_RADIUS = 4
+
+--super random: every boo has its own movement and swaps to a new one every 3-5 seconds
+local BOO_RANDOM_INTERVAL = {3, 5} --seconds (not sped up by the round)
+
+--keep a moving boo inside the play area by bouncing it off the edges
+local function boo_bounceinside(b)
+	local x0, y0, x1, y1 = boo_area()
+	if (b.x <= x0 and b.vx < 0) or (b.x >= x1 and b.vx > 0) then
+		b.vx = -b.vx
+	end
+	if (b.y <= y0 and b.vy < 0) or (b.y >= y1 and b.vy > 0) then
+		b.vy = -b.vy
+	end
+	boo_clamp(b)
+end
+
+local BOO_RANDOM_MOVES = {
+	--floats in a straight line, bouncing off the edges
+	drift = {
+		start = function(S, b)
+			local a, speed = rnd(0, math.pi*2), rnd(1, 3)
+			b.vx, b.vy = math.cos(a)*speed, math.sin(a)*speed
+		end,
+		update = function(S, b, dt)
+			b.x, b.y = b.x + b.vx*dt, b.y + b.vy*dt
+			boo_bounceinside(b)
+		end,
+	},
+	--strolls around, slowly changing direction
+	wander = {
+		start = function(S, b)
+			boo_wanderinit(b)
+		end,
+		update = function(S, b, dt)
+			local vx, vy = boo_wander(b, dt, 1.5)
+			b.x, b.y = b.x + vx*dt, b.y + vy*dt
+			boo_clamp(b)
+		end,
+	},
+	--moves in a zigzag
+	zigzag = {
+		start = function(S, b)
+			local a, speed = rnd(0, math.pi*2), rnd(1.5, 2.5)
+			b.vx, b.vy = math.cos(a)*speed, math.sin(a)*speed
+			b.zigfreq, b.zigamp = rnd(4, 7), rnd(2, 4)
+		end,
+		update = function(S, b, dt)
+			local speed = math.sqrt(b.vx*b.vx + b.vy*b.vy)
+			local side = math.cos(b.zigfreq*b.rt)*b.zigamp
+			b.x = b.x + (b.vx - b.vy/speed*side)*dt
+			b.y = b.y + (b.vy + b.vx/speed*side)*dt
+			boo_bounceinside(b)
+		end,
+	},
+	--circles around a spot next to it
+	orbit = {
+		start = function(S, b)
+			local x0, y0, x1, y1 = boo_area()
+			local r, a = rnd(1, 2.5), rnd(0, math.pi*2)
+			local cx = math.max(x0+r, math.min(x1-r, b.x - math.cos(a)*r))
+			local cy = math.max(y0+r, math.min(y1-r, b.y - math.sin(a)*r))
+			b.orbit = {x = cx, y = cy, r = math.sqrt((b.x-cx)^2 + (b.y-cy)^2), a = math.atan2(b.y-cy, b.x-cx), speed = randomsign()*rnd(1.5, 3)}
+		end,
+		update = function(S, b, dt)
+			local o = b.orbit
+			o.a = o.a + o.speed*dt
+			b.x, b.y = o.x + math.cos(o.a)*o.r, o.y + math.sin(o.a)*o.r
+			boo_clamp(b)
+		end,
+	},
+	--stays in place, bobbing up and down
+	bob = {
+		start = function(S, b)
+			b.basey, b.bobamp, b.bobfreq = b.y, rnd(0.3, 0.8), rnd(3, 6)
+		end,
+		update = function(S, b, dt)
+			b.y = b.basey + math.sin(b.bobfreq*b.rt)*b.bobamp
+			boo_clamp(b)
+		end,
+	},
+	--waits, then shoots off in a random direction
+	dash = {
+		start = function(S, b)
+			b.dashwait, b.dashleft, b.vx, b.vy = rnd(0.3, 0.8), 0, 0, 0
+		end,
+		update = function(S, b, dt)
+			if b.dashleft > 0 then
+				b.dashleft = b.dashleft - dt
+				b.x, b.y = b.x + b.vx*dt, b.y + b.vy*dt
+				boo_bounceinside(b)
+			else
+				b.dashwait = b.dashwait - dt
+				if b.dashwait <= 0 then
+					local a = rnd(0, math.pi*2)
+					b.vx, b.vy = math.cos(a)*8, math.sin(a)*8
+					b.dashleft, b.dashwait = 0.25, rnd(0.4, 0.9)
+				end
+			end
+		end,
+	},
+	--vanishes in a poof and pops up somewhere else, then hovers
+	teleport = {
+		start = function(S, b)
+			makepoof(b.x+0.5, b.y+1, "poof")
+			local x0, y0, x1, y1 = boo_area()
+			b.x, b.y = rnd(x0, x1), rnd(y0+0.2, y1-0.2)
+			b.basey = b.y
+		end,
+		update = function(S, b, dt)
+			b.y = b.basey + 0.15*math.sin(3*b.rt)
+		end,
+	},
+	--runs away from the cursor
+	flee = {
+		start = function(S, b)
+			boo_wanderinit(b)
+		end,
+		update = function(S, b, dt)
+			local vx, vy = boo_wander(b, dt, 0.8)
+			local mx, my = boo_mouse()
+			local dx, dy = (b.x+0.5) - mx, (b.y+0.5) - my
+			local d = math.sqrt(dx*dx + dy*dy)
+			if d < BOO_FLEE_RADIUS and d > 0 then
+				local push = (1 - d/BOO_FLEE_RADIUS)*6
+				vx, vy = vx + dx/d*push, vy + dy/d*push
+			end
+			b.x, b.y = b.x + vx*dt, b.y + vy*dt
+			boo_clamp(b)
+		end,
+	},
+	--sneaks towards the cursor and stops next to it
+	chase = {
+		start = function(S, b)
+			b.chasespeed = rnd(1, 2)
+		end,
+		update = function(S, b, dt)
+			local mx, my = boo_mouse()
+			local dx, dy = mx - (b.x+0.5), my - (b.y+0.5)
+			local d = math.sqrt(dx*dx + dy*dy)
+			if d > 1.5 then
+				b.x, b.y = b.x + dx/d*b.chasespeed*dt, b.y + dy/d*b.chasespeed*dt
+				boo_clamp(b)
+			end
+		end,
+	},
+	--stops completely
+	freeze = {
+		start = function(S, b) end,
+		update = function(S, b, dt) end,
+	},
+	--fades in and out while wandering slowly
+	fade = {
+		start = function(S, b)
+			boo_wanderinit(b)
+			b.fadespeed = rnd(1.5, 3)
+		end,
+		update = function(S, b, dt)
+			local vx, vy = boo_wander(b, dt, 0.7)
+			b.x, b.y = b.x + vx*dt, b.y + vy*dt
+			boo_clamp(b)
+			b.alpha = 25 + 230*(0.5 + 0.5*math.cos(b.fadespeed*b.rt))
+		end,
+	},
+	--shakes on the spot
+	jitter = {
+		start = function(S, b)
+			b.basex, b.basey = b.x, b.y
+			b.shakex, b.shakey = rnd(0, math.pi*2), rnd(0, math.pi*2)
+		end,
+		update = function(S, b, dt)
+			b.x = b.basex + 0.15*math.sin(23*b.rt + b.shakex)
+			b.y = b.basey + 0.15*math.sin(17*b.rt + b.shakey)
+		end,
+	},
+}
+local BOO_RANDOM_NAMES = {}
+for name in pairs(BOO_RANDOM_MOVES) do
+	table.insert(BOO_RANDOM_NAMES, name)
+end
+table.sort(BOO_RANDOM_NAMES) --same order every time, so the seed decides
+
+local function boo_randommove(S, b)
+	local name
+	repeat
+		name = randomitem(BOO_RANDOM_NAMES)
+	until name ~= b.randommove
+	b.randommove = name
+	b.rt = 0
+	b.alpha = 255
+	b.randomleft = rnd(BOO_RANDOM_INTERVAL[1], BOO_RANDOM_INTERVAL[2])
+	BOO_RANDOM_MOVES[name].start(S, b)
+end
+
+local BOO_MOVES = {
+	--1. shy: boos near the cursor stop and turn see-through, the others creep towards it
+	shy = {
+		init = function(S, boos)
+			boo_placespread(boos)
+			for _, b in ipairs(boos) do
+				b.creep = rnd(0.7, 1.3)
+			end
+		end,
+		update = function(S, b, dt)
+			local mx, my = boo_mouse()
+			local dx, dy = mx - (b.x+0.5), my - (b.y+0.5)
+			local d = math.sqrt(dx*dx + dy*dy)
+			if d < BOO_SHY_RADIUS then
+				b.alpha = math.max(110, b.alpha - 600*dt)
+				b.frametimer = 0 --frozen while hiding
+			else
+				b.alpha = math.min(255, b.alpha + 600*dt)
+				b.x = b.x + dx/d*b.creep*dt
+				b.y = b.y + dy/d*b.creep*dt
+				boo_clamp(b)
+			end
+			--always face the cursor
+			b.facing = (dx > 0) and -1 or 1
+		end,
+	},
+
+	--2. circle: rings of boos around a few centres, some spinning each way
+	circle = {
+		init = function(S, boos)
+			local x0, y0, x1, y1 = boo_area()
+			local rings, capacity = {}, 0
+			while capacity < #boos do
+				local last = rings[#rings]
+				local ring
+				if last and math.random() < 0.4 and last.r + 1.4 <= math.min(last.cx-x0-0.5, x1+0.5-last.cx, last.cy-y0-0.5, y1+0.5-last.cy) then
+					--around the same centre
+					ring = {cx = last.cx, cy = last.cy, r = last.r + 1.4}
+				else
+					local r = math.min(rnd(1.5, 4), (x1-x0)/2, (y1-y0)/2)
+					ring = {cx = rnd(x0+0.5+r, x1+0.5-r), cy = rnd(y0+0.5+r, y1+0.5-r), r = r}
+				end
+				ring.speed = randomsign()*rnd(0.5, 1.1)
+				ring.angle = rnd(0, math.pi*2)
+				ring.cap = math.max(3, math.floor(math.pi*2*ring.r/1.2))
+				ring.boos = {}
+				table.insert(rings, ring)
+				capacity = capacity + ring.cap
+			end
+			local ri = 1
+			for _, b in ipairs(boos) do
+				while #rings[ri].boos >= rings[ri].cap do
+					ri = ri + 1
+				end
+				table.insert(rings[ri].boos, b)
+				b.ring = rings[ri]
+			end
+			for _, ring in ipairs(rings) do
+				for k, b in ipairs(ring.boos) do
+					b.ringoffset = math.pi*2*(k-1)/#ring.boos
+				end
+			end
+		end,
+		update = function(S, b, dt)
+			local ring = b.ring
+			local a = ring.angle + ring.speed*S.movetime + b.ringoffset
+			b.x = ring.cx + ring.r*math.cos(a) - 0.5
+			b.y = ring.cy + ring.r*math.sin(a) - 0.5
+		end,
+	},
+
+	--3. chain: boos follow a leader in a snaking line
+	chain = {
+		init = function(S, boos)
+			local chains = (#boos <= 12) and 1 or math.random(2, 3)
+			local lists = {}
+			for i = 1, chains do
+				lists[i] = {curve = boo_newcurve(), speed = rnd(2, 3), start = 0}
+			end
+			for i, b in ipairs(boos) do
+				local list = lists[(i-1) % chains + 1]
+				b.chain = list
+				list.count = (list.count or 0) + 1
+				b.chainindex = list.count
+			end
+			for _, list in ipairs(lists) do
+				list.spacing = math.min(1.15, list.curve.total/math.max(1, list.count))
+				list.start = rnd(0, list.curve.total)
+			end
+		end,
+		update = function(S, b, dt)
+			local list = b.chain
+			b.x, b.y = boo_curvepoint(list.curve, list.start + list.speed*S.movetime - b.chainindex*list.spacing)
+		end,
+	},
+
+	--4. wave: drift sideways while bobbing on a sine wave
+	wave = {
+		init = function(S, boos)
+			local x0, y0, x1, y1 = boo_area()
+			for _, b in ipairs(boos) do
+				b.vx = randomsign()*rnd(0.8, 2)
+				b.amp = rnd(0.4, 1.5)
+				b.freq = rnd(1.5, 3.5)
+				b.phase = rnd(0, math.pi*2)
+				b.basey = math.max(y0+b.amp, math.min(y1-b.amp, b.y))
+			end
+		end,
+		update = function(S, b, dt)
+			b.x = b.x + b.vx*dt
+			if b.x+1 <= 0 and b.vx < 0 then
+				b.x = width
+			elseif b.x >= width and b.vx > 0 then
+				b.x = -1
+			end
+			b.y = b.basey + b.amp*math.sin(b.phase + b.freq*S.movetime)
+		end,
+	},
+
+	--5. lanes: rows sliding in alternating directions, wrapping around
+	lanes = {
+		init = function(S, boos)
+			local x0, y0, x1, y1 = boo_area()
+			local count = math.max(2, math.floor((y1-y0)/1.3)+1)
+			local lanes = {}
+			local dir = randomsign()
+			for i = 1, count do
+				lanes[i] = {y = y0 + (y1-y0)*(i-1)/(count-1), dir = dir, speed = rnd(1.5, 2.5), boos = {}}
+				dir = -dir
+			end
+			for i, b in ipairs(boo_shufflelist({unpack(boos)})) do
+				table.insert(lanes[(i-1) % count + 1].boos, b)
+			end
+			for _, lane in ipairs(lanes) do
+				local n = #lane.boos
+				lane.loop = math.max(width+2, n*rnd(1.6, 2.4))
+				for k, b in ipairs(lane.boos) do
+					b.lane = lane
+					b.laneoffset = (k-1)*lane.loop/math.max(1, n) + rnd(0, 0.3)
+				end
+			end
+		end,
+		update = function(S, b, dt)
+			local lane = b.lane
+			b.x = (b.laneoffset + lane.dir*lane.speed*S.movetime) % lane.loop - 1
+			b.y = lane.y
+		end,
+	},
+
+	--6. spiral: arms of boos that spiral out from the centre and back in
+	spiral = {
+		init = function(S, boos)
+			local x0, y0, x1, y1 = boo_area()
+			S.spiral = {
+				cx = (x0+x1)/2, cy = (y0+y1)/2, rx = (x1-x0)/2, ry = (y1-y0)/2,
+				arms = math.random(2, 3), spin = randomsign()*rnd(0.4, 0.8),
+				twist = randomsign()*rnd(2, 4), rate = rnd(0.12, 0.2),
+			}
+			for i, b in ipairs(boos) do
+				b.arm = (i-1) % S.spiral.arms
+				b.spiraloffset = (i-1)/#boos
+			end
+		end,
+		update = function(S, b, dt)
+			local sp = S.spiral
+			local p = 0.5 - 0.5*math.cos(math.pi*2*(sp.rate*S.movetime + b.spiraloffset))
+			local r = 0.08 + 0.92*p
+			local a = b.arm*math.pi*2/sp.arms + sp.spin*S.movetime + sp.twist*r
+			b.x = sp.cx + sp.rx*r*math.cos(a)
+			b.y = sp.cy + sp.ry*r*math.sin(a)
+		end,
+	},
+
+	--7. flock: boos swarm like a school of fish
+	flock = {
+		init = function(S, boos)
+			for _, b in ipairs(boos) do
+				local a = rnd(0, math.pi*2)
+				b.vx, b.vy = math.cos(a)*2, math.sin(a)*2
+			end
+		end,
+		update = function(S, b, dt)
+			local ax, ay, cx, cy, sx, sy, n = 0, 0, 0, 0, 0, 0, 0
+			for _, o in ipairs(S.boos) do
+				if o ~= b and not o.stopped and not o.anim then
+					local dx, dy = o.x - b.x, o.y - b.y
+					local d = math.sqrt(dx*dx + dy*dy)
+					if d < 3.5 then
+						n = n + 1
+						ax, ay = ax + o.vx, ay + o.vy
+						cx, cy = cx + dx, cy + dy
+						if d < 1.2 and d > 0 then
+							sx, sy = sx - dx/(d*d), sy - dy/(d*d)
+						end
+					end
+				end
+			end
+			if n > 0 then
+				b.vx = b.vx + ((ax/n - b.vx)*1.5 + cx/n*0.8 + sx*3)*dt
+				b.vy = b.vy + ((ay/n - b.vy)*1.5 + cy/n*0.8 + sy*3)*dt
+			end
+			--steer away from the edges
+			local x0, y0, x1, y1 = boo_area()
+			if b.x < x0+1.5 then b.vx = b.vx + 8*dt end
+			if b.x > x1-1.5 then b.vx = b.vx - 8*dt end
+			if b.y < y0+1.5 then b.vy = b.vy + 8*dt end
+			if b.y > y1-1.5 then b.vy = b.vy - 8*dt end
+			--keep a swimming speed
+			local speed = math.sqrt(b.vx*b.vx + b.vy*b.vy)
+			local target = math.max(1.8, math.min(3.2, speed))
+			if speed > 0 then
+				b.vx, b.vy = b.vx/speed*target, b.vy/speed*target
+			end
+			b.x = b.x + b.vx*dt
+			b.y = b.y + b.vy*dt
+			boo_clamp(b)
+		end,
+	},
+
+	--8. shuffle: still for a moment, then every boo dashes to another boo's spot
+	shuffle = {
+		init = function(S, boos)
+			boo_placespread(boos)
+			S.shuffle = {stage = "hold", t = rnd(1.2, 2)}
+		end,
+		groupupdate = function(S, dt)
+			local q = S.shuffle
+			local active = {}
+			for _, b in ipairs(S.boos) do
+				if not b.stopped and not b.anim then
+					table.insert(active, b)
+				end
+			end
+			q.t = q.t - dt
+			if q.stage == "hold" then
+				if q.t <= 0 and #active > 1 then
+					--each boo takes the spot of the next one in a shuffled order
+					boo_shufflelist(active)
+					for i, b in ipairs(active) do
+						local to = active[i % #active + 1]
+						b.from = {b.x, b.y}
+						b.to = {to.x, to.y}
+					end
+					q.stage = "dash"
+					q.duration = 0.7
+					q.t = q.duration
+				end
+			elseif q.stage == "dash" then
+				local p = 1 - math.max(0, q.t)/q.duration
+				p = 0.5 - 0.5*math.cos(p*math.pi) --ease in and out
+				for _, b in ipairs(active) do
+					if b.from then
+						b.x = b.from[1] + (b.to[1]-b.from[1])*p
+						b.y = b.from[2] + (b.to[2]-b.from[2])*p
+					end
+				end
+				if q.t <= 0 then
+					for _, b in ipairs(active) do
+						b.from, b.to = nil, nil
+					end
+					q.stage = "hold"
+					q.t = rnd(1, 1.8)
+				end
+			end
+		end,
+	},
+
+	--9. teleport: boos blink to a new spot with a poof, one at a time
+	teleport = {
+		init = function(S, boos)
+			boo_placespread(boos)
+			for _, b in ipairs(boos) do
+				b.teleport = rnd(0.5, 3.5)
+				b.basey = b.y
+				b.bob = rnd(0, math.pi*2)
+			end
+		end,
+		update = function(S, b, dt)
+			b.teleport = b.teleport - dt
+			if b.teleport <= 0 then
+				makepoof(b.x+0.5, b.y+1, "poof")
+				local x0, y0, x1, y1 = boo_area()
+				b.x, b.basey = rnd(x0, x1), rnd(y0+0.15, y1-0.15)
+				b.teleport = rnd(2, 4)
+			end
+			b.y = b.basey + 0.15*math.sin(b.bob + 3*S.movetime)
+		end,
+	},
+
+	--10. flee: boos wander around and drift away from the cursor
+	flee = {
+		init = function(S, boos)
+			for _, b in ipairs(boos) do
+				boo_wanderinit(b)
+			end
+		end,
+		update = function(S, b, dt)
+			local vx, vy = boo_wander(b, dt, 0.9)
+			local mx, my = boo_mouse()
+			local dx, dy = (b.x+0.5) - mx, (b.y+0.5) - my
+			local d = math.sqrt(dx*dx + dy*dy)
+			if d < BOO_FLEE_RADIUS and d > 0 then
+				local push = (1 - d/BOO_FLEE_RADIUS)*6
+				vx, vy = vx + dx/d*push, vy + dy/d*push
+			end
+			b.x = b.x + vx*dt
+			b.y = b.y + vy*dt
+			boo_clamp(b) --so they can be cornered
+		end,
+	},
+
+	--11. phase: boos wander slowly while fading in and out like ghosts
+	phase = {
+		init = function(S, boos)
+			for _, b in ipairs(boos) do
+				boo_wanderinit(b)
+				b.fadespeed = rnd(0.8, 1.6)
+				b.fadephase = rnd(0, math.pi*2)
+			end
+		end,
+		update = function(S, b, dt)
+			local vx, vy = boo_wander(b, dt, 0.7)
+			b.x = b.x + vx*dt
+			b.y = b.y + vy*dt
+			boo_clamp(b)
+			b.alpha = 25 + 230*(0.5 + 0.5*math.sin(b.fadephase + b.fadespeed*S.movetime))
+		end,
+	},
+
+	--12. swing: boos hang on invisible strings and swing like a pendulum wave
+	swing = {
+		init = function(S, boos)
+			local x0, y0, x1, y1 = boo_area()
+			local count = math.max(4, math.min(10, math.ceil(#boos/3)))
+			local pivoty = y0 - 0.5
+			local reach = y1 + 0.5 - pivoty
+			S.pendulums = {}
+			for i = 1, count do
+				local px = width*(0.2 + 0.6*(i-0.5)/count)
+				S.pendulums[i] = {x = px, y = pivoty, boos = {}, omega = math.pi*2*(8+i)/30}
+			end
+			for i, b in ipairs(boos) do
+				table.insert(S.pendulums[(i-1) % count + 1].boos, b)
+			end
+			for _, pd in ipairs(S.pendulums) do
+				local m = #pd.boos
+				local length = rnd(math.min(reach, 1.5 + 1.3*(m-1) + 1), reach)
+				pd.length = length
+				local margin = math.min(pd.x - 0.5, width - 0.5 - pd.x)
+				pd.amp = math.min(0.75, math.asin(math.min(1, margin/length)))
+				pd.phase = rnd(-0.3, 0.3)
+				for k, b in ipairs(pd.boos) do
+					b.pendulum = pd
+					b.reach = length - (k-1)*1.3
+				end
+			end
+		end,
+		update = function(S, b, dt)
+			local pd = b.pendulum
+			local a = pd.amp*math.sin(pd.omega*S.movetime + pd.phase)
+			b.x = pd.x + b.reach*math.sin(a) - 0.5
+			b.y = pd.y + b.reach*math.cos(a) - 0.5
+		end,
+	},
+
+	--13. super random: each boo moves its own random way and switches every 3-5 seconds
+	superrandom = {
+		init = function(S, boos)
+			boo_placespread(boos)
+			for _, b in ipairs(boos) do
+				boo_randommove(S, b)
+			end
+		end,
+		update = function(S, b, dt)
+			b.rt = b.rt + dt
+			b.randomleft = b.randomleft - dt/(S.speedmul or 1) --real seconds
+			if b.randomleft <= 0 then
+				boo_randommove(S, b)
+			end
+			BOO_RANDOM_MOVES[b.randommove].update(S, b, dt)
+		end,
+	},
+}
 
 local function boo_newround(S)
 	S.phase = "play"
@@ -1226,7 +2192,13 @@ local function boo_newround(S)
 	S.bonustime = nil
 	S.seq = nil
 	S.target = math.random(3)
-	S.roundtype = randomitem(BOO_ROUNDTYPES)
+	local roundtype
+	repeat
+		roundtype = randomitem(BOO_ROUNDTYPES)
+	until roundtype ~= S.roundtype
+	S.roundtype = roundtype
+	S.speedmul = 1 + math.min(BOO_SPEEDUP_MAX, (S.round-1)*BOO_SPEEDUP)
+	S.movetime = 0
 	S.boos = {}
 
 	local others = {}
@@ -1241,26 +2213,17 @@ local function boo_newround(S)
 		local b = {
 			istarget = (i == targetindex),
 			variant = (i == targetindex) and S.target or randomitem(others),
-			x = rnd(0, width-1), y = rnd(2.5, height-1),
+			x = rnd(0, width-1), y = rnd(BOO_TOP, height-1),
 			mode = S.roundtype,
 			frametimer = math.random()*BOO_ANIM_TIME*2,
 			scale = 1, alpha = 255, rot = 0,
-			speedx = 0, speedy = 0,
 			facing = randomsign(),
 		}
-		if b.mode == "roam" then
-			--sine waves that start randomly, each moves the boo in x or y
-			b.waveaxis = (math.random(2) == 1) and "x" or "y"
-			b.wavephase = math.random()*math.pi*2
-			b.wavespeed = rnd(2, 5)
-		elseif b.mode == "wrap" then
-			b.speedx = randomsign()*rnd(1.25, 3)
-			b.speedy = randomsign()*rnd(1.25, 3)
-		else --bounce
-			b.speedx = BOO_BOUNCE_SPEED*randomsign()
-			b.speedy = BOO_BOUNCE_SPEED*randomsign()
-		end
 		table.insert(S.boos, b)
+	end
+	local move = BOO_MOVES[S.roundtype]
+	if move and move.init then
+		move.init(S, S.boos)
 	end
 end
 
@@ -1311,6 +2274,12 @@ local function boo_updateanimation(b, dt)
 end
 
 local function boo_updateboos(S, dt)
+	local mdt = dt*(S.speedmul or 1) --movement gets faster every round
+	S.movetime = (S.movetime or 0) + mdt
+	local move = BOO_MOVES[S.roundtype]
+	if move and move.groupupdate then
+		move.groupupdate(S, mdt)
+	end
 	for _, b in ipairs(S.boos) do
 		b.frametimer = (b.frametimer + dt) % (BOO_ANIM_TIME*2)
 		if b.cross then
@@ -1322,33 +2291,16 @@ local function boo_updateboos(S, dt)
 		if b.anim then
 			boo_updateanimation(b, dt)
 		elseif not b.stopped then
-			if b.mode == "roam" then
-				b.wavephase = b.wavephase + b.wavespeed*dt
-			else
-				b.x = b.x + b.speedx*dt
-				b.y = b.y + b.speedy*dt
-				if b.mode == "wrap" then
-					if b.x+1 <= 0 and b.speedx < 0 then
-						b.x = width
-					elseif b.x >= width and b.speedx > 0 then
-						b.x = -1
-					end
-					if b.y+1 <= 0 and b.speedy < 0 then
-						b.y = height
-					elseif b.y >= height and b.speedy > 0 then
-						b.y = -1
-					end
-				else --bounce
-					if (b.x <= 0 and b.speedx < 0) or (b.x+1 >= width and b.speedx > 0) then
-						b.speedx = -b.speedx
-					end
-					if (b.y <= 0 and b.speedy < 0) or (b.y+1 >= height and b.speedy > 0) then
-						b.speedy = -b.speedy
-					end
-				end
-				if b.speedx ~= 0 then
-					b.facing = (b.speedx > 0) and -1 or 1
-				end
+			local m = BOO_MOVES[b.mode]
+			local oldx = b.x
+			if m and m.update then
+				m.update(S, b, mdt)
+			end
+			--look where it's going
+			if b.x > oldx + 0.001 then
+				b.facing = -1
+			elseif b.x < oldx - 0.001 then
+				b.facing = 1
 			end
 		end
 	end
@@ -1359,8 +2311,8 @@ addminigame({
 	savename = "Boo Baffler Bash",
 	endless = true, --no win condition, see victoryscore
 	name = "boo baffler bash",
-	description = "boo baffler bash description",
-	tagline = "boo baffler bash tagline", --short description on the menu graphic
+	description = "find the boo shown at the top of the screen and click it before the timer runs out! the faster you find it, the more time you win back. the boos get a little faster every round, and every round they move in a new way:\n\nshy: boos close to your mouse get shy. they stop and turn see-through. boos far away sneak towards your mouse.\ncircle: boos fly around in circles, like a merry-go-round. some circles spin one way and some spin the other way.\nchain: boos follow each other in a long line, like a train, and wiggle all over the screen.\nwave: boos float sideways and bob up and down, like boats on the sea. when they leave one side, they come back on the other side.\nlanes: boos slide in rows, like cars on a road. each row goes the opposite way to the row next to it.\nspiral: boos spin around the middle of the screen. they move out to the edges, then back to the middle.\nflock: boos fly together in groups, like a school of fish. the groups join up and split apart.\nshuffle: boos stay still for a moment. then they all zoom and swap places! keep your eyes on yours!\nteleport: boos vanish in a puff of smoke and pop up somewhere else.\nflee: boos run away from your mouse. trap one against a wall to catch it!\nphase: boos fade away until they are almost invisible, then come back, like real ghosts.\nswing: boos hang on strings and swing back and forth, like a swing at the park.\nsuper random: every boo does its own crazy thing, like zooming, spinning, shaking or hiding, and switches to something new every few seconds!",
+	tagline = "find the boo before time runs out!", --short description on the menu graphic
 	usesplayer = false,
 
 	createmap = function(S)
@@ -1478,6 +2430,16 @@ addminigame({
 	end,
 
 	drawworld = function(S)
+		if S.roundtype == "swing" and S.phase == "play" and S.pendulums then
+			--faint strings
+			love.graphics.setColor(255, 255, 255, 35)
+			love.graphics.setLineWidth(scale)
+			for _, pd in ipairs(S.pendulums) do
+				local a = pd.amp*math.sin(pd.omega*S.movetime + pd.phase)
+				love.graphics.line(pd.x*16*scale, pd.y*16*scale, (pd.x + pd.length*math.sin(a))*16*scale, (pd.y + pd.length*math.cos(a))*16*scale)
+			end
+			love.graphics.setLineWidth(1)
+		end
 		for _, b in ipairs(S.boos) do
 			if not b.hidden then
 				local img, quad, color = boo_graphic(b.variant, boo_frame(b))
@@ -1497,15 +2459,7 @@ addminigame({
 	end,
 
 	drawoverlay = function(S)
-		--the boo to find
 		local cx = width*8
-		love.graphics.setColor(255, 255, 255)
-		love.graphics.rectangle("fill", (cx-15)*scale, 3*scale, 30*scale, 30*scale, 4*scale)
-		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", (cx-14)*scale, 4*scale, 28*scale, 28*scale, 3*scale)
-		local img, quad, color = boo_graphic(S.target, math.floor((S.time % (BOO_ANIM_TIME*2))/BOO_ANIM_TIME)+1)
-		love.graphics.setColor(color)
-		love.graphics.draw(img, quad, cx*scale, 18*scale, 0, scale, scale, 8, 8)
 
 		--bonus meter (one segment per second of bonus, the current one drains) with the bonus display on its right
 		--the meter and the display are one group, centered on the screen
@@ -1538,10 +2492,39 @@ addminigame({
 		end
 	end,
 
-	hud = function(S, items)
-		items[1].column = 0.5
-		table.insert(items, {label = T("round"), value = S.round, column = 1.5})
-		table.insert(items, {label = T("time"), value = math.ceil(S.timer), column = 3.5})
+	drawhud = function(S)
+		--one rectangle centered on the screen: score and round on the left, the boo to find in the middle, the time on the right
+		local cx = width*8
+		local scoretext = "Score: " .. formatscore(S.score)
+		local roundtext = "Round " .. S.round
+		local timetext = tostring(math.ceil(S.timer))
+		local clockw, clockgap = 10, 2
+		local side = math.max(textwidth(scoretext), textwidth(roundtext), clockw + clockgap + textwidth(timetext))
+		local pad, gap = 5, 6
+		local boxw = 30
+		local w = boxw + 2*(gap + side + pad)
+		local x = cx - w/2
+		local top, h = 3, 30
+		--the rectangle is half transparent (the border is a line so it doesn't show through the fill)
+		love.graphics.setColor(0, 0, 0, 128)
+		love.graphics.rectangle("fill", (x+1)*scale, (top+1)*scale, (w-2)*scale, (h-2)*scale, 3*scale)
+		local linewidth = love.graphics.getLineWidth()
+		love.graphics.setLineWidth(scale)
+		love.graphics.setColor(255, 255, 255, 128)
+		love.graphics.rectangle("line", (x+0.5)*scale, (top+0.5)*scale, (w-1)*scale, (h-1)*scale, 3.5*scale)
+		love.graphics.setLineWidth(linewidth)
+		local img, quad, color = boo_graphic(S.target, math.floor((S.time % (BOO_ANIM_TIME*2))/BOO_ANIM_TIME)+1)
+		love.graphics.setColor(color)
+		love.graphics.draw(img, quad, cx*scale, (top+h/2)*scale, 0, scale, scale, 8, 8)
+		--left: score and round (right-aligned against the boo)
+		local lx = cx - boxw/2 - gap
+		shadowprint(scoretext, lx - textwidth(scoretext), top+5)
+		shadowprint(roundtext, lx - textwidth(roundtext), top+17)
+		--right: clock and time
+		local rx = cx + boxw/2 + gap
+		love.graphics.setColor(255, 255, 255)
+		love.graphics.draw(hudclockimg, hudclockquad[hudoutline], rx*scale, (top+h/2-5)*scale, 0, scale, scale)
+		shadowprint(timetext, rx + clockw + clockgap, top+h/2-4)
 	end,
 })
 
@@ -1550,6 +2533,7 @@ addminigame({
 ------------------------------
 
 local SNAKE_SPEED = 7 --tiles per second
+local SNAKE_SLOW_SPEED = snakeblockspeed --slow mode: a normal speed snake block (green graphic)
 local SNAKE_WALL_TILE = 78
 local SNAKE_SECRET_POINTS = {2, 3, 5, 10}
 local SNAKE_STAR_MIN, SNAKE_STAR_MAX = 15, 25 --seconds before a star appears (the ? block takes 5 to 10)
@@ -1613,6 +2597,7 @@ end
 local function snake_starstart(S)
 	S.starleft = mariostarduration
 	S.ghost = true --no loss until the head is on a blank tile after the star wears off
+	playsound(mushroomeatsound)
 	if not NoMusic then
 		stopmusic()
 		music:play("starmusic")
@@ -1639,7 +2624,7 @@ local function snake_arrive(S)
 		S.score = S.score + 1
 		S.growing = true
 		S.mushroom = nil
-		playsound(mushroomeatsound)
+		playsound(coinsound)
 		minigame_popup("+1", hx*16+8, hy*16)
 	end
 	if S.secret and S.secret[1] == hx and S.secret[2] == hy then
@@ -1648,7 +2633,7 @@ local function snake_arrive(S)
 		S.growing = true
 		S.secret = nil
 		S.secrettimer = rnd(5, 10)
-		playsound(coinsound)
+		playsound(mushroomeatsound)
 		minigame_popup("+" .. points, hx*16+8, hy*16, {255, 230, 80})
 	end
 
@@ -1692,7 +2677,7 @@ local function snake_arrive(S)
 		end
 	end
 	local d = SNAKE_DIRS[S.dir]
-	S.speedx, S.speedy = d[1]*SNAKE_SPEED, d[2]*SNAKE_SPEED
+	S.speedx, S.speedy = d[1]*S.speed, d[2]*S.speed
 
 	local nx, ny = snake_wrap(S, hx+d[1], hy+d[2])
 	if (not S.ghost) and (snake_iswall(S, nx, ny) or snake_onsnake(S, nx, ny, not S.growing)) then
@@ -1742,12 +2727,21 @@ addminigame({
 	savename = "Snake Slither Scramble",
 	scorevictory = true, --has its own win, but a loss above victoryscore is a victory too
 	name = "snake slither scramble",
-	description = "snake slither scramble description",
+	description = "steer the snake block with your movement keys and gobble up mushrooms to grow longer. hidden ? blocks are worth 2 to 10 points. don't bite yourself, and fill the whole screen to win!",
+	tagline = "gobble mushrooms and fill the screen!",
 	usesplayer = false,
 	options = {
 		{type = "checkbox", key = "walls", label = "wall mode", default = false},
+		{type = "checkbox", key = "fast", label = "fast mode", default = true},
 	},
 	title = snake_title,
+
+	drawhud = function(S)
+		drawscorehud(S)
+		if S.starleft and S.starleft > 0 then
+			centerprintline("Remaining Invincibility Time: " .. math.ceil(S.starleft), width*8, 18, {255, 230, 80})
+		end
+	end,
 
 	createmap = function(S, opts)
 		backgroundrgbon = true
@@ -1764,9 +2758,10 @@ addminigame({
 		S.emptytiles = S.totalcells - #S.segs --the highest possible score
 		S.dir = "right"
 		S.px, S.py = hx, hy
-		S.speedx, S.speedy = SNAKE_SPEED, 0
+		S.speed = opts.fast and SNAKE_SPEED or SNAKE_SLOW_SPEED
+		S.speedx, S.speedy = S.speed, 0
 		S.growing = false
-		S.quadi = (SNAKE_SPEED > snakeblockspeed) and 3 or 1 --snake block graphic logic
+		S.quadi = (S.speed > snakeblockspeed) and 3 or 1 --snake block graphic logic (green when slow, blue when fast)
 		S.keyheld = {}
 		S.queue = {}
 		S.mushroom = snake_freecell(S)
@@ -1855,10 +2850,10 @@ addminigame({
 			end
 			if cross then
 				if S.speedx ~= 0 then
-					step = step - math.abs(cross-ox)/SNAKE_SPEED
+					step = step - math.abs(cross-ox)/S.speed
 					S.px = cross
 				else
-					step = step - math.abs(cross-oy)/SNAKE_SPEED
+					step = step - math.abs(cross-oy)/S.speed
 					S.py = cross
 				end
 				if not snake_arrive(S) then
@@ -1947,8 +2942,79 @@ local JJJ_BLOCK_TILE = 78
 local JJJ_GROUND_TILE = 2
 local JJJ_BLOCK_ROW = 9
 local JJJ_GROUND_Y = 13 --top of the ground
-local JJJ_ENEMIES = {"goomba", "goombrat", "paragoomba", "biggoomba", "splunkin", "drygoomba", "fighterfly", "ninji", "mole", "spike"}
+local JJJ_ENEMIES = {"goomba", "goombrat", "paragoomba", "biggoomba", "splunkin", "drygoomba", "fighterfly", "mole", "spike"}
 local JJJ_WINDMODES = {"none", "occasional", "continuous"}
+
+--decoration generator: the same shapes the SMB levels use (rows listed top to bottom, false = empty)
+local JJJ_DECOR = {
+	smallhill = {{false, 3, false}, {24, 25, 26}},
+	bighill = {{false, false, 3, false, false}, {false, 24, 25, 26, false}, {24, 25, 27, 28, 26}},
+	smalltree = {{87}, {88}},
+	tree = {{44}, {66}, {88}},
+}
+
+local function jjj_place(shape, x, bottomy)
+	--x is the left column, bottomy the row the shape stands on
+	for r = 1, #shape do
+		local y = bottomy - (#shape - r)
+		for c = 1, #shape[r] do
+			local id = shape[r][c]
+			if id and map[x+c-1] and map[x+c-1][y] then
+				map[x+c-1][y][1] = id
+			end
+		end
+	end
+end
+
+local function jjj_generatedecor(groundrow)
+	--things on the ground, left to right with gaps in between
+	local x = math.random(1, 2)
+	while x <= mapwidth do
+		local kind = randomitem({"smallhill", "bighill", "bush", "fence", "smalltree", "tree"})
+		local w
+		if kind == "bush" then
+			local middle = math.random(1, 3)
+			w = middle + 2
+			if x + w - 1 <= mapwidth then
+				local row = {4}
+				for i = 1, middle do row[#row+1] = 5 end
+				row[#row+1] = 6
+				jjj_place({row}, x, groundrow)
+			end
+		elseif kind == "fence" then
+			w = math.random(1, 4)
+			if x + w - 1 <= mapwidth then
+				local row = {}
+				for i = 1, w do row[i] = 86 end
+				jjj_place({row}, x, groundrow)
+			end
+		else
+			w = #JJJ_DECOR[kind][#JJJ_DECOR[kind]]
+			if x + w - 1 <= mapwidth then
+				jjj_place(JJJ_DECOR[kind], x, groundrow)
+			end
+		end
+		x = x + w + math.random(1, 3)
+	end
+
+	--clouds in the sky
+	local cx = math.random(1, 4)
+	while cx <= mapwidth do
+		local middle = math.random(1, 3)
+		local w = middle + 2
+		if cx + w - 1 <= mapwidth then
+			local top, bottom = {33}, {55}
+			for i = 1, middle do
+				top[#top+1] = 34
+				bottom[#bottom+1] = 56
+			end
+			top[#top+1] = 35
+			bottom[#bottom+1] = 57
+			jjj_place({top, bottom}, cx, math.random(4, 7))
+		end
+		cx = cx + w + math.random(2, 6)
+	end
+end
 
 local function jjj_dirname(dir)
 	return (dir > 0) and T("wind right") or T("wind left")
@@ -2055,14 +3121,63 @@ local function jjj_windpush(o, dist)
 	end
 end
 
-local function jjj_spawnenemy(S)
+--turn an enemy around (speed and sprite)
+local function jjj_turn(o)
+	o.speedx = -o.speedx
+	if o.animationdirection == "left" then
+		o.animationdirection = "right"
+	elseif o.animationdirection == "right" then
+		o.animationdirection = "left"
+	end
+end
+
+--a random enemy from the list, standing on the ground in column x
+local function jjj_newenemy(S, x)
 	local t = randomitem(JJJ_ENEMIES)
-	local side = (math.random(2) == 1) and "left" or "right"
 	local r
 	if t == "mole" then
 		r = {1, nil, "false"} --walking monty mole, not one hiding in the ground
 	end
-	local obj = spawnenemy(t, (side == "left") and 1 or mapwidth, JJJ_GROUND_Y, r)
+	local obj = spawnenemy(t, x, JJJ_GROUND_Y, r)
+	if obj and t == "spike" and not S.spikeballs then
+		obj.spittimer = math.huge
+	end
+	return obj
+end
+
+--enemies already on the screen when the map loads
+local function jjj_spawnstartenemies(S)
+	local columns = {}
+	for x = 1, mapwidth do
+		columns[x] = x
+	end
+	for i = #columns, 2, -1 do
+		local j = math.random(i)
+		columns[i], columns[j] = columns[j], columns[i]
+	end
+	local count = math.random(3, 5)
+	local used = {}
+	for _, x in ipairs(columns) do
+		if count <= 0 then
+			break
+		end
+		if not used[x-1] and not used[x] and not used[x+1] then
+			local obj = jjj_newenemy(S, x)
+			if obj then
+				used[x] = true
+				count = count - 1
+				if math.random(2) == 1 then
+					jjj_turn(obj)
+				end
+				table.insert(S.enemies, {obj = obj, side = (obj.speedx > 0) and "left" or "right", spawny = obj.y, entered = true})
+			end
+		end
+	end
+end
+
+local function jjj_spawnenemy(S)
+	local side = (math.random(2) == 1) and "left" or "right"
+	local obj = jjj_newenemy(S, (side == "left") and 1 or mapwidth)
 	if not obj then
 		return
 	end
@@ -2070,9 +3185,6 @@ local function jjj_spawnenemy(S)
 		obj.x = -obj.width --rightx = 0
 	else
 		obj.x = mapwidth --x = game width
-	end
-	if t == "spike" and not S.spikeballs then
-		obj.spittimer = math.huge
 	end
 	--no gravity until it is on the screen (there is no ground outside of it)
 	local e = {obj = obj, side = side, spawny = obj.y, pending = true, entered = false, oldignoregravity = obj.ignoregravity}
@@ -2084,11 +3196,15 @@ addminigame({
 	id = "jumping_juggle_jamboree",
 	savename = "Jumping Juggle Jamboree",
 	name = "jumping juggle jamboree",
-	description = "jumping juggle jamboree description",
+	description = "you only get one jump! leap off the blocks and keep bouncing on the enemies that walk in from the sides. touching the ground ends the game, so watch out for the wind!",
+	tagline = "one jump, endless bouncing!",
 	usesplayer = true,
 	holdjump = true,
+	lockcontrols = function(S) return not S.jumped end, --stuck on the blocks: nothing but jump works
+	drawhud = drawscorehud,
 	options = {
-		{type = "checkbox", key = "spikeballs", label = "can spike spawn spikeballs?", default = true},
+		{type = "checkbox", key = "spikeballs", label = "can spike spawn spikeballs?", default = false},
+		{type = "checkbox", key = "fastfall", label = "fast falling", default = false},
 		{type = "dropdown", key = "windmode", label = "wind mode:", entries = JJJ_WINDMODES, default = 1},
 	},
 
@@ -2098,6 +3214,7 @@ addminigame({
 				map[x][y][1] = JJJ_GROUND_TILE
 			end
 		end
+		jjj_generatedecor(JJJ_GROUND_Y) --decor stands on the row above the ground
 		local cx = math.ceil(mapwidth/2)
 		S.blocks = {cx-1, cx, cx+1}
 		for _, x in ipairs(S.blocks) do
@@ -2106,8 +3223,11 @@ addminigame({
 		startx = cx-0.5
 		starty = JJJ_BLOCK_ROW-1
 		portalgun = false
-		lowgravity = true
-		maxyspeed = lowgravitymaxyspeed
+		if opts.fastfall then
+			--fast falling: mari0-maker physics instead of mario maker
+			currentphysics = 5
+			setphysics(currentphysics)
+		end
 		S.spikeballs = (opts.spikeballs ~= false)
 		S.enemies = {}
 		S.spawntimer = 0.5
@@ -2124,6 +3244,7 @@ addminigame({
 			p.minigamenowalkcap = true --always able to reach maxrunspeed
 			S.pinx = p.x
 		end
+		jjj_spawnstartenemies(S)
 	end,
 
 	update = function(S, dt)
@@ -2173,12 +3294,6 @@ addminigame({
 		windstarted = math.abs(S.wind.current) > 0.05
 		local dist = S.wind.current*dt
 
-		S.spawntimer = S.spawntimer - dt
-		if S.spawntimer <= 0 then
-			S.spawntimer = rnd(3, 5)
-			jjj_spawnenemy(S)
-		end
-
 		for i = #S.enemies, 1, -1 do
 			local e = S.enemies[i]
 			local o = e.obj
@@ -2189,7 +3304,8 @@ addminigame({
 					--first update after initialisation
 					e.pending = false
 					if (e.side == "left" and o.speedx < 0) or (e.side == "right" and o.speedx > 0) then
-						o.speedx = -o.speedx
+						--turns the sprite around with it, so it doesn't face backwards until its own next update
+						jjj_turn(o)
 					end
 				end
 				if not e.entered then
@@ -2200,7 +3316,7 @@ addminigame({
 						o.y = e.spawny - (stationary and 1/16 or 0)
 						o.speedy = 0
 						if stationary then
-							--enemies that don't walk (ninjis) get pushed in
+							--enemies that aren't walking at the moment (like hopping fighter flies) get pushed in
 							o.x = o.x + inward*2*dt
 						elseif o.speedx*inward < 0 then
 							--some enemies turn around at ledges, and there is no ground outside the screen
@@ -2214,7 +3330,21 @@ addminigame({
 					end
 				else
 					jjj_windpush(o, dist)
-					if o.x > mapwidth+1 or o.x+o.width < -1 or o.y > mapheight+1 then
+					--the map edges act like tiles just offscreen: walk into one and turn around
+					if not o.shot then
+						if o.x < 0 then
+							o.x = 0
+							if o.speedx < 0 then
+								jjj_turn(o)
+							end
+						elseif o.x + o.width > mapwidth then
+							o.x = mapwidth - o.width
+							if o.speedx > 0 then
+								jjj_turn(o)
+							end
+						end
+					end
+					if o.y > mapheight+1 or (o.shot and (o.x > mapwidth+1 or o.x+o.width < -1)) then
 						o.instantdelete = true
 						table.remove(S.enemies, i)
 					end
@@ -2225,6 +3355,13 @@ addminigame({
 			for _, o in pairs(objects["spikeball"]) do
 				jjj_windpush(o, dist)
 			end
+		end
+
+		--spawned after the enemy loop, so the direction check waits for the enemy's first update
+		S.spawntimer = S.spawntimer - dt
+		if S.spawntimer <= 0 then
+			S.spawntimer = rnd(3, 5)
+			jjj_spawnenemy(S)
 		end
 	end,
 
@@ -2250,154 +3387,6 @@ addminigame({
 		if W.message and math.floor(W.messaget/JJJ_BLINK) % 2 == 0 then
 			centerprintwrapped(W.message, width*8, 48, 46, {255, 255, 255})
 		end
-	end,
-})
-
--------------------------
---  MOLE MALLET MAYHEM --
--------------------------
-
-local MOLE_RISE_TIME = 0.15
-local MOLE_LIVES = 3
-
-local function mole_holes()
-	local holes = {}
-	for row = 1, 3 do
-		for col = 1, 3 do
-			table.insert(holes, {cx = width*8 + (col-2)*96, top = 64 + (row-1)*48})
-		end
-	end
-	return holes
-end
-
-local function mole_rise(h)
-	if h.state == "rising" then
-		return math.min(1, h.t/MOLE_RISE_TIME)
-	elseif h.state == "up" then
-		return 1
-	elseif h.state == "hiding" then
-		return math.max(0, 1-h.t/MOLE_RISE_TIME)
-	end
-	return 0
-end
-
-local function mole_loselife(S, h)
-	S.lives = S.lives - 1
-	playsound(shrinksound)
-	minigame_popup("-1", h.cx, h.top-20, {255, 80, 80})
-	if S.lives <= 0 then
-		minigame_finish("lose", 1, true)
-	end
-end
-
-addminigame({
-	id = "mole_mallet_mayhem",
-	savename = "Mole Mallet Mayhem",
-	name = "mole mallet mayhem",
-	description = "mole mallet mayhem description",
-	usesplayer = false,
-
-	createmap = function(S)
-		for x = 1, mapwidth do
-			for y = 14, mapheight do
-				map[x][y][1] = 2
-			end
-		end
-		S.holes = mole_holes()
-		S.lives = MOLE_LIVES
-		S.spawntimer = 1
-	end,
-
-	update = function(S, dt)
-		local active = 0
-		for _, h in ipairs(S.holes) do
-			if h.state then
-				active = active + 1
-				h.t = h.t + dt
-				if h.state == "rising" and h.t >= MOLE_RISE_TIME then
-					h.state, h.t = "up", 0
-				elseif h.state == "up" and h.t >= h.uptime then
-					h.state, h.t = "hiding", 0
-				elseif h.state == "hiding" and h.t >= MOLE_RISE_TIME then
-					h.state = nil
-					if h.kind == "mole" then
-						mole_loselife(S, h) --it got away
-						if S.finish then
-							return
-						end
-					end
-				end
-			end
-		end
-
-		S.spawntimer = S.spawntimer - dt
-		local maxactive = math.min(4, 1 + math.floor(S.score/10))
-		if S.spawntimer <= 0 and active < maxactive then
-			local empty = {}
-			for _, h in ipairs(S.holes) do
-				if not h.state then
-					table.insert(empty, h)
-				end
-			end
-			if #empty > 0 then
-				local h = randomitem(empty)
-				h.state, h.t = "rising", 0
-				h.kind = (S.score >= 3 and math.random() < 0.18) and "spiny" or "mole"
-				h.uptime = math.max(0.55, 1.5 - S.score*0.025)
-			end
-			S.spawntimer = math.max(0.35, 1.1 - S.score*0.02)
-		end
-	end,
-
-	mousepressed = function(S, x, y, button)
-		if button ~= "l" then
-			return
-		end
-		for _, h in ipairs(S.holes) do
-			if h.state and mole_rise(h) > 0.4 and x >= h.cx-16 and x <= h.cx+16 and y >= h.top-26 and y <= h.top+6 then
-				if h.kind == "mole" then
-					S.score = S.score + 1
-					playsound(stompsound)
-					makepoof(h.cx/16, (h.top-10)/16+0.5, "poof")
-					minigame_popup("+1", h.cx, h.top-28)
-					h.state = nil
-				else
-					h.state, h.t = "hiding", MOLE_RISE_TIME*(1-mole_rise(h))
-					mole_loselife(S, h)
-				end
-				return
-			end
-		end
-		playsound(blockhitsound)
-	end,
-
-	drawworld = function(S)
-		local sx, sy, sw, sh = love.graphics.getScissor()
-		for _, h in ipairs(S.holes) do
-			local rise = mole_rise(h)
-			if rise > 0 then
-				--only the part above the pipe is visible
-				love.graphics.setScissor((h.cx-24)*scale, (h.top-32)*scale, 48*scale, 32*scale)
-				love.graphics.setColor(255, 255, 255)
-				local y = h.top + 12 - rise*22
-				if h.kind == "spiny" then
-					love.graphics.draw(spikeyimg, spikeyquad[math.floor(S.time*8)%2+1], h.cx*scale, y*scale, 0, 1.5*scale, 1.5*scale, 8, 8)
-				else
-					love.graphics.draw(moleimage, molequad[spriteset][1], h.cx*scale, y*scale, 0, 1.5*scale, 1.5*scale, 8, 8)
-				end
-				love.graphics.setScissor(sx, sy, sw, sh)
-			end
-			love.graphics.setColor(255, 255, 255)
-			drawtilegraphic(16, h.cx-16, h.top)
-			drawtilegraphic(17, h.cx, h.top)
-			drawtilegraphic(38, h.cx-16, h.top+16)
-			drawtilegraphic(39, h.cx, h.top+16)
-		end
-		love.graphics.setScissor(sx, sy, sw, sh)
-	end,
-
-	hud = function(S, items)
-		table.insert(items, {label = T("lives"), value = math.max(0, S.lives)})
 	end,
 })
 
@@ -2430,32 +3419,91 @@ local function beat_light(S, i, duration)
 	playsound(beattones[i])
 end
 
+local BEAT_START_LIVES = 5
+local BEAT_IDLE_TIME = 10 --seconds without a press before the pattern is shown again
+local BEAT_REVIVE_LIVES = 3
+local BEAT_REVIVE_COST = 10 --every this many points earns one revive
+local BEAT_WRONG_TIME = 0.6
+
+--show the pattern again, the player starts from its first block
+local function beat_replay(S, delay)
+	S.phase = "watchwait"
+	S.t = delay or 0.6
+	S.inputi = 1
+	S.idle = 0
+end
+
+--out of lives: offer a revive if the revive-check score has at least one revive's worth of points
+local function beat_gameover(S)
+	if S.revivescore >= BEAT_REVIVE_COST then
+		S.phase = "revive"
+		S.revivechoice = 1 --1 = yes, 2 = no
+	else
+		S.phase = "over"
+		minigame_finish("lose", 1)
+	end
+end
+
+local function beat_revive(S, accept)
+	if accept then
+		--spend the points from the revive-check score, the real score stays the same
+		S.revivescore = S.revivescore - BEAT_REVIVE_COST
+		S.lives = S.lives + BEAT_REVIVE_LIVES
+		--the music starts over
+		stopmusic()
+		playmusic()
+		playsound(oneupsound)
+		beat_replay(S, 1)
+	else
+		S.phase = "over"
+		minigame_finish("lose", 1)
+	end
+end
+
 local function beat_press(S, i)
 	if S.phase ~= "input" then
 		return
 	end
+	S.idle = 0
 	beat_light(S, i, 0.25)
 	if S.sequence[S.inputi] == i then
 		S.inputi = S.inputi + 1
 		if S.inputi > #S.sequence then
 			S.score = #S.sequence
+			S.revivescore = S.revivescore + 1
 			minigame_popup("+1", width*8, 76)
 			S.phase = "success"
 			S.t = 0.8
 		end
 	else
-		S.phase = "over"
 		S.wrong = i
+		S.wrongt = BEAT_WRONG_TIME
 		playsound(blockhitsound)
-		minigame_finish("lose", 1)
+		S.lives = S.lives - 1
+		if S.lives <= 0 then
+			beat_gameover(S)
+		else
+			beat_replay(S, 1)
+		end
 	end
+end
+
+--revive prompt layout (game pixels)
+local function beat_promptboxes()
+	local cx, y = width*8, 160
+	return {
+		{x = cx-44, y = y+14, w = 36, h = 13, accept = true, text = "yes"},
+		{x = cx+8, y = y+14, w = 36, h = 13, accept = false, text = "no"},
+	}, cx, y
 end
 
 addminigame({
 	id = "block_beat_bonanza",
 	savename = "Block Beat Bonanza",
+	endless = true, --no win condition, see victoryscore
 	name = "block beat bonanza",
-	description = "block beat bonanza description",
+	description = "watch the coloured ? blocks light up in a sequence, then hit them in the same order with the mouse or your movement keys. every round adds one more beat. you have 5 lives, and playing well can earn you a revive!",
+	tagline = "watch the blocks, repeat the beat!", --short description on the menu graphic
 	usesplayer = false,
 
 	createmap = function(S)
@@ -2464,6 +3512,9 @@ addminigame({
 		S.blocks = beat_blocks()
 		S.lit = {0, 0, 0, 0}
 		S.sequence = {math.random(4)}
+		S.lives = BEAT_START_LIVES
+		S.revivescore = 0
+		S.idle = 0
 		S.phase = "watchwait"
 		S.t = 1
 	end,
@@ -2471,6 +3522,13 @@ addminigame({
 	update = function(S, dt)
 		for i = 1, 4 do
 			S.lit[i] = math.max(0, S.lit[i]-dt)
+		end
+		if S.wrongt then
+			S.wrongt = S.wrongt - dt
+			if S.wrongt <= 0 then
+				S.wrongt = nil
+				S.wrong = nil
+			end
 		end
 		if S.phase == "watchwait" then
 			S.t = S.t - dt
@@ -2487,10 +3545,17 @@ addminigame({
 				if S.showi > #S.sequence then
 					S.phase = "input"
 					S.inputi = 1
+					S.idle = 0
 				else
 					beat_light(S, S.sequence[S.showi], interval*0.65)
 					S.t = interval
 				end
+			end
+		elseif S.phase == "input" then
+			--idle for too long: show the pattern again
+			S.idle = S.idle + dt
+			if S.idle >= BEAT_IDLE_TIME then
+				beat_replay(S, 0.3)
 			end
 		elseif S.phase == "success" then
 			S.t = S.t - dt
@@ -2506,6 +3571,15 @@ addminigame({
 		if button ~= "l" then
 			return
 		end
+		if S.phase == "revive" then
+			for i, b in ipairs(beat_promptboxes()) do
+				if x >= b.x and x <= b.x+b.w and y >= b.y and y <= b.y+b.h then
+					beat_revive(S, b.accept)
+					return
+				end
+			end
+			return
+		end
 		for i, b in ipairs(S.blocks) do
 			if x >= b.cx-22 and x <= b.cx+22 and y >= b.cy-22 and y <= b.cy+22 then
 				beat_press(S, i)
@@ -2515,6 +3589,16 @@ addminigame({
 	end,
 
 	keypressed = function(S, key)
+		if S.phase == "revive" then
+			if key == "left" or key == "a" or controlbindingmatcheskey(1, "left", key) then
+				S.revivechoice = 1
+			elseif key == "right" or key == "d" or controlbindingmatcheskey(1, "right", key) then
+				S.revivechoice = 2
+			elseif key == "return" or key == "enter" or key == "kpenter" or key == " " or controlbindingmatcheskey(1, "jump", key) then
+				beat_revive(S, S.revivechoice == 1)
+			end
+			return true
+		end
 		for i, name in ipairs(BEAT_KEYS) do
 			if controlbindingmatcheskey(1, name, key) then
 				beat_press(S, i)
@@ -2538,15 +3622,31 @@ addminigame({
 			local bump = lit and -4 or 0
 			love.graphics.draw(coinblockimage, coinblockquads[spriteset][lit and 1 or (coinframe or 1)], (b.cx-16)*scale, (b.cy-16+bump)*scale, 0, 2*scale, 2*scale)
 			love.graphics.setColor(200, 200, 200)
-			properprintF(T(BEAT_KEYS[i]), (b.cx-textwidth(T(BEAT_KEYS[i]))/2)*scale, (b.cy+28)*scale)
+			properprintF(BEAT_KEYS[i], (b.cx-textwidth(BEAT_KEYS[i])/2)*scale, (b.cy+28)*scale)
 		end
 	end,
 
 	drawoverlay = function(S)
-		if S.phase == "watch" or S.phase == "watchwait" then
-			centerprintline(T("watch!"), width*8, 172)
+		if S.phase == "revive" then
+			local boxes, cx, y = beat_promptboxes()
+			love.graphics.setColor(0, 0, 0, 210)
+			love.graphics.rectangle("fill", (cx-90)*scale, (y-6)*scale, 180*scale, 40*scale, 4*scale)
+			centerprintline("revive? (+" .. BEAT_REVIVE_LIVES .. " lives)", cx, y)
+			for i, b in ipairs(boxes) do
+				local selected = (S.revivechoice == i)
+				love.graphics.setColor(selected and {255, 230, 80} or {120, 120, 120})
+				love.graphics.rectangle("line", b.x*scale, b.y*scale, b.w*scale, b.h*scale, 2*scale)
+				centerprintline(b.text, b.x + b.w/2, b.y + 3, selected and {255, 230, 80} or {200, 200, 200})
+			end
+		elseif S.phase == "watch" or S.phase == "watchwait" then
+			centerprintline("watch!", width*8, 172)
 		elseif S.phase == "input" then
-			centerprintline(T("your turn!"), width*8, 172, {255, 230, 80})
+			centerprintline("your turn!", width*8, 172, {255, 230, 80})
 		end
+	end,
+
+	drawhud = function(S)
+		drawscorehud(S)
+		centerprintline("Lives: " .. math.max(0, S.lives or 0), width*8, 18)
 	end,
 })

@@ -8955,6 +8955,10 @@ function game_joystickpressed( joystick, button )
 		endgame()
 		return
 	end
+
+	if minigameplaying and minigame_joystickblocked(joystick, button) then
+		return
+	end
 	
 	for i = 1, players do
 		if (not noupdate) and objects then --and objects["player"][i].controlsenabled then -- and --and (not objects["player"][i].vine) and (not objects["player"][i].fence) then

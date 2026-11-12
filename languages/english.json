@@ -372,20 +372,12 @@
 
 "^_Minigames":"",
 	"your turn!": "your turn!",
-	"boo baffler bash tagline": "find the boo before time runs out!",
-	"snake slither scramble tagline": "gobble mushrooms and fill the screen!",
-	"jumping juggle jamboree tagline": "one jump, endless bouncing!",
-	"mole mallet mayhem tagline": "whack the moles, spare the spinies!",
-	"block beat bonanza tagline": "watch the blocks, repeat the beat!",
 	"title: ": "title: ",
 	"snake title 1": "garden snake",
 	"snake title 2": "slithering scout",
 	"snake title 3": "serpent strategist",
 	"snake title 4": "snake charmer",
 	"snake title 5": "snake block legend",
-	"boo baffler bash description": "find the boo shown at the top of the screen and click it before the timer runs out! the faster you find it, the more time you win back for the next round.",
-	"snake slither scramble description": "steer the snake block with your movement keys and gobble up mushrooms to grow longer. hidden ? blocks are worth 2 to 10 points. don't bite yourself, and fill the whole screen to win!",
-	"jumping juggle jamboree description": "you only get one jump! leap off the blocks and keep bouncing on the enemies that walk in from the sides. touching the ground ends the game, so watch out for the wind!",
-	"mole mallet mayhem description": "monty moles keep popping out of the pipes. click them before they duck back in, but leave the spinies alone! every mole that gets away, or spiny you touch, costs you a life.",
-	"block beat bonanza description": "watch the coloured ? blocks light up in a sequence, then hit them in the same order with the mouse or your movement keys. every round adds one more beat. one mistake and it's over!"
+	"slow mode": "slow mode",
+	"fast falling": "fast falling"
 }

@@ -368,6 +368,89 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.1.0
+
+### 🧩 New Features
+
+#### 🎮 Minigames
+
+* Added a new **Minigames** tab to the mappack menu, next to the Local, DLC and Daily Challenge tabs.
+* Each minigame option is 200x58 and shows a 192x50 graphic from `graphics/minigames/<id>.png`, with the minigame's title and tagline drawn in lowercase over the centre of the graphic.
+* The search bar is hidden on the Minigames tab. The minigame's description sits where the search bar was, with its game mode settings (checkboxes and dropdowns) 2 pixels below the text.
+* The description and the settings share one box that never takes up more than half of the game height. If they don't fit, the box gets a GUI scrollbar and can also be scrolled with the mouse wheel, one line per notch. Settings that are scrolled out of view can't be clicked, and an open dropdown is always drawn on top.
+* Descriptions support line breaks (`\n`).
+* The highscores list shows every score, best first, under the description box. It scrolls with the mouse wheel and has its own GUI scrollbar.
+* Minigames run inside the normal game, with one player, the daily challenge music, and the built-in graphics and sounds. Mappacks can never override a minigame's assets.
+* Every score is saved in `alesans_entities/minigame_data.json`, as `{"Minigame Name": [all scores, oldest first]}`.
+* Winning plays `dcwin2sound` with falling confetti. Losing plays `dclosesound`. Once the sound finishes, the game returns to the Minigames tab.
+* Endless minigames have no real win, so losing with more than `victoryscore` points (100 by default, set in `minigames.lua`) shows the victory screen instead.
+* Getting a new highscore plays `dcwin2sound` instead of `dclosesound`, even when you lose.
+* The pause menu in a minigame has **Restart** and **Menu** options, both with fades.
+* Each minigame has its own HUD with the score centred at the top of the screen.
+* Big scores use short units: K, M, B, T, Qa, Qi, Sx, Sp, Oc, No, then the -illions from Dc to Nog, up to Ce (centillion) and UCe, the largest number Lua can hold. For example, 1,234 shows as 1.23K and a googol shows as 10DTg. The full score is still saved.
+
+#### 👻 Boo Baffler Bash
+
+Find the Boo shown at the top of the screen and click it before the timer runs out.
+
+* You start with 10 seconds. Finding the Boo quickly wins time back: if you find it within the first 3 seconds you get 5 extra seconds, then 4 within 6 seconds, and so on down to 1. The bonus is added in 0.0625-second steps while `scoreringsound` plays.
+* A bonus meter under the HUD shows how much time you will win back. It drains as the round goes on and changes colour from green to yellow to red. The same colour is used for the "+N" display beside it and the popup over the found Boo.
+* The HUD is one half-transparent box in the middle of the screen, with the score and round on the left, the Boo to find in the middle, and the clock and time left on the right.
+* Clicking the wrong Boo shows a red cross on it.
+* When you find the right Boo, every other Boo disappears in a poof. The found Boo then leaves with a random animation: it fades out, falls off the screen while spinning, or vanishes in a poof.
+* More Boos appear every round, and they move a little faster each round, up to 50% faster.
+* Every round uses a random movement type, never the same one twice in a row:
+  * **Shy:** Boos near your cursor stop and turn see-through, while the rest sneak towards it.
+  * **Circle:** Boos fly around in rings, some spinning each way.
+  * **Chain:** Boos follow each other in long lines, like a train.
+  * **Wave:** Boos float sideways and bob up and down, wrapping around the sides.
+  * **Lanes:** Boos slide along in rows, each row going the opposite way to the one next to it.
+  * **Spiral:** Boos spin around the middle of the screen, moving out to the edges and back in.
+  * **Flock:** Boos fly together in groups, like a school of fish.
+  * **Shuffle:** Boos stay still for a moment, then all zoom and swap places.
+  * **Teleport:** Boos vanish in a puff of smoke and pop up somewhere else.
+  * **Flee:** Boos run away from your cursor, so you have to trap them against a wall.
+  * **Phase:** Boos fade until they are almost invisible, then come back.
+  * **Swing:** Boos hang on faint strings and swing like a pendulum wave.
+  * **Super Random:** Every Boo does its own random move (drift, wander, zigzag, orbit, bob, dash, teleport, flee, chase, freeze, fade or jitter) and switches to a new one every 3 to 5 seconds.
+
+#### 🐍 Snake Slither Scramble
+
+Steer the snake block around the screen, eat mushrooms to grow longer, and try to fill every empty tile.
+
+* The snake uses the snake block graphics. It only turns when it crosses a tile, and remembers up to two turns in a row, ignoring presses in the same or the opposite direction.
+* Mushrooms add 1 point. A ? block appears every 5 to 10 seconds and is worth 2, 3, 5 or 10 points.
+* A Starman appears every 15 to 25 seconds. It makes the snake invincible for `mariostarduration` seconds, lets it pass through itself and walls, and plays the star music. A crash only counts again once the head is back on an empty tile. The HUD shows the invincibility time left.
+* Crashing plays `blockhitsound` and bumps the head into what it hit, like a bumped block, before the game ends.
+* Filling every empty tile wins the game. Losing with more than `victoryscore` points still counts as a victory.
+* Scores of 100 or more earn a title, scaled up to the highest possible score.
+* **Wall Mode:** The edges of the screen become walls.
+* **Slow Mode:** The snake moves at the snake block's speed and uses the green snake block graphic.
+
+#### 🦘 Jumping Juggle Jamboree
+
+You only get one jump. Keep bouncing on the enemies that walk in from the sides, and don't touch the ground.
+
+* You play as player 1 with your own skin, without the portal gun, standing on three hard blocks.
+* Every control except jump is locked until you jump. The blocks disappear as soon as you leave them.
+* After the jump, jump and run are held for you. Run doesn't trigger custom character animations, and you can always reach `maxrunspeed` in the air.
+* Touching the ground ends the game and only plays the death sting.
+* 3 to 10 enemies are already on screen when the game starts, and more walk in from the sides every 3 to 5 seconds. Once an enemy is fully on screen, the edges of the map turn it around.
+* Each run gets a randomly decorated background with hills, bushes, fences, trees and clouds.
+* The physics are always Super Mario Maker.
+* **Can Spike Spawn Spikeballs?:** Lets Spikes throw spikeballs.
+* **Fast Falling:** Switches the physics to Mari0-Maker for a faster fall.
+* **Wind Mode:** None, Occasional (gusts that come and go) or Continuous. Wind blows at speed 4 and eases in and out.
+
+#### 🟨 Block Beat Bonanza
+
+Watch the coloured ? blocks light up in a pattern, then hit them in the same order with the mouse or your movement keys. Every round adds one more beat.
+
+* You start with 5 lives. A wrong hit costs a life and plays the pattern again.
+* If you wait 10 seconds without hitting a block, the pattern plays again.
+* Every point also goes into a separate revive-check score, and every 10 points there pays for a revive. When you run out of lives with 10 or more, you get a prompt to revive with 3 extra lives. Accepting restarts the music from the beginning, plays `oneupsound`, and uses up 10 points of the revive-check score. Your real score doesn't change.
+* The HUD shows your score and lives.
+
 ---
 
 # Requirements
