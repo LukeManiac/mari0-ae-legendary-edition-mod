@@ -451,6 +451,8 @@ Watch the coloured ? blocks light up in a pattern, then hit them in the same ord
 * Every point also goes into a separate revive-check score, and every 10 points there pays for a revive. When you run out of lives with 10 or more, you get a prompt to revive with 3 extra lives. Accepting restarts the music from the beginning, plays `oneupsound`, and uses up 10 points of the revive-check score. Your real score doesn't change.
 * The HUD shows your score and lives.
 
+**Disclaimer:** This entire minigames feature was created only with Claude Opus 5.5.
+
 ---
 
 # Requirements

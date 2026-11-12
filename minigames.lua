@@ -2225,23 +2225,414 @@ local function boo_newround(S)
 	if move and move.init then
 		move.init(S, S.boos)
 	end
+	--some round types (circle, chain, lanes, spiral, swing...) only work out positions in update
+	--so run it once with no time passing, or the boos show at their random spot for a frame first
+	if move and move.groupupdate then
+		move.groupupdate(S, 0)
+	end
+	if move and move.update then
+		for _, b in ipairs(S.boos) do
+			move.update(S, b, 0)
+		end
+	end
 end
+
+----------------------------
+--  BOO FOUND ANIMATIONS  --
+----------------------------
+--what a boo does once it's been found (or when time runs out), one is picked at random
+--start(b, a) plays the starting sound and sets things up, update(b, a, dt) sets a.done once it's finished
+--drawbehind(b, a) and drawfront(b, a) are optional and draw extra bits (smoke, trails, puddles, pieces, sparkles)
+--b.sx/b.sy stretch the boo, b.ox/b.oy nudge it (in tiles) and b.tint replaces its colour
+
+local BOO_SPIN_TIME = 0.6
+local BOO_SPIN_TURNS = 3
+local BOO_ROCKET_WINDUP = 0.25
+local BOO_ROCKET_ACCEL = 60
+local BOO_SMOKE_INTERVAL = 0.03
+local BOO_SMOKE_LIFE = 0.4
+local BOO_SQUASH_TIME = 0.12
+local BOO_SQUASH_HOLD = 0.4
+local BOO_SQUASH_FADE = 0.25
+local BOO_MELT_TIME = 1
+local BOO_PUDDLE_FADE = 0.3
+local BOO_FREEZE_TIME = 0.5
+local BOO_SHATTER_TIME = 1.5
+local BOO_ICE_COLOUR = {150, 220, 255}
+local BOO_BURST_GROW = 0.2
+local BOO_BURST_TIME = 0.6
+local BOO_BURST_SPARKS = 8
+local BOO_BURST_SPEED = 7
+local BOO_DASH_WINDUP = 0.3
+local BOO_DASH_SPEED = 12
+local BOO_DASH_ACCEL = 50
+local BOO_TRAIL_INTERVAL = 0.025
+local BOO_TRAIL_LIFE = 0.2
+
+local function boo_lerp(a, b, t)
+	return a + (b-a)*t
+end
+
+local function boo_lerpcolour(c1, c2, t)
+	return {boo_lerp(c1[1], c2[1], t), boo_lerp(c1[2], c2[2], t), boo_lerp(c1[3], c2[3], t)}
+end
+
+--keeps the bottom of the boo on the same spot while it's squashed or stretched
+local function boo_anchorbottom(b)
+	b.oy = (1 - b.scale*b.sy)*0.5
+end
+
+--counts down every particle's life and removes the dead ones
+local function boo_ageparticles(list, dt)
+	for i = #list, 1, -1 do
+		local p = list[i]
+		p.life = p.life - dt
+		if p.life <= 0 then
+			table.remove(list, i)
+		end
+	end
+end
+
+local BOO_FOUND_ANIMS = {
+	--grows and fades away
+	fade = {
+		start = function(b, a)
+			playsound(mushroomappearsound)
+			a.t = 0
+		end,
+		update = function(b, a, dt)
+			a.t = a.t + dt
+			local p = math.min(1, a.t/BOO_FADE_TIME)
+			b.scale = 1 + p*1.5
+			b.alpha = 255*(1-p)
+			if b.alpha <= 0 then
+				a.done = true
+			end
+		end,
+	},
+
+	--flips over and falls off the screen
+	fall = {
+		start = function(b, a)
+			playsound(bowserfallsound)
+			a.t = 0
+			a.dir = randomsign()
+			a.speedy = 0
+		end,
+		update = function(b, a, dt)
+			a.t = a.t + dt
+			b.rot = a.dir*math.pi*motion_curve(math.min(1, a.t/BOO_ROTATE_TIME), "sine", true, true, true, true)
+			a.speedy = a.speedy + minigamegravity*dt
+			b.y = b.y + a.speedy*dt
+			--off the bottom of the screen and the fall sound has finished
+			if b.y > height and not bowserfallsound:isPlaying() then
+				a.done = true
+			end
+		end,
+	},
+
+	--vanishes in a puff of smoke
+	poof = {
+		start = function(b, a)
+			playsound(stompbigsound)
+			makepoof(b.x+0.5, b.y+1, "poof")
+			a.poof = poofs[#poofs]
+			b.hidden = true
+		end,
+		update = function(b, a, dt)
+			if not (a.poof and tablefind(poofs, a.poof)) then
+				a.done = true
+			end
+		end,
+	},
+
+	--twirls faster and faster, puffs up a little and shrinks to nothing
+	spin = {
+		start = function(b, a)
+			playsound(raccoonswingsound)
+			a.t = 0
+			a.dir = randomsign()
+		end,
+		update = function(b, a, dt)
+			a.t = a.t + dt
+			local p = math.min(1, a.t/BOO_SPIN_TIME)
+			b.rot = a.dir*motion_curve(p, "quad")*math.pi*2*BOO_SPIN_TURNS
+			--"back" dips below 0 first, so the boo grows a bit before it shrinks
+			b.scale = math.max(0, 1 - motion_curve(p, "back"))
+			if p >= 1 then
+				b.hidden = true
+				a.done = true
+			end
+		end,
+	},
+
+	--crouches down, then blasts off the top of the screen with a smoke trail
+	rocket = {
+		start = function(b, a)
+			playsound(cannonfastsound)
+			a.t = 0
+			a.speedy = 0
+			a.smoke = {}
+			a.smoketimer = 0
+		end,
+		update = function(b, a, dt)
+			a.t = a.t + dt
+			if a.t < BOO_ROCKET_WINDUP then
+				local p = motion_curve(a.t/BOO_ROCKET_WINDUP, "quad", true)
+				b.sx, b.sy = 1 + 0.3*p, 1 - 0.4*p
+				boo_anchorbottom(b)
+			else
+				b.sx, b.sy = 0.8, 1.4
+				b.oy = 0
+				a.speedy = a.speedy - BOO_ROCKET_ACCEL*dt
+				b.y = b.y + a.speedy*dt
+				a.smoketimer = a.smoketimer - dt
+				if a.smoketimer <= 0 and b.y > -1.5 then
+					a.smoketimer = BOO_SMOKE_INTERVAL
+					table.insert(a.smoke, {x = b.x+0.5+rnd(-0.15, 0.15), y = b.y+1.2, life = BOO_SMOKE_LIFE})
+				end
+			end
+			boo_ageparticles(a.smoke, dt)
+			if b.y < -2 and #a.smoke == 0 then
+				a.done = true
+			end
+		end,
+		drawbehind = function(b, a)
+			for _, s in ipairs(a.smoke) do
+				local life = s.life/BOO_SMOKE_LIFE
+				love.graphics.setColor(200, 200, 200, 180*life)
+				love.graphics.circle("fill", s.x*16*scale, s.y*16*scale, (1.5 + 3.5*(1-life))*scale)
+			end
+		end,
+	},
+
+	--gets flattened like a pancake, then fades
+	squash = {
+		start = function(b, a)
+			playsound(stompsound)
+			a.t = 0
+		end,
+		update = function(b, a, dt)
+			a.t = a.t + dt
+			--"back" eased out overshoots, so it squishes a bit too far and springs back
+			local e = motion_curve(math.min(1, a.t/BOO_SQUASH_TIME), "back", true)
+			b.sx, b.sy = boo_lerp(1, 1.8, e), boo_lerp(1, 0.15, e)
+			boo_anchorbottom(b)
+			local fade = a.t - BOO_SQUASH_TIME - BOO_SQUASH_HOLD
+			if fade > 0 then
+				b.alpha = 255*math.max(0, 1 - fade/BOO_SQUASH_FADE)
+				if b.alpha <= 0 then
+					a.done = true
+				end
+			end
+		end,
+	},
+
+	--wobbles and melts down into a puddle that dries up
+	melt = {
+		start = function(b, a)
+			playsound(meltsound)
+			a.t = 0
+			local _, _, colour = boo_graphic(b.variant, 1)
+			a.colour = colour
+			a.puddle = 0
+			a.puddlealpha = 1
+		end,
+		update = function(b, a, dt)
+			a.t = a.t + dt
+			local p = math.min(1, a.t/BOO_MELT_TIME)
+			local e = motion_curve(p, "quad")
+			local wobble = math.sin(a.t*25)*0.08*(1-p)
+			b.sx = 1 + 0.6*e + wobble
+			b.sy = math.max(0.01, 1 - e)
+			boo_anchorbottom(b)
+			a.puddle = math.min(1, p*1.5)
+			if p > 0.7 then
+				b.alpha = 255*math.max(0, 1 - (p-0.7)/0.3)
+			end
+			if p >= 1 then
+				b.hidden = true
+				a.puddlealpha = math.max(0, 1 - (a.t-BOO_MELT_TIME)/BOO_PUDDLE_FADE)
+				if a.puddlealpha <= 0 then
+					a.done = true
+				end
+			end
+		end,
+		drawbehind = function(b, a)
+			love.graphics.setColor(a.colour[1], a.colour[2], a.colour[3], 160*a.puddlealpha)
+			love.graphics.ellipse("fill", (b.x+0.5)*16*scale, ((b.y+1)*16-1)*scale, 9*a.puddle*scale, 2*a.puddle*scale)
+		end,
+	},
+
+	--freezes solid, shakes, then shatters into four pieces
+	shatter = {
+		start = function(b, a)
+			playsound(freezesound)
+			a.t = 0
+			a.img, a.quad, a.colour = boo_graphic(b.variant, boo_frame(b))
+		end,
+		update = function(b, a, dt)
+			a.t = a.t + dt
+			if not a.pieces then
+				local p = math.min(1, a.t/BOO_FREEZE_TIME)
+				b.tint = boo_lerpcolour(a.colour, BOO_ICE_COLOUR, p)
+				b.ox, b.oy = rnd(-1, 1)*p/16, rnd(-1, 1)*p/16
+				if p >= 1 then
+					playsound(iceblockbreaksound)
+					b.hidden = true
+					a.pieces = {}
+					local qx, qy = a.quad:getViewport()
+					local iw, ih = a.img:getDimensions()
+					for i = 0, 1 do
+						for j = 0, 1 do
+							--the sprite can be mirrored, so the pieces have to be too
+							local dx, dy = (i-0.5)*b.facing, j-0.5
+							table.insert(a.pieces, {
+								quad = love.graphics.newQuad(qx+i*8, qy+j*8, 8, 8, iw, ih),
+								x = b.x+0.5+dx*0.5, y = b.y+0.5+dy*0.5,
+								vx = dx*rnd(4, 7), vy = -rnd(6, 10) + dy*3,
+								rot = 0, spin = rnd(-12, 12),
+							})
+						end
+					end
+				end
+			else
+				for _, pc in ipairs(a.pieces) do
+					pc.vy = pc.vy + minigamegravity*dt
+					pc.x = pc.x + pc.vx*dt
+					pc.y = pc.y + pc.vy*dt
+					pc.rot = pc.rot + pc.spin*dt
+				end
+				if a.t > BOO_FREEZE_TIME + BOO_SHATTER_TIME then
+					a.done = true
+				end
+			end
+		end,
+		drawfront = function(b, a)
+			if a.pieces then
+				love.graphics.setColor(BOO_ICE_COLOUR)
+				for _, pc in ipairs(a.pieces) do
+					love.graphics.draw(a.img, pc.quad, pc.x*16*scale, pc.y*16*scale, pc.rot, b.facing*scale, scale, 4, 4)
+				end
+			end
+		end,
+	},
+
+	--puffs up, flashes white and bursts into a ring of sparkles
+	burst = {
+		start = function(b, a)
+			playsound(magicsound)
+			a.t = 0
+			local _, _, colour = boo_graphic(b.variant, 1)
+			a.colour = colour
+		end,
+		update = function(b, a, dt)
+			a.t = a.t + dt
+			if not a.sparks then
+				local p = math.min(1, a.t/BOO_BURST_GROW)
+				b.scale = 1 + 0.6*motion_curve(p, "quad")
+				b.tint = boo_lerpcolour(a.colour, {255, 255, 255}, p)
+				if p >= 1 then
+					b.hidden = true
+					a.sparks = {}
+					for i = 1, BOO_BURST_SPARKS do
+						local angle = (i-1)/BOO_BURST_SPARKS*math.pi*2
+						table.insert(a.sparks, {x = b.x+0.5, y = b.y+0.5, vx = math.cos(angle)*BOO_BURST_SPEED, vy = math.sin(angle)*BOO_BURST_SPEED})
+					end
+					a.t = 0
+				end
+			else
+				local drag = math.exp(-4*dt)
+				for _, s in ipairs(a.sparks) do
+					s.x = s.x + s.vx*dt
+					s.y = s.y + s.vy*dt
+					s.vx, s.vy = s.vx*drag, s.vy*drag
+				end
+				if a.t >= BOO_BURST_TIME then
+					a.done = true
+				end
+			end
+		end,
+		drawfront = function(b, a)
+			if a.sparks then
+				local life = math.max(0, 1 - a.t/BOO_BURST_TIME)
+				local size = 1 + 3*life
+				love.graphics.setLineWidth(scale)
+				for i, s in ipairs(a.sparks) do
+					--every other sparkle is white
+					local c = a.colour
+					if i % 2 == 0 then
+						c = {255, 255, 255}
+					end
+					love.graphics.setColor(c[1], c[2], c[3], 255*life)
+					love.graphics.push()
+					love.graphics.translate(s.x*16*scale, s.y*16*scale)
+					love.graphics.rotate(a.t*10)
+					love.graphics.line(-size*scale, 0, size*scale, 0)
+					love.graphics.line(0, -size*scale, 0, size*scale)
+					love.graphics.pop()
+				end
+				love.graphics.setLineWidth(1)
+			end
+		end,
+	},
+
+	--leans back, then zooms off the side of the screen it's looking at, leaving afterimages
+	dash = {
+		start = function(b, a)
+			playsound(capeflysound)
+			a.t = 0
+			a.dir = -b.facing --the sprite looks left when facing is 1
+			a.startx = b.x
+			a.speed = BOO_DASH_SPEED
+			a.trail = {}
+			a.trailtimer = 0
+		end,
+		update = function(b, a, dt)
+			a.t = a.t + dt
+			if a.t < BOO_DASH_WINDUP then
+				local p = motion_curve(a.t/BOO_DASH_WINDUP, "quad", true)
+				b.x = a.startx - a.dir*0.4*p
+				b.rot = -a.dir*0.35*p
+				b.sx, b.sy = 1 - 0.15*p, 1 + 0.1*p
+			else
+				a.speed = a.speed + BOO_DASH_ACCEL*dt
+				b.x = b.x + a.dir*a.speed*dt
+				b.rot = a.dir*0.25
+				b.sx, b.sy = 1.3, 0.85
+				a.trailtimer = a.trailtimer - dt
+				if a.trailtimer <= 0 and b.x > -1 and b.x < width then
+					a.trailtimer = BOO_TRAIL_INTERVAL
+					table.insert(a.trail, {x = b.x, y = b.y, life = BOO_TRAIL_LIFE})
+				end
+			end
+			boo_ageparticles(a.trail, dt)
+			if (b.x < -2 or b.x > width+1) and #a.trail == 0 then
+				a.done = true
+			end
+		end,
+		drawbehind = function(b, a)
+			local img, quad, colour = boo_graphic(b.variant, boo_frame(b))
+			for _, tr in ipairs(a.trail) do
+				love.graphics.setColor(colour[1], colour[2], colour[3], 120*tr.life/BOO_TRAIL_LIFE)
+				love.graphics.draw(img, quad, (tr.x*16+8)*scale, (tr.y*16+8)*scale, b.rot, b.sx*b.facing*scale, b.sy*scale, 8, 8)
+			end
+		end,
+	},
+}
+
+--sorted so the same random seed always picks the same animation
+local BOO_FOUND_ANIM_NAMES = {}
+for name in pairs(BOO_FOUND_ANIMS) do
+	table.insert(BOO_FOUND_ANIM_NAMES, name)
+end
+table.sort(BOO_FOUND_ANIM_NAMES)
 
 local function boo_startanimation(b)
 	boo_stop(b)
-	local t = math.random(3)
-	if t == 1 then
-		playsound(mushroomappearsound)
-		b.anim = {type = "fade", t = 0}
-	elseif t == 2 then
-		playsound(bowserfallsound)
-		b.anim = {type = "fall", t = 0, dir = randomsign(), speedy = 0}
-	else
-		playsound(stompbigsound)
-		makepoof(b.x+0.5, b.y+1, "poof")
-		b.anim = {type = "poof", poof = poofs[#poofs]}
-		b.hidden = true
-	end
+	local name = randomitem(BOO_FOUND_ANIM_NAMES)
+	b.anim = {type = name}
+	BOO_FOUND_ANIMS[name].start(b, b.anim)
 end
 
 local function boo_updateanimation(b, dt)
@@ -2249,28 +2640,7 @@ local function boo_updateanimation(b, dt)
 	if a.done then
 		return
 	end
-	if a.type == "fade" then
-		a.t = a.t + dt
-		local p = math.min(1, a.t/BOO_FADE_TIME)
-		b.scale = 1 + p*1.5
-		b.alpha = 255*(1-p)
-		if b.alpha <= 0 then
-			a.done = true
-		end
-	elseif a.type == "fall" then
-		a.t = a.t + dt
-		b.rot = a.dir*math.pi*motion_curve(math.min(1, a.t/BOO_ROTATE_TIME), "sine", true, true, true, true)
-		a.speedy = a.speedy + minigamegravity*dt
-		b.y = b.y + a.speedy*dt
-		--off the bottom of the screen and the fall sound has finished
-		if b.y > height and not bowserfallsound:isPlaying() then
-			a.done = true
-		end
-	elseif a.type == "poof" then
-		if not (a.poof and tablefind(poofs, a.poof)) then
-			a.done = true
-		end
-	end
+	BOO_FOUND_ANIMS[a.type].update(b, a, dt)
 end
 
 local function boo_updateboos(S, dt)
@@ -2441,11 +2811,21 @@ addminigame({
 			love.graphics.setLineWidth(1)
 		end
 		for _, b in ipairs(S.boos) do
+			--found animations can draw extra bits behind and in front of the boo
+			local animdef = nil
+			if b.anim then
+				animdef = BOO_FOUND_ANIMS[b.anim.type]
+			end
+			if animdef and animdef.drawbehind then
+				animdef.drawbehind(b, b.anim)
+			end
 			if not b.hidden then
 				local img, quad, color = boo_graphic(b.variant, boo_frame(b))
 				local bx, by = boo_position(b)
-				love.graphics.setColor(color[1], color[2], color[3], b.alpha)
-				love.graphics.draw(img, quad, (bx*16+8)*scale, (by*16+8)*scale, b.rot, b.scale*b.facing*scale, b.scale*scale, 8, 8)
+				bx, by = bx + (b.ox or 0), by + (b.oy or 0)
+				local tint = b.tint or color
+				love.graphics.setColor(tint[1], tint[2], tint[3], b.alpha)
+				love.graphics.draw(img, quad, (bx*16+8)*scale, (by*16+8)*scale, b.rot, b.scale*(b.sx or 1)*b.facing*scale, b.scale*(b.sy or 1)*scale, 8, 8)
 				if b.cross then
 					--red wrong cross
 					love.graphics.setColor(255, 30, 30, 255*(b.cross/BOO_CROSS_TIME))
@@ -2454,6 +2834,9 @@ addminigame({
 					love.graphics.line((bx*16+14)*scale, (by*16+2)*scale, (bx*16+2)*scale, (by*16+14)*scale)
 					love.graphics.setLineWidth(1)
 				end
+			end
+			if animdef and animdef.drawfront then
+				animdef.drawfront(b, b.anim)
 			end
 		end
 	end,
