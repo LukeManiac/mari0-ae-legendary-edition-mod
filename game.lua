@@ -53,11 +53,21 @@ function game_load(suspended, deletesuspend)
 		dcplaying = false
 	end
 
+	--Minigames (one player, built-in assets only)
+	if suspended == "minigame" then
+		suspended = false
+		minigameplaying = true
+		disablecheats()
+	else
+		minigameplaying = false
+	end
+
 	dailychallengeoverridegraphics = dcplaying and mappacksettingenabled("overridegraphics")
 	dailychallengeoverridesounds = dcplaying and mappacksettingenabled("overridesounds")
-	dailychallengebuiltingraphics = dcplaying and not dailychallengeoverridegraphics
-	dailychallengebuiltinsounds = dcplaying and not dailychallengeoverridesounds
-	dailychallengerestoremusic = dcplaying
+	--minigame assets can never be overridden, even with overrideassets/overridegraphics/overridesounds
+	dailychallengebuiltingraphics = (dcplaying and not dailychallengeoverridegraphics) or minigameplaying
+	dailychallengebuiltinsounds = (dcplaying and not dailychallengeoverridesounds) or minigameplaying
+	dailychallengerestoremusic = dcplaying or minigameplaying
 	if dailychallengebuiltingraphics then
 		loadcustomsprites(false, true)
 		loadanimatedtiles(true)
@@ -87,7 +97,7 @@ function game_load(suspended, deletesuspend)
 	alwaysdeletesuspend = false
 	disabletransition = false
 	setphysics(1)
-	if not dcplaying then
+	if not dcplaying and not minigameplaying then
 		loadmappacksettings()
 	end
 
@@ -151,7 +161,7 @@ function game_load(suspended, deletesuspend)
 	
 	--add custom tiles
 	local bla = love.timer.getTime()
-	if (not dcplaying or dailychallengeoverridegraphics) and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/tiles.png") then
+	if (not dcplaying or dailychallengeoverridegraphics) and (not minigameplaying) and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/tiles.png") then
 		loadtiles("custom")
 		customtiles = true
 	else
@@ -216,6 +226,8 @@ function game_load(suspended, deletesuspend)
 	enemies_load()
 	if dcplaying then
 		levelscreen_load("dc")
+	elseif minigameplaying then
+		levelscreen_load("minigame")
 	else
 		levelscreen_load("initial")
 	end
@@ -547,7 +559,7 @@ function game_update(dt)
 	end
 	
 	--timer	
-	if editormode == false then
+	if editormode == false and not minigameplaying then
 		--get if any player has their controls disabled
 		local notime = false
 		for i = 1, players do
@@ -1778,6 +1790,13 @@ function game_update(dt)
 		end
 	end
 	
+	--minigames
+	if minigameplaying then
+		if minigame_update(dt) then
+			return
+		end
+	end
+	
 	--Editor
 	if editormode then
 		editor_update(dt)
@@ -2843,6 +2862,11 @@ function game_draw()
 			v:draw()
 		end
 		
+		--minigames
+		if minigameplaying then
+			minigame_drawworld()
+		end
+		
 		--Foreground tiles
 		drawmaptiles("foreground", xscroll, yscroll)
 		
@@ -3218,6 +3242,10 @@ function game_draw()
 		end
 	end
 	
+	if minigameplaying then
+		minigame_drawoverlay()
+	end
+	
 	if dcplaying then
 		love.graphics.setColor(255, 255, 255)
 		properprintbackground(DCchalobjective, width*8*scale-string.len(DCchalobjective)*4*scale, 35*scale)
@@ -3285,7 +3313,7 @@ function game_draw()
 				love.graphics.setColor(255, 255, 255, 255)
 				properprint(">", (width*8*scale)-145*scale, (112*scale)-60*scale+(i-1)*25*scale)
 			end
-			if dcplaying and pausemenuoptions[i] == "save game" then --restart instead of suspend
+			if (dcplaying or minigameplaying) and pausemenuoptions[i] == "save game" then --restart instead of suspend
 				properprintF(TEXT["restart"], (width*8*scale)-135*scale, (112*scale)-60*scale+(i-1)*25*scale)
 			elseif alwaysdeletesuspend and pausemenuoptions[i] == "save game" then
 				properprintF(TEXT["suspend"], (width*8*scale)-135*scale, (112*scale)-60*scale+(i-1)*25*scale)
@@ -4216,6 +4244,14 @@ function drawHUD()
 		love.graphics.translate(0, yoffset*scale)
 	end
 
+	if minigameplaying then
+		--in game the minigame overlay draws its HUD on top of everything
+		if gamestate ~= "game" then
+			minigame_drawHUD()
+		end
+		return
+	end
+
 	local cy = 32 --collectable coin ui y
 		
 	if hudsimple then
@@ -4655,6 +4691,8 @@ function startlevel(level, reason)
 	--LOAD THE MAP
 	if level == "dc" then --create daily challenge
 		createdailychallenge()
+	elseif level == "minigame" then --minigames make their own map
+		minigame_createmap()
 	elseif loadmap(level) == false then --make one up
 		mapwidth = width
 		originalmapwidth = mapwidth
@@ -5003,6 +5041,10 @@ function startlevel(level, reason)
 
 	prevxscroll = splitxscroll[1]
 	prevyscroll = splityscroll[1]
+	
+	if minigameplaying and level == "minigame" then
+		minigame_postload()
+	end
 end
 
 function loadmap(filename)
@@ -5465,6 +5507,9 @@ function updatespritebatch(camx, camy)
 end
 
 function game_keypressed(key, textinput)
+	if minigameplaying and warpfade then
+		return --leaving or restarting a minigame
+	end
 	if pausemenuopen then
 		if menuprompttimer >= menupromptduration then
 			if (key == "left" or key == "a") then
@@ -5485,7 +5530,10 @@ function game_keypressed(key, textinput)
 					if CLIENT then
 						net_quit()
 					end
-					if dcplaying then
+					if minigameplaying then
+						--the pause menu stays up while the screen fades out
+						minigame_exit()
+					elseif dcplaying then
 						stopmusic()
 						love.audio.stop()
 						renderoverlay("returning to menu...")
@@ -5534,7 +5582,7 @@ function game_keypressed(key, textinput)
 			elseif (key == "right" or key == "d") then
 				pausemenuselected2 = 2
 			elseif (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
-				if dcplaying then
+				if dcplaying or minigameplaying then
 					suspendprompt = false
 				elseif pausemenuselected2 == 1 then
 					renderoverlay("saving game...")
@@ -5565,7 +5613,10 @@ function game_keypressed(key, textinput)
 						playmusic()
 					end
 				elseif pausemenuoptions[pausemenuselected] == "save game" then
-					if dcplaying then
+					if minigameplaying then
+						--restart the minigame (the pause menu stays up while the screen fades out)
+						minigame_restart()
+					elseif dcplaying then
 						pausemenuopen = false
 						updatesizes("reset")
 						levelscreen_load("dc")
@@ -5695,6 +5746,10 @@ function game_keypressed(key, textinput)
 	if endpressbutton then
 		endpressbutton = false
 		endgame()
+		return
+	end
+
+	if minigameplaying and not isPauseKey(key) and minigame_keypressed(key) then
 		return
 	end
 
@@ -5871,7 +5926,9 @@ function game_keyreleased(key, unicode)
 			local player = objects["player"][i]
 			if controlinputrelease(i, "jump") then
 				player:buttonrelease("jump")
-				player:stopjump()
+				if not minigame_jumpheld(i) then --jump stays held in some minigames
+					player:stopjump()
+				end
 				animationsystem_buttonreleasetrigger(i, "jump")
 			end
 		elseif controlbindingmatcheskey(i, "run", key) then
@@ -5958,8 +6015,16 @@ end
 
 function game_mousepressed(x, y, button)
 	local s = ""
+	if minigameplaying and warpfade then
+		return
+	end
 	if pausemenuopen then
 		controlspopup_mousepressed(x, y, button)
+		return
+	end
+	if minigameplaying then
+		--no portal gun in minigames, the mouse belongs to the minigame
+		minigame_mousepressed(x, y, button)
 		return
 	end
 	if editormode and editorstate ~= "portalgun" then
@@ -8994,7 +9059,9 @@ function game_joystickreleased( joystick, button )
 				local player = objects["player"][i]
 				if controlinputrelease(i, "jump") then
 					player:buttonrelease("jump")
-					player:stopjump()
+					if not minigame_jumpheld(i) then --jump stays held in some minigames
+						player:stopjump()
+					end
 					animationsystem_buttonreleasetrigger(i, "jump")
 				end
 				return

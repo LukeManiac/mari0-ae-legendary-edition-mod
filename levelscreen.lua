@@ -31,6 +31,12 @@ function levelscreen_load(reason, i)
 		return
 	end
 
+	--minigame intro, win and lose screens (a death in a minigame is a loss)
+	if minigameplaying and (reason == "minigame" or reason == "minigamewin" or reason == "minigamelose" or reason == "death") then
+		minigame_levelscreen_load(reason)
+		return
+	end
+
 	windsound:stop()
 	if not continuesublevelmusic then
 		music:disableintromusic()
@@ -205,6 +211,9 @@ function levelscreen_load(reason, i)
 end
 
 function levelscreen_update(dt)
+	if gamestate == "minigamelevelscreen" then
+		minigame_levelscreen_update(dt)
+	end
 	if endingmusic:isPlaying() then
 		levelscreentimer = 1
 	else
@@ -262,6 +271,14 @@ function levelscreen_exit()
 		elseif gamestate == "dclevelscreen" then
 			gamestate = "game"
 			startlevel("dc")
+		elseif gamestate == "minigamelevelscreen" then
+			if minigamescreen == "intro" then
+				gamestate = "game"
+				startlevel("minigame")
+			else
+				--back to the minigame menu once the win/lose sound finished
+				minigame_returntomenu()
+			end
 		else
 			if SERVER or CLIENT then
 				lobby_load()
@@ -373,6 +390,8 @@ function levelscreen_draw()
 			properprintfunc(endingtext[1], width*8*scale-string.len(endingtext[1])*4*scale, 120*scale)
 			properprintfunc(endingtext[2], width*8*scale-string.len(endingtext[2])*4*scale, 140*scale)
 			love.graphics.setColor(255, 255, 255, 255)
+		elseif gamestate == "minigamelevelscreen" then
+			minigame_levelscreen_draw()
 		elseif gamestate == "dclevelscreen" or dcplaying then
 			if dcfinish then
 				properprintfunc("daily challenge completed!", width*8*scale-string.len("daily challenge completed!")*4*scale, 120*scale)

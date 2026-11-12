@@ -17,8 +17,8 @@ The project expands Mari0 AE with new gameplay systems, playable characters, ene
 * [Changelog](#changelog)
 * [Requirements](#requirements)
 * [Installation](#installation)
-  * [Option 1: Using the Windows Release](#option-1-using-the-windows-release)
-  * [Option 2: Using the Source Release](#option-2-using-the-source-release)
+  * [Option 1: Using the .exe File](#option-1-using-the-exe-file)
+  * [Option 2: Using the .love File](#option-2-using-the-love-file)
 
 * [Features](#features)
   * [Gameplay](#gameplay)
@@ -387,25 +387,18 @@ A clean Mari0 AE v13.2 installation is recommended as the base for Legendary Edi
 
 Legendary Edition can be installed using either the **.exe** file or the **.love** file. Both are available from the project's **Releases** page.
 
-## Option 1: Using the Windows Release
+## Option 1: Using the .exe File
 
-Use this option if you are on Windows and want to run the game without installing LÖVE separately.
+Use this option if you are on Windows and want to run the game without installing LÖVE.
 
 1. Open the repository's **Releases** page.
-2. Download **`mari0_le.exe`**.
-3. Place the EXE in any safe, writable folder you prefer. For example:
-   * Your game's AppData folder.
-   * A dedicated folder for your games.
-   * The same folder as `mari0_ae.exe`.
+2. Download the Legendary Edition `.exe` file.
+3. Place the `.exe` file in the **same directory as your original [Mari0 AE](https://forum.stabyourself.net/viewtopic.php?t=3636) game folder**.
+4. Double-click the `.exe` file to launch the game.
 
-   You can move the EXE wherever you like, provided the location is safe and you have permission to run files from it.
-4. Double-click `mari0_le.exe` to launch the game.
+> **Important:** Do **not** place the `.exe` file in the AppData folder (`C:/Users/<YOUR_USERNAME>/AppData/Roaming/mari0`). It must sit next to the original Mari0 AE game folder, not inside the AppData folder.
 
-> **Important:** The Windows release is a standalone executable, not a ZIP archive. The required LÖVE runtime DLLs are already packaged inside the EXE, so you do not need to download or extract any additional files, install LÖVE separately, or keep the EXE in a particular folder.
->
-> For the best results, use a normal, trusted folder that you can write to. Avoid temporary folders, protected Windows system directories, and other locations where Windows or security software may restrict execution.
-
-## Option 2: Using the Source Release
+## Option 2: Using the .love File
 
 Use this option if you already have LÖVE installed, or if you are on macOS or Linux.
 
@@ -417,7 +410,7 @@ Use this option if you already have LÖVE installed, or if you are on macOS or L
    * Dragging the `.love` file onto the LÖVE executable, or
    * Running it from a terminal:
 
-     ```bash
+     ```
      love LegendaryEdition.love
      ```
 

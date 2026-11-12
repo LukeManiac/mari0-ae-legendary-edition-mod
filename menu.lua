@@ -1551,6 +1551,9 @@ function menu_update(dt)
 	if mappacksearchbar.active then
 		mappacksearchbar:update(dt)
 	end
+	if gamestate == "mappackmenu" and mappacktype == "minigames" then
+		minigame_menu_update(dt)
+	end
 
 	if gamestate == "options" and optionstab == 2 then
 		portalanimationtimer = portalanimationtimer + dt
@@ -2425,13 +2428,26 @@ function menu_draw()
 			love.graphics.setScissor()
 			
 			love.graphics.translate(- (round(((mappackhorscrollrange*scale)*2) - mappackhorscrollsmooth*scale*mappackhorscrollrange)), 0)
+			
+			-------------
+			--MINIGAMES--
+			-------------
+			
+			love.graphics.translate(round(((mappackhorscrollrange*scale)*3) - mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
+			
+			if mappackhorscrollsmooth > 2 then
+				minigame_menu_draw()
+			end
+			love.graphics.setScissor()
+			
+			love.graphics.translate(- (round(((mappackhorscrollrange*scale)*3) - mappackhorscrollsmooth*scale*mappackhorscrollrange)), 0)
 		end
 		
 		love.graphics.setScissor()
 		
 		--draw tabs
 		local colors = {}
-		for i = 0, 2 do
+		for i = 0, 3 do
 			if mappackhorscroll == i then
 				colors[i] = {{255, 255, 255}, {0, 0, 0}}
 			else
@@ -2459,6 +2475,13 @@ function menu_draw()
 		love.graphics.rectangle("fill", 104*scale, 4*scale, 123*scale, 11*scale)
 		love.graphics.setColor(colors[2][2])
 		properprint("daily challenge", 105*scale, 6*scale)
+		--minigames
+		love.graphics.setColor(0, 0, 0)
+		love.graphics.rectangle("fill", 232*scale, 3*scale, 77*scale, 13*scale)
+		love.graphics.setColor(colors[3][1])
+		love.graphics.rectangle("fill", 233*scale, 4*scale, 75*scale, 11*scale)
+		love.graphics.setColor(colors[3][2])
+		properprint("minigames", 234*scale, 6*scale)
 		
 		if downloadingmappack then
 			renderoverlay((onlinedlc and (onlineassetlist[onlinemappackselection].downloadable and "downloading asset" or "opening link") or "loading mappacks") .. "...", true, true)
@@ -3160,6 +3183,8 @@ function mappacks()
 		opendlcbutton.active = true
 	elseif mappackhorscroll == 2 then
 		loaddailychallenge()
+	elseif mappackhorscroll == 3 then
+		loadminigames()
 	end
 end
 
@@ -3514,6 +3539,9 @@ function menu_keypressed(key, unicode)
 			end
 		end
 	elseif gamestate == "mappackmenu" then
+		if mappacktype == "minigames" and minigame_menu_keypressed(key) then
+			return
+		end
 		if mappacksearchbar.inputting then
 			if (key == "up" or key == "down") then
 				mappacksearchbar.inputting = false
@@ -3652,10 +3680,10 @@ function menu_keypressed(key, unicode)
 			else
 				mappackhorscroll = mappackhorscroll - 1
 			end
-			if mappackhorscroll > 2 then
+			if mappackhorscroll > 3 then
 				mappackhorscroll = 0
 			elseif mappackhorscroll < 0 then
-				mappackhorscroll = 2
+				mappackhorscroll = 3
 			end
 			mappacks()
 		elseif key == "m" then
@@ -4172,6 +4200,9 @@ function menu_mousepressed(x, y, button)
 		openmappacksbutton:click(x, y, button)
 		opendlcbutton:click(x, y, button)
 		mappacksearchbar:click(x, y, button)
+		if mappacktype == "minigames" and (button == "wu" or button == "wd") and minigame_menu_wheel(x, y, button) then
+			return
+		end
 		if button == "wu" then
 			menu_keypressed("up")
 		elseif button == "wd" then
@@ -4185,6 +4216,8 @@ function menu_mousepressed(x, y, button)
 					mappackhorscroll = 1
 				elseif x > 103*scale and x < 225*scale then
 					mappackhorscroll = 2
+				elseif x > 233*scale and x < 308*scale then
+					mappackhorscroll = 3
 				end
 				if oldmappackhorscroll ~= mappackhorscroll then
 					openmappacksbutton.active = false
@@ -4192,6 +4225,10 @@ function menu_mousepressed(x, y, button)
 					mappacks()
 					return
 				end
+			end
+			if mappacktype == "minigames" then
+				minigame_menu_mousepressed(x, y, button)
+				return
 			end
 			--mappack selection
 			if not android then
@@ -4263,6 +4300,9 @@ function menu_mousereleased(x, y, button)
 	elseif gamestate == "mappackmenu" then
 		mappackscrollmouse = false
 		mappacksearchbar:unclick(x, y)
+		if mappacktype == "minigames" then
+			minigame_menu_mousereleased(x, y, button)
+		end
 	end
 end
 
@@ -4275,6 +4315,10 @@ function menu_mousemoved(x, y, dx, dy)
 		return
 	end
 	if gamestate == "mappackmenu" then
+		if mappacktype == "minigames" then
+			minigame_menu_mousemoved(x, y)
+			return
+		end
 		--mappack selection
 		if (not android) and mappacktype ~= "daily_challenge" then
 			local scrollsmooth = mappackscrollsmooth

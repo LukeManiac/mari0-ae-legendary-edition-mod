@@ -19,7 +19,7 @@ function intro_load()
 	introalpha = 255
 
 	if SkipIntro then
-		intro_finish_menu()
+		startwarpfade(intro_finish_menu, false, true)
 	else
 		playsound(introsound)
 	end
@@ -50,7 +50,7 @@ local function intro_printcolour(text, x, y, scalemult, spacingmult)
 		end
 
 		--character is still waiting for its turn, skip it (no colour calculation, no print)
-		if not charscale then
+		if SkipIntro or not charscale then
 			goto continue
 		end
 

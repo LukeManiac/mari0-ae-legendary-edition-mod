@@ -2950,7 +2950,10 @@ function mario:movement(dt)
 	end
 		
 	--HORIZONTAL MOVEMENT
-	local runningkey = runkey(self.playernumber)
+	--minigames can hold run for the movement only (custom character run animations aren't triggered)
+	local runningkey = runkey(self.playernumber) or self.minigameforcerun
+	--minigames can lift the walking speed cap, so maxrunspeed can always be reached
+	local walkspeedcap = self.minigamenowalkcap and maxrunspeed or maxwalkspeed
 	local mariojumpkey = jumpkey(self.playernumber)
 	local mariorightkey = rightkey(self.playernumber)
 	local marioleftkey = leftkey(self.playernumber)
@@ -3043,14 +3046,14 @@ function mario:movement(dt)
 				if self.shoe == true or self.shoe == "heel" or self.shoe == "drybonesshell" then
 					self.animationdirection = self.gravitydir == "right" and "left" or "right"
 				end
-				if self[speedx] < maxwalkspeed then
+				if self[speedx] < walkspeedcap then
 					if self[speedx] < 0 then
 						self[speedx] = self[speedx] + self.characterdata.runaccelerationair*dt*self.characterdata.airslidefactor
 					else
 						self[speedx] = self[speedx] + self.characterdata.runaccelerationair*dt
 					end
 					
-					self[speedx] = math.min(self[speedx], maxwalkspeed)
+					self[speedx] = math.min(self[speedx], walkspeedcap)
 				elseif self[speedx] > maxwalkspeed and self[speedx] < maxrunspeed then
 					if self[speedx] < 0 then
 						self[speedx] = self[speedx] + self.characterdata.runaccelerationair*dt*self.characterdata.airslidefactor
@@ -3098,14 +3101,14 @@ function mario:movement(dt)
 				if self.shoe == true or self.shoe == "heel" or self.shoe == "drybonesshell" then
 					self.animationdirection = self.gravitydir == "right" and "right" or "left"
 				end
-				if self[speedx] > -maxwalkspeed then
+				if self[speedx] > -walkspeedcap then
 					if self[speedx] > 0 then
 						self[speedx] = self[speedx] - self.characterdata.runaccelerationair*dt*self.characterdata.airslidefactor
 					else
 						self[speedx] = self[speedx] - self.characterdata.runaccelerationair*dt
 					end
 					
-					self[speedx] = math.max(self[speedx], -maxwalkspeed)
+					self[speedx] = math.max(self[speedx], -walkspeedcap)
 				elseif self[speedx] < -maxwalkspeed and self[speedx] > -maxrunspeed then
 					if self[speedx] > 0 then
 						self[speedx] = self[speedx] - self.characterdata.runaccelerationair*dt*self.characterdata.airslidefactor
@@ -7431,7 +7434,11 @@ function mario:die(how)
 		love.audio.stop()
 		updatesizes("reset")
 		updateplayerproperties("reset")
-		playsound(dailychallenge and dclosesound or deathsound)
+		if minigameplaying then
+			playsound(deathstingsound) --minigames only play the death sting
+		else
+			playsound(dailychallenge and dclosesound or deathsound)
+		end
 	else
 		playsound(deathstingsound)
 	end
