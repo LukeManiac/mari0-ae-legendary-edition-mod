@@ -1417,6 +1417,7 @@ end
 ------------------------
 --  BOO BAFFLER BASH  --
 ------------------------
+do --each minigame keeps its locals in a do block (a file can only have 200 at the top level)
 
 local BOO_ANIM_TIME = 0.1 --the whole animation (column 1, column 2)
 local BOO_START_TIME = 10
@@ -2666,6 +2667,8 @@ function boo_updateanimation(b, dt)
 	BOO_FOUND_ANIMS[a.type].update(b, a, dt)
 end
 
+end --do
+
 local function boo_updateboos(S, dt)
 	local mdt = dt*(S.speedmul or 1) --movement gets faster every round
 	S.movetime = (S.movetime or 0) + mdt
@@ -2937,9 +2940,12 @@ addminigame({
 	end,
 })
 
+end --do (boo baffler bash)
+
 ------------------------------
 --  SNAKE SLITHER SCRAMBLE  --
 ------------------------------
+do --each minigame keeps its locals in a do block (a file can only have 200 at the top level)
 
 local SNAKE_SPEED = 7 --tiles per second
 local SNAKE_SLOW_SPEED = snakeblockspeed --slow mode: a normal speed snake block (green graphic)
@@ -3347,9 +3353,12 @@ addminigame({
 	end,
 })
 
+end --do (snake slither scramble)
+
 -------------------------------
 --  JUMPING JUGGLE JAMBOREE  --
 -------------------------------
+do --each minigame keeps its locals in a do block (a file can only have 200 at the top level)
 
 local JJJ_WIND_SPEED = 4
 local JJJ_WIND_RAMP = 1 --sine in-out start and stop of the wind
@@ -3854,9 +3863,12 @@ addminigame({
 	end,
 })
 
+end --do (jumping juggle jamboree)
+
 --------------------------
 --  BLOCK BEAT BONANZA  --
 --------------------------
+do --each minigame keeps its locals in a do block (a file can only have 200 at the top level)
 
 local BEAT_PITCHES = {0.8, 1, 1.25, 1.5}
 local BEAT_COLORS = {{230, 60, 60}, {70, 200, 80}, {60, 130, 240}, {240, 200, 40}}
@@ -4118,3 +4130,5 @@ addminigame({
 		centerprintline("Lives: " .. math.max(0, S.lives or 0), width*8, 18)
 	end,
 })
+
+end --do (block beat bonanza)
