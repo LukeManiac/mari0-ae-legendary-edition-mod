@@ -3646,6 +3646,11 @@ function loadnitpicks()
 		NoLogDumping = t.nologdumping
 		SkipIntro = t.skipintro
 		ConsistentVineSpeed = t.consistentvinespeed
+		OrderedMovementTypes = t.orderedmovementtypes
+		InvincibleSnake = t.invinciblesnake
+		MultipleJumping = t.multiplejumping
+		ProbabilityPasser = t.probabilitypasser
+		ImmortalComboMeter = t.immortalcombometer
 	end
 end
 

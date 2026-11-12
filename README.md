@@ -332,8 +332,8 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `infinitelivesmultiplayer`: Gives infinite lives in local multiplayer when there is more than one player.
 - `slowbackgrounds`: Draws custom backgrounds as repeated tiles instead of using the static-background optimisation.
 - `nomusic`: Disables music.
-- `alwaysinfinitetime`: Starts with infinite time enabled.
-- `alwaysinfinitelives`: Starts with infinite lives enabled.
+- `alwaysinfinitetime`: Starts with infinite time enabled. In Boo Baffler Bash, the timer never goes down.
+- `alwaysinfinitelives`: Starts with infinite lives enabled. In Jumping Juggle Jamboree, touching the ground doesn't end the game, and in Block Beat Bonanza, reviving is always available and free.
 - `centercamera`: Selects the centered camera mode when loading a mappack outside the editor.
 - `render3d`: Enables 3D rendering.
 - `viewhitboxes`: Draws object hitboxes.
@@ -361,6 +361,11 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `nologdumping`: You can guess what this does.
 - `skipintro`: Skips the intro completely and loads the main menu straight away.
 - `consistentvinespeed`: Moving down vines are now in the same speed as moving up vines.
+- `orderedmovementtypes`: Boo Baffler Bash goes through its movement types in order, starting with Shy and looping, without Super Random.
+- `invinciblesnake`: The snake in Snake Slither Scramble can't crash, without looking invincible.
+- `multiplejumping`: In Jumping Juggle Jamboree, every jump press gives a full-height jump, even in mid-air, and landing on the ground adds a point and jumps you back up.
+- `probabilitypasser`: In Snake Slither Scramble, the ? block and the Starman appear straight away whenever there isn't one on the screen.
+- `immortalcombometer`: The bonus meter in Boo Baffler Bash always stays full.
 
 ---
 
@@ -397,7 +402,18 @@ Find the Boo shown at the top of the screen and click it before the timer runs o
 * A bonus meter under the HUD shows how much time you will win back. It drains as the round goes on and changes colour from green to yellow to red. The same colour is used for the "+N" display beside it and the popup over the found Boo.
 * The HUD is one half-transparent box in the middle of the screen, with the score and round on the left, the Boo to find in the middle, and the clock and time left on the right.
 * Clicking the wrong Boo shows a red cross on it.
-* When you find the right Boo, every other Boo disappears in a poof. The found Boo then leaves with a random animation: it fades out, falls off the screen while spinning, or vanishes in a poof.
+* When you find the right Boo, every other Boo disappears in a poof. The found Boo then leaves with one of 10 random found animations, each starting with its own sound. When time runs out, every Boo on the screen plays one:
+  * **Fade:** Grows and fades out (`mushroomappearsound`).
+  * **Fall:** Flips over and falls off the screen (`bowserfallsound`).
+  * **Poof:** Vanishes in a puff of smoke (`stompbigsound`).
+  * **Spin:** Twirls three times, faster and faster, puffs up a little and shrinks to nothing (`raccoonswingsound`).
+  * **Rocket:** Crouches down, then blasts off the top of the screen with a smoke trail (`cannonfastsound`).
+  * **Squash:** Gets flattened like a pancake, springs back slightly, then fades (`stompsound`).
+  * **Melt:** Wobbles and melts down into a puddle of its own colour, which then dries up (`meltsound`).
+  * **Shatter:** Turns icy blue and shakes harder and harder, then breaks into four pieces that tumble away (`freezesound`, then `iceblockbreaksound` when it breaks).
+  * **Burst:** Puffs up and flashes white, then pops into a ring of spinning sparkles (`magicsound`).
+  * **Dash:** Leans back, then zooms off the side of the screen it's facing, leaving afterimages behind (`capeflysound`).
+* Found animations are kept in the `BOO_FOUND_ANIMS` table in `minigames.lua`. Each one has a `start` function that plays its sound and an `update` function that runs every frame until the animation is done, and can draw extra effects behind or in front of the Boo. Adding a new entry adds it to the random pick.
 * More Boos appear every round, and they move a little faster each round, up to 50% faster.
 * Every round uses a random movement type, never the same one twice in a row:
   * **Shy:** Boos near your cursor stop and turn see-through, while the rest sneak towards it.
@@ -450,6 +466,21 @@ Watch the coloured ? blocks light up in a pattern, then hit them in the same ord
 * If you wait 10 seconds without hitting a block, the pattern plays again.
 * Every point also goes into a separate revive-check score, and every 10 points there pays for a revive. When you run out of lives with 10 or more, you get a prompt to revive with 3 extra lives. Accepting restarts the music from the beginning, plays `oneupsound`, and uses up 10 points of the revive-check score. Your real score doesn't change.
 * The HUD shows your score and lives.
+
+#### ⚙️ Minigame Nitpicks
+
+New nitpicks for the minigames, set in `alesans_entities/nitpicks.json` like the others. **Generate Nitpicks File** adds them to an existing file.
+
+* `orderedmovementtypes`: Boo Baffler Bash uses its movement types in order instead of at random. It starts with Shy, then Circle, Chain, Wave, Lanes, Spiral, Flock, Shuffle, Teleport, Flee, Phase and Swing, then loops back to Shy. Super Random is never used.
+* `invinciblesnake`: The snake in Snake Slither Scramble acts as if it always has a Starman, so walls and its own body can't stop it. It doesn't flash or show the invincibility timer. Starmen still work as normal.
+* `multiplejumping`: In Jumping Juggle Jamboree, you can jump as many times as you like in mid-air. Every jump, including the first one off the blocks, is a full-height jump, the same height as a jump with a full-speed run-up, and plays the jump sound and animation from the start. Landing on the ground adds 1 point and throws you straight back up with a full-height jump.
+* `probabilitypasser`: In Snake Slither Scramble, the ? block and the Starman appear as soon as there isn't one on the screen, without a random wait. There is still only one of each on the screen at a time, and no Starman appears while the snake is invincible.
+* `immortalcombometer`: The bonus meter in Boo Baffler Bash always stays full, so every Boo you find wins back the full 5 seconds.
+
+The existing infinite time and infinite lives nitpicks now also work in the minigames:
+
+* `alwaysinfinitetime`: In Boo Baffler Bash, the timer never goes down, so you can take as long as you like to find the Boo. Finding it still adds bonus time.
+* `alwaysinfinitelives`: In Jumping Juggle Jamboree, touching the ground no longer ends the game; you just land as if nothing happened. If `multiplejumping` is also on, landing bounces you back up instead. In Block Beat Bonanza, you can always revive when you run out of lives, and reviving doesn't use up any of the revive-check score.
 
 **Disclaimer:** This entire minigames feature was created only with Claude Opus 5.5.
 

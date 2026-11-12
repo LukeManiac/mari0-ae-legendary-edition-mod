@@ -1177,7 +1177,12 @@ local nitpickkeys = {
 	"smwwaterphysics",
 	"nologdumping",
 	"skipintro",
-	"consistentvinespeed"
+	"consistentvinespeed",
+	"orderedmovementtypes",
+	"invinciblesnake",
+	"multiplejumping",
+	"probabilitypasser",
+	"immortalcombometer"
 }
 
 function generatenitpicksfile()

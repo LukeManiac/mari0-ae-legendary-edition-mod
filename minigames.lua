@@ -1244,6 +1244,7 @@ end
 
 if jumpkey then
 	local originaljumpkey = jumpkey
+	minigame_rawjumpkey = originaljumpkey --the real button, for minigames that need actual presses
 	function jumpkey(i)
 		if minigame_jumpheld(i) then
 			return true
@@ -1425,6 +1426,13 @@ local BOO_FADE_TIME = 0.5
 local BOO_ROTATE_TIME = 0.25
 local BOO_CROSS_TIME = 0.5
 local BOO_ROUNDTYPES = {"shy", "circle", "chain", "wave", "lanes", "spiral", "flock", "shuffle", "teleport", "flee", "phase", "swing", "superrandom"}
+--nitpick "orderedmovementtypes": the round types go in this order and loop, without super random
+local BOO_ORDEREDTYPES = {}
+for _, roundtype in ipairs(BOO_ROUNDTYPES) do
+	if roundtype ~= "superrandom" then
+		table.insert(BOO_ORDEREDTYPES, roundtype)
+	end
+end
 local BOO_SPEEDUP = 0.025 --boos move this much faster every round...
 local BOO_SPEEDUP_MAX = 0.5 --...up to 50% faster
 local BOO_TOP = 2.5 --boos stay under the HUD (tiles)
@@ -1434,12 +1442,18 @@ local BOO_METER_W, BOO_METER_H = 40, 4 --bonus meter under the boo to find
 local BOO_METER_Y = 37
 
 local function boo_bonus(roundtime)
+	if ImmortalComboMeter then
+		return BOO_BONUS_MAX --nitpick: the meter never drains
+	end
 	local n = math.floor(roundtime/BOO_BONUS_STEP)+1
 	return math.max(0, BOO_BONUS_MAX+1-n)
 end
 
 --how many meter segments are filled: full ones for the bonus below the current one, the current one drains over its 3 seconds
 local function boo_bonusfill(roundtime)
+	if ImmortalComboMeter then
+		return BOO_BONUS_MAX
+	end
 	local bonus = boo_bonus(roundtime)
 	if bonus <= 0 then
 		return 0
@@ -2193,9 +2207,14 @@ local function boo_newround(S)
 	S.seq = nil
 	S.target = math.random(3)
 	local roundtype
-	repeat
-		roundtype = randomitem(BOO_ROUNDTYPES)
-	until roundtype ~= S.roundtype
+	if OrderedMovementTypes then
+		S.roundtypeindex = (S.roundtypeindex or 0) % #BOO_ORDEREDTYPES + 1
+		roundtype = BOO_ORDEREDTYPES[S.roundtypeindex]
+	else
+		repeat
+			roundtype = randomitem(BOO_ROUNDTYPES)
+		until roundtype ~= S.roundtype
+	end
 	S.roundtype = roundtype
 	S.speedmul = 1 + math.min(BOO_SPEEDUP_MAX, (S.round-1)*BOO_SPEEDUP)
 	S.movetime = 0
@@ -2245,6 +2264,10 @@ end
 --drawbehind(b, a) and drawfront(b, a) are optional and draw extra bits (smoke, trails, puddles, pieces, sparkles)
 --b.sx/b.sy stretch the boo, b.ox/b.oy nudge it (in tiles) and b.tint replaces its colour
 
+--the file's main chunk can only hold 200 locals, so everything only used here lives in a do block
+local BOO_FOUND_ANIMS, boo_startanimation, boo_updateanimation
+do
+
 local BOO_SPIN_TIME = 0.6
 local BOO_SPIN_TURNS = 3
 local BOO_ROCKET_WINDUP = 0.25
@@ -2293,7 +2316,7 @@ local function boo_ageparticles(list, dt)
 	end
 end
 
-local BOO_FOUND_ANIMS = {
+BOO_FOUND_ANIMS = {
 	--grows and fades away
 	fade = {
 		start = function(b, a)
@@ -2628,14 +2651,14 @@ for name in pairs(BOO_FOUND_ANIMS) do
 end
 table.sort(BOO_FOUND_ANIM_NAMES)
 
-local function boo_startanimation(b)
+function boo_startanimation(b)
 	boo_stop(b)
 	local name = randomitem(BOO_FOUND_ANIM_NAMES)
 	b.anim = {type = name}
 	BOO_FOUND_ANIMS[name].start(b, b.anim)
 end
 
-local function boo_updateanimation(b, dt)
+function boo_updateanimation(b, dt)
 	local a = b.anim
 	if a.done then
 		return
@@ -2697,10 +2720,13 @@ addminigame({
 		boo_updateboos(S, dt)
 		if S.phase == "play" then
 			S.roundtime = S.roundtime + dt
-			local old = S.timer
-			S.timer = math.max(0, S.timer - dt)
-			if math.ceil(S.timer) < math.ceil(old) then
-				playsound(beepsound)
+			--nitpick "alwaysinfinitetime": take as long as you like, the timer never goes down
+			if not AlwaysInfiniteTime then
+				local old = S.timer
+				S.timer = math.max(0, S.timer - dt)
+				if math.ceil(S.timer) < math.ceil(old) then
+					playsound(beepsound)
+				end
 			end
 			if S.timer <= 0 then
 				S.phase = "timeout"
@@ -3063,7 +3089,8 @@ local function snake_arrive(S)
 	S.speedx, S.speedy = d[1]*S.speed, d[2]*S.speed
 
 	local nx, ny = snake_wrap(S, hx+d[1], hy+d[2])
-	if (not S.ghost) and (snake_iswall(S, nx, ny) or snake_onsnake(S, nx, ny, not S.growing)) then
+	--nitpick "invinciblesnake": acts like it always has a star, without looking like it
+	if (not S.ghost) and (not InvincibleSnake) and (snake_iswall(S, nx, ny) or snake_onsnake(S, nx, ny, not S.growing)) then
 		--hit something: bump into it like a hit block, then the game stops
 		S.dead = true
 		S.speedx, S.speedy = 0, 0
@@ -3196,6 +3223,10 @@ addminigame({
 				snake_starend(S)
 			end
 		elseif not S.star then
+			--nitpick "probabilitypasser": no random wait, it shows up as soon as there isn't one
+			if ProbabilityPasser then
+				S.startimer = 0
+			end
 			S.startimer = S.startimer - dt
 			if S.startimer <= 0 then
 				S.star = snake_freecell(S)
@@ -3206,6 +3237,9 @@ addminigame({
 		end
 
 		if not S.secret then
+			if ProbabilityPasser then
+				S.secrettimer = 0
+			end
 			S.secrettimer = S.secrettimer - dt
 			if S.secrettimer <= 0 then
 				S.secret = snake_freecell(S)
@@ -3575,6 +3609,30 @@ local function jjj_spawnenemy(S)
 	table.insert(S.enemies, e)
 end
 
+--is the real jump button down? (jumpkey counts as held for the whole run)
+local function jjj_rawjump()
+	local fn = minigame_rawjumpkey or jumpkey
+	return fn(1) == true
+end
+
+--the speed of a jump with the most height a jump can get (what a full speed run-up gives)
+local function jjj_fullheight(p)
+	local jumpforce, jumpforceadd = p.characterdata.jumpforce, p.characterdata.jumpforceadd
+	if currentphysics == 7 then --portal physics, same as mario:jump
+		jumpforce, jumpforceadd = portalphysicsjumpforce, portalphysicsjumpforceadd
+	end
+	p.speedy = -(jumpforce + jumpforceadd)
+end
+
+--nitpick "multiplejumping": a full height jump from anywhere, with the jump sound and animation
+local function jjj_fulljump(p)
+	--mario:jump only works when standing, so it gets told the player is
+	p.falling = false
+	p.hasdoublejumped = false
+	p:jump(true)
+	jjj_fullheight(p)
+end
+
 addminigame({
 	id = "jumping_juggle_jamboree",
 	savename = "Jumping Juggle Jamboree",
@@ -3627,6 +3685,7 @@ addminigame({
 			p.minigamenowalkcap = true --always able to reach maxrunspeed
 			S.pinx = p.x
 		end
+		S.rawjumpheld = jjj_rawjump() --a button held from the menu isn't a new press
 		jjj_spawnstartenemies(S)
 	end,
 
@@ -3634,6 +3693,14 @@ addminigame({
 		local p = objects["player"][1]
 		if not p then
 			return
+		end
+
+		--multiple jumping: presses of the real jump button
+		local jumppressed = false
+		if MultipleJumping then
+			local down = jjj_rawjump()
+			jumppressed = down and not S.rawjumpheld
+			S.rawjumpheld = down
 		end
 
 		if not S.jumped then
@@ -3646,6 +3713,11 @@ addminigame({
 					makepoof(x-0.5, JJJ_BLOCK_ROW-0.5, "makerpoof")
 				end
 				generatespritebatch()
+				if MultipleJumping then
+					--the normal jump already played its sound and animation, it only needs the full height
+					jjj_fullheight(p)
+					jumppressed = false --this press was the jump off the blocks
+				end
 			else
 				--static on the blocks until it jumps
 				p.x = S.pinx or p.x
@@ -3666,8 +3738,17 @@ addminigame({
 			end
 			--landed on the ground
 			if not p.falling and not p.jumping and p.y+p.height >= JJJ_GROUND_Y-1/16 then
-				p:die("killscript")
-				return
+				if MultipleJumping then
+					--a point and straight back up
+					S.score = S.score + 1
+					jjj_fulljump(p)
+				elseif not AlwaysInfiniteLives then
+					p:die("killscript")
+					return
+				end
+				--nitpick "alwaysinfinitelives": just land, as if nothing happened
+			elseif MultipleJumping and jumppressed then
+				jjj_fulljump(p)
 			end
 		end
 
@@ -3818,7 +3899,8 @@ end
 
 --out of lives: offer a revive if the revive-check score has at least one revive's worth of points
 local function beat_gameover(S)
-	if S.revivescore >= BEAT_REVIVE_COST then
+	--nitpick "alwaysinfinitelives": a revive is always on offer
+	if AlwaysInfiniteLives or S.revivescore >= BEAT_REVIVE_COST then
 		S.phase = "revive"
 		S.revivechoice = 1 --1 = yes, 2 = no
 	else
@@ -3830,7 +3912,10 @@ end
 local function beat_revive(S, accept)
 	if accept then
 		--spend the points from the revive-check score, the real score stays the same
-		S.revivescore = S.revivescore - BEAT_REVIVE_COST
+		--(free with infinite lives)
+		if not AlwaysInfiniteLives then
+			S.revivescore = S.revivescore - BEAT_REVIVE_COST
+		end
 		S.lives = S.lives + BEAT_REVIVE_LIVES
 		--the music starts over
 		stopmusic()
