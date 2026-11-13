@@ -8884,7 +8884,7 @@ function mario:fire()
 				net_action(self.playernumber, "fire")
 			end
 		elseif (self.size == 3 or self.size == 7 or self.size == 13) then
-			if self:canfire() then
+			if mario.canfire(self) then
 				local dir = "right"
 				if (self.portalgun and self.pointingangle > 0) or (self.portalgun == false and self.animationdirection == "left") then
 					dir = "left"
@@ -8909,7 +8909,7 @@ function mario:fire()
 				net_action(self.playernumber, "fire")
 			end
 		elseif self.size == 4 then --hammer
-			if self:canfire() then
+			if mario.canfire(self) then
 				local dir = "right"
 				if (self.portalgun and self.pointingangle > 0)  or (self.portalgun == false and self.animationdirection == "left") then
 					dir = "left"
@@ -8922,7 +8922,7 @@ function mario:fire()
 				net_action(self.playernumber, "fire")
 			end
 		elseif self.size == 15 then --boomerang
-			if self:canfire() then
+			if mario.canfire(self) then
 				local dir = "right"
 				if (self.portalgun and self.pointingangle > 0)  or (self.portalgun == false and self.animationdirection == "left") then
 					dir = "left"
