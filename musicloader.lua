@@ -205,15 +205,150 @@ end
 
 --a song without a fast version gets one: the song itself, played faster and higher (rate 1.25: 1.25x speed,
 --and 3.86 semitones up, the closest to 4 a single rate can get while keeping the speed)
+--a song sped up without changing its pitch: decoded and time-stretched (WSOLA) in a thread, since LÖVE can only change
+--the playback rate, which moves the pitch with it. The result is kept, so a song is only stretched once.
+local STRETCH_THREAD = [[
+local path, rate, channelname = ...
+require("love.filesystem")
+require("love.sound")
+local ffi = require("ffi")
+local ok, err = pcall(function()
+	local sd = love.sound.newSoundData(path)
+	local C, N, sr = sd:getChannelCount(), sd:getSampleCount(), sd:getSampleRate()
+	if sd:getBitDepth() ~= 16 then --(decoded songs are 16-bit, this is just in case)
+		local copy = love.sound.newSoundData(N, sr, 16, C)
+		for i = 0, N-1 do
+			for c = 1, C do
+				copy:setSample(i, c, sd:getSample(i, c))
+			end
+		end
+		sd = copy
+	end
+	local inp = ffi.cast("int16_t*", sd:getFFIPointer())
+	local outN = math.floor(N/rate)
+	local acc = ffi.new("float[?]", outN*C)
+	local W, Hs = 2048, 1024 --window and output hop (a Hann window at 50% overlap adds up to 1)
+	local DELTA, STEP, CSTEP = 256, 4, 16 --how far to look for the best fit, and how finely
+	local win = ffi.new("float[?]", W)
+	for j = 0, W-1 do
+		win[j] = 0.5 - 0.5*math.cos(2*math.pi*j/W)
+	end
+	local prev, k = 0, 0
+	while k*Hs < outN do
+		local os = k*Hs
+		local ideal = math.floor(os*rate)
+		local best = ideal
+		if k > 0 then
+			--the input that lines up best with how the last piece would have carried on
+			local natural = prev + Hs
+			local bestcorr = -math.huge
+			for d = -DELTA, DELTA, STEP do
+				local s = ideal + d
+				if s >= 0 and s + W <= N and natural + W <= N then
+					local corr = 0
+					for j = 0, W-1, CSTEP do
+						corr = corr + inp[(s+j)*C]*inp[(natural+j)*C]
+					end
+					if corr > bestcorr then
+						bestcorr = corr
+						best = s
+					end
+				end
+			end
+		end
+		for j = 0, W-1 do
+			local o, ii = os + j, best + j
+			if o >= outN or ii >= N then
+				break
+			end
+			local w = win[j]
+			if k == 0 and j < Hs then
+				w = 1 --the very start doesn't fade in
+			end
+			for c = 0, C-1 do
+				acc[o*C+c] = acc[o*C+c] + inp[ii*C+c]*w
+			end
+		end
+		prev = best
+		k = k + 1
+	end
+	local out = love.sound.newSoundData(outN, sr, 16, C)
+	local op = ffi.cast("int16_t*", out:getFFIPointer())
+	for i = 0, outN*C-1 do
+		local v = acc[i]
+		if v > 32767 then
+			v = 32767
+		elseif v < -32768 then
+			v = -32768
+		end
+		op[i] = v
+	end
+	love.thread.getChannel(channelname):push(out)
+end)
+if not ok then
+	love.thread.getChannel(channelname):push("error: " .. tostring(err))
+end
+]]
+
+music.stretched = {} --[song .. "|" .. rate] = time-stretched SoundData
+music.stretchjobs = {} --[song .. "|" .. rate] = {thread, channel name} while it's being made
+
+--starts stretching a song in the background (music:fakefast picks it up, or waits for it)
+function music:prestretch(name, rate)
+	local key = name .. "|" .. rate
+	if self.stretched[key] or self.stretchjobs[key] or not FFIAVAILABLE or not love.filesystem.getInfo(name) then
+		return
+	end
+	local channelname = "musicstretch|" .. key
+	love.thread.getChannel(channelname):clear()
+	local thread = love.thread.newThread(STRETCH_THREAD)
+	thread:start(name, rate, channelname)
+	self.stretchjobs[key] = {thread = thread, channel = channelname}
+end
+
+--the stretched song, waiting for it if it's still being made (nil if it can't be made)
+function music:getstretched(name, rate)
+	local key = name .. "|" .. rate
+	if self.stretched[key] then
+		return self.stretched[key]
+	end
+	self:prestretch(name, rate)
+	local job = self.stretchjobs[key]
+	if not job then
+		return nil
+	end
+	local result = love.thread.getChannel(job.channel):demand(30)
+	self.stretchjobs[key] = nil
+	if type(result) ~= "userdata" then
+		print("couldn't speed up " .. name .. ": " .. tostring(result or job.thread:getError()))
+		return nil
+	end
+	self.stretched[key] = result
+	return result
+end
+
 --returns the fast version's name; music:unfakefast takes it away again
-function music:fakefast(name, rate)
+--classic: just play the song faster, which raises its pitch too (the classicspeedupfastmusic nitpick).
+--Otherwise it's time-stretched to keep its pitch (falling back to the classic way if that can't be done)
+function music:fakefast(name, rate, classic)
 	local fastname = self:variant(name, "-fast")
 	if self.loaded[fastname] or not love.filesystem.getInfo(name) then
 		return fastname --a real one (or nothing to make one from)
 	end
-	local source = love.audio.newSource(name, "stream")
+	rate = rate or 1.25
+	local stretched = nil
+	if not classic then
+		stretched = self:getstretched(name, rate)
+	end
+	local source
+	if stretched then
+		source = love.audio.newSource(stretched)
+		self.pitchmul[fastname] = 1 --already faster, at the same pitch
+	else
+		source = love.audio.newSource(name, "stream")
+		self.pitchmul[fastname] = rate
+	end
 	source:setLooping(true)
-	self.pitchmul[fastname] = rate or 1.25
 	source:setPitch(self.pitch*self.pitchmul[fastname])
 	self.loaded[fastname] = source
 	return fastname

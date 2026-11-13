@@ -1183,7 +1183,8 @@ local nitpickkeys = {
 	"multiplejumping",
 	"probabilitypasser",
 	"immortalcombometer",
-	"removecooldowns"
+	"removecooldowns",
+	"classicspeedupfastmusic"
 }
 
 function generatenitpicksfile()

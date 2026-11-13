@@ -367,6 +367,7 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `probabilitypasser`: In Snake Slither Scramble, the ? block and the Starman appear straight away whenever there isn't one on the screen.
 - `immortalcombometer`: The bonus meter in Boo Baffler Bash always stays full.
 - `removecooldowns`: The ? blocks in Rival Rumble Royale have no cooldown, so every hit gives an item.
+- `classicspeedupfastmusic`: In Rival Rumble Royale, a song without a fast version is just played faster, which also makes it higher.
 
 ---
 
@@ -440,7 +441,7 @@ A four-player battle minigame inspired by the battle mode of Super Mario 4 Jugad
   * After the 3-2-1-go countdown, `lowtimesound` plays, then the fast music. The HUD shows "sudden death" instead of the timer.
   * The last one standing wins, the same way as above.
 * If the timer runs out with fewer than two players still in, the player with the most lives left wins (being alive at that moment beats waiting to respawn), then the one with the most knockouts. If it's still a tie, the battle is a draw. Either way, the music stops and the battle clear theme plays in the arena. Once it ends, the game fades to the results screen, which says "pN wins!" or "draw!" and stays up for 4 seconds without a sound.
-* When the timer drops below 100, the music stops, `lowtimesound` plays, and the fast version of the battle music takes over as soon as the sound ends (with its `-fastintro` if it has one). The star theme speeds up too. The fast version is `song-fast.ogg` next to a custom song, or one of the built-in `-fast` versions. A song without one gets one made up: the song itself played 1.25 times faster, which also raises it by just under 4 semitones (LÖVE can't change the speed and the pitch separately).
+* When the timer drops below 100, the music stops, `lowtimesound` plays, and the fast version of the battle music takes over as soon as the sound ends (with its `-fastintro` if it has one). The star theme speeds up too. The fast version is `song-fast.ogg` next to a custom song, or one of the built-in `-fast` versions. A song without one gets one made up: the song is time-stretched to 1.25 times its speed at the same pitch. LÖVE can only change a song's playback rate, which moves its pitch with it, so the stretching is done once in the background when the battle starts and is kept for sudden death. With the `classicspeedupfastmusic` nitpick, the song is just played 1.25 times faster instead, which also raises it by just under 4 semitones.
 * The score is every human player's knockouts added up. Bots' knockouts don't count (if only bots played, it's the winner's knockouts). It's kept up to date during the battle, so quitting from the pause menu can save it. The victory screen labels it "knockouts".
 
 **Custom Music**
@@ -500,6 +501,7 @@ rivalrumbleroyalemusic/
 #### ⚙️ Minigame Nitpicks
 
 * `removecooldowns`: The ? blocks in Rival Rumble Royale have no cooldown. Every hit gives an item, and the block shows its roulette again straight away. **Generate Nitpicks File** adds it to an existing file.
+* `classicspeedupfastmusic`: In Rival Rumble Royale, a song without a fast version gets its made-up fast version the old way: it's played 1.25 times faster, which also raises it by just under 4 semitones, instead of being time-stretched to keep its pitch. **Generate Nitpicks File** adds it to an existing file.
 
 #### 🎮 Minigames
 
@@ -534,7 +536,8 @@ rivalrumbleroyalemusic/
 * When the blinking invincibility ends while the player is a Tanooki statue, they now stay invincible. Before, enemies could hurt a statue once the blinking was over.
 * Stomping enemies in a row without landing gives 100, 200, 400, 500, 800, 1000, 2000, 4000, 5000 and 8000 points again, then a 1up for each stomp after that. Before, the nth stomp only gave n points ("+1", "+2"...). Minigames still count stomps that way.
 * Changing form now ends any animation the new form doesn't have, and sets the new form's sprite straight away. For example, getting hit during a tail whip ends the whip, and its hitbox stops hitting things. A raccoon flight or a float ends the same way.
-* Changing form while ducking in mid-air (a duck jump into a power-up, for example) now keeps you ducking once the grow or shrink animation ends. Before, you only ducked again if you were on the ground.
+* Changing form while ducking now keeps you ducking through the whole grow or shrink animation, like picking up a power-up in Rival Rumble Royale. This works on the ground and in mid-air (a duck jump into a power-up, for example). Frames of a size that can't duck show you standing, and your feet stay in the same place throughout. Before, you stood up for the animation and only ducked again afterwards if you were on the ground.
+* Changing form while you're blinking after a hit now keeps your invincibility timer: once the grow animation ends, the blinking carries on from where it was.
 * Dropdowns in a minigame's settings no longer disappear when the description above them is long. They used to stay where they were before the panel was scrolled.
 
 ### ✨ Improvements

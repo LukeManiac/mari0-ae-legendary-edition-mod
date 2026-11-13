@@ -126,7 +126,7 @@ function levelball:update(dt)
 	return self.destroy
 end
 
-function levelball:get()
+function levelball:get(p)
 	self.static = true
 	self.active = false
 	self.drawable = false
@@ -134,6 +134,7 @@ function levelball:get()
 		return
 	end
 	
+	levelfinish_uncloud(p)
 	levelfinished = true
 
 	stopmusic()
@@ -157,7 +158,7 @@ function levelball:leftcollide(a, b)
 	self.speedx = 0
 	
 	if a == "player" then
-		self:get()
+		self:get(a)
 	end
 	
 	return false
@@ -167,7 +168,7 @@ function levelball:rightcollide(a, b)
 	self.speedx = 0
 	
 	if a == "player" then
-		self:get()
+		self:get(a)
 	end
 	
 	return false
@@ -175,7 +176,7 @@ end
 
 function levelball:floorcollide(a, b)
 	if a == "player" then
-		self:get()
+		self:get(a)
 	end
 	
 	if self.activatey then
@@ -189,13 +190,13 @@ end
 
 function levelball:ceilcollide(a, b)
 	if a == "player" then
-		self:get()
+		self:get(a)
 	end	
 end
 
 function levelball:passivecollide(a, b)
 	if a == "player" then
-		self:get()
+		self:get(a)
 		return false
 	end	
 end

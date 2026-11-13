@@ -4533,7 +4533,7 @@ RRR_K.FINALCOUNT = 5 --under this many seconds, the timer shows as a big number 
 RRR_K.SD_ANNOUNCE = 1.5 --time up: "time up!", then this much later "sudden death!"
 RRR_K.SD_DELAY = 3 --and this long after time up, the fade to the sudden death arena
 RRR_K.SD_LIVES = 1 --everyone still in the battle gets this many lives in sudden death
-RRR_K.FAKEFAST_RATE = 1.25 --a song without a fast version gets one: 1.25x speed, 3.86 semitones up (see music:fakefast)
+RRR_K.FAKEFAST_RATE = 1.25 --a song without a fast version gets one at 1.25x speed (higher too with classicspeedupfastmusic, see music:fakefast)
 local RRR_DEFAULT_CLEAR = "sounds/levelend.ogg"
 local RRR_MUSIC_NAME = "rivalrumbleroyalemusic"
 local RRR_MUSIC_FOLDER = "sounds/" .. RRR_MUSIC_NAME
@@ -7059,7 +7059,7 @@ function rrrx.ensurefastmusic()
 	if not custommusic or music.loaded[music:variant(custommusic, "-fast")] then
 		return
 	end
-	music:fakefast(custommusic, RRR_K.FAKEFAST_RATE)
+	music:fakefast(custommusic, RRR_K.FAKEFAST_RATE, ClassicSpeedUpFastMusic) --(classic: faster and higher, not stretched)
 	rrrx.fakefast = custommusic --taken away again by rrr_restoremusic
 end
 
@@ -7140,6 +7140,12 @@ local function rrr_updatecountdown(S)
 			rrrx.startlowtime(S) --sudden death: the low time sound, then the fast music
 		else
 			playmusic()
+			--a song without a fast version gets one made up when the time runs low: stretching it takes a moment,
+			--so it starts in the background now (sudden death reuses it)
+			if S.timeleft and custommusic and not ClassicSpeedUpFastMusic
+				and not music.loaded[music:variant(custommusic, "-fast")] then
+				music:prestretch(custommusic, RRR_K.FAKEFAST_RATE)
+			end
 		end
 		return
 	end

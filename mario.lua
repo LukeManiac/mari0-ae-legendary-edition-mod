@@ -3951,7 +3951,9 @@ function mario:jump(force)
 					end
 					force = math.max(-jumpforce - jumpforceadd, force)
 
-					if (self.size == 6 or self.size == 9 or self.size == 10) and self.planemode and (not self.shoe) then
+					--(raccoon and tanooki can fly on Yoshi too)
+					if (self.size == 6 or self.size == 9 or self.size == 10) and self.planemode
+						and ((not self.shoe) or (self.yoshi and (self.size == 6 or self.size == 9))) then
 						if self.size == 10 then
 							self.speedy = -self.characterdata.capejumpforce
 						else
@@ -4225,9 +4227,7 @@ function mario:grow(update)
 			blinking = self.animationtimer
 		end
 		self.sizechange = {duck = self.ducking, blinking = blinking}
-		if self.ducking then --stop small mario ducking
-			self:duck(false)
-		end
+		--(ducking stays on through grow2, which only flashes colours; grow1 stands, see below)
 		local oldsize = self.size
 		if ((self.size == 1 and (not update or (update == 3 and (not mariomakerphysics)))) or (self.size == 2 and not update)) and update ~= -1 and update ~= 8 and update ~= 12 and update ~= 16 then
 			self.size = self.size + 1
@@ -4243,6 +4243,10 @@ function mario:grow(update)
 		
 		if self.size == 2 or self.size == -1 or (oldsize <= 1 and self.size == 12) then
 			self.animation = "grow1"
+			--the classic small-to-big animation stands (the duck comes back at the end, see endsizechange)
+			if self.ducking then
+				self:duck(false)
+			end
 		elseif (self.size == 8 or self.size == 16) then
 			self.animation = false
 			noupdate = false
@@ -4302,12 +4306,6 @@ function mario:shrink()
 	self.sizechange = nil --a straight change below keeps ducking itself (setsize), only the animation needs it put back
 	
 	playsound(shrinksound)
-
-	if self.size == 2 or (self.size > 2 and (not mariomakerphysics)) then
-		if self.ducking then --stop small mario ducking
-			self:duck(false)
-		end
-	end
 	
 	if mariomakerphysics and self.size > 2 and self.size ~= 12 and self.size ~= 8 then --shrink to big mario
 		self.size = 2
@@ -4332,6 +4330,9 @@ function mario:shrink()
 	end
 	
 	self.sizechange = {duck = wasducking} --ducking comes back once the shrink animation is done (see endsizechange)
+	if self.ducking then --the classic big-to-small animation stands
+		self:duck(false)
+	end
 	self.size = 1
 	self:setsize(1)
 	
@@ -5399,7 +5400,7 @@ end
 --bouncing off an enemy at p-speed (raccoon or tanooki) keeps p-speed and refills it: a full p-meter,
 --and a flight that was going on gets its whole flying time back
 function mario:keeppspeed(plane, fly, flaptimer)
-	if plane and (self.size == 6 or self.size == 9) and not self.dead and not self.yoshi then
+	if plane and (self.size == 6 or self.size == 9) and not self.dead then
 		self.planemode = true
 		self.planetimer = raccoonplanefull
 		self.raccoonfly = fly
@@ -8287,10 +8288,18 @@ function mario:noteblockwarp(x, y, i)
 	self.controlsenabled = false
 end
 
+--finishing a level (flag, axe, levelball) gets everyone off their Lakitu cloud
+function levelfinish_uncloud(p)
+	if p and p.shoe == "cloud" then
+		p:shoed(false, false, false, true)
+	end
+end
+
 function mario:flag()
 	if levelfinished then
 		return
 	end
+	levelfinish_uncloud(self)
 	if self.size == 8 then
 		--mega mushroom
 		megamushroomsound:stop()
@@ -8387,6 +8396,7 @@ function mario:axe()
 	if levelfinished then
 		return
 	end
+	levelfinish_uncloud(self)
 	self.ducking = false
 	for i = 1, players do
 		objects["player"][i]:removeportals()
@@ -9303,7 +9313,7 @@ function mario:dropwearable(graphic, quad, width, height, offsetX, offsetY, quad
     table.insert(objects["enemy"], obj)
 end
 
-function mario:shoed(shoe, initial, drop) --get in shoe (type, make sound?, drop shoe?)
+function mario:shoed(shoe, initial, drop, silent) --get in shoe (type, make sound?, drop shoe?, no sound getting out?)
 	soundfordrop = helmetremovesound
 
 	if shoe then
@@ -9413,7 +9423,9 @@ function mario:shoed(shoe, initial, drop) --get in shoe (type, make sound?, drop
 			self.dofireenemy = self.fireenemy
 		end
 		--self:setsize(self.size)
-		playsound(soundfordrop)
+		if not silent then
+			playsound(soundfordrop)
+		end
 		net_action(self.playernumber, "shoed|" .. tostring(shoe) .. "|" .. tostring(initial) .. "|" .. tostring(drop))
 	end
 	return true

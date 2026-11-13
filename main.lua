@@ -3654,6 +3654,7 @@ function loadnitpicks()
 		ProbabilityPasser = t.probabilitypasser
 		ImmortalComboMeter = t.immortalcombometer
 		RemoveCooldowns = t.removecooldowns
+		ClassicSpeedUpFastMusic = t.classicspeedupfastmusic
 	end
 end
 
