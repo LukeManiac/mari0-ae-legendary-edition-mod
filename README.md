@@ -464,7 +464,7 @@ A four-player battle minigame inspired by the battle mode of Super Mario 4 Jugad
 * Without `pack.json`, names come from the folder and file names ("my_song.ogg" becomes "My Song").
 * `overworld.ogg`, `underground.ogg` or `castle.ogg` placed directly in a music folder replaces the built-in song. Inside a pack folder, they're songs of that pack instead ("My Pack- Overworld"), and the built-in songs stay.
 * If a song or pack in the save folder has the same name in the list as one in the game, the save folder's one is used.
-* `pack.json` files are included for **Kirby VRC6 Music**, **Castlevania VRC6 Music** and **Super Mario Bros. 2 Remade**. The songs themselves aren't included. `sounds/rivalrumbleroyalemusic/README.md` explains all of this.
+* `pack.json` files are included for **Kirby VRC6 Music**, **Castlevania VRC6 Music** and **Super Mario Bros. 2 Remade**. The songs themselves aren't included. `RIVALRUMBLEROYALE_README.md` explains all of this.
 
 Example of what a music folder can hold:
 

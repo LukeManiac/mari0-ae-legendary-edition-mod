@@ -29,6 +29,8 @@ Every `.ogg` file becomes an option in the dropdown. A folder is a music pack, a
 {
     "name": "Kirby VRC6 Music",
     "order": 1,
+    "Starman Theme": "kirby star",
+    "Battle Clear": "level clear",
     "songs": [
         ["boss", "Boss"],
         ["skybattle", "Battle Across The Sky"]
