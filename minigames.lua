@@ -4528,6 +4528,12 @@ local RRR_HIT_CREDIT = 4 --dying this soon after a hit (falling in a pit for exa
 local RRR_RESULT_TIME = 4 --the results screen (the battle clear theme already played in the arena)
 local RRR_CLEAR_MAX = 15 --a battle clear theme longer than this gets cut off
 local RRR_KO_FREEZE = 3 --the last knockout freezes the arena for this long before the results screen
+local RRR_K = {} --(a table: the file can only have 200 locals at once)
+RRR_K.FINALCOUNT = 5 --under this many seconds, the timer shows as a big number with a beep every second
+RRR_K.SD_ANNOUNCE = 1.5 --time up: "time up!", then this much later "sudden death!"
+RRR_K.SD_DELAY = 3 --and this long after time up, the fade to the sudden death arena
+RRR_K.SD_LIVES = 1 --everyone still in the battle gets this many lives in sudden death
+RRR_K.FAKEFAST_RATE = 1.25 --a song without a fast version gets one: 1.25x speed, 3.86 semitones up (see music:fakefast)
 local RRR_DEFAULT_CLEAR = "sounds/levelend.ogg"
 local RRR_MUSIC_NAME = "rivalrumbleroyalemusic"
 local RRR_MUSIC_FOLDER = "sounds/" .. RRR_MUSIC_NAME
@@ -4578,7 +4584,7 @@ local RRR_LAYOUTS = {
 		"X               ========               X",
 		"X                                      X",
 		"X          3                4          X",
-		"X  S    ======   ?    ?   ======    S  X",
+		"X  S    ====== ?        ? ======    S  X", --the ? blocks stay out from under the platform (3 clear tiles over a ? block)
 		"X                                      X",
 		"X    PP                          PP    X",
 		"X  1 PP                          PP 2  X",
@@ -4589,11 +4595,11 @@ local RRR_LAYOUTS = {
 	castle = {
 		"X                                      X",
 		"X                                      X",
-		"X                                      X",
 		"X                  R                   X",
-		"X              S        S              X",
 		"X                                      X",
-		"X                 ====                 X",
+		"X              S        S              X",
+		"X                 ====                 X", --3 clear tiles over the ? blocks under it
+		"X                                      X",
 		"X              3        4              X",
 		"X            =====    =====            X",
 		"X  S               ??               S  X",
@@ -4614,12 +4620,84 @@ local RRR_LAYOUTS = {
 		"X              ==========              X",
 		"X                                      X",
 		"X         3                  4         X",
-		"X  S    =====   ?      ?   =====    S  X",
+		"X  S    ===== ?          ? =====    S  X", --the ? blocks stay out from under the platform (3 clear tiles over a ? block)
 		"X                  XX                  X",
 		"X                  XX                  X",
 		"X  1               XX               2  X",
 		"########################################",
 		"########################################",
+	},
+}
+
+--sudden death arenas (time up with more than one player left), 25x15, without ? blocks: no power-ups
+local RRR_SD_LAYOUTS = {
+	field = {
+		"X                       X",
+		"X                       X",
+		"X                       X",
+		"X                       X",
+		"X                       X",
+		"X                       X",
+		"X        =======        X",
+		"X                       X",
+		"X    1             2    X",
+		"X  =====         =====  X",
+		"X                       X",
+		"X        PP   PP        X",
+		"X 3      PP   PP      4 X",
+		"#########################",
+		"#########################",
+	},
+	cave = {
+		"XBBBBBBBBBBBBBBBBBBBBBBBX",
+		"X                       X",
+		"X                       X",
+		"X                       X",
+		"X                       X",
+		"X                       X",
+		"X        =======        X",
+		"X                       X",
+		"X    1             2    X",
+		"X  =====         =====  X",
+		"X                       X",
+		"X        PP   PP        X",
+		"X 3      PP   PP      4 X",
+		"#########################",
+		"#########################",
+	},
+	castle = {
+		"X                       X",
+		"X                       X",
+		"X                       X",
+		"X                       X",
+		"X                       X",
+		"X                       X",
+		"X        =======        X",
+		"X                       X",
+		"X    1             2    X",
+		"X  =====         =====  X",
+		"X                       X",
+		"X                       X",
+		"X 3                   4 X",
+		"###########LLL###########",
+		"###########LLL###########",
+	},
+	lab = {
+		"XXXXXXXXXXXXXXXXXXXXXXXXX",
+		"X                       X",
+		"X                       X",
+		"X                       X",
+		"X                       X",
+		"X                       X",
+		"X        =======        X",
+		"X                       X",
+		"X    1             2    X",
+		"X  =====         =====  X",
+		"X           X           X",
+		"X           X           X",
+		"X 3         X         4 X",
+		"#########################",
+		"#########################",
 	},
 }
 
@@ -4950,7 +5028,14 @@ local function rrr_newsource(path, looping)
 end
 
 --put back the star theme a music pack replaced
+local rrrx = {} --the newer helpers (a table: the file can only have 200 locals at once)
+rrrx.fakefast = nil --the song a made-up fast version was made for (see rrrx.ensurefastmusic)
+
 local function rrr_restoremusic()
+	if rrrx.fakefast then
+		music:unfakefast(rrrx.fakefast)
+		rrrx.fakefast = nil
+	end
 	if rrr_saved then
 		if rrr_saved.star then
 			music.loaded["starmusic"]:stop()
@@ -5642,6 +5727,21 @@ local function rrr_generatelayout(theme)
 	end
 	set(randomitem(spots), lowrow, "?")
 
+	--3 clear tiles over every ? block: with a platform any closer, a bot jumping from on top of the block
+	--gets pushed into the tiles and through the wall
+	for y = 1, H do
+		for x = 1, W do
+			if RRR_BLOCKS[grid[y][x]] then
+				for d = 1, 3 do
+					local c = get(x, y-d)
+					if c ~= " " and not c:match("%d") then
+						return nil
+					end
+				end
+			end
+		end
+	end
+
 	local rows = {}
 	for y = 1, H do
 		rows[y] = table.concat(grid[y])
@@ -5689,6 +5789,14 @@ local function rrr_arenaok(S)
 	for _, target in ipairs(targets) do
 		if not rrr_path(S, spawnsegs[1], target) or not rrr_path(S, target, spawnsegs[1]) then
 			return false
+		end
+	end
+	--3 clear tiles over every ? block, on the map as it's built (the generator checks its layout too)
+	for _, b in ipairs(S.blocks) do
+		for d = 1, 3 do
+			if rrr_solid(b.x, b.y - d) then
+				return false
+			end
 		end
 	end
 	return true
@@ -5992,6 +6100,9 @@ local function rrr_respawn(S, p)
 	local i = p.playernumber
 	if S.out[i] or S.over then
 		p.drawable = false
+		if S.out[i] then
+			S.viewdone[i] = true --the death animation is over: the viewport can go (rrrx.updateviews)
+		end
 		return
 	end
 	local spawn = S.spawns[i] or S.spawns[1]
@@ -6014,9 +6125,46 @@ local function rrr_respawn(S, p)
 	p.y = spawn.y - p.height
 	p.jumping = false
 	p.falling = true
-	p.controlsenabled = true
+	p.controlsenabled = not S.sdpending --(time up: everyone waits for sudden death)
 	p.active = true
 	makepoof(spawn.x - 0.5, spawn.y - 0.5, "makerpoof")
+end
+
+--a player who is out loses their viewport once their death animation is over, and the others move and resize into the
+--new layout (splitscreen_setviewplayers). The last viewport stays, it watches someone who's still in.
+function rrrx.updateviews(S)
+	if not splitscreenviewplayers then
+		return
+	end
+	local list, changed = {}, false
+	for _, pn in ipairs(splitscreenviewplayers) do
+		if S.out[pn] and S.viewdone[pn] then
+			changed = true
+		else
+			table.insert(list, pn)
+		end
+	end
+	if changed and #list > 0 then
+		splitscreen_setviewplayers(list)
+	end
+end
+
+--a viewport comes back (a person back in the battle with the konami code), in player order
+function rrrx.addview(S, i)
+	S.viewdone[i] = nil
+	if not splitscreenviewplayers then
+		return
+	end
+	local list = {}
+	for _, pn in ipairs(splitscreenviewplayers) do
+		if pn == i then
+			return
+		end
+		table.insert(list, pn)
+	end
+	table.insert(list, i)
+	table.sort(list)
+	splitscreen_setviewplayers(list)
 end
 
 ------------
@@ -6808,10 +6956,15 @@ local function rrr_konamirevive(S, i)
 		end
 	end
 	S.konami[i].used = true
-	mariolives[i] = RRR_KONAMI_LIVES
+	if S.suddendeath then
+		mariolives[i] = RRR_K.SD_LIVES
+	else
+		mariolives[i] = RRR_KONAMI_LIVES
+	end
 	if S.watch == i then
 		S.watch = nil
 	end
+	rrrx.addview(S, i)
 	rrr_respawn(S, objects["player"][i])
 	playsound(oneupsound)
 	rrr_banner(S, "p" .. i .. " is back!", 2)
@@ -6880,7 +7033,11 @@ local function rrr_drawhud(S)
 		end
 		properprintFbackground(second, (x+10)*scale, 18*scale)
 	end
-	if S.timeleft then
+	if S.suddendeath then
+		local s = "sudden death"
+		love.graphics.setColor(255, 90, 90)
+		properprintFbackground(s, (width*8 - #s*4)*scale, 30*scale)
+	elseif S.timeleft and not S.finalcount then --(the last seconds show as a big number instead, see rrrx.drawfinalcount)
 		local t = math.max(0, math.ceil(S.timeleft))
 		love.graphics.setColor(255, 255, 255)
 		if t <= 30 and S.timeleft > 0 and math.floor(S.timeleft*4) % 2 == 0 then
@@ -6896,34 +7053,61 @@ end
 --the timer's low time warning: below this, the battle music speeds up (if it has a fast version)
 local RRR_LOWTIME = 100
 
---the battle music has a fast version (song-fast.ogg next to a custom song, overworld-fast.ogg and so on for the built-in ones)
-local function rrr_hasfastmusic()
-	return custommusic and music.loaded[music:variant(custommusic, "-fast")] ~= nil
+--the battle music always has a fast version: song-fast.ogg next to a custom song (overworld-fast.ogg and so on for the
+--built-in ones), and a song without one gets one made up, the song itself 1.25x faster and higher (music:fakefast)
+function rrrx.ensurefastmusic()
+	if not custommusic or music.loaded[music:variant(custommusic, "-fast")] then
+		return
+	end
+	music:fakefast(custommusic, RRR_K.FAKEFAST_RATE)
+	rrrx.fakefast = custommusic --taken away again by rrr_restoremusic
 end
 
---with the timer below RRR_LOWTIME: the low time sound, then the fast music. Without a fast version the music just keeps going.
+--the low time sound, then the fast music (rrr_updatelowtime starts it once the sound is done)
+function rrrx.startlowtime(S)
+	rrrx.ensurefastmusic()
+	S.lowtime = {waiting = true}
+	stopmusic()
+	playsound(lowtimesound)
+	queuelowtime = true --nothing starts the music (a star for example) until the low time sound is done
+end
+
+--with the timer below RRR_LOWTIME, and in sudden death from "go!": the low time sound, then the fast music.
 --the game picks the fast music (and the fast star theme) from mariotime, which minigames don't count down themselves,
---so it follows the battle's timer from then on
+--so it follows the battle's timer from then on (sudden death has no timer, so it stays low)
 local function rrr_updatelowtime(S)
-	if not S.timeleft or S.over or S.starting then
+	if S.over or S.starting or S.sdpending then
 		return
 	end
-	if not S.lowtime then
-		if S.timeleft < RRR_LOWTIME and rrr_hasfastmusic() then
-			S.lowtime = {waiting = true}
-			mariotime = math.max(S.timeleft, 0.01)
-			stopmusic()
-			playsound(lowtimesound)
-			queuelowtime = true --nothing starts the music (a star for example) until the low time sound is done
+	if S.suddendeath then
+		mariotime = 1
+	elseif S.timeleft then
+		if not S.lowtime then
+			if S.timeleft < RRR_LOWTIME then
+				mariotime = math.max(S.timeleft, 0.01)
+				rrrx.startlowtime(S)
+			end
+			return
 		end
-		return
+		mariotime = math.max(S.timeleft, 0.01)
 	end
-	mariotime = math.max(S.timeleft, 0.01)
-	if S.lowtime.waiting and not lowtimesound:isPlaying() then
+	if S.lowtime and S.lowtime.waiting and not lowtimesound:isPlaying() then
 		S.lowtime.waiting = false
 		queuelowtime = false
 		updatemusicpriority() --the fast music, or the fast star theme if someone has a star
 	end
+end
+
+--under RRR_K.FINALCOUNT seconds the timer is a big number (rrrx.drawfinalcount), with a beep every time it changes
+function rrrx.updatefinalcount(S)
+	local n = nil
+	if S.timeleft and S.timeleft > 0 and S.timeleft < RRR_K.FINALCOUNT and not S.over then
+		n = math.ceil(S.timeleft)
+	end
+	if n and S.finalcount ~= n then
+		playsound(countdownbeepsound)
+	end
+	S.finalcount = n
 end
 
 local function rrr_updatecountdown(S)
@@ -6947,11 +7131,16 @@ local function rrr_updatecountdown(S)
 		playsound(countdowngosound)
 		for i = 1, RRR_PLAYERS do
 			local p = objects["player"][i]
-			if p then
+			if p and not S.out[i] then
 				p.controlsenabled = true
 			end
 		end
-		playmusic()
+		if S.suddendeath then
+			mariotime = 1
+			rrrx.startlowtime(S) --sudden death: the low time sound, then the fast music
+		else
+			playmusic()
+		end
 		return
 	end
 	local number = tostring(RRR_COUNTDOWN - math.floor(C.elapsed)) --3, then 2, then 1
@@ -6964,6 +7153,14 @@ local function rrr_updatecountdown(S)
 	end
 end
 
+--the big text in the middle of the screen: the countdown, and the last seconds of the timer
+function rrrx.drawbig(s, alpha)
+	local size = 3
+	love.graphics.setColor(255, 255, 255, alpha or 255)
+	properprintFbackground(s, (width*8 - utf8.len(s)*4*size)*scale, (height*8 - 5*size - 16)*scale, nil, nil, size)
+	love.graphics.setColor(255, 255, 255)
+end
+
 local function rrr_drawcountdown(S)
 	local C = S.countdown
 	if not (C and C.shown) or C.finished then
@@ -6973,15 +7170,19 @@ local function rrr_drawcountdown(S)
 	if C.shown == "go!" then
 		alpha = 255*math.max(0, math.min(1, (RRR_COUNTDOWN + 1 - C.elapsed)/0.3))
 	end
-	local size = 3
-	local s = C.shown
-	love.graphics.setColor(255, 255, 255, alpha)
-	properprintFbackground(s, (width*8 - utf8.len(s)*4*size)*scale, (height*8 - 5*size - 16)*scale, nil, nil, size)
-	love.graphics.setColor(255, 255, 255)
+	rrrx.drawbig(C.shown, alpha)
+end
+
+--the timer's last seconds, drawn like the countdown
+function rrrx.drawfinalcount(S)
+	if S.finalcount and not S.over then
+		rrrx.drawbig(tostring(S.finalcount))
+	end
 end
 
 local function rrr_drawoverlay(S)
 	rrr_drawcountdown(S)
+	rrrx.drawfinalcount(S)
 	local B = S.banner
 	if B then
 		local alpha = 255
@@ -7097,7 +7298,49 @@ local function rrr_endbattle(S, winner, knockout)
 	--the results screen comes once the battle clear theme is done (update)
 end
 
+--sudden death: what carries over from the battle into the sudden death arena (createmap reads it, the level is loaded again)
+rrrx.carry = nil
+
+--the fade to the sudden death arena: a new level, with the knockouts, who's out and the viewports carried over
+function rrrx.startsuddendeath(S)
+	startwarpfade(function()
+		if minigamestate ~= S or S.over or not minigameplaying then
+			return --the battle ended while the screen faded out (someone fell in a pit with their last life)
+		end
+		local views = {}
+		for _, pn in ipairs(splitscreenviewplayers or {}) do
+			table.insert(views, pn)
+		end
+		local konamiused = {}
+		for i = 1, RRR_PLAYERS do
+			konamiused[i] = S.konami[i].used
+		end
+		rrrx.carry = {kos = S.kos, out = S.out, outorder = S.outorder, konamiused = konamiused, views = views}
+		startlevel("minigame")
+	end, false, true)
+end
+
 local function rrr_timeup(S)
+	--more than one player still in: sudden death in a small arena without ? blocks, one life each
+	local stillin = 0
+	for i = 1, RRR_PLAYERS do
+		if not S.out[i] then
+			stillin = stillin + 1
+		end
+	end
+	if stillin > 1 then
+		S.sdpending = {t = 0}
+		S.finalcount = nil
+		rrr_banner(S, "time up!", RRR_K.SD_ANNOUNCE)
+		for i = 1, RRR_PLAYERS do
+			local p = objects["player"][i]
+			if p then
+				p.controlsenabled = false
+			end
+		end
+		return
+	end
+
 	--most lives left wins, then most knockouts, still a tie: draw
 	local best, bestlives, bestkos, tie = nil, -1, -1, false
 	for i = 1, RRR_PLAYERS do
@@ -7163,9 +7406,22 @@ addminigame({
 		S.battle = true
 		S.theme = theme
 		S.endbattle = rrr_endbattle
+		--sudden death: the battle's knockouts and who's out carry over (rrrx.startsuddendeath)
+		local carry = rrrx.carry
+		rrrx.carry = nil
 		--a new arena every time (the fixed one for the theme if the generator keeps failing)
 		local built = false
+		if carry then
+			--sudden death: a small fixed arena without ? blocks, so no power-ups
+			rrr_buildmap(S, theme, RRR_SD_LAYOUTS[theme.layout] or RRR_SD_LAYOUTS.field)
+			rrr_buildnavigation(S)
+			S.suddendeath = true
+			built = true
+		end
 		for try = 1, RRR_GEN_TRIES do
+			if built then
+				break
+			end
 			local layout = rrr_generatelayout(theme)
 			if layout then
 				rrr_buildmap(S, theme, layout)
@@ -7200,9 +7456,10 @@ addminigame({
 		S.out = {}
 		S.outorder = {}
 		S.lasthit = {}
+		S.viewdone = {} --players who are out and whose death animation is over (their viewport goes)
 		S.konami = {}
 		for i = 1, RRR_PLAYERS do
-			S.konami[i] = {progress = 0, held = {}, used = false}
+			S.konami[i] = {progress = 0, held = {}, used = carry ~= nil and carry.konamiused[i] == true}
 		end
 		local humans = {}
 		local humancount = opts.humans or 1
@@ -7222,8 +7479,23 @@ addminigame({
 			mariolives[i] = mariolivecount
 			mariosizes[i] = 1
 		end
-		if opts.timer then
+		if opts.timer and not carry then
 			S.timeleft = opts.timelimit or 300
+		end
+		if carry then
+			--sudden death: the players still in get one life each (and start small), the rest stay out
+			S.kos = carry.kos
+			S.out = carry.out
+			S.outorder = carry.outorder
+			S.score = rrr_humankos(S)
+			for i = 1, RRR_PLAYERS do
+				if S.out[i] then
+					mariolives[i] = 0
+					S.viewdone[i] = true
+				else
+					mariolives[i] = RRR_K.SD_LIVES
+				end
+			end
 		end
 
 		--split screen for every person (all bots: one screen that follows whoever is left)
@@ -7237,6 +7509,21 @@ addminigame({
 			splitscreenviewplayers = {}
 			for i = 1, RRR_PLAYERS do
 				table.insert(splitscreenviewplayers, i)
+			end
+		end
+		if carry then
+			--the viewports of the players still in (the last one stays even if its player is out, it watches)
+			local list = {}
+			for _, pn in ipairs(carry.views) do
+				if not S.out[pn] then
+					table.insert(list, pn)
+				end
+			end
+			if #list == 0 and carry.views[1] then
+				list = {carry.views[1]}
+			end
+			if #list > 0 then
+				splitscreenviewplayers = list
 			end
 		end
 		splitscreenviewtarget = rrr_viewtarget
@@ -7271,6 +7558,15 @@ addminigame({
 				if spawn.x > mapwidth/2 then
 					p.animationdirection = "left"
 				end
+				if S.out[i] then
+					--sudden death: out of the battle, as if their death animation just finished
+					p.dead = true
+					p.animation = "death"
+					p.animationmisc = nil
+					p.animationtimer = deathtotaltime + 1
+					p.drawable = false
+					p.active = false
+				end
 			end
 		end
 		--the countdown: nobody moves and no music until "go!"
@@ -7292,22 +7588,37 @@ addminigame({
 
 		rrr_updateblocks(S, dt)
 		rrr_updatekonami(S)
+		rrrx.updateviews(S)
 
-		if S.over then
+		if S.sdpending and not S.over then
+			--time up with more than one player still in: "time up!", "sudden death!", then the fade to its arena
+			local P = S.sdpending
+			P.t = P.t + dt
+			if not P.announced and P.t >= RRR_K.SD_ANNOUNCE then
+				P.announced = true
+				rrr_banner(S, "sudden death!", 99)
+			end
+			if not P.fading and P.t >= RRR_K.SD_DELAY then
+				P.fading = true
+				rrrx.startsuddendeath(S)
+			end
+		elseif S.over then
 			S.over.t = S.over.t + dt
 			if not S.knockoutend and rrr_updateclear(S, dt) and S.over.t > 1 and not S.finish then
 				minigame_finish(S.result, 0, false)
 			end
 		else
+			--(the timer only goes down while the battle is on: not once it's over, nor during the countdown)
 			if S.timeleft and not S.starting then
 				S.timeleft = S.timeleft - dt
+				rrrx.updatefinalcount(S)
 				if S.timeleft <= 0 then
 					S.timeleft = 0
 					rrr_timeup(S)
 				end
-				rrr_updatelowtime(S)
 			end
-			if not S.over then
+			rrr_updatelowtime(S)
+			if not S.over and not S.sdpending then
 				rrr_updatecombat(S, dt)
 			end
 		end

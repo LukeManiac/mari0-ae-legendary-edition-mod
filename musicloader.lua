@@ -11,6 +11,7 @@ music = {
 	list = {},
 	list_fast = {},
 	pitch = 1,
+	pitchmul = {}, --a song's own pitch on top of music.pitch (a made-up fast version, see music:fakefast)
 }
 
 local musicpath = "sounds/%s.ogg"
@@ -191,7 +192,7 @@ end
 function music:update()
 	for name, source in pairs(self.loaded) do
 		if source ~= false then
-			source:setPitch(self.pitch)
+			source:setPitch(self.pitch*(self.pitchmul[name] or 1))
 		end
 	end
 	if intromusic then
@@ -199,6 +200,33 @@ function music:update()
 			music:play(intromusic[2], nil, true)
 			intromusic = false
 		end
+	end
+end
+
+--a song without a fast version gets one: the song itself, played faster and higher (rate 1.25: 1.25x speed,
+--and 3.86 semitones up, the closest to 4 a single rate can get while keeping the speed)
+--returns the fast version's name; music:unfakefast takes it away again
+function music:fakefast(name, rate)
+	local fastname = self:variant(name, "-fast")
+	if self.loaded[fastname] or not love.filesystem.getInfo(name) then
+		return fastname --a real one (or nothing to make one from)
+	end
+	local source = love.audio.newSource(name, "stream")
+	source:setLooping(true)
+	self.pitchmul[fastname] = rate or 1.25
+	source:setPitch(self.pitch*self.pitchmul[fastname])
+	self.loaded[fastname] = source
+	return fastname
+end
+
+function music:unfakefast(name)
+	local fastname = self:variant(name, "-fast")
+	if self.pitchmul[fastname] then
+		if self.loaded[fastname] then
+			self.loaded[fastname]:stop()
+		end
+		self.loaded[fastname] = nil
+		self.pitchmul[fastname] = nil
 	end
 end
 

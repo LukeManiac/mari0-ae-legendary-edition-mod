@@ -24,6 +24,10 @@ splitscreencurves = {
 splitscreenviewplayers = nil
 splitscreenviewtarget = nil
 splitscreenviewhud = nil --function(view index, view, player number), drawn after the lives of a viewport
+--a change of splitscreenviewplayers made with splitscreen_setviewplayers: the viewports move and resize into the new layout
+--{from = {[player number] = {x, y, w, h, mul}}, t = 0 to 1, curve = a motion curve name}
+splitscreenlayoutanim = nil
+splitscreenlayouttime = 0.5
 
 function splitscreen_viewcount()
 	if splitscreenviewplayers then
@@ -62,6 +66,50 @@ function splitscreen_reset()
 	splitcamy = {}
 	splitscreenfade = {}
 	splitscreenwasactive = false
+	splitscreenlayoutanim = nil
+end
+
+--how much more of the level a viewport shows than its size: the ones shaped like the screen (2x2 for example)
+--are drawn at half scale, so they show twice as much (see splitscreen_beginview)
+function splitscreen_rangemul(view)
+	if view.rangemul then
+		return view.rangemul
+	end
+	local gameaspect = (width * 16) / (height * 16)
+	local viewaspect = view.w / view.h
+	if math.abs(viewaspect - gameaspect) < 1e-6 and view.w < width*16 then
+		return scale / math.max(scale / 2, 1)
+	end
+	return 1
+end
+
+--a new list of players with a viewport (a minigame taking away a player who's out, for example).
+--Every viewport keeps its camera and fade, and they all move and resize into the new layout with a random motion curve;
+--one that's new grows out of the middle of where it goes
+function splitscreen_setviewplayers(list)
+	local old = getsplitscreenviews()
+	local from, state = {}, {}
+	if old then
+		for i, v in ipairs(old) do
+			local pn = splitscreen_viewplayer(i)
+			from[pn] = {x = v.x, y = v.y, w = v.w, h = v.h, mul = splitscreen_rangemul(v)}
+			state[pn] = {cx = splitcamx[i], cy = splitcamy[i], fade = splitscreenfade[i]}
+		end
+	end
+	splitscreenviewplayers = list
+	splitcamx, splitcamy, splitscreenfade = {}, {}, {}
+	for i, pn in ipairs(list) do
+		local s = state[pn]
+		if s then
+			splitcamx[i], splitcamy[i], splitscreenfade[i] = s.cx, s.cy, s.fade
+		end
+	end
+	splitscreenviewscache = nil
+	if old then
+		splitscreenlayoutanim = {from = from, t = 0, curve = random_motion_curve()}
+	else
+		splitscreenlayoutanim = nil
+	end
 end
 
 function splitscreenactive()
@@ -134,12 +182,31 @@ function getsplitscreenviews()
 		views[3] = {x = 0, y = H/2, w = W/2, h = H/2, lives = "centerbottom"}
 		views[4] = {x = W/2, y = H/2, w = W/2, h = H/2, lives = "centerbottom"}
 	end
+
+	--a layout change: every viewport on its way from where it was to where it goes
+	local A = splitscreenlayoutanim
+	if A then
+		local k = motion_curve(A.t, A.curve, true, false, true, true)
+		for i, v in ipairs(views) do
+			local target = {x = v.x, y = v.y, w = v.w, h = v.h}
+			local tmul = splitscreen_rangemul(target)
+			local f = A.from[splitscreen_viewplayer(i)] or {x = v.x + v.w/2, y = v.y + v.h/2, w = 0, h = 0, mul = tmul}
+			v.x = lerp(f.x, target.x, k)
+			v.y = lerp(f.y, target.y, k)
+			v.w = math.max(1, lerp(f.w, target.w, k))
+			v.h = math.max(1, lerp(f.h, target.h, k))
+			v.rangemul = lerp(f.mul, tmul, k)
+		end
+	end
 	return views
 end
 
 function getsplitscreenviewscached()
 	if not splitscreenactive() then
 		return nil
+	end
+	if splitscreenlayoutanim then
+		return getsplitscreenviews() --they change every frame
 	end
 	local c = splitscreenviewscache
 	if not c or c.players ~= players or c.count ~= splitscreen_viewcount() or c.horizontal ~= HorizontalSplitScreen or c.width ~= width or c.height ~= height then
@@ -156,6 +223,15 @@ function splitscreen_update(dt)
 	end
 	local resnap = not splitscreenwasactive
 	splitscreenwasactive = true
+
+	local A = splitscreenlayoutanim
+	if A then
+		A.t = A.t + dt/splitscreenlayouttime
+		if A.t >= 1 then
+			splitscreenlayoutanim = nil
+			splitscreenviewscache = nil
+		end
+	end
 
 	for i = 1, #views do
 		local p = splitscreen_viewtarget(i)
@@ -377,25 +453,42 @@ function splitscreen_beginview(split, view)
 	local renderscale = scale
 	local upscale = 1
 	local viewrangemul = 1
-	-- viewports matching the game window aspect (e.g. 2x2) render at half scale and stay there
-	local gameaspect = (width * 16) / (height * 16)
-	local viewaspect = view.w / view.h
-	if math.abs(viewaspect - gameaspect) < 1e-6 and view.w < width*16 then --(a single full screen viewport stays at full scale)
-		renderscale = math.max(scale / 2, 1)
-		viewrangemul = basescale / renderscale
-		-- do not scale back up
+	if view.rangemul then
+		--a layout change: the range eases between the old and the new layout's
+		viewrangemul = view.rangemul
+		renderscale = basescale / viewrangemul
+	else
+		-- viewports matching the game window aspect (e.g. 2x2) render at half scale and stay there
+		local gameaspect = (width * 16) / (height * 16)
+		local viewaspect = view.w / view.h
+		if math.abs(viewaspect - gameaspect) < 1e-6 and view.w < width*16 then --(a single full screen viewport stays at full scale)
+			renderscale = math.max(scale / 2, 1)
+			viewrangemul = basescale / renderscale
+			-- do not scale back up
+		end
 	end
 	-- canvas stays full viewport size so the extra view range fills the slot
-	local cw, ch = math.floor(view.w * basescale), math.floor(view.h * basescale)
+	local cw, ch = math.max(1, math.floor(view.w * basescale)), math.max(1, math.floor(view.h * basescale))
 	local sc = splitscreencanvases[split]
-	if (not sc) or sc.w ~= cw or sc.h ~= ch then
-		sc = {w = cw, h = ch, canvas = love.graphics.newCanvas(cw, ch), upscale = upscale, viewrangemul = viewrangemul}
+	--during a layout change the size changes every frame: one screen-sized canvas for the whole change, only part of it is shown
+	local canvasw, canvash = cw, ch
+	if splitscreenlayoutanim then
+		if sc and sc.w >= cw and sc.h >= ch then
+			canvasw, canvash = sc.w, sc.h
+		else
+			canvasw = math.max(cw, math.floor(width*16*basescale))
+			canvash = math.max(ch, math.floor(height*16*basescale))
+		end
+	end
+	if (not sc) or sc.w ~= canvasw or sc.h ~= canvash then
+		sc = {w = canvasw, h = canvash, canvas = love.graphics.newCanvas(canvasw, canvash), upscale = upscale, viewrangemul = viewrangemul}
 		sc.canvas:setFilter("nearest", "nearest")
 		splitscreencanvases[split] = sc
 	else
 		sc.upscale = upscale
 		sc.viewrangemul = viewrangemul
 	end
+	sc.vw, sc.vh = cw, ch --the part of the canvas the viewport shows
 	splitscreenprevcanvas = love.graphics.getCanvas()
 	love.graphics.origin()
 	love.graphics.setCanvas({sc.canvas, stencil = true})
@@ -421,7 +514,14 @@ function splitscreen_endview(split, view)
 	local x, y = view.x*scale, view.y*scale
 	love.graphics.setColor(255, 255, 255, 255)
 	local up = sc.upscale or 1
-	love.graphics.draw(sc.canvas, x, y, 0, up, up)
+	if sc.vw and (sc.vw ~= sc.w or sc.vh ~= sc.h) then
+		--a bigger canvas than the viewport (a layout change): only the viewport's part of it
+		sc.quad = sc.quad or love.graphics.newQuad(0, 0, 1, 1, 1, 1)
+		sc.quad:setViewport(0, 0, sc.vw, sc.vh, sc.w, sc.h)
+		love.graphics.draw(sc.canvas, sc.quad, x, y, 0, up, up)
+	else
+		love.graphics.draw(sc.canvas, x, y, 0, up, up)
+	end
 
 	--dead players fade to black
 	local f = splitscreenfade[split]

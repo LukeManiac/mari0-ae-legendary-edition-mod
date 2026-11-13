@@ -405,7 +405,7 @@ A four-player battle minigame inspired by the battle mode of Super Mario 4 Jugad
 * Every battle gets a new arena in its theme's style, 40 tiles wide and 30 tiles high, with the camera scrolling up and down. Both halves of the arena mirror each other, so it's fair.
 * The Overworld has pipes, hills, bushes, trees and clouds. The Underground has a brick ceiling and pipes. The Castle has lava pits. The Portal test chamber has a pillar in the middle.
 * Platforms are stacked up to near the top of the arena, each one 3 or 4 tiles above the last. The rare block sits over the highest platform in the middle.
-* Every arena is checked before the battle starts: every spawn has ground under it, every ? block can be hit from below, and there is a route to every spawn and block (the same routes the bots use). If 40 arenas in a row fail the check, the theme's fixed arena is used instead.
+* Every arena is checked before the battle starts: every spawn has ground under it, every ? block can be hit from below, there is a route to every spawn and block (the same routes the bots use), and every ? block has at least 3 empty tiles above it. With a platform any closer, a bot jumping from on top of the block could get pushed into the tiles and through the wall. If 40 arenas in a row fail the check, the theme's fixed arena is used instead.
 
 **? Blocks**
 
@@ -428,12 +428,19 @@ A four-player battle minigame inspired by the battle mode of Super Mario 4 Jugad
 
 **Lives, knockouts and winning**
 
-* A player who loses their last life is out. Their viewport follows someone who's still in the battle and shows "watching pN".
+* A player who loses their last life is out. Once their death animation is over, their viewport is removed, and the other viewports slide and resize into the new layout with the same random motion curves as the pause menu. The last viewport is never removed: if its player is out, it follows someone who's still in the battle and shows "watching pN".
 * A knockout counts for the player who hit you, if you die within 4 seconds of their hit (falling into a pit, for example). The HUD shows every player's lives and knockouts, and marks the bots with "CPU".
-* A human player who is out can type the Konami code with their own controls to come back with 3 lives, once per battle: **Up, Up, Down, Down, Left, Right, Left, Right, Run, Jump**.
+* A human player who is out can type the Konami code with their own controls to come back with 3 lives (1 in sudden death), once per battle: **Up, Up, Down, Down, Left, Right, Left, Right, Run, Jump**. Their viewport comes back with them.
 * When only one player is left, everything freezes for 3 seconds, except the players who are still dying. Sounds that are already playing carry on, but nothing new plays and nothing is stopped. Then the game fades to the results screen, which says "pN wins!" and plays the battle clear theme: `levelend.ogg`, or the music pack's own one (see **Custom Music** below), with its `-intro` first if it has one. The results screen stays up until the theme ends, and for at least 4 seconds. A battle clear theme longer than 15 seconds gets cut off.
-* When the timer runs out, "time up!" shows for a moment. The player with the most lives left wins (being alive at that moment beats waiting to respawn), then the one with the most knockouts. If it's still a tie, the battle is a draw. Either way, the music stops and the battle clear theme plays in the arena. Once it ends, the game fades to the results screen, which says "pN wins!" or "draw!" and stays up for 4 seconds without a sound.
-* When the timer drops below 100 and the battle music has a fast version (`song-fast.ogg` next to a custom song, or the built-in `-fast` versions), the music stops, `lowtimesound` plays, and the fast version takes over as soon as the sound ends (with its `-fastintro` if it has one). The star theme speeds up too. Without a fast version, the normal music just keeps playing.
+* With less than 5 seconds left, the timer turns into a big number in the middle of the screen, drawn the same way as the countdown at the start, and `countdownbeepsound` plays every time it changes. The timer stops as soon as the battle is over.
+* When the timer runs out with more than one player still in, it's **sudden death**:
+  * "time up!" shows, then "sudden death!" 1.5 seconds later. Nobody can move in the meantime.
+  * After 3 seconds the game fades to a small 25x15 arena in the same theme. It has no ? blocks, so there are no power-ups.
+  * Only the players who were still in take part. Each one starts small with 1 life, and everyone's knockouts carry over.
+  * After the 3-2-1-go countdown, `lowtimesound` plays, then the fast music. The HUD shows "sudden death" instead of the timer.
+  * The last one standing wins, the same way as above.
+* If the timer runs out with fewer than two players still in, the player with the most lives left wins (being alive at that moment beats waiting to respawn), then the one with the most knockouts. If it's still a tie, the battle is a draw. Either way, the music stops and the battle clear theme plays in the arena. Once it ends, the game fades to the results screen, which says "pN wins!" or "draw!" and stays up for 4 seconds without a sound.
+* When the timer drops below 100, the music stops, `lowtimesound` plays, and the fast version of the battle music takes over as soon as the sound ends (with its `-fastintro` if it has one). The star theme speeds up too. The fast version is `song-fast.ogg` next to a custom song, or one of the built-in `-fast` versions. A song without one gets one made up: the song itself played 1.25 times faster, which also raises it by just under 4 semitones (LÖVE can't change the speed and the pitch separately).
 * The score is every human player's knockouts added up. Bots' knockouts don't count (if only bots played, it's the winner's knockouts). It's kept up to date during the battle, so quitting from the pause menu can save it. The victory screen labels it "knockouts".
 
 **Custom Music**
