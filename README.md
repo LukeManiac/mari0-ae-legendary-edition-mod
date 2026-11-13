@@ -505,7 +505,8 @@ rivalrumbleroyalemusic/
 * A minigame can play its own jingle in the game and then show a silent results screen for a set number of seconds (`resultsilent`).
 * A minigame can end with a silent freeze: the game stands still, sounds that are already playing carry on, and no new sounds play until the results screen.
 * A minigame can play its own music on the results screen (`resultmusic`), and the screen stays up for as long as the minigame says.
-* Quitting a minigame from the pause menu, to the menu or to the desktop, now asks "save highscore?" once you confirm. **Yes** saves your score and then quits, **No** quits without saving it, and **Cancel** closes both prompts and takes you back to the pause menu. Escape takes you back to the quit prompt.
+* Quitting a minigame from the pause menu, to the menu or to the desktop, now asks "save highscore?" once you confirm. **Yes** saves your score and then quits, **No** quits without saving it, and **Cancel** closes both prompts and takes you back to the pause menu. Escape takes you back to the quit prompt. With a score of 0 there's nothing to save, so the game quits straight away without asking.
+* Scores of 0 are never saved. They're also removed from `alesans_entities/minigame_data.json` whenever it's read, and the file is rewritten without them.
 * Words in a minigame's description that are longer than a line (like a long folder name) are now split over several lines, so they don't run under the scrollbar.
 
 #### 🖥️ Splitscreen

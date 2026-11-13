@@ -236,13 +236,17 @@ function minigame_getdata()
 		local ok, t = pcall(function()
 			return JSON:decode(love.filesystem.read(MINIGAME_DATA_FILE))
 		end)
+		local removedzeros = false
 		if ok and type(t) == "table" then
 			for name, scores in pairs(t) do
 				if type(name) == "string" and type(scores) == "table" then
 					local clean = {}
 					for i = 1, #scores do
-						if tonumber(scores[i]) then
-							table.insert(clean, tonumber(scores[i]))
+						local v = tonumber(scores[i])
+						if v == 0 then
+							removedzeros = true --scores of 0 are never kept
+						elseif v then
+							table.insert(clean, v)
 						end
 					end
 					minigamedata[name] = clean
@@ -250,6 +254,9 @@ function minigame_getdata()
 			end
 		else
 			print("minigame_data.json could not be read, starting fresh")
+		end
+		if removedzeros then
+			minigame_savedata() --the file loses its 0s too
 		end
 	end
 	return minigamedata
@@ -285,8 +292,10 @@ function minigame_savedata()
 	local out = {"{"}
 	for i, name in ipairs(order) do
 		local scores = {}
-		for j, v in ipairs(data[name]) do
-			scores[j] = tostring(math.floor(v) == v and math.floor(v) or v)
+		for _, v in ipairs(data[name]) do
+			if v ~= 0 then --scores of 0 are never saved
+				table.insert(scores, tostring(math.floor(v) == v and math.floor(v) or v))
+			end
 		end
 		table.insert(out, "\t" .. jsonstring(name) .. ": [" .. table.concat(scores, ", ") .. "]" .. (i < #order and "," or ""))
 	end
@@ -330,11 +339,14 @@ function minigame_recordscore()
 		end
 	end
 	local score = math.floor(S.score or 0)
-	table.insert(data[name], score)
 	minigameresult = {score = score, highscore = (score > 0 and (best == nil or score > best))}
 	if minigamecurrent.title then
 		minigameresult.title = minigamecurrent.title(S, score)
 	end
+	if score == 0 then
+		return --a score of 0 isn't saved
+	end
+	table.insert(data[name], score)
 	minigame_savedata()
 end
 
@@ -1159,6 +1171,9 @@ end
 function minigame_canrecordscore()
 	if not (minigameplaying and minigamestate and minigamecurrent) then
 		return false
+	end
+	if math.floor(minigamestate.score or 0) == 0 then
+		return false --a score of 0 isn't saved, so there's nothing to ask
 	end
 	return not minigamestate.recorded
 end
