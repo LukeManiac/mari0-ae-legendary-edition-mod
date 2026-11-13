@@ -680,6 +680,11 @@ multiplayerdoorwait = 1
 growtime = 0.9
 shrinktime = 0.9
 growframedelay = 0.08
+--the modernsizechangeanimation nitpick (Super Mario Maker 2 style): each part of the animation is this long
+modernsizechangeparttime = 1/8
+modernsizegrowscales = {0.75, 0.625, 0.875, 0.75, 1} --small type to big type: the sprite's height, part by part (then it ends)
+modernsizeshrinkscales = {0.75, 0.875, 0.625, 0.75, 0.5} --big type to small type (then it ends on the small sprite)
+modernsizesuitparts = 5 --big type to big type: new, old, new, old, new (it ends as soon as the last one is reached)
 shrinkframedelay = 0.08
 invincibletime = 3.2
 invincibletime2 = 2

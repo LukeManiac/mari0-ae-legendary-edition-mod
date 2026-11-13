@@ -1184,7 +1184,9 @@ local nitpickkeys = {
 	"probabilitypasser",
 	"immortalcombometer",
 	"removecooldowns",
-	"classicspeedupfastmusic"
+	"classicspeedupfastmusic",
+	"modernsizechangeanimation",
+	"noairspeedcap"
 }
 
 function generatenitpicksfile()

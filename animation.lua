@@ -1030,7 +1030,7 @@ function animation:update(dt)
 				end
 				if v[3] == "everyone" then
 					for i = 1, players do
-						if objects["player"][i].animation ~= "grow1" and objects["player"][i].animation ~= "grow2" and objects["player"][i].animation ~= "shrink" then
+						if objects["player"][i].animation ~= "grow1" and objects["player"][i].animation ~= "grow2" and objects["player"][i].animation ~= "shrink" and objects["player"][i].animation ~= "modernsize" then
 							objects["player"][i]:star()
 							objects["player"][i].startimer = (mariostarduration-time)
 						end
@@ -1038,7 +1038,7 @@ function animation:update(dt)
 				else
 					local i = tonumber(string.sub(v[3], -1))
 					if objects["player"][i] then
-						if objects["player"][i].animation ~= "grow1" and objects["player"][i].animation ~= "grow2" and objects["player"][i].animation ~= "shrink" then
+						if objects["player"][i].animation ~= "grow1" and objects["player"][i].animation ~= "grow2" and objects["player"][i].animation ~= "shrink" and objects["player"][i].animation ~= "modernsize" then
 							objects["player"][i]:star()
 							objects["player"][i].startimer = (mariostarduration-time)
 						end

@@ -1841,6 +1841,23 @@ function mario:update(dt)
 		
 		return
 	
+	elseif self.animation == "modernsize" then
+		self.animationtimer = self.animationtimer + dt
+		local part = math.floor(self.animationtimer/modernsizechangeparttime) + 1
+		local M = self.modernsize
+		if not M.settled then
+			--the rest of the frame the change happened in may have moved the player a little: it stays where it ended up
+			M.settled = true
+			local dx, dy = self.x - M.shown.x, self.y - M.shown.y
+			M.from.x, M.from.y = M.from.x + dx, M.from.y + dy
+			M.to.x, M.to.y = M.to.x + dx, M.to.y + dy
+		end
+		if part > self:modernsizeparts() then
+			self:endmodernsize()
+		else
+			self:modernsizeframe(part, true)
+		end
+		return
 	elseif self.animation == "shrink" then
 		self.animationtimer = self.animationtimer + dt
 		--set frame lol
@@ -2984,8 +3001,12 @@ function mario:movement(dt)
 	--HORIZONTAL MOVEMENT
 	--minigames can hold run for the movement only (custom character run animations aren't triggered)
 	local runningkey = runkey(self.playernumber) or self.minigameforcerun
-	--minigames can lift the walking speed cap, so maxrunspeed can always be reached
-	local walkspeedcap = self.minigamenowalkcap and maxrunspeed or maxwalkspeed
+	--running in the air below walking speed is capped at walking speed (SMB1). Minigames and the noairspeedcap nitpick
+	--lift the cap, so maxrunspeed can always be reached in the air, like in Super Mario Maker 2
+	local walkspeedcap = maxwalkspeed
+	if self.minigamenowalkcap or NoAirSpeedCap then
+		walkspeedcap = maxrunspeed
+	end
 	local mariojumpkey = jumpkey(self.playernumber)
 	local mariorightkey = rightkey(self.playernumber)
 	local marioleftkey = leftkey(self.playernumber)
@@ -3676,6 +3697,9 @@ function mario:setquad(anim, s)
 		end
 	end
 	local animationstate = anim or self.animationstate
+	if not s and self.modernsize and self.modernsize.showsize then
+		s = self.modernsize.showsize --the modern size change animation: the sheet that's showing, not the new size
+	end
 	local size = s or self.size
 	local t = self.characterdata
 	
@@ -4215,6 +4239,32 @@ function mario:grow(update)
 		return
 	end
 	
+	--the modernsizechangeanimation nitpick: Super Mario Maker 2 style (see mario:startmodernsize)
+	local target
+	if self.size > 2 then
+		target = update
+	elseif ((self.size == 1 and (not update or (update == 3 and (not mariomakerphysics)))) or (self.size == 2 and not update)) and update ~= -1 and update ~= 8 and update ~= 12 and update ~= 16 then
+		target = self.size + 1
+	else
+		target = update or 2
+	end
+	if target and self:usesmodernsize(self.size, target) then
+		local from = self:sizesnapshot()
+		local blinking = false
+		if self.animation == "invincible" then
+			blinking = self.animationtimer
+		end
+		self.sizechange = {duck = self.ducking, blinking = blinking}
+		self.size = target
+		self:setsize(target)
+		self.invincible = false
+		self:startmodernsize(from, false)
+		if self.size ~= 6 and self.size ~= 9 and not raccoonplaning(self) then
+			raccoonplanesound:stop() --stops raccoon flying sound
+		end
+		return
+	end
+
 	if self.size > 2 then
 		if update then
 			self.size = update
@@ -4263,6 +4313,156 @@ end
 
 --a grow or shrink animation is over: the player ducks again if they were ducking (and the new size can duck),
 --and the blinking after a hit goes on where it was if it was going when they grew
+--MODERN SIZE CHANGE ANIMATION (the modernsizechangeanimation nitpick, Super Mario Maker 2 style), in parts of
+--modernsizechangeparttime with the game frozen:
+-- small type to big type (small to big, tiny to small, small to hammer...): the new sprite, scaled from the bottom of the
+--  hitbox through modernsizegrowscales, then it ends
+-- big type to small type (big to small, small to tiny, hammer to small...): the old sprite, scaled from the bottom of the
+--  hitbox through modernsizeshrinkscales, then it ends on the new (small) sprite
+-- big type to big type (big to fire, fire to hammer, hammer to big...): new, old, new, old (sprite and colours), and it
+--  ends as soon as the last new one (part modernsizesuitparts) is reached
+--The pose (quad) doesn't reset: every part shows the same pose on that part's sprite sheet. Hats are drawn from the
+--sprite's centre (game.lua, drawplayer), so they scale with it from the same point
+
+--small types are tiny and small, everything else is a big type
+function mario:sizerank(size)
+	if size == -1 then
+		return 0
+	elseif size == 1 then
+		return 1
+	end
+	return 2
+end
+
+--whether a change between these sizes gets the modern animation (Mega Mario and classic huge Mario keep their own)
+function mario:usesmodernsize(from, to)
+	if not ModernSizeChangeAnimation or minigameplaying or bigmario or self.characterdata.health then
+		return false
+	end
+	if from == to or from == 8 or to == 8 or from == 16 or to == 16 then
+		return false
+	end
+	return true
+end
+
+--how the player looks (and where the hitbox is) right now
+function mario:sizesnapshot()
+	return {size = self.size, graphic = self.graphic, colors = self.colors, basecolors = self.basecolors,
+		customcolors = self.customcolors, quadcenterX = self.quadcenterX, quadcenterY = self.quadcenterY,
+		offsetX = self.offsetX, offsetY = self.offsetY, x = self.x, y = self.y, width = self.width, height = self.height,
+		ducking = self.ducking}
+end
+
+--shows a snapshot, in the current pose. scaley: the sprite's height, scaled from the bottom of the hitbox
+function mario:applysizesnapshot(s, scaley)
+	self.graphic = s.graphic
+	self.colors = s.colors
+	self.basecolors = s.basecolors
+	self.customcolors = s.customcolors
+	self.quadcenterX = s.quadcenterX
+	self.quadcenterY = s.quadcenterY
+	self.offsetX = s.offsetX
+	self.offsetY = s.offsetY
+	self.x = s.x
+	self.y = s.y
+	self.width = s.width
+	self.height = s.height
+	self.ducking = s.ducking
+	self:setquad(nil, s.size)
+	self.sizechangescaley = scaley
+	if scaley and self.gravitydir == "down" then
+		--the sprite's centre moves to the row that's drawn at the bottom of the hitbox (it's drawn in the same place).
+		--Objects are drawn half a tile up (offsetY's 8), so the hitbox bottom is drawn at (y + height)*16 - 8
+		local shoeadd = 0
+		if self.shoeoffsetY and (not self.ducking) and (not self.clearpipe) then
+			shoeadd = self.shoeoffsetY
+		end
+		self.quadcenterY = self.quadcenterY + self.height*16 + self.offsetY + shoeadd - 8
+		self.offsetY = 8 - self.height*16 - shoeadd
+	end
+end
+
+--from: a snapshot of the player before the change (the player is already the new size). hit: blinking afterwards
+function mario:startmodernsize(from, hit)
+	local to = self:sizesnapshot()
+	local kind = "suit"
+	if self:sizerank(to.size) > self:sizerank(from.size) then
+		kind = "up"
+	elseif self:sizerank(to.size) < self:sizerank(from.size) then
+		kind = "down"
+	end
+	self.modernsize = {from = from, to = to, kind = kind, hit = hit, part = 0}
+	self.animation = "modernsize"
+	self.animationtimer = 0
+	self.drawable = true
+	noupdate = true
+	self:modernsizeframe(1)
+end
+
+--the new size's look changed after the animation started (a custom power-up's colours)
+function mario:modernsizesettarget()
+	local M = self.modernsize
+	if not M then
+		return
+	end
+	M.to.colors, M.to.basecolors, M.to.customcolors = self.colors, self.basecolors, self.customcolors
+	local part = M.part
+	M.part = 0
+	self:modernsizeframe(part)
+end
+
+--how many parts the animation shows before it ends
+function mario:modernsizeparts()
+	local M = self.modernsize
+	if M.kind == "up" then
+		return #modernsizegrowscales
+	elseif M.kind == "down" then
+		return #modernsizeshrinkscales
+	end
+	return modernsizesuitparts - 1 --(reaching the last one ends it)
+end
+
+--force: show the part again even if it's already showing (the rest of the frame a hit happened in can change the pose,
+--move the player or pick a quad for the new size, see mario:update)
+function mario:modernsizeframe(part, force)
+	local M = self.modernsize
+	if M.part == part and not force then
+		return
+	end
+	M.part = part
+	local snap, scaley
+	if M.kind == "up" then
+		snap, scaley = M.to, modernsizegrowscales[part]
+	elseif M.kind == "down" then
+		snap, scaley = M.from, modernsizeshrinkscales[part]
+	elseif part % 2 == 1 then
+		snap = M.to --new first
+	else
+		snap = M.from
+	end
+	M.showsize = snap.size --setquad picks quads for this sheet while the animation plays
+	M.shown = snap
+	self:applysizesnapshot(snap, scaley)
+end
+
+function mario:endmodernsize()
+	local M = self.modernsize
+	M.showsize = nil
+	self.modernsize = nil
+	self:applysizesnapshot(M.to)
+	self.sizechangescaley = nil
+	noupdate = false
+	if M.hit then
+		self.animation = "invincible"
+		self.invincible = true
+		self.animationtimer = invincibletime - invincibletime2
+	else
+		self.animation = false
+	end
+	self.drawable = true
+	self:endsizechange()
+end
+
 function mario:endsizechange()
 	local c = self.sizechange
 	self.sizechange = nil
@@ -4308,6 +4508,10 @@ function mario:shrink()
 	playsound(shrinksound)
 	
 	if mariomakerphysics and self.size > 2 and self.size ~= 12 and self.size ~= 8 then --shrink to big mario
+		local from = nil
+		if self:usesmodernsize(self.size, 2) then
+			from = self:sizesnapshot()
+		end
 		self.size = 2
 		self:setsize(2)
 		self.basecolors = mariocolors[self.playernumber]
@@ -4324,8 +4528,24 @@ function mario:shrink()
 		end
 		self.fireenemy = false
 		self.invincible = true
+		if from then
+			self:startmodernsize(from, true) --old and new suit take turns, then the blinking
+			return
+		end
 		self.animationtimer = invincibletime - invincibletime2
 		self.animation = "invincible"
+		return
+	end
+	
+	if self:usesmodernsize(self.size, 1) and not self.largeshrink then
+		--the old sprite shrinks down, then the small one, then the blinking (see mario:startmodernsize)
+		local from = self:sizesnapshot()
+		self.sizechange = {duck = wasducking}
+		self.size = 1
+		self:setsize(1)
+		self.invincible = true
+		self.fireenemy = false
+		self:startmodernsize(from, true)
 		return
 	end
 	
@@ -6582,6 +6802,11 @@ function mario:globalcollide(a, b)
 			return true
 		elseif b.makesmariogrow then
 			local oldfireenemy = self.fireenemy
+			--modernsizechangeanimation: a fire player only gets an animation when the power-up has its own colours
+			local before = nil
+			if self.size == 3 and b.makesmariocolor and self:usesmodernsize(1, 3) and self.animation ~= "modernsize" then
+				before = self:sizesnapshot()
+			end
 			if tonumber(b.makesmariogrow) then
 				self:grow(b.makesmariogrow)
 			else
@@ -6599,6 +6824,11 @@ function mario:globalcollide(a, b)
 						self.customcolors = false
 					end
 				--end
+				if self.animation == "modernsize" then
+					self:modernsizesettarget() --it ends with the power-up's colours
+				elseif before and self.size == 3 then
+					self:startmodernsize(before, false) --fire to fire with new colours: old and new take turns
+				end
 			end
 			b.marioused = true
 			return true

@@ -368,6 +368,8 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `immortalcombometer`: The bonus meter in Boo Baffler Bash always stays full.
 - `removecooldowns`: The ? blocks in Rival Rumble Royale have no cooldown, so every hit gives an item.
 - `classicspeedupfastmusic`: In Rival Rumble Royale, a song without a fast version is just played faster, which also makes it higher.
+- `modernsizechangeanimation`: Powering up and down uses a Super Mario Maker 2 style animation instead of the classic one.
+- `noairspeedcap`: Holding run in the air speeds you up to full running speed, even if you jumped from below walking speed.
 
 ---
 
@@ -528,6 +530,21 @@ rivalrumbleroyalemusic/
 * In normal levels, the fast music now starts as soon as the low time sound ends, instead of after a fixed wait of about 3 seconds that only matched the default sound. It also starts while the timer is stopped, in a pipe for example.
 * Custom music's fast version can now have its own intro, including a mappack's `music` folder and `music.ogg`/`music1.ogg` files, in `.ogg` or `.mp3`. `song-fastintro.ogg` (or `song-introfast.ogg`) plays once before `song-fast.ogg` when the time runs low, the same way `song-intro.ogg` plays before `song.ogg`. Fast intros don't show up as separate songs in the editor's music list. Stopping the music while an intro is playing now stops the intro too.
 
+#### 🍄 Modern Size Change Animation
+
+A new nitpick, `modernsizechangeanimation`, swaps the classic power-up and power-down animations for Super Mario Maker 2 style ones. The game freezes while it plays, the same as before. **Generate Nitpicks File** adds it to an existing file.
+
+* The animation plays in parts of 1/8 of a second each (`modernsizechangeparttime` in `variables.lua`). Your pose doesn't reset: every part shows the pose you were in, on that part's sprite sheet. Hats scale along with you from the same point, so they stay on your head.
+* **Small type to big type** (small to big, tiny to small, small to hammer and so on): the new sprite is squashed and stretched from the bottom of your hitbox, at 0.75, 0.625, 0.875, 0.75 and 1 times its height, and the animation ends after the last one (`modernsizegrowscales`).
+* **Big type to small type** (big to small, small to tiny, hammer to small and so on): the old sprite goes through 0.75, 0.875, 0.625, 0.75 and 0.5 times its height from the bottom of your hitbox, then the animation ends on the small sprite (`modernsizeshrinkscales`). Getting hit then gives you the usual blinking.
+* **Big type to big type** (big to fire, fire to hammer, hammer to boomerang, fire to big and so on): the new and old sprite sheets and colours take turns: new, old, new, old, and the animation ends as soon as it reaches the last new one (`modernsizesuitparts`). Getting hit as a power-up in Mari0-Maker physics, which drops you to big, plays this too.
+* A custom power-up that gives you a fire enemy plays the big-to-big animation into its own colours. If you're already fire and it has no colours of its own, you get the power straight away, without an animation or a freeze.
+* Mega Mario, classic huge Mario and characters with health keep their own effects, and minigames keep their instant power-ups.
+
+#### 🏃 No Air Speed Cap
+
+A new nitpick, `noairspeedcap`, lifts the classic air speed cap. Normally, if you're moving slower than walking speed in the air, holding run only gets you up to walking speed, and only a run you already had when you jumped carries on at full speed. With `noairspeedcap`, holding run in the air always speeds you up to full running speed, like in Super Mario Maker 2. **Generate Nitpicks File** adds it to an existing file.
+
 ### 🐛 Bug Fixes
 
 * In splitscreen, player fireballs, superballs, iceballs, hammers and boomerangs no longer disappear as soon as they leave the shared camera. They now last as long as they're inside the level.
@@ -536,8 +553,9 @@ rivalrumbleroyalemusic/
 * When the blinking invincibility ends while the player is a Tanooki statue, they now stay invincible. Before, enemies could hurt a statue once the blinking was over.
 * Stomping enemies in a row without landing gives 100, 200, 400, 500, 800, 1000, 2000, 4000, 5000 and 8000 points again, then a 1up for each stomp after that. Before, the nth stomp only gave n points ("+1", "+2"...). Minigames still count stomps that way.
 * Changing form now ends any animation the new form doesn't have, and sets the new form's sprite straight away. For example, getting hit during a tail whip ends the whip, and its hitbox stops hitting things. A raccoon flight or a float ends the same way.
-* Changing form while ducking now keeps you ducking through the whole grow or shrink animation, like picking up a power-up in Rival Rumble Royale. This works on the ground and in mid-air (a duck jump into a power-up, for example). Frames of a size that can't duck show you standing, and your feet stay in the same place throughout. Before, you stood up for the animation and only ducked again afterwards if you were on the ground.
+* Changing form while ducking now keeps you ducking, like picking up a power-up in Rival Rumble Royale. This works on the ground and in mid-air (a duck jump into a power-up, for example). Power-ups that only flash your colours (a Fire Flower when you're already big, for example) keep the duck the whole time. The classic small-to-big and big-to-small animations still show you standing, then you duck again as soon as they end. Your feet stay in the same place throughout. Before, you only ducked again afterwards if you were on the ground.
 * Changing form while you're blinking after a hit now keeps your invincibility timer: once the grow animation ends, the blinking carries on from where it was.
+* Finishing a level (at the flagpole, the axe or a levelball) now takes every player off their Lakitu cloud, quietly, so the cloud doesn't follow you through the ending.
 * Dropdowns in a minigame's settings no longer disappear when the description above them is long. They used to stay where they were before the panel was scrolled.
 
 ### ✨ Improvements
@@ -558,6 +576,7 @@ rivalrumbleroyalemusic/
 * The P-meter now has a maximum: 1.1 seconds of running at full speed fills it, which is where P-speed starts. It's set with `raccoonplanefull` in `variables.lua`.
 * Each flap while flying now plays the whole flying animation, all 3 frames, over `raccoonflaptime` (0.3 seconds, in `variables.lua`). It keeps playing even when you start falling. Before, it went back to the first frame as soon as you started falling.
 * Pressing jump again while flapping keeps the animation going from the frame it's on, instead of starting it over. It only goes back to the first frame once you stop flapping.
+* Raccoon and Tanooki Mario can now fly while riding Yoshi. Run to build up P-speed, jump to take off, then keep pressing jump to flap, the same as without Yoshi. Stomping an enemy at P-speed while on Yoshi keeps P-speed too.
 
 ## v1.1.0
 

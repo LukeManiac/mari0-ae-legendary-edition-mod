@@ -206,7 +206,7 @@ function mushroom:use(a, b) --DUDE MUSHROOMS LMAO
 	end
 
 	if a == "player" then
-		if b.animation == "grow1" or b.animation == "grow2" or b.animation == "shrink" then
+		if b.animation == "grow1" or b.animation == "grow2" or b.animation == "shrink" or b.animation == "modernsize" then
 			return false
 		end
 		self.active = false

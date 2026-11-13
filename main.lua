@@ -3655,6 +3655,8 @@ function loadnitpicks()
 		ImmortalComboMeter = t.immortalcombometer
 		RemoveCooldowns = t.removecooldowns
 		ClassicSpeedUpFastMusic = t.classicspeedupfastmusic
+		ModernSizeChangeAnimation = t.modernsizechangeanimation
+		NoAirSpeedCap = t.noairspeedcap
 	end
 end
 

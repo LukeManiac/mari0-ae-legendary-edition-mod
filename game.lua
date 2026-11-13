@@ -3718,6 +3718,9 @@ function drawplayer(i, x, y, r, pad, drop)
 	if v.animationscaley then
 		horscale = horscale*v.animationscaley
 	end
+	if v.sizechangescaley then --the modern size change animation (see mario:applysizesnapshot)
+		horscale = horscale*v.sizechangescaley
+	end
 
 	if v.customscale then
 		horscale = horscale * v.customscale
