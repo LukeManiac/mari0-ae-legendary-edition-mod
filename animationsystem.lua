@@ -8,7 +8,7 @@ function animationsystem_load()
 	animations = {}
 	animationschar = {}
 	
-	if not dcplaying then
+	if not dcplaying and not minigameplaying then
 		local fl = love.filesystem.getDirectoryItems(mappackfolder .. "/" .. mappack .. "/animations")
 		for i = 1, #fl do
 			if love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/animations/" .. fl[i], "directory") then
