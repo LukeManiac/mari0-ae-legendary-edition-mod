@@ -581,6 +581,14 @@ function enemy:init(x, y, t, a, properties)
 end
 
 function enemy:update(dt)
+	--Camera-relative enemies: snap into place before anything else runs this frame
+	if self.xrelativetocamera then
+		self.x = (splitxscroll[1] or xscroll) + self.xrelativetocamera
+	end
+	if self.yrelativetocamera then
+		self.y = (splityscroll[1] or yscroll) + self.yrelativetocamera
+	end
+
 	--Just spawned
 	if self.justspawned then
 		self.justspawned = nil

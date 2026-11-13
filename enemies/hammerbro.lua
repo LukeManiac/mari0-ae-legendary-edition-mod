@@ -904,7 +904,7 @@ function boomerang:update(dt)
 			end
 		end
 	end
-	if self.x < xscroll-1 or self.x > xscroll+width+1 or self.y > mapheight and self.active then
+	if projectileoffscreenx(self.x) or self.y > mapheight and self.active then
 		self:explode()
 		return true
 	end
@@ -941,6 +941,10 @@ end
 
 function boomerang:globalcollide(a, b)
 	if self.boomerangbrocollide == a then
+		--a player's boomerang only goes back into the hand of the one who threw it
+		if a == "player" and self.fireballthrower and b ~= self.fireballthrower then
+			return true
+		end
 		self:explode()
 		return true
 	end

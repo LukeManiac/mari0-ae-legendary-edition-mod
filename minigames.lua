@@ -7,6 +7,7 @@
 		minigame_createmap()            startlevel("minigame") builds the map
 		minigame_postload()             end of startlevel, after the player spawned
 		minigame_update(dt)             game_update, right before the physics update
+		minigame_drawtiles()            game_draw, right after the tiles (behind every object)
 		minigame_drawworld()            game_draw, before the foreground tiles
 		minigame_drawoverlay()          game_draw, on top of everything (includes the HUD)
 		minigame_drawHUD()              drawHUD (the minigame levelscreens use it too)
@@ -153,6 +154,16 @@ function minigame_wraptext(s, maxchars)
 	for paragraph in (tostring(s) .. "\n"):gmatch("(.-)\n") do
 		local line = ""
 		for word in paragraph:gmatch("[^ ]+") do
+			--a word longer than a line (a long folder name) gets split over several lines
+			while utf8.len(word) > maxchars do
+				if line ~= "" then
+					table.insert(lines, line)
+					line = ""
+				end
+				local cut = utf8.offset(word, maxchars+1)
+				table.insert(lines, word:sub(1, cut-1))
+				word = word:sub(cut)
+			end
 			if line == "" then
 				line = word
 			elseif utf8.len(line) + 1 + utf8.len(word) <= maxchars then
@@ -331,12 +342,39 @@ end
 --  REGISTRY  --
 ----------------
 
+--entries of a dropdown, they can come from a function (lists that depend on files)
+function minigame_optionentries(opt)
+	if type(opt.entries) == "function" then
+		return opt.entries()
+	end
+	return opt.entries
+end
+
+--sliders snap to whole steps: value = min + n*step
+local function slidervalue(opt, fraction)
+	local step = opt.step or 1
+	local v = opt.min + fraction*(opt.max-opt.min)
+	v = opt.min + math.floor((v-opt.min)/step + 0.5)*step
+	return math.max(opt.min, math.min(opt.max, v))
+end
+
+local function sliderfraction(opt, v)
+	if opt.max == opt.min then
+		return 0
+	end
+	return (math.max(opt.min, math.min(opt.max, v or opt.default)) - opt.min)/(opt.max-opt.min)
+end
+
 local function addminigame(def)
 	def.options = def.options or {}
 	minigameoptions[def.id] = minigameoptions[def.id] or {}
 	for _, opt in ipairs(def.options) do
 		if minigameoptions[def.id][opt.key] == nil then
 			minigameoptions[def.id][opt.key] = opt.default
+		end
+		--the checkbox next to a slider
+		if opt.checkkey and minigameoptions[def.id][opt.checkkey] == nil then
+			minigameoptions[def.id][opt.checkkey] = opt.checkdefault
 		end
 	end
 	table.insert(minigamelist, def)
@@ -380,7 +418,11 @@ end
 
 --lays out the description and the game mode settings as one block (content y, not scrolled)
 local function layoutcontent(def, layout, narrow)
-	local space = narrow and SCROLLBAR_SPACE or 0
+	local space = 0
+	if narrow then
+		space = SCROLLBAR_SPACE
+	end
+	layout.space = space
 	layout.lines = wraptext(def.description, math.floor((DESC_W-6-space)/8))
 	layout.items = {}
 	local y = DESC_Y + DESC_LINE*#layout.lines
@@ -391,7 +433,7 @@ local function layoutcontent(def, layout, narrow)
 			if opt.type == "checkbox" then
 				item.labellines = wraptext(opt.label, CHECKBOX_LABEL_CHARS - math.ceil(space/8))
 				item.height = math.max(9, DESC_LINE*#item.labellines-1)
-			else --dropdown, the label sits above it
+			else --dropdown or slider, the label sits above it
 				item.labellines = wraptext(opt.label, math.floor((DESC_W-6-space)/8))
 				item.height = DESC_LINE*#item.labellines + 11
 			end
@@ -415,6 +457,62 @@ local function panellayout(def)
 	layout.maxscroll = layout.contenth - layout.viewh --in pixels
 	layout.bottom = DESC_Y + layout.viewh
 	return layout
+end
+
+--"Castlevania VRC6 Music- Vampire Killer" in n characters: the pack name gets shortened first
+function minigame_shortentry(s, n)
+	if utf8.len(s) <= n then
+		return s
+	end
+	local pack, name = s:match("^(.-)%- (.+)$")
+	if pack and utf8.len(name)+2 < n then
+		local room = n - utf8.len(name) - 3 --"." and "- "
+		if room >= 3 then
+			local short = pack:sub(1, room):gsub("%s+$", "")
+			return short .. ".- " .. name
+		end
+	end
+	if name then
+		s = name
+	end
+	return s:sub(1, n)
+end
+
+local SLIDER_HANDLE_W = 33 --fits "1000" like the volume slider
+
+function minigame_newslider(opt, opts, x, y, w)
+	local el = guielement:new("scrollbar", x, y, w, SLIDER_HANDLE_W, 9, sliderfraction(opt, opts[opt.key]), "hor")
+	el.buttonround = true
+	el.scrollstepdisabled = true --the mouse wheel scrolls the panel
+	el.min, el.max = opt.min, opt.max --right click to type a number
+	opts[opt.key] = slidervalue(opt, el.value)
+	el.displayfunction = function(self, v)
+		return tostring(slidervalue(opt, v))
+	end
+	el.updatefunc = function(self, v)
+		opts[opt.key] = slidervalue(opt, v)
+	end
+	el.releasefunc = function(self, v)
+		--settle on the step
+		opts[opt.key] = slidervalue(opt, v)
+		self.value = sliderfraction(opt, opts[opt.key])
+	end
+	minigame_setsliderenabled(el, true)
+	return el
+end
+
+function minigame_setsliderenabled(el, enabled)
+	el.disabled = not enabled
+	el.backgroundcolor = {0, 0, 0}
+	if enabled then
+		el.bordercolor = {127, 127, 127}
+		el.bordercolorhigh = {255, 255, 255}
+	else
+		el.bordercolor = {50, 50, 50}
+		el.bordercolorhigh = {90, 90, 90}
+		el.dragging = false
+		el.inputting = false
+	end
 end
 
 function minigame_buildgui(force)
@@ -442,14 +540,54 @@ function minigame_buildgui(force)
 		elseif opt.type == "dropdown" then
 			local entries = {}
 			local w = 1
-			for j, e in ipairs(opt.entries) do
-				entries[j] = T(e)
+			for j, e in ipairs(minigame_optionentries(opt)) do
+				entries[j] = T(e):lower() --dropdowns use the old font, its capitals are symbols
 				w = math.max(w, utf8.len(entries[j]))
 			end
-			el = guielement:new("dropdown", DESC_X+3, item.y + DESC_LINE*#item.labellines, w, function(v)
+			if #entries == 0 then
+				entries[1] = "-"
+			end
+			if (opts[opt.key] or 1) > #entries then
+				opts[opt.key] = 1 --the list got shorter (files were removed)
+			end
+			local panelw = math.floor((DESC_W-6-layout.space-13)/8) --the most characters that fit in the panel
+			local closedw = w
+			if opt.wide then
+				closedw = math.min(w, panelw)
+			end
+			el = guielement:new("dropdown", DESC_X+3, item.y + DESC_LINE*#item.labellines, closedw, function(v)
 				opts[opt.key] = v
 				el.var = v
 			end, opts[opt.key], unpack(entries))
+			if opt.wide and w > closedw then
+				--long entries: shortened while closed, the list opens wide enough for the full names
+				el.closedwidth = closedw
+				el.fullwidth = math.min(w, math.floor((width*16-4-13)/8))
+				el.basex = el.x
+				el.openx = math.max(2, math.min(el.x, width*16-2-13-el.fullwidth*8))
+				el.shortentries = {}
+				for j, e in ipairs(entries) do
+					el.shortentries[j] = minigame_shortentry(e, closedw)
+				end
+				el.displayentries = el.shortentries
+			end
+		elseif opt.type == "slider" then
+			el = minigame_newslider(opt, opts, DESC_X+3, item.y + DESC_LINE*#item.labellines, DESC_W-6-layout.space)
+		elseif opt.type == "sliderbox" then
+			--checkbox with a slider next to it, the slider only works while the box is ticked
+			local y = item.y + DESC_LINE*#item.labellines
+			local slider = minigame_newslider(opt, opts, DESC_X+16, y, DESC_W-19-layout.space)
+			local box
+			box = guielement:new("checkbox", DESC_X+3, y, function(v)
+				opts[opt.checkkey] = v
+				box.var = v
+				minigame_setsliderenabled(slider, v)
+			end, opts[opt.checkkey] == true)
+			minigame_setsliderenabled(slider, opts[opt.checkkey] == true)
+			box.active = false
+			box.basey = box.y
+			table.insert(minigamegui, box)
+			el = slider
 		end
 		if el then
 			el.active = false
@@ -486,9 +624,22 @@ function minigame_menu_update(dt)
 	local settled = menusettled()
 	minigame_updatescrollbars(dt, settled)
 	for _, el in ipairs(minigamegui) do
-		el.active = settled and el.panelvisible ~= false
+		el.active = settled and el.panelvisible ~= false and not el.disabled
 		if not el.active and el.extended then
 			el:close()
+		end
+		if el.fullwidth then
+			--wide dropdowns open to the left so the full names fit
+			local open = el.extended or el:getlistprogress() > 0
+			if open ~= el.wideopen then
+				el.wideopen = open
+				if open then
+					el.width, el.x, el.displayentries = el.fullwidth, el.openx, nil
+				else
+					el.width, el.x, el.displayentries = el.closedwidth, el.basex, el.shortentries
+				end
+				el:updatePos()
+			end
 		end
 		el:update(dt)
 	end
@@ -590,6 +741,15 @@ function minigame_placegui()
 	local offset = minigamepanelscroll.desc.smooth
 	for _, el in ipairs(minigamegui) do
 		el.y = (el.basey or el.y) - offset
+		--a closed dropdown whose list would go past the bottom of the screen opens upwards from where it is now
+		--(it remembers that spot and goes back to it every frame, so it's worked out again after scrolling)
+		if el.type == "dropdown" and not el.extended and el:getlistprogress() == 0 and not el.cutoff then
+			if el.y + 10*(#el.entries+1) > height*16 then
+				el.multiy = {el.y, height*16-(10*(#el.entries+1))}
+			else
+				el.multiy = false
+			end
+		end
 		--hidden above or below the panel: can't be clicked
 		local h = (el.type == "dropdown") and 11 or 9
 		el.panelvisible = el.y + h > DESC_Y and el.y < layout.bottom
@@ -803,6 +963,12 @@ function minigame_menu_wheel(x, y, button)
 end
 
 function minigame_menu_keypressed(key)
+	for _, el in ipairs(minigamegui) do
+		if el.type == "scrollbar" and el.inputting then
+			el:keypress(key)
+			return true
+		end
+	end
 	local dd = openminigamedropdown()
 	if dd then
 		if key == "escape" then
@@ -918,11 +1084,11 @@ function minigame_start(i)
 	minigamestate = false
 	minigameresult = false
 	minigamescreen = false
-	--one player only, just like the daily challenges
+	--one player only (just like the daily challenges), unless the minigame needs more
 	if not minigameoldplayers then
 		minigameoldplayers = players
 	end
-	players = 1
+	players = def.players or 1
 	infinitetime = false
 	warpfadeoutnow()
 	game_load("minigame")
@@ -958,6 +1124,14 @@ function minigame_restart()
 	end, false, true)
 end
 
+--undo what a minigame changed outside of its own state (music overrides, split screen...)
+function minigame_cleanup()
+	local def = minigamecurrent
+	if def and def.cleanup then
+		def.cleanup()
+	end
+end
+
 function minigame_stopsounds()
 	if scoreringsound then scoreringsound:stop() end
 	if windsound then windsound:stop() end
@@ -965,6 +1139,7 @@ end
 
 function minigame_returntomenu()
 	minigame_stopsounds()
+	minigame_cleanup()
 	minigameplaying = false
 	minigamescreen = false
 	lowgravity = false
@@ -1053,9 +1228,12 @@ function minigame_createmap()
 	startx = math.floor(mapwidth/2)+0.5
 	starty = 13
 
-	--minigame physics are always mario maker (a minigame can switch to mari0-maker, see jumping juggle jamboree)
-	currentphysics = 6
-	setphysics(currentphysics)
+	--minigame physics are mario maker (a minigame can switch to mari0-maker, see jumping juggle jamboree),
+	--unless the minigame keeps the game's own physics (the ones game_load picked)
+	if not def.keepphysics then
+		currentphysics = 6
+		setphysics(currentphysics)
+	end
 
 	minigamestate = {score = 0, time = 0, popups = {}, options = minigameoptions[def.id] or {}}
 	if def.createmap then
@@ -1113,6 +1291,9 @@ function minigame_update(dt)
 			end
 		end
 		if S.finish.freeze then
+			if def.frozenupdate then
+				def.frozenupdate(S, dt) --what keeps moving while the game stands still
+			end
 			return true
 		end
 	end
@@ -1121,6 +1302,15 @@ function minigame_update(dt)
 		return def.update(S, dt) == true
 	end
 	return false
+end
+
+function minigame_drawtiles()
+	local S, def = minigamestate, minigamecurrent
+	if S and def and def.drawtiles then
+		love.graphics.setColor(255, 255, 255)
+		def.drawtiles(S)
+		love.graphics.setColor(255, 255, 255)
+	end
 end
 
 function minigame_drawworld()
@@ -1348,18 +1538,32 @@ function minigame_levelscreen_load(reason)
 			reason = "minigamewin"
 		end
 		minigame_recordscore()
-		stopmusic()
-		love.audio.stop()
+		local silent = minigamecurrent and minigamecurrent.resultsilent --the minigame already played its own jingle
+		if not silent then
+			stopmusic()
+			love.audio.stop()
+		end
 		--blacktime ends when the sound does (the fade out starts right after it)
 		if reason == "minigamewin" then
 			minigamescreen = "win"
-			blacktime = dcwin2sound:getDuration("seconds") + warpfadetime
-			playsound(dcwin2sound)
 			confetti_start()
 		else --"minigamelose" or the player's death
 			minigamescreen = "lose"
-			--a new highscore gets the victory sound even on a loss
-			local sound = (minigameresult and minigameresult.highscore) and dcwin2sound or dclose2sound
+		end
+		if silent then
+			--no sound, the results stay up for resultsilent seconds (or just the fade when it's true)
+			blacktime = warpfadetime
+			if type(silent) == "number" then
+				blacktime = silent + warpfadetime
+			end
+		else
+			local sound = dclose2sound
+			if minigamescreen == "win" or (minigameresult and minigameresult.highscore) then
+				sound = dcwin2sound --a new highscore gets the victory sound even on a loss
+			end
+			if minigamecurrent and minigamecurrent.resultsound and minigamestate then
+				sound = minigamecurrent.resultsound(minigamestate) or sound --the minigame's own fanfare
+			end
 			blacktime = sound:getDuration("seconds") + warpfadetime
 			playsound(sound)
 		end
@@ -1395,13 +1599,17 @@ function minigame_levelscreen_draw()
 	else
 		if minigamescreen == "win" then
 			confetti_draw()
+		end
+		if def.resultheadline and minigamestate then
+			centerprintline(def.resultheadline(minigamestate), cx, 84)
+		elseif minigamescreen == "win" then
 			centerprintline(T("you win!"), cx, 84)
 		else
 			centerprintline(T("game over!"), cx, 84)
 		end
 		centerprintline(name, cx, 104, {200, 200, 200})
 		local score = minigameresult and minigameresult.score or (minigamestate and minigamestate.score) or 0
-		centerprintline("score: " .. formatscore(score), cx, 128)
+		centerprintline(T(def.scorelabel or "score") .. ": " .. formatscore(score), cx, 128)
 		local y = 144
 		if minigameresult and minigameresult.title then
 			centerprintline(T("title: ") .. T(minigameresult.title), cx, y, {140, 230, 255})
@@ -2803,8 +3011,8 @@ addminigame({
 				if b.istarget then
 					playsound(coinsound)
 					boo_stop(b)
-					S.score = S.score + 1
 					local bonus = boo_bonus(S.roundtime)
+					S.score = S.score + math.max(1, bonus) --points from the combo meter, at least 1 even when it's empty
 					S.phase = "caught"
 					S.seq = {stage = "wait1", t = BOO_WAIT, left = bonus, boo = b}
 					S.bonustime = S.roundtime --the bonus meter stops where it was
@@ -3369,6 +3577,15 @@ local JJJ_GROUND_TILE = 2
 local JJJ_BLOCK_ROW = 9
 local JJJ_GROUND_Y = 13 --top of the ground
 local JJJ_ENEMIES = {"goomba", "goombrat", "paragoomba", "biggoomba", "splunkin", "drygoomba", "fighterfly", "mole", "spike"}
+local JJJ_PROJECTILES = {"bulletbill", "homingbullet", "cannonball", "bigbill"} --fly in from the sides, never on the screen at the start
+local JJJ_SPAWNABLE = {} --everything that can come in from the sides
+for _, t in ipairs(JJJ_ENEMIES) do
+	table.insert(JJJ_SPAWNABLE, t)
+end
+for _, t in ipairs(JJJ_PROJECTILES) do
+	table.insert(JJJ_SPAWNABLE, t)
+end
+local JJJ_REACH_ENEMY_HEIGHT = 12/16 --the grounded enemy the jump reach is measured from (a goomba)
 local JJJ_WINDMODES = {"none", "occasional", "continuous"}
 
 --decoration generator: the same shapes the SMB levels use (rows listed top to bottom, false = empty)
@@ -3558,8 +3775,8 @@ local function jjj_turn(o)
 end
 
 --a random enemy from the list, standing on the ground in column x
-local function jjj_newenemy(S, x)
-	local t = randomitem(JJJ_ENEMIES)
+local function jjj_newenemy(S, x, t)
+	local t = t or randomitem(JJJ_ENEMIES)
 	local r
 	if t == "mole" then
 		r = {1, nil, "false"} --walking monty mole, not one hiding in the ground
@@ -3581,7 +3798,7 @@ local function jjj_spawnstartenemies(S)
 		local j = math.random(i)
 		columns[i], columns[j] = columns[j], columns[i]
 	end
-	local count = math.random(3, 5)
+	local count = math.random(3, 10)
 	local used = {}
 	for _, x in ipairs(columns) do
 		if count <= 0 then
@@ -3601,9 +3818,97 @@ local function jjj_spawnstartenemies(S)
 	end
 end
 
+--the speed of the bounce off a stomped enemy (no low gravity)
+local function jjj_stompbouncespeed(p, held)
+	local grav = yacceleration
+	if p.characterdata then
+		grav = p.characterdata.yacceleration
+	end
+	local bouncespeed = math.sqrt(2*grav*bounceheight)
+	if mariomakerphysics and (not portalphysics) then
+		if held then
+			bouncespeed = math.sqrt(2*grav*bounceheighthigh)
+		else
+			bouncespeed = math.sqrt(2*grav*bounceheightmaker)
+		end
+	end
+	return bouncespeed
+end
+
+--the highest y the player's feet reach after stomping a grounded enemy (smaller y = higher up)
+local function jjj_stompreachy(p)
+	local risegrav = yacceleration
+	if p.characterdata then
+		risegrav = p.characterdata.yacceleration
+	end
+	if mariomakerphysics and (not portalphysics) then
+		--mario:stompenemy keeps the player "jumping", so the way up uses the jumping gravity
+		risegrav = yaccelerationjumping
+		if p.characterdata then
+			risegrav = p.characterdata.yaccelerationjumping
+		end
+	end
+	local speed = jjj_stompbouncespeed(p, true) --jump counts as held for the whole run
+	local riseheight = speed*speed/(2*risegrav)
+	return JJJ_GROUND_Y - JJJ_REACH_ENEMY_HEIGHT - riseheight
+end
+
+--a bullet bill, homing bullet bill, cannon ball or big bill flying in from one side
+local function jjj_spawnprojectile(S, t, side)
+	local dir = "left"
+	if side == "left" then
+		dir = "right" --comes in from the left, flies to the right
+	end
+
+	local obj, objtable
+	if t == "bulletbill" then
+		obj, objtable = bulletbill:new(0, 0, dir), "bulletbill"
+	elseif t == "homingbullet" then
+		obj, objtable = bulletbill:new(0, 0, dir, "homing"), "bulletbill"
+	elseif t == "cannonball" then
+		obj, objtable = cannonball:new(0, 0, dir), "cannonball"
+	elseif t == "bigbill" then
+		obj, objtable = bigbill:new(0, 0, dir), "bigbill"
+	end
+	if not obj then
+		return
+	end
+	--no launcher to come out of
+	obj.customscissor = nil
+	obj.active = true
+
+	local lowesty = JJJ_GROUND_Y - 1 - obj.height --bottom one tile above the ground
+	local highesty = 1 --homing bullets can come in at any height, they chase the player anyway
+	if t ~= "homingbullet" then
+		local p = objects["player"][1]
+		if p then
+			highesty = jjj_stompreachy(p) + 1 --top one tile below the highest stomp bounce
+		end
+	end
+	if highesty > lowesty then
+		highesty = lowesty --the bounce is too low for the range, so keep it one tile above the ground
+	end
+	obj.y = rnd(highesty, lowesty)
+
+	if side == "left" then
+		obj.x = -obj.width
+	else
+		obj.x = mapwidth
+	end
+	obj.startx = obj.x
+
+	table.insert(objects[objtable], obj)
+	table.insert(S.enemies, {obj = obj, side = side, projectile = true, entered = true})
+end
+
 local function jjj_spawnenemy(S)
 	local side = (math.random(2) == 1) and "left" or "right"
-	local obj = jjj_newenemy(S, (side == "left") and 1 or mapwidth)
+	local t = randomitem(JJJ_SPAWNABLE)
+	if tablecontains(JJJ_PROJECTILES, t) then
+		jjj_spawnprojectile(S, t, side)
+		return
+	end
+	local obj = jjj_newenemy(S, (side == "left") and 1 or mapwidth, t)
 	if not obj then
 		return
 	end
@@ -3772,6 +4077,22 @@ addminigame({
 			local o = e.obj
 			if o.delete or o.instantdelete then
 				table.remove(S.enemies, i)
+			elseif e.projectile then
+				--flies straight across (no walking, turning or wind), gone once it leaves the screen
+				local gone = o.y > mapheight+1
+				if not o.shot then
+					if o.speedx > 0 and o.x > mapwidth+1 then
+						gone = true
+					elseif o.speedx < 0 and o.x+o.width < -1 then
+						gone = true
+					end
+				elseif o.x > mapwidth+1 or o.x+o.width < -1 then
+					gone = true
+				end
+				if gone then
+					o.instantdelete = true
+					table.remove(S.enemies, i)
+				end
 			else
 				if e.pending then
 					--first update after initialisation
@@ -3833,7 +4154,7 @@ addminigame({
 		--spawned after the enemy loop, so the direction check waits for the enemy's first update
 		S.spawntimer = S.spawntimer - dt
 		if S.spawntimer <= 0 then
-			S.spawntimer = rnd(3, 5)
+			S.spawntimer = rnd(0.5, 2)
 			jjj_spawnenemy(S)
 		end
 	end,
@@ -3842,16 +4163,7 @@ addminigame({
 		if player.speedy < 0 then
 			S.score = S.score + 1
 			--the stomp bounce without low gravity
-			local grav = (player.characterdata and player.characterdata.yacceleration) or yacceleration
-			local bouncespeed = math.sqrt(2*grav*bounceheight)
-			if mariomakerphysics and (not portalphysics) then
-				if jumpkey(player.playernumber) then
-					bouncespeed = math.sqrt(2*grav*bounceheighthigh)
-				else
-					bouncespeed = math.sqrt(2*grav*bounceheightmaker)
-				end
-			end
-			player.speedy = -bouncespeed
+			player.speedy = -jjj_stompbouncespeed(player, jumpkey(player.playernumber))
 		end
 	end,
 
@@ -4132,3 +4444,2837 @@ addminigame({
 })
 
 end --do (block beat bonanza)
+
+---------------------
+--  RIVAL RUMBLE ROYALE  --
+---------------------
+--Four players (people or bots) on one arena, the last one with lives left wins.
+--Built after the battle mode of Super Mario 4 Jugadores: a closed arena a bit wider than the screen (split screen
+--for every person playing), a ? block above every spawn, two ? blocks in the middle and a rare one at the top.
+do --each minigame keeps its locals in a do block (a file can only have 200 at the top level)
+
+local RRR_ID = "rival_rumble_royale"
+local RRR_PLAYERS = 4
+local RRR_ROULETTE_TIME = 0.2 --an item shows for this long, then the next one
+local RRR_COUNTDOWN = 3 --"3", "2", "1" (a second each, real time), then "go!" and the music starts
+local RRR_HIT_CREDIT = 4 --dying this soon after a hit (falling in a pit for example) is a knockout for the hitter
+local RRR_RESULT_TIME = 4 --the results screen (the battle clear theme already played in the arena)
+local RRR_CLEAR_MAX = 15 --a battle clear theme longer than this gets cut off
+local RRR_DEFAULT_CLEAR = "sounds/levelend.ogg"
+local RRR_MUSIC_NAME = "rivalrumbleroyalemusic"
+local RRR_MUSIC_FOLDER = "sounds/" .. RRR_MUSIC_NAME
+local RRR_SAVE_MUSIC_FOLDER = "alesans_entities/" .. RRR_MUSIC_NAME --in the save folder, so music can be added without touching the game
+--where custom music is looked for (the save folder first: a song or pack there wins over one with the same name in the game)
+local RRR_MUSIC_FOLDERS = {RRR_SAVE_MUSIC_FOLDER, RRR_MUSIC_FOLDER}
+
+--? blocks: the block above a spawn, the two in the middle and the rare one
+local RRR_BLOCKS = {
+	S = {kind = "spawn", cooldown = 10, items = {"fireflower", "hammersuit", "boomerangflower"}, color = {255, 255, 255}},
+	["?"] = {kind = "normal", cooldown = 15, items = {"leaf", "tanookisuit", "superballflower"}, color = {150, 220, 255}},
+	R = {kind = "rare", cooldown = 30, items = {"blueshell", "star", "feather"}, color = {255, 220, 60}},
+}
+local RRR_QUESTIONBLOCK = 8 --the animated ? block tile
+local RRR_ITEMQUADS = {leaf = 6, tanookisuit = 10, feather = 11, hammersuit = 14, blueshell = 16, boomerangflower = 17} --in items.png
+local RRR_ITEMTABLES = {"flower", "leaf", "star", "hammersuit", "mushroom"} --where the items from the blocks end up
+
+--arenas, 40 tiles wide and 15 high (wider screens get more floor next to the walls)
+-- X wall/block, # ground, B brick, = platform, P pipe (2 wide), L lava (decoration, the pit kills)
+-- S ? block above a spawn, ? ? block, R rare ? block, 1-4 spawns (the tile the player stands in)
+local RRR_LAYOUTS = {
+	--overworld and night overworld: two pipes and a pit in the middle
+	field = {
+		"X                                      X",
+		"X                                      X",
+		"X                                      X",
+		"X                  R                   X",
+		"X                                      X",
+		"X       S                      S       X",
+		"X              ==========              X",
+		"X                                      X",
+		"X       3                      4       X",
+		"X S  =======  ?          ?  =======  S X",
+		"X                                      X",
+		"X               PP    PP               X",
+		"X 1             PP    PP             2 X",
+		"########################################",
+		"########################################",
+	},
+	--underground: brick ceiling, pipes next to the ground spawns
+	cave = {
+		"XBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBX",
+		"X                                      X",
+		"X                                      X",
+		"X                  R                   X",
+		"X                                      X",
+		"X          S                S          X",
+		"X               ========               X",
+		"X                                      X",
+		"X          3                4          X",
+		"X  S    ======   ?    ?   ======    S  X",
+		"X                                      X",
+		"X    PP                          PP    X",
+		"X  1 PP                          PP 2  X",
+		"########################################",
+		"########################################",
+	},
+	--castle: lava pits on both sides
+	castle = {
+		"X                                      X",
+		"X                                      X",
+		"X                                      X",
+		"X                  R                   X",
+		"X              S        S              X",
+		"X                                      X",
+		"X                 ====                 X",
+		"X              3        4              X",
+		"X            =====    =====            X",
+		"X  S               ??               S  X",
+		"X                                      X",
+		"X                                      X",
+		"X  1                                2  X",
+		"#########LLL################LLL#########",
+		"#########LLL################LLL#########",
+	},
+	--portal: a test chamber with a pillar splitting the floor
+	lab = {
+		"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+		"X                                      X",
+		"X                                      X",
+		"X                  R                   X",
+		"X                                      X",
+		"X         S                  S         X",
+		"X              ==========              X",
+		"X                                      X",
+		"X         3                  4         X",
+		"X  S    =====   ?      ?   =====    S  X",
+		"X                  XX                  X",
+		"X                  XX                  X",
+		"X  1               XX               2  X",
+		"########################################",
+		"########################################",
+	},
+}
+
+--tiles for every theme (platform: left, middle, right; pipe: top left, top right, body left, body right)
+--the smb tiles are 1-132 (the last two rows of smbtiles.png are secret), the portal tiles come right after them
+local RRR_GREENPIPE = {16, 17, 38, 39}
+local RRR_GRAYPIPE = {14, 15, 36, 37}
+local RRR_THEMES = {
+	{name = "Overworld", layout = "field", spriteset = 1, background = 1, ground = 2, block = 78, brick = 7, used = 113,
+		platform = {70, 71, 72}, trunk = 93, pipe = RRR_GREENPIPE, decor = "hills"},
+	{name = "Underground", layout = "cave", spriteset = 2, background = 2, ground = 50, block = 111, brick = 49, used = 114,
+		platform = {49, 49, 49}, pipe = RRR_GREENPIPE},
+	{name = "Castle", layout = "castle", spriteset = 3, background = 2, ground = 29, block = 29, brick = 122, used = 117,
+		platform = {122, 122, 122}, pipe = RRR_GRAYPIPE, lava = {107, 120}},
+	{name = "Portal", layout = "lab", spriteset = 1, backgroundrgb = {36, 40, 48}, ground = 140, block = 154, brick = 141, used = 113,
+		platform = {141, 141, 141}, pipe = RRR_GRAYPIPE, decor = "lab"},
+	{name = "Night Overworld", layout = "field", spriteset = 3, background = 2, ground = 92, block = 29, brick = 122, used = 117,
+		platform = {89, 90, 91}, pipe = RRR_GRAYPIPE, decor = "clouds"},
+}
+
+--a music pack is a folder in sounds/minigames, its pack.json gives its name, its place in the list and the songs' names:
+--  {"name": "Kirby VRC6 Music", "order": 1, "songs": [["boss", "Boss"], ["skybattle", "Battle Across The Sky"]]}
+--(songs are [file name without .ogg, name in the list], in the order they're listed; everything is optional:
+--a folder without pack.json, or a song it doesn't list, is named after its folder or file)
+local RRR_PACKFILE = "pack.json"
+local RRR_BUILTINMUSIC = {"overworld", "underground", "castle"}
+
+--the star theme and the music while the battle runs are put back once it's over
+local rrr_saved = nil
+local rrr_saved_split = nil --the split screen nitpick, it's always on during a battle
+
+----------------
+--  HELPERS  --
+----------------
+
+--where the blinking after a hit, a power-up or a respawn starts: 2.2 instead of the game's 1.2
+--(invincibletime - invincibletime2), so it lasts 1 second instead of 2
+local function rrr_invinciblestart()
+	return invincibletime - invincibletime2 + 1
+end
+
+local function rrr_state()
+	local S = minigamestate
+	if minigameplaying and gamestate == "game" and S and S.battle and minigamecurrent and minigamecurrent.id == RRR_ID then
+		return S
+	end
+	return nil
+end
+
+local function rrr_center(p)
+	return p.x + p.width/2
+end
+
+local function rrr_feet(p)
+	return p.y + p.height
+end
+
+local function rrr_clamp(v, a, b)
+	return math.max(a, math.min(b, v))
+end
+
+local function rrr_overlap(a, b, shrink)
+	shrink = shrink or 0
+	return a.x+shrink < b.x+b.width-shrink and b.x+shrink < a.x+a.width-shrink
+		and a.y+shrink < b.y+b.height-shrink and b.y+shrink < a.y+a.height-shrink
+end
+
+local function rrr_solid(x, y)
+	if x < 1 or x > mapwidth then
+		return true
+	end
+	if y < 1 or y > mapheight then
+		return false
+	end
+	local t = tilequads[map[x][y][1]]
+	return t ~= nil and t.collision == true
+end
+
+local function rrr_fileexists(path)
+	return love.filesystem.getInfo(path) ~= nil
+end
+
+local function rrr_prettyname(s)
+	s = s:gsub("[_%-]", " ")
+	return (s:gsub("(%a)([%w']*)", function(first, rest)
+		return first:upper() .. rest
+	end))
+end
+
+--"x-intro.ogg", "x-fast.ogg", starmusic.ogg and battleclear.ogg belong to a song or a pack, they aren't songs themselves
+local function rrr_issong(file)
+	if file:lower():sub(-4) ~= ".ogg" then
+		return false
+	end
+	local base = file:sub(1, -5):lower()
+	if base:match("%-intro$") or base:match("%-fast$") or base:match("%-fastintro$") or base:match("%-introfast$") or base == "starmusic" or base:match("^starmusic%-") or base == "battleclear" then
+		return false
+	end
+	return true
+end
+
+local function rrr_alive(S, i)
+	local p = objects["player"][i]
+	return p and not p.dead and not S.out[i]
+end
+
+--deadly to touch: star power, or a blue shell at full speed
+local function rrr_dangerous(p)
+	if p.starred or p.statue then --a tanooki statue can't be hurt, so it hurts whoever touches it
+		return true
+	end
+	if p.size == 14 then
+		local top = maxrunspeed
+		if p.characterdata and p.characterdata.maxrunspeed then
+			top = p.characterdata.maxrunspeed
+		end
+		return p.blueshelled or math.abs(p.speedx) >= top - 0.05
+	end
+	return false
+end
+
+--can't be hurt right now (star, tanooki statue, blinking after a hit or a respawn)
+local function rrr_protected(p)
+	return p.starred or p.statue or p.invincible or p.dead or not p.active
+end
+
+-------------
+--  MUSIC  --
+-------------
+
+--pack.json keys that pick the pack's star theme and win fanfare, and the files a pack without pack.json uses
+local RRR_STARKEY, RRR_CLEARKEY = "Starman Theme", "Battle Clear"
+local RRR_PACKEXTRAS = {RRR_STARKEY, RRR_CLEARKEY}
+local RRR_PACKEXTRADEFAULTS = {[RRR_STARKEY] = "starmusic.ogg", [RRR_CLEARKEY] = "battleclear.ogg"}
+
+--a pack's pack.json (nil when there isn't one or it can't be read)
+local function rrr_readpack(folderpath)
+	local path = folderpath .. "/" .. RRR_PACKFILE
+	if not rrr_fileexists(path) then
+		return nil
+	end
+	local text = love.filesystem.read(path)
+	JSONcrashgame = false --a broken pack.json just gets ignored
+	local ok, data = pcall(function() return JSON:decode(text) end)
+	JSONcrashgame = true
+	if not (ok and type(data) == "table") then
+		print("rival rumble royale: couldn't read " .. path)
+		return nil
+	end
+	local pack = {}
+	if type(data.name) == "string" then
+		pack.name = data.name
+	end
+	if type(data.order) == "number" then
+		pack.order = data.order
+	end
+	--the star theme and the win fanfare of the pack, checked when the music list is made (rrr_packextra)
+	pack.extras = {}
+	for _, key in ipairs(RRR_PACKEXTRAS) do
+		for k, v in pairs(data) do
+			if type(k) == "string" and k:lower() == key:lower() then --"starman theme" works too
+				pack.extras[key] = v
+			end
+		end
+	end
+	pack.songs = {}
+	if type(data.songs) == "table" then
+		for _, song in ipairs(data.songs) do
+			if type(song) == "table" and song[1] and type(song[2]) == "string" then
+				table.insert(pack.songs, {tostring(song[1]), song[2]})
+			end
+		end
+	end
+	return pack
+end
+
+--the pack's star theme or win fanfare (key is RRR_STARKEY or RRR_CLEARKEY): path and file name, or nil for the built-in one.
+--1. the song pack.json names ("Starman Theme": "my star song"), 2. starmusic.ogg or battleclear.ogg in the pack, 3. the built-in one
+local function rrr_packextra(folderpath, pack, key)
+	local value = pack and pack.extras[key]
+	if type(value) == "string" and value ~= "" then
+		local file = value
+		if file:lower():sub(-4) ~= ".ogg" then
+			file = file .. ".ogg"
+		end
+		if rrr_fileexists(folderpath .. "/" .. file) then
+			return folderpath .. "/" .. file, file
+		end
+	end
+	if value ~= nil then
+		print("rival rumble royale: \"" .. key .. "\" in " .. folderpath .. "/" .. RRR_PACKFILE .. " isn't a song in the pack")
+	end
+	local file = RRR_PACKEXTRADEFAULTS[key]
+	if rrr_fileexists(folderpath .. "/" .. file) then
+		return folderpath .. "/" .. file, file
+	end
+	return nil
+end
+
+--every song for the battle music dropdown: {label, path, pack folder, star theme path, win fanfare path}
+function rrr_musiclist()
+	love.filesystem.createDirectory(RRR_SAVE_MUSIC_FOLDER) --so it's there to put music in
+	local list = {}
+	local labels = {} --a label already in the list (the save folder's song wins)
+	local function addsong(entry)
+		local key = entry.label:lower()
+		if not labels[key] then
+			labels[key] = true
+			table.insert(list, entry)
+		end
+	end
+	local function isfolder(path)
+		local info = love.filesystem.getInfo(path)
+		return info and info.type == "directory"
+	end
+
+	for _, name in ipairs(RRR_BUILTINMUSIC) do
+		--a song of the same name in a music folder replaces the built-in one
+		local path = "sounds/" .. name .. ".ogg"
+		for _, root in ipairs(RRR_MUSIC_FOLDERS) do
+			if rrr_fileexists(root .. "/" .. name .. ".ogg") then
+				path = root .. "/" .. name .. ".ogg"
+				break
+			end
+		end
+		addsong({label = rrr_prettyname(name), path = path})
+	end
+
+	--loose songs right in the music folders, and the pack folders in them
+	local packs = {}
+	for rootindex, root in ipairs(RRR_MUSIC_FOLDERS) do
+		if isfolder(root) then
+			local items = love.filesystem.getDirectoryItems(root)
+			table.sort(items, function(a, b) return a:lower() < b:lower() end)
+			for _, item in ipairs(items) do
+				local path = root .. "/" .. item
+				if isfolder(path) then
+					table.insert(packs, {folder = item, folderpath = path, pack = rrr_readpack(path), root = rootindex})
+				elseif rrr_issong(item) and not tablecontains(RRR_BUILTINMUSIC, item:sub(1, -5):lower()) then
+					addsong({label = rrr_prettyname(item:sub(1, -5)), path = path})
+				end
+			end
+		end
+	end
+
+	--the name the pack has in the list ("name" in pack.json, or the folder's name)
+	for _, entry in ipairs(packs) do
+		entry.packname = rrr_prettyname(entry.folder)
+		if entry.pack and entry.pack.name then
+			entry.packname = entry.pack.name
+		end
+	end
+	--packs with an "order" first (lowest first), then the rest. Packs with the same order (or no order) are sorted
+	--alphabetically by that name (a pack in the save folder comes before one with the same name in the game, so its songs win)
+	table.sort(packs, function(a, b)
+		local ao, bo = a.pack and a.pack.order, b.pack and b.pack.order
+		if ao and bo and ao ~= bo then
+			return ao < bo
+		elseif ao and not bo then
+			return true
+		elseif bo and not ao then
+			return false
+		end
+		local an, bn = a.packname:lower(), b.packname:lower()
+		if an ~= bn then
+			return an < bn
+		end
+		if a.folder:lower() ~= b.folder:lower() then
+			return a.folder:lower() < b.folder:lower()
+		end
+		return a.root < b.root
+	end)
+
+	for _, entry in ipairs(packs) do
+		local folderpath = entry.folderpath
+		local packname = entry.packname
+		local used = {}
+		--the star theme and win fanfare aren't songs of the pack
+		local star, starfile = rrr_packextra(folderpath, entry.pack, RRR_STARKEY)
+		local clear, clearfile = rrr_packextra(folderpath, entry.pack, RRR_CLEARKEY)
+		if starfile then
+			used[starfile:lower()] = true
+		end
+		if clearfile then
+			used[clearfile:lower()] = true
+		end
+		local function add(song)
+			song.star, song.clear = star, clear
+			addsong(song)
+		end
+		if entry.pack then
+			for _, song in ipairs(entry.pack.songs or {}) do
+				local file = tostring(song[1]) .. ".ogg"
+				if song[2] and rrr_fileexists(folderpath .. "/" .. file) and not used[file:lower()] then
+					used[file:lower()] = true
+					add({label = packname .. "- " .. song[2], path = folderpath .. "/" .. file, pack = folderpath})
+				end
+			end
+		end
+		local files = love.filesystem.getDirectoryItems(folderpath)
+		table.sort(files, function(a, b) return a:lower() < b:lower() end)
+		for _, file in ipairs(files) do
+			if rrr_issong(file) and not used[file:lower()] then
+				add({label = packname .. "- " .. rrr_prettyname(file:sub(1, -5)), path = folderpath .. "/" .. file, pack = folderpath})
+			end
+		end
+	end
+	return list
+end
+
+local function rrr_musiclabels()
+	local labels = {}
+	for i, entry in ipairs(rrr_musiclist()) do
+		labels[i] = entry.label
+	end
+	return labels
+end
+
+local function rrr_newsource(path, looping)
+	local ok, source = pcall(love.audio.newSource, path, "stream")
+	if not ok then
+		print("rival rumble royale: couldn't load " .. tostring(path))
+		return nil
+	end
+	source:setLooping(looping == true)
+	source:setPitch(music.pitch or 1)
+	return source
+end
+
+--put back the star theme a music pack replaced
+local function rrr_restoremusic()
+	if rrr_saved then
+		if rrr_saved.star then
+			music.loaded["starmusic"]:stop()
+			if music.loaded["starmusic-intro"] then
+				music.loaded["starmusic-intro"]:stop()
+			end
+		end
+		if rrr_saved.star then
+			music.loaded["starmusic"] = rrr_saved.star
+			music.loaded["starmusic-intro"] = rrr_saved.starintro
+		end
+		rrr_saved = nil
+	end
+end
+
+local function rrr_setupmusic(S, entry)
+	rrr_restoremusic()
+	S.clearpath = RRR_DEFAULT_CLEAR
+	if not (entry and rrr_fileexists(entry.path)) then
+		return
+	end
+	custommusics = custommusics or {}
+	custommusics["battle"] = entry.path
+	music:load(entry.path) --also loads entry-intro.ogg
+	musici = 7
+	custommusic = false
+	custommusici = "battle"
+
+	--the pack's star theme replaces the built-in one (with an intro if it has one)
+	if entry.star then
+		local source = rrr_newsource(entry.star, true)
+		if source then
+			rrr_saved = {star = music.loaded["starmusic"], starintro = music.loaded["starmusic-intro"]}
+			music.loaded["starmusic"] = source
+			music.loaded["starmusic-intro"] = nil
+			local intro = music:variant(entry.star, "-intro")
+			if rrr_fileexists(intro) then
+				music.loaded["starmusic-intro"] = rrr_newsource(intro, false)
+			end
+		end
+	end
+	--the pack's battle clear theme, played in the arena when the battle ends
+	if entry.clear then
+		S.clearpath = entry.clear
+	end
+end
+
+--the battle clear theme plays once, with its intro first if there is one
+local function rrr_startclear(S)
+	local C = {t = 0}
+	local intropath = S.clearpath:sub(1, -5) .. "-intro.ogg"
+	if rrr_fileexists(intropath) then
+		C.intro = rrr_newsource(intropath, false)
+	end
+	C.main = rrr_newsource(S.clearpath, false)
+	if C.intro then
+		playsound(C.intro)
+		C.introplaying = true
+	elseif C.main then
+		playsound(C.main)
+	end
+	S.clear = C
+end
+
+--true once the clear theme is done
+local function rrr_updateclear(S, dt)
+	local C = S.clear
+	if not C then
+		return true
+	end
+	C.t = C.t + dt
+	if C.introplaying then
+		if not C.intro:isPlaying() then
+			C.introplaying = false
+			if C.main then
+				playsound(C.main)
+			end
+		end
+		return false
+	end
+	if C.t > RRR_CLEAR_MAX or not soundenabled then
+		return true
+	end
+	return not (C.main and C.main:isPlaying())
+end
+
+local function rrr_stopclear(S)
+	local C = S and S.clear
+	if C then
+		if C.intro then C.intro:stop() end
+		if C.main then C.main:stop() end
+	end
+end
+
+-----------
+--  MAP  --
+-----------
+
+--wider screens: the arena gets more floor next to the walls (columns 2 and the second to last get repeated)
+local function rrr_padlayout(rows, w)
+	local extra = math.max(0, w - #rows[1])
+	if extra == 0 then
+		return rows
+	end
+	local left = math.floor(extra/2)
+	local right = extra - left
+	local out = {}
+	for i, r in ipairs(rows) do
+		local l = r:sub(2, 2):gsub("[1234S?R]", " ")
+		local rr = r:sub(-2, -2):gsub("[1234S?R]", " ")
+		out[i] = r:sub(1, 1) .. string.rep(l, left) .. r:sub(2, -2) .. string.rep(rr, right) .. r:sub(-1, -1)
+	end
+	return out
+end
+
+local function rrr_settile(x, y, id)
+	if map[x] and map[x][y] then
+		map[x][y][1] = id
+	end
+end
+
+local function rrr_char(rows, x, y)
+	local r = rows[y]
+	if not r or x < 1 or x > #r then
+		return " "
+	end
+	return r:sub(x, x)
+end
+
+--hills, bushes and clouds where nothing else is
+local function rrr_decorate(S, rows, theme)
+	local function free(x, y)
+		return map[x] and map[x][y] and map[x][y][1] == 1 and rrr_char(rows, x, y) == " "
+	end
+	local function place(shape, x, bottomy)
+		for r = 1, #shape do
+			for c = 1, #shape[r] do
+				if shape[r][c] and not free(x+c-1, bottomy-(#shape-r)) then
+					return false
+				end
+			end
+		end
+		for r = 1, #shape do
+			for c = 1, #shape[r] do
+				if shape[r][c] then
+					rrr_settile(x+c-1, bottomy-(#shape-r), shape[r][c])
+				end
+			end
+		end
+		return true
+	end
+
+	if theme.decor == "hills" then
+		--trunks under the low treetops
+		for y = 1, mapheight do
+			for x = 1, mapwidth do
+				if rrr_char(rows, x, y) == "=" and rrr_char(rows, x-1, y) == "=" and rrr_char(rows, x+1, y) == "=" and y >= mapheight - 6 then
+					local ty = y+1
+					while ty <= mapheight and free(x, ty) do
+						ty = ty + 1
+					end
+					if ty <= mapheight and rrr_solid(x, ty) then
+						for yy = y+1, ty-1 do
+							rrr_settile(x, yy, theme.trunk)
+						end
+					end
+				end
+			end
+		end
+		--things on the ground (the row 2 over the bottom stands on the ground)
+		local shapes = {
+			{{false, 3, false}, {24, 25, 26}},
+			{{4, 5, 6}},
+			{{4, 5, 5, 6}},
+			{{false, false, 3, false, false}, {false, 24, 25, 26, false}, {24, 25, 27, 28, 26}},
+		}
+		local x = 2
+		while x < mapwidth do
+			local shape = randomitem(shapes)
+			if place(shape, x, mapheight - 2) then
+				x = x + #shape[#shape] + math.random(1, 3)
+			else
+				x = x + 1
+			end
+		end
+	end
+	if theme.decor == "hills" or theme.decor == "clouds" then
+		local x = math.random(2, 5)
+		while x < mapwidth-4 do
+			local cloudrow = math.random(3, mapheight - 8)
+			local cloudrow = math.random(3, mapheight - 8)
+			local middle = math.random(1, 2)
+			local top, bottom = {33}, {55}
+			for i = 1, middle do
+				top[#top+1] = 34
+				bottom[#bottom+1] = 56
+			end
+			top[#top+1] = 35
+			bottom[#bottom+1] = 57
+			if place({top, bottom}, x, cloudrow) then
+				x = x + #top + math.random(3, 7)
+			else
+				x = x + 2
+			end
+		end
+	end
+	if theme.decor == "lab" then
+		--windows in the walls of the test chamber
+		for _, x in ipairs({3, 7, mapwidth-8, mapwidth-4}) do
+			place({{147, 148}}, x, 3)
+		end
+	end
+end
+
+--read the layout into the map, the ? blocks and the spawns
+local function rrr_buildmap(S, theme, layout)
+	local rows = rrr_padlayout(layout, width)
+	mapwidth = #rows[1]
+	originalmapwidth = mapwidth
+	mapheight = #rows
+	map = {}
+	for x = 1, mapwidth do
+		map[x] = {}
+		for y = 1, mapheight do
+			map[x][y] = {1}
+			map[x][y]["gels"] = {}
+		end
+	end
+
+	S.blocks = {}
+	S.blockat = {}
+	S.spawns = {}
+	for y = 1, mapheight do
+		for x = 1, mapwidth do
+			local c = rrr_char(rows, x, y)
+			if c == "#" then
+				rrr_settile(x, y, theme.ground)
+			elseif c == "X" then
+				rrr_settile(x, y, theme.block)
+			elseif c == "B" then
+				rrr_settile(x, y, theme.brick)
+			elseif c == "=" then
+				local id = theme.platform[2]
+				if rrr_char(rows, x-1, y) ~= "=" then
+					id = theme.platform[1]
+				elseif rrr_char(rows, x+1, y) ~= "=" then
+					id = theme.platform[3]
+				end
+				rrr_settile(x, y, id)
+			elseif c == "P" then
+				--pipes are always 2 wide: count from the left end of the run
+				local runstart = x
+				while rrr_char(rows, runstart-1, y) == "P" do
+					runstart = runstart - 1
+				end
+				local left = (x-runstart)%2 == 0
+				local top = rrr_char(rows, x, y-1) ~= "P"
+				local id
+				if top and left then
+					id = theme.pipe[1]
+				elseif top then
+					id = theme.pipe[2]
+				elseif left then
+					id = theme.pipe[3]
+				else
+					id = theme.pipe[4]
+				end
+				rrr_settile(x, y, id)
+			elseif c == "L" then
+				if theme.lava then
+					if rrr_char(rows, x, y-1) == "L" then
+						rrr_settile(x, y, theme.lava[2])
+					else
+						rrr_settile(x, y, theme.lava[1])
+					end
+				end
+			elseif RRR_BLOCKS[c] then
+				rrr_settile(x, y, RRR_QUESTIONBLOCK)
+				local def = RRR_BLOCKS[c]
+				local b = {x = x, y = y, def = def, cooldown = 0, roulette = math.random(#def.items), roulettet = math.random()*RRR_ROULETTE_TIME}
+				table.insert(S.blocks, b)
+				S.blockat[x] = S.blockat[x] or {}
+				S.blockat[x][y] = b
+			elseif c:match("%d") then
+				S.spawns[tonumber(c)] = {x = x, y = y}
+			end
+		end
+	end
+	rrr_decorate(S, rows, theme)
+	return rows
+end
+
+-------------------
+--  NAVIGATION  --
+-------------------
+--bots walk on "segments": runs of tiles a player can stand in (air with something solid under it)
+
+local RRR_JUMP_UP = 4 --how high a bot jumps (tiles)
+local RRR_JUMP_GAP = 3 --how wide a gap a bot jumps over
+
+local function rrr_segat(S, x, row)
+	local column = S.segat[x]
+	if column then
+		return column[row]
+	end
+	return nil
+end
+
+--the segment a player stands on, nil in the air
+local function rrr_playerseg(S, p)
+	if p.falling or p.jumping then
+		return nil
+	end
+	local row = math.floor(rrr_feet(p) + 0.5)
+	return rrr_segat(S, math.floor(rrr_center(p))+1, row) or rrr_segat(S, math.floor(p.x+0.05)+1, row) or rrr_segat(S, math.floor(p.x+p.width-0.05)+1, row)
+end
+
+--the first surface at or under a point (x, y in tiles)
+local function rrr_segbelow(S, x, y)
+	local column = math.floor(x)+1
+	for row = math.max(1, math.ceil(y-0.05)), mapheight do
+		local seg = rrr_segat(S, column, row)
+		if seg then
+			return seg
+		end
+	end
+	return nil
+end
+
+--where you land when you fall down a column
+local function rrr_landing(S, column, fromrow)
+	for row = fromrow, mapheight do
+		if rrr_solid(column, row) then
+			return nil
+		end
+		local seg = rrr_segat(S, column, row)
+		if seg then
+			return seg
+		end
+	end
+	return nil
+end
+
+local function rrr_makeedge(S, A, B)
+	local rise = A.y - B.y
+	local gap, side = -1, 0
+	if B.x1 > A.x2 then
+		gap, side = B.x1 - A.x2 - 1, 1
+	elseif B.x2 < A.x1 then
+		gap, side = A.x1 - B.x2 - 1, -1
+	end
+	local edgex = A.x2
+	if side < 0 then
+		edgex = A.x1
+	end
+
+	if rise > 0 then
+		if rise > RRR_JUMP_UP then
+			return nil
+		end
+		if gap >= 0 then
+			if gap > RRR_JUMP_GAP then
+				return nil
+			end
+			return {kind = "jump", takeoffs = {{x = edgex, dir = side}}}
+		end
+		--B is right above A: jump from next to it, not from under it
+		local takeoffs = {}
+		if B.x1-1 >= A.x1 then
+			table.insert(takeoffs, {x = B.x1-1, dir = 1, under = true})
+		end
+		if B.x2+1 <= A.x2 then
+			table.insert(takeoffs, {x = B.x2+1, dir = -1, under = true})
+		end
+		if #takeoffs == 0 then
+			return nil
+		end
+		return {kind = "jump", takeoffs = takeoffs}
+	elseif rise == 0 then
+		if gap < 0 or gap > RRR_JUMP_GAP+1 then
+			return nil
+		end
+		return {kind = "jump", takeoffs = {{x = edgex, dir = side}}}
+	end
+
+	--B is lower: walk off the side it sticks out of, or jump over to it
+	local sides = {}
+	if B.x2 > A.x2 then
+		table.insert(sides, 1)
+	end
+	if B.x1 < A.x1 then
+		table.insert(sides, -1)
+	end
+	for _, d in ipairs(sides) do
+		local column = A.x2+1
+		local edge = A.x2
+		if d < 0 then
+			column = A.x1-1
+			edge = A.x1
+		end
+		if not rrr_solid(column, A.y) then
+			--a drop needs room to land: walking off keeps some speed
+			local room = B.x2 - column
+			if d < 0 then
+				room = column - B.x1
+			end
+			if rrr_landing(S, column, A.y) == B and room >= 2 then
+				return {kind = "drop", x = column, dir = d}
+			end
+			if gap >= 0 and gap <= RRR_JUMP_GAP and d == side then
+				local near = B.x1
+				if d < 0 then
+					near = B.x2
+				end
+				if rrr_landing(S, near, A.y) == B then
+					return {kind = "jump", takeoffs = {{x = edge, dir = d}}}
+				end
+			end
+		end
+	end
+	return nil
+end
+
+local function rrr_buildnavigation(S)
+	S.segs = {}
+	S.segat = {}
+	for x = 1, mapwidth do
+		S.segat[x] = {}
+	end
+	for row = 1, mapheight-1 do
+		local current = nil
+		for x = 1, mapwidth do
+			local standable = (not rrr_solid(x, row)) and rrr_solid(x, row+1)
+			if standable then
+				if current then
+					current.x2 = x
+				else
+					current = {y = row, x1 = x, x2 = x, id = #S.segs+1}
+					table.insert(S.segs, current)
+				end
+				S.segat[x][row] = current
+			else
+				current = nil
+			end
+		end
+	end
+	S.edges = {}
+	for _, A in ipairs(S.segs) do
+		S.edges[A] = {}
+		for _, B in ipairs(S.segs) do
+			if A ~= B then
+				local e = rrr_makeedge(S, A, B)
+				if e then
+					S.edges[A][B] = e
+				end
+			end
+		end
+	end
+	--the surface under every ? block, where you jump from to hit it
+	for _, b in ipairs(S.blocks) do
+		b.seg = rrr_segbelow(S, b.x-0.5, b.y+0.5)
+	end
+end
+
+--shortest route (in jumps) between two segments, false when there is none
+local function rrr_path(S, from, to)
+	if from == to then
+		return {from}
+	end
+	local prev = {[from] = from}
+	local queue = {from}
+	local qi = 1
+	while qi <= #queue do
+		local a = queue[qi]
+		qi = qi + 1
+		for _, b in ipairs(S.segs) do
+			--one tile wide spots (on top of a ? block) are too easy to miss on the way somewhere else
+			if S.edges[a][b] and not prev[b] and (b.x2 > b.x1 or b == to) then
+				prev[b] = a
+				if b == to then
+					local path = {b}
+					while path[1] ~= from do
+						table.insert(path, 1, prev[path[1]])
+					end
+					return path
+				end
+				table.insert(queue, b)
+			end
+		end
+	end
+	return false
+end
+
+-------------------------
+--  TERRAIN GENERATOR  --
+-------------------------
+--every battle gets a new arena in its theme's style, mirrored so both sides are fair. The rules stay the same as the
+--fixed arenas: a ? block 3 tiles over every spawn, a ? block on each side, the rare block over the middle platform,
+--and every spawn and block can be reached (checked with the bots' own routes, so they can play it too)
+
+local RRR_GEN_W = 40
+local RRR_MAPHEIGHT = 30 --every arena is 30 tiles high
+local RRR_GEN_TRIES = 40 --after this many arenas that don't pass the check, the fixed one for the theme is used
+
+--a new layout (rows of characters like RRR_LAYOUTS), nil when the dice gave something that can't work
+--from the bottom up: the ground with the first two spawns, the low platforms with the other two, then platforms
+--going up in turns (the middle one, one on each side, the middle one...) with the rare block over the highest one
+local function rrr_generatelayout(theme)
+	local W, H = RRR_GEN_W, RRR_MAPHEIGHT
+	local G = H - 2 --the row a player on the ground stands in (the ground is the 2 rows under it)
+	local style = theme.layout
+	local grid = {}
+	for y = 1, H do
+		grid[y] = {}
+		for x = 1, W do
+			grid[y][x] = " "
+		end
+	end
+	local function get(x, y)
+		if x < 1 or x > W or y < 1 or y > H then
+			return "X"
+		end
+		return grid[y][x]
+	end
+	--everything goes on the left half and gets mirrored to the right
+	local function setpair(x, y, left, right)
+		if x >= 1 and x <= W and y >= 1 and y <= H then
+			grid[y][x] = left
+			grid[y][W+1-x] = right
+		end
+	end
+	local function set(x, y, c)
+		setpair(x, y, c, c)
+	end
+	local function free(x1, y1, x2, y2)
+		for y = y1, y2 do
+			for x = x1, x2 do
+				if get(x, y) ~= " " then
+					return false
+				end
+			end
+		end
+		return true
+	end
+	--a platform in the middle, from the center out to hw tiles on each side
+	local function middleplatform(row, hw)
+		for x = W/2 + 1 - hw, W/2 do
+			set(x, row, "=")
+		end
+	end
+
+	--ground and walls (and a ceiling underground and in the test chamber)
+	for x = 1, W/2 do
+		set(x, G+1, "#")
+		set(x, G+2, "#")
+		if style == "cave" then
+			set(x, 1, "B")
+		elseif style == "lab" then
+			set(x, 1, "X")
+		end
+	end
+	for y = 1, G do
+		set(1, y, "X")
+	end
+
+	--the bottom spawns (p3 and p4) on the ground near the walls
+	local s1 = math.random(3, 5)
+	setpair(s1, G, "3", "4")
+	set(s1, G-3, "S")
+
+	--lava pits in the castle, the low platform comes after them (a platform over a pit's edge would bonk
+	--anyone jumping over the pit into the lava)
+	local pitfrom, pitto = 0, -1
+	local platformfrom, platformto, platformmax = s1 + 2, 9, 15
+	if style == "castle" then
+		pitfrom = s1 + math.random(3, 4)
+		pitto = pitfrom + math.random(2, 3) - 1
+		for x = pitfrom, pitto do
+			set(x, G+1, "L")
+			set(x, G+2, "L")
+		end
+		platformfrom, platformto, platformmax = pitto + 3, pitto + 4, 17
+	end
+	--near a pit's edge, where players jump from (a block there would bonk them into the lava)
+	local function nearpit(x)
+		return x >= pitfrom - 2 and x <= pitto + 2
+	end
+
+	--the low platform with a ? block over it
+	local lowrow = G - math.random(2, 3) --3 or 4 tiles over the ground
+	local x1 = math.random(platformfrom, platformto)
+	local x2 = math.min(x1 + math.random(4, 7) - 1, platformmax)
+	for x = x1, x2 do
+		set(x, lowrow, "=")
+	end
+	local pc = math.floor((x1 + x2)/2)
+	set(pc, lowrow-4, "?")
+
+	--a pipe on the ground (overworld and underground), a pillar in the middle of the test chamber
+	if style == "field" or style == "cave" then
+		local h = math.random(1, 2)
+		local spots = {}
+		for x = 2, 18 do
+			local clear = free(x, G+1-h, x+1, G) and math.abs(x - s1) > 1 and math.abs(x+1 - s1) > 1
+			if clear and (x+1 < x1 - 1 or x > x2 + 1) then
+				table.insert(spots, x)
+			end
+		end
+		if #spots > 0 then
+			local x = randomitem(spots)
+			for y = G+1-h, G do
+				set(x, y, "P")
+				set(x+1, y, "P")
+			end
+		end
+	elseif style == "lab" then
+		for y = G+1 - math.random(2, 3), G do
+			set(W/2, y, "X")
+		end
+	end
+
+	--the first middle platform, 3 tiles over the low platform and close enough to jump to
+	local row = lowrow - 3
+	local hwmin = math.max(3, 17 - x2) --the gap from the low platform is at most 3 tiles
+	local hwmax = math.min(7, 19 - pc) --and it can't be under the ? block over the low platform
+	if hwmin > hwmax then
+		return nil
+	end
+	local hw = math.random(hwmin, hwmax)
+	middleplatform(row, hw)
+
+	--a ledge on the wall now and then
+	if math.random() < 0.5 then
+		local lx2 = 1 + math.random(2, 4)
+		if lx2 < pc - 1 and x1 - lx2 - 1 <= 3 and free(2, row-2, lx2, row) then
+			for x = 2, lx2 do
+				set(x, row, "=")
+			end
+		end
+	end
+
+	--more platforms going up: one on each side, then the middle again (3 or 4 tiles up each time, 1 to 3 tiles
+	--across), as long as there's room for both and the rare block over the last one
+	local topside --the highest side platforms, the top spawns (p1 and p2) go there
+	while row - 8 - 3 >= 3 do
+		--the side platforms, out from the middle one's end
+		local siderow = row - math.random(3, 4)
+		local sx2 = W/2 - hw - math.random(1, 3)
+		local sx1 = math.max(2, sx2 - math.random(3, 6) + 1)
+		if sx2 < sx1 + 1 then
+			break
+		end
+		for x = sx1, sx2 do
+			set(x, siderow, "=")
+		end
+		topside = {x1 = sx1, x2 = sx2, row = siderow}
+		--the next middle platform, out to within 1 to 3 tiles of the side ones
+		local nextrow = siderow - math.random(3, 4)
+		local nexthw = W/2 - sx2 - math.random(1, 3)
+		if nexthw < 2 then
+			return nil
+		end
+		nexthw = math.min(nexthw, 7)
+		row, hw = nextrow, nexthw
+		middleplatform(row, hw)
+	end
+	grid[row-3][W/2] = "R"
+
+	--the top spawns, with their ? block over them
+	if not topside then
+		return nil
+	end
+	local sc = math.floor((topside.x1 + topside.x2)/2)
+	if not free(sc, topside.row-4, sc, topside.row-1) then
+		return nil
+	end
+	setpair(sc, topside.row-1, "1", "2")
+	set(sc, topside.row-4, "S")
+
+	--a ? block on each side, hit from the ground
+	local spots = {}
+	for x = math.max(x2 + 2, s1 + 2), W/2 - 1 do
+		if not nearpit(x) and free(x, lowrow-1, x, G) and free(x-1, lowrow, x+1, lowrow) then
+			table.insert(spots, x)
+		end
+	end
+	if #spots == 0 then
+		return nil
+	end
+	set(randomitem(spots), lowrow, "?")
+
+	local rows = {}
+	for y = 1, H do
+		rows[y] = table.concat(grid[y])
+	end
+	return rows
+end
+
+--the fixed arenas are 15 high: 15 empty rows (with the walls) go on top, under the ceiling if there is one.
+--their ground spawns are 1 and 2, those become 3 and 4 (p1 and p2 get the higher ones)
+local RRR_SPAWNSWAP = {["1"] = "3", ["2"] = "4", ["3"] = "1", ["4"] = "2"}
+local function rrr_tallfixedlayout(layout)
+	local rows = {layout[1]}
+	local empty = "X" .. string.rep(" ", #layout[1] - 2) .. "X"
+	for i = 1, RRR_MAPHEIGHT - #layout do
+		table.insert(rows, empty)
+	end
+	for i = 2, #layout do
+		table.insert(rows, (layout[i]:gsub("[1234]", RRR_SPAWNSWAP)))
+	end
+	return rows
+end
+
+--can everyone get everywhere? every spawn stands on something, every ? block can be hit from below,
+--and there's a route (for the bots too) from the first spawn to every spawn and every block and back
+local function rrr_arenaok(S)
+	local spawnsegs = {}
+	for i = 1, RRR_PLAYERS do
+		local spawn = S.spawns[i]
+		local seg = spawn and rrr_segat(S, spawn.x, spawn.y)
+		if not seg then
+			return false
+		end
+		spawnsegs[i] = seg
+	end
+	local targets = {}
+	for _, seg in ipairs(spawnsegs) do
+		table.insert(targets, seg)
+	end
+	for _, b in ipairs(S.blocks) do
+		if not b.seg or b.seg.y - b.y < 2 or b.seg.y - b.y > 4 then
+			return false
+		end
+		table.insert(targets, b.seg)
+	end
+	for _, target in ipairs(targets) do
+		if not rrr_path(S, spawnsegs[1], target) or not rrr_path(S, target, spawnsegs[1]) then
+			return false
+		end
+	end
+	return true
+end
+
+--------------
+--  BLOCKS  --
+--------------
+
+--the image and quad an item is drawn with (nil when the sprite isn't there)
+local function rrr_itemicon(name)
+	local ss = spriteset or 1
+	local img, quads, index = itemsimg, itemsquad, RRR_ITEMQUADS[name]
+	if name == "fireflower" then
+		img, quads, index = flowerimg, flowerquad, 1
+	elseif name == "superballflower" then
+		img, quads, index = superballflowerimg, coinblockquads, coinframe or 1
+	elseif name == "star" then
+		img, quads, index = starimg, starquad, 1
+	end
+	if not (img and quads and quads[ss] and index) then
+		return nil
+	end
+	return img, quads[ss][index]
+end
+
+--hit from below (or by a tail): bounce, and give out the item on show when the block is ready
+local function rrr_hitblock(S, x, y, hitter)
+	local b = S.blockat[x] and S.blockat[x][y]
+	local breakable = inmap(x, y) and tilequads[map[x][y][1]] and tilequads[map[x][y][1]].breakable
+	if not (b or breakable) then
+		return false
+	end
+	--a new bump replaces the one that's still going on this block: an item that one was going to let out
+	--(when its bump is done) comes out right away instead of getting lost
+	local previous = getblockbounce(x, y)
+	if previous and previous.content then
+		item(previous.content, previous.x, previous.y, previous.content2)
+		previous.content = false
+	end
+	local bounce = createblockbounce(x, y)
+	bounce.timer = 0.000000001
+	bounce.x = x
+	bounce.y = y
+	bounce.content = false
+	playsound(blockhitsound)
+	if b and b.cooldown <= 0 and not S.over then
+		--the item comes out once the bounce is done
+		bounce.content = b.def.items[b.roulette]
+		bounce.content2 = 2 --as if a big player hit it, so it's never a mushroom
+		playsound(mushroomappearsound)
+		if not RemoveCooldowns then --removecooldowns nitpick: the block is ready again straight away
+			b.cooldown = b.def.cooldown
+			map[x][y][1] = S.theme.used
+		end
+		--a bot that got something out of a block leaves it alone for the block's cooldown (it would keep hitting the
+		--same block forever with the removecooldowns nitpick) and goes for what came out instead
+		local bot = type(hitter) == "table" and hitter.playernumber and S.bots[hitter.playernumber]
+		if bot then
+			bot.ignore[b] = S.time + b.def.cooldown
+			bot.think = 0
+		end
+	end
+	--bricks only bounce, the arena stays in one piece
+	generatespritebatch()
+	return true
+end
+
+local function rrr_updateblocks(S, dt)
+	local changed = false
+	for _, b in ipairs(S.blocks) do
+		if b.cooldown > 0 then
+			b.cooldown = b.cooldown - dt
+			if b.cooldown <= 0 then
+				b.cooldown = 0
+				map[b.x][b.y][1] = RRR_QUESTIONBLOCK
+				changed = true
+			end
+		else
+			b.roulettet = b.roulettet + dt
+			while b.roulettet >= RRR_ROULETTE_TIME do
+				b.roulettet = b.roulettet - RRR_ROULETTE_TIME
+				b.roulette = b.roulette % #b.def.items + 1
+			end
+		end
+	end
+	if changed then
+		generatespritebatch()
+	end
+end
+
+--how far a bumped block is up (tiles), same motion as the tile itself
+local function rrr_bounceoffset(x, y)
+	local bounce = getblockbounce(x, y)
+	if not (bounce and bounce.timer) then
+		return 0
+	end
+	local t = math.abs(bounce.timer)
+	if t < blockbouncetime/2 then
+		return t/(blockbouncetime/2)*blockbounceheight
+	end
+	return math.max(0, (2 - t/(blockbouncetime/2))*blockbounceheight)
+end
+
+--the roulette (or the cooldown) over every ? block
+local function rrr_drawblocks(S)
+	for _, b in ipairs(S.blocks) do
+		--drawn on the block itself, like a roulette block (items that come out sit right above it)
+		local px = (b.x-1-xscroll)*16
+		local py = (b.y-1-yscroll)*16 - 8 - rrr_bounceoffset(b.x, b.y)*16
+		if px > -16 and px < width*16*screenzoom2*2 then
+			if b.cooldown <= 0 then
+				local img, quad = rrr_itemicon(b.def.items[b.roulette])
+				if img and quad then
+					love.graphics.setColor(255, 255, 255)
+					love.graphics.draw(img, quad, math.floor(px*scale), math.floor(py*scale), 0, scale, scale)
+				end
+			else
+				local text = tostring(math.ceil(b.cooldown))
+				local c = b.def.color
+				love.graphics.setColor(c[1], c[2], c[3])
+				properprintFbackground(text, math.floor((px + 8 - #text*4)*scale), math.floor((py + 4)*scale))
+			end
+		end
+	end
+	love.graphics.setColor(255, 255, 255)
+end
+
+---------------
+--  COMBAT  --
+---------------
+
+local function rrr_banner(S, text, duration)
+	S.banner = {text = text, t = 0, duration = duration or 2}
+end
+
+--touching a player with a star or a blue shell at full speed, a projectile or a stomp: damage, like an enemy's
+--(a powered up player drops to super, super drops to small, small dies)
+local function rrr_hurt(S, victim, attacker)
+	if rrr_protected(victim) or S.over or S.starting then
+		return false
+	end
+	if attacker then
+		S.lasthit[victim.playernumber] = {by = attacker.playernumber, t = S.time}
+	end
+	victim:die("Enemy")
+	return true
+end
+
+--what players throw: fireballs, superballs, hammers, boomerangs, tails, and a custom character's own enemy
+--when it kills other enemies (a custom fireenemy with killsenemies)
+local RRR_PROJECTILES = {"fireball", "mariohammer", "boomerang", "mariotail", "enemy"}
+
+local function rrr_isprojectile(name, o)
+	if name == "enemy" then
+		return o.fireballthrower ~= nil and o.killsenemies and not o.shot and not o.dead
+	end
+	return true
+end
+
+local function rrr_projectileowner(o)
+	return o.fireballthrower or o.mariohammerthrower or o.player
+end
+
+local RRR_STOMP_GRACE = 0.25 --after a stomp, the two players can't hurt each other by touching for this long
+
+--a is coming down onto v's head
+local function rrr_stomping(a, v, dt)
+	return a.speedy > 0 and rrr_feet(a) - a.speedy*dt <= v.y + 0.3
+end
+
+--a stomped b (or b stomped a) a moment ago
+local function rrr_stompgrace(S, a, b)
+	local t = S.stompgrace[a .. "," .. b] or S.stompgrace[b .. "," .. a]
+	return t ~= nil and S.time < t
+end
+
+local function rrr_updatecombat(S, dt)
+	local list = objects["player"]
+	S.stompgrace = S.stompgrace or {}
+	local function touching(i, j)
+		local a, v = list[i], list[j]
+		return i ~= j and a and v and rrr_alive(S, i) and rrr_alive(S, j) and a.active and v.active and rrr_overlap(a, v, 1/16)
+	end
+
+	--stomps first: anyone can bounce off anyone's head, like off an enemy. The one underneath only takes
+	--damage when it can be hurt (a star or the blinking after a hit just means a bounce), and the one on top
+	--never gets hurt by the stomp, even landing on a star or a fast blue shell
+	for i = 1, RRR_PLAYERS do
+		for j = 1, RRR_PLAYERS do
+			local a, v = list[i], list[j]
+			if touching(i, j) and not rrr_dangerous(a) and rrr_stomping(a, v, dt) and not rrr_stompgrace(S, i, j) then
+				S.stompgrace[i .. "," .. j] = S.time + RRR_STOMP_GRACE
+				rrr_hurt(S, v, a)
+				a:stompbounce("player", {stompbouncesound = true})
+				playsound(stompsound)
+			end
+		end
+	end
+
+	--players with a star or a fast blue shell hurt whoever they touch
+	for i = 1, RRR_PLAYERS do
+		for j = 1, RRR_PLAYERS do
+			local a, v = list[i], list[j]
+			if touching(i, j) and not rrr_stompgrace(S, i, j) then
+				local adanger, vdanger = rrr_dangerous(a), rrr_dangerous(v)
+				if a.size == 14 and v.size == 14 and adanger and vdanger and not (a.starred or v.starred or a.statue or v.statue) then
+					--two shells bounce off each other
+					if i < j then
+						a.speedx, v.speedx = -a.speedx, -v.speedx
+						playsound(blockhitsound)
+					end
+				elseif adanger then
+					rrr_hurt(S, v, a) --does nothing to someone who can't be hurt (a star, a statue, blinking)
+				end
+			end
+		end
+	end
+
+	--fireballs, superballs, hammers, boomerangs and tails hit anyone but who threw them
+	for _, name in ipairs(RRR_PROJECTILES) do
+		for _, o in pairs(objects[name] or {}) do
+			local owner = rrr_projectileowner(o)
+			if owner and rrr_isprojectile(name, o) and o.active ~= false and not o.destroy and not o.delete and not o.destroysoon then
+				for j = 1, RRR_PLAYERS do
+					local v = list[j]
+					if v and v ~= owner and rrr_alive(S, j) and rrr_overlap(o, v) then
+						if rrr_hurt(S, v, owner) then
+							if name == "fireball" and o.explode then
+								o:explode()
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
+local function rrr_checkwinner(S)
+	if S.over then
+		return
+	end
+	local alive = {}
+	for i = 1, RRR_PLAYERS do
+		if not S.out[i] then
+			table.insert(alive, i)
+		end
+	end
+	if #alive <= 1 then
+		S.endbattle(S, alive[1])
+	end
+end
+
+--every player's star ends, so the star theme stops
+local function rrr_endstar(p)
+	if p.starred then
+		p.startimer = mariostarduration - 0.0001
+		if p.dead then
+			p.starred = false
+			p.colors = p.basecolors
+		end
+	end
+end
+
+local function rrr_ondeath(S, p)
+	local i = p.playernumber
+	rrr_endstar(p)
+	p.starred = false
+	if S.over then
+		return --falling in a pit after the battle doesn't change the result (or the music)
+	end
+	updatemusicpriority() --a star ends with the player
+	local hit = S.lasthit[i]
+	if hit and S.time - hit.t <= RRR_HIT_CREDIT and hit.by ~= i then
+		S.kos[hit.by] = S.kos[hit.by] + 1
+	end
+	S.lasthit[i] = nil
+	if (mariolives[i] or 0) <= 0 then
+		S.out[i] = true
+		table.insert(S.outorder, i)
+		rrr_banner(S, "p" .. i .. " is out!", 2)
+	end
+	rrr_checkwinner(S)
+end
+
+--back at the spawn, small and blinking for a bit
+local function rrr_respawn(S, p)
+	local i = p.playernumber
+	if S.out[i] or S.over then
+		p.drawable = false
+		return
+	end
+	local spawn = S.spawns[i] or S.spawns[1]
+	p.speedx = 0
+	p.speedy = 0
+	p.dead = false
+	p.size = 1
+	p.health = p.characterdata.health
+	p:setsize(1)
+	p.starred = false
+	p.startimer = mariostarduration
+	p.colors = p.basecolors
+	p.drawable = true
+	p.animationstate = "idle"
+	p:setquad()
+	p.animation = "invincible"
+	p.invincible = true
+	p.animationtimer = rrr_invinciblestart()
+	p.x = spawn.x - 0.5 - p.width/2
+	p.y = spawn.y - p.height
+	p.jumping = false
+	p.falling = true
+	p.controlsenabled = true
+	p.active = true
+	makepoof(spawn.x - 0.5, spawn.y - 0.5, "makerpoof")
+end
+
+------------
+--  BOTS  --
+------------
+--a bot holds buttons through the same functions the keyboard goes through (checkkey), presses call the same player functions
+
+local RRR_SHOOTERS = {[3] = true, [4] = true, [13] = true, [15] = true} --fire, hammer, superball, boomerang
+local RRR_INFINITE_FIRE_RATE = 0.4 --with infinite fireballs on, bots wait this much of their usual time between shots
+local RRR_MIN_FIRE_WAIT = 0.08 --but never less than this (about as fast as someone can mash the button)
+local RRR_SPINNERS = {[6] = true, [9] = true, [10] = true} --leaf, tanooki, cape
+
+--bot difficulty
+--think: how long it takes to make up its mind (seconds, up to 60% more at random)
+--fire: the wait between shots (up to twice as long at random)
+--dodge: the chance it jumps over a projectile coming at it
+--range: how far away it starts shooting (tiles)
+--flee: how close a star or a fast blue shell gets before it runs (tiles)
+--dawdle: the chance it stands around for a moment when it makes up its mind
+--lead: aims where the target will be this many seconds from now
+--greed: how often it goes for a block instead of a fight (at random between 0.3 and 0.7 when not set)
+--dodgestomps: steps out from under anyone coming down on its head
+local RRR_BOTLEVELS = {
+	{name = "easy", think = 0.8, fire = 1.2, dodge = 0.15, range = 7, flee = 4, dawdle = 0.3, lead = 0},
+	{name = "normal", think = 0.45, fire = 0.7, dodge = 0.5, range = 10, flee = 6, dawdle = 0.1, lead = 0},
+	{name = "expert", think = 0.25, fire = 0.35, dodge = 0.9, range = 12, flee = 7, dawdle = 0, lead = 0},
+	{name = "super expert", think = 0.12, fire = 0.18, dodge = 1, range = 16, flee = 9, dawdle = 0, lead = 0.3},
+	{name = "godmode", think = 0.05, fire = 0.1, dodge = 1, range = 40, flee = 12, dawdle = 0, lead = 0.4, greed = 0.8, dodgestomps = true},
+}
+
+local function rrr_newbot(level)
+	level = RRR_BOTLEVELS[level] or RRR_BOTLEVELS[2]
+	return {
+		level = level,
+		dawdle = 0,
+		input = {},
+		think = 0,
+		goal = {kind = "wander"},
+		firecooldown = 0.5,
+		stuck = 0,
+		lastx = 0,
+		greed = level.greed or 0.3 + math.random()*0.4, --how often it goes for a block instead of a fight
+		wandert = 0,
+		ignore = {}, --items and blocks it gave up on (thing = time it can try again)
+		tried = {}, --how long it has gone after each item or block, all together (switching goals doesn't reset it)
+	}
+end
+
+local function rrr_steer(input, from, to, slack)
+	if to < from - slack then
+		input.left = true
+	elseif to > from + slack then
+		input.right = true
+	end
+end
+
+local function rrr_facing(p)
+	if p.animationdirection == "left" then
+		return -1
+	end
+	return 1
+end
+
+local function rrr_itemobjects()
+	local out = {}
+	for _, name in ipairs(RRR_ITEMTABLES) do
+		for _, o in pairs(objects[name] or {}) do
+			if not (o.destroy or o.delete or o.instantdelete) and o.y < mapheight then
+				table.insert(out, o)
+			end
+		end
+	end
+	return out
+end
+
+--the closest thing in a list (by distance), nil when the list is empty
+local function rrr_nearest(p, things, getpos)
+	local best, bestd = nil, math.huge
+	local cx, cy = rrr_center(p), rrr_feet(p)
+	for _, t in ipairs(things) do
+		local x, y = getpos(t)
+		if x then
+			local d = math.abs(x-cx) + math.abs(y-cy)*1.5
+			if d < bestd then
+				best, bestd = t, d
+			end
+		end
+	end
+	return best, bestd
+end
+
+local function rrr_enemies(S, i)
+	local out = {}
+	for j = 1, RRR_PLAYERS do
+		if j ~= i and rrr_alive(S, j) then
+			table.insert(out, objects["player"][j])
+		end
+	end
+	return out
+end
+
+local function rrr_playerpos(q)
+	return rrr_center(q), rrr_feet(q)
+end
+
+local function rrr_ignored(S, bot, thing)
+	local t = bot.ignore[thing]
+	return t ~= nil and S.time < t
+end
+
+--set a new goal (the same goal stays as it is)
+local function rrr_setgoal(S, bot, goal)
+	local old = bot.goal
+	local same = old.kind == goal.kind and old.obj == goal.obj and old.block == goal.block and old.target == goal.target
+	if not same then
+		bot.goal = goal
+	end
+end
+
+--pick something to do
+local function rrr_botthink(S, i, p, bot)
+	local enemies = rrr_enemies(S, i)
+	local cx = rrr_center(p)
+
+	--run from deadly players (unless deadly too)
+	if not p.starred then
+		local danger, dist = nil, math.huge
+		for _, e in ipairs(enemies) do
+			if rrr_dangerous(e) and not e.statue then --a statue can't chase anyone, bots jump over it instead (rrr_botupdate)
+				local d = math.abs(rrr_center(e)-cx) + math.abs(rrr_feet(e)-rrr_feet(p))
+				if d < dist then
+					danger, dist = e, d
+				end
+			end
+		end
+		if danger and dist < bot.level.flee then
+			rrr_setgoal(S, bot, {kind = "flee", from = danger})
+			return
+		end
+	end
+
+	--items lying around
+	if not p.starred then
+		local items = {}
+		for _, o in ipairs(rrr_itemobjects()) do
+			if not rrr_ignored(S, bot, o) then
+				table.insert(items, o)
+			end
+		end
+		local item, dist = rrr_nearest(p, items, function(o)
+			return o.x + o.width/2, o.y + o.height
+		end)
+		if item and (dist < 8 or p.size <= 2) then
+			rrr_setgoal(S, bot, {kind = "item", obj = item})
+			return
+		end
+	end
+
+	--small (or greedy): get something out of a ? block
+	if not p.starred and (p.size <= 2 or math.random() < bot.greed) then
+		local ready = {}
+		for _, b in ipairs(S.blocks) do
+			if b.cooldown <= 0 and b.seg and not rrr_ignored(S, bot, b) then
+				table.insert(ready, b)
+			end
+		end
+		local b = rrr_nearest(p, ready, function(block)
+			return block.x - 0.5, block.seg.y
+		end)
+		if b then
+			rrr_setgoal(S, bot, {kind = "block", block = b})
+			return
+		end
+	end
+
+	--fight: the closest one that can be hurt
+	local targets = {}
+	for _, e in ipairs(enemies) do
+		if not e.starred and (p.starred or not rrr_dangerous(e)) then
+			table.insert(targets, e)
+		end
+	end
+	local target = rrr_nearest(p, targets, rrr_playerpos)
+	if target then
+		rrr_setgoal(S, bot, {kind = "enemy", target = target})
+		return
+	end
+	rrr_setgoal(S, bot, {kind = "wander"})
+end
+
+--where the goal is: the segment to get to and the x to stand at
+local function rrr_goalpos(S, p, bot)
+	local g = bot.goal
+	if g.kind == "block" then
+		if g.block.cooldown > 0 then
+			bot.think = 0
+		end
+		return g.block.seg, g.block.x - 0.5
+	elseif g.kind == "item" then
+		local o = g.obj
+		if o.destroy or o.delete or o.instantdelete or o.y > mapheight then
+			bot.think = 0
+			return nil, rrr_center(p)
+		end
+		local x = o.x + o.width/2
+		return rrr_segbelow(S, x, o.y + o.height), x
+	elseif g.kind == "enemy" then
+		local e = g.target
+		if e.dead or not e.active then
+			bot.think = 0
+			return nil, rrr_center(p)
+		end
+		return rrr_playerseg(S, e) or rrr_segbelow(S, rrr_center(e), rrr_feet(e)), rrr_center(e)
+	elseif g.kind == "flee" then
+		local seg = rrr_playerseg(S, p)
+		local away = rrr_center(p) - rrr_center(g.from)
+		if seg then
+			--the far end of where it stands (it jumps when it gets close anyway)
+			local x = seg.x1 - 0.5
+			if away > 0 then
+				x = seg.x2 - 0.5
+			end
+			return seg, x
+		end
+		return nil, rrr_center(p)
+	end
+	--wander somewhere
+	if not bot.wanderseg or bot.wandert <= 0 then
+		bot.wanderseg = randomitem(S.segs)
+		bot.wandert = 3 + math.random()*3
+	end
+	return bot.wanderseg, (bot.wanderseg.x1 + bot.wanderseg.x2)/2 - 0.5
+end
+
+--fight on the same level as the target
+local function rrr_botattack(S, p, bot, input, e, dt)
+	local cx = rrr_center(p)
+	local ex = rrr_center(e) + (e.speedx or 0)*bot.level.lead
+	local dx = ex - cx
+	local dy = rrr_feet(e) - rrr_feet(p)
+	local dir = 1
+	if dx < 0 then
+		dir = -1
+	end
+	local function face()
+		if rrr_facing(p) ~= dir then
+			if dir > 0 then
+				input.right = true
+			else
+				input.left = true
+			end
+			return false
+		end
+		return true
+	end
+
+	if p.starred then
+		rrr_steer(input, cx, ex, 0.2)
+		if dy < -1 and math.abs(dx) < 3 then
+			input.jump = true
+		end
+	elseif RRR_SHOOTERS[p.size] then
+		--keep some distance and shoot
+		local dist = math.abs(dx)
+		if dist < 2.5 then
+			rrr_steer(input, cx, cx - dir*3, 0.1)
+		elseif dist > 7 then
+			rrr_steer(input, cx, ex, 0.5)
+		end
+		local inline = math.abs(dy) < 1.3 or (p.size == 4 and dy < 0 and dy > -3.5)
+		--only when a shot can come out (2 on screen at most, unless infinite fireballs is on), so a press isn't wasted
+		if inline and dist < bot.level.range and face() and bot.firecooldown <= 0 and p:canfire() then
+			bot.fire = true
+			local wait = bot.level.fire*(1 + math.random())
+			if INFINITEFIREBALLS then
+				wait = math.max(wait*RRR_INFINITE_FIRE_RATE, RRR_MIN_FIRE_WAIT)
+			end
+			bot.firecooldown = wait
+		end
+	elseif RRR_SPINNERS[p.size] then
+		rrr_steer(input, cx, ex, 0.8)
+		if math.abs(dx) < 1.8 and math.abs(dy) < 1.3 and face() and bot.firecooldown <= 0 then
+			bot.fire = true
+			bot.firecooldown = bot.level.fire*0.8*(1 + math.random())
+		end
+		if dy < -1.2 and math.abs(dx) < 2.5 then
+			input.jump = true
+		end
+	elseif p.size == 14 then
+		--blue shell: full speed into them
+		rrr_steer(input, cx, ex + dir*4, 0.2)
+		input.run = true
+	else
+		--stomp them
+		rrr_steer(input, cx, ex, 0.1)
+		if math.abs(dx) < 2.6 and dy > -2 and not e.falling and not e.jumping then
+			input.jump = true
+		end
+	end
+end
+
+--projectiles coming this way: jump
+local function rrr_incoming(S, p)
+	local cx, cy = rrr_center(p), p.y + p.height/2
+	for _, name in ipairs(RRR_PROJECTILES) do
+		for _, o in pairs(objects[name] or {}) do
+			local owner = rrr_projectileowner(o)
+			if name ~= "mariotail" and owner and owner ~= p and rrr_isprojectile(name, o) and o.active ~= false and not o.destroy then
+				local ox = o.x + o.width/2
+				local toward = (o.speedx or 0) * (cx - ox) > 0
+				if toward and math.abs(ox - cx) < 3.5 and math.abs((o.y + o.height/2) - cy) < 1.4 then
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+
+local function rrr_applyinputs(p, bot)
+	local input = bot.input
+	if input.jump and not bot.prevjump then
+		p:button("jump")
+		p:wag()
+		p:jump()
+	elseif not input.jump and bot.prevjump then
+		p:buttonrelease("jump")
+		p:stopjump()
+	end
+	bot.prevjump = input.jump
+	if bot.fire then
+		bot.fire = false
+		p:button("run")
+		p:fire()
+	end
+end
+
+local function rrr_botupdate(S, i, p, dt)
+	local bot = S.bots[i]
+	local input = bot.input
+	input.left, input.right, input.up, input.down = false, false, false, false
+	input.run = false
+	input.jump = false
+	if p.dead or S.out[i] or S.over or S.starting or not p.controlsenabled then
+		rrr_applyinputs(p, bot)
+		return
+	end
+	input.run = true
+	bot.firecooldown = bot.firecooldown - dt
+	bot.wandert = bot.wandert - dt
+	--an item or block it can't get to in 6 seconds (all tries together) gets left alone for 10
+	local thing = bot.goal.obj or bot.goal.block
+	if thing then
+		bot.tried[thing] = (bot.tried[thing] or 0) + dt
+		if bot.tried[thing] > 6 then
+			bot.tried[thing] = 0
+			bot.ignore[thing] = S.time + 10
+			bot.think = 0
+		end
+	end
+	bot.think = bot.think - dt
+	if bot.think <= 0 then
+		rrr_botthink(S, i, p, bot)
+		bot.think = bot.level.think*(1 + math.random()*0.6)
+		if bot.goal.kind ~= "flee" and math.random() < bot.level.dawdle then
+			bot.dawdle = 0.4 + math.random()*0.6
+		end
+	end
+
+	--standing around for a moment (only on the ground, and never while something dangerous is close)
+	if bot.dawdle > 0 then
+		bot.dawdle = bot.dawdle - dt
+		if rrr_playerseg(S, p) and bot.goal.kind ~= "flee" then
+			input.run = false
+			bot.lastx = p.x
+			rrr_applyinputs(p, bot)
+			return
+		end
+	end
+
+	local cx, feet = rrr_center(p), rrr_feet(p)
+	local cur = rrr_playerseg(S, p)
+	local goalseg, goalx = rrr_goalpos(S, p, bot)
+	local g = bot.goal
+
+	if cur then
+		bot.air = nil
+		bot.lastground = cur
+		if bot.runup and not (S.edges[cur] and goalseg) then
+			bot.runup = nil
+		end
+		local path = goalseg and rrr_path(S, cur, goalseg)
+		bot.pending = nil
+		if goalseg == nil or goalseg == cur or not path then
+			--on the goal's level (or no way to get there): the goal itself, jumps here land back on this segment
+			bot.pending = {seg = cur, home = true}
+			if g.kind == "enemy" then
+				bot.pending.chase = g.target
+			end
+			local seglo, seghi = cur.x1 - 1 + 0.45, cur.x2 - 0.45
+			if g.kind == "enemy" and goalseg == cur then
+				rrr_botattack(S, p, bot, input, g.target, dt)
+			elseif g.kind == "enemy" and RRR_SHOOTERS[p.size] and math.abs(rrr_feet(g.target) - feet) < 1.5 then
+				rrr_botattack(S, p, bot, input, g.target, dt) --shooting works across a gap too
+			elseif g.kind == "block" and goalseg == cur then
+				rrr_steer(input, cx, goalx, 0.15)
+				if math.abs(cx - goalx) < 0.3 then
+					input.jump = true
+				end
+			elseif g.kind == "flee" then
+				rrr_steer(input, cx, rrr_clamp(goalx, seglo, seghi), 0.3)
+				local d = math.abs(rrr_center(g.from) - cx)
+				if d < 3 then
+					input.jump = true
+				end
+			else
+				rrr_steer(input, cx, rrr_clamp(goalx, seglo, seghi), 0.3)
+				if g.kind == "item" and g.obj.y + g.obj.height < feet - 1 and math.abs(goalx - cx) < 1.5 then
+					input.jump = true
+				end
+				if not path and goalseg and goalseg ~= cur and math.random() < dt then
+					input.jump = true --no route found: try something
+				end
+			end
+		else
+			--follow the route
+			local nextseg = path[2]
+			local e = S.edges[cur][nextseg]
+			if e.kind == "drop" then
+				input.run = false --walk off, so it doesn't fly past where it lands
+				rrr_steer(input, cx, e.x - 0.5 + e.dir*0.3, 0.05)
+				bot.pending = {seg = nextseg, dir = e.dir}
+			else
+				local t = e.takeoffs[1]
+				for k = 2, #e.takeoffs do
+					if math.abs(e.takeoffs[k].x - 0.5 - cx) < math.abs(t.x - 0.5 - cx) then
+						t = e.takeoffs[k]
+					end
+				end
+				local tx = t.x - 0.5
+				if not t.under then
+					tx = tx + t.dir*0.25 --run up to the very edge
+				end
+				bot.pending = {seg = nextseg, dir = t.dir, under = t.under, gap = not t.under, down = nextseg.y > cur.y}
+				--only a wide gap needs a running start, otherwise a small platform gets overshot
+				local gapwidth = math.max(nextseg.x1 - cur.x2, cur.x1 - nextseg.x2) - 1
+				if gapwidth < 3 then
+					input.run = false
+				elseif not t.under then
+					--a wide gap: back up for a running start when too slow at the edge
+					local edge = t.x - 0.5
+					if math.abs(p.speedx) < maxrunspeed*0.8 and (tx - cx)*t.dir < 1.5 then
+						bot.runup = t
+					end
+					if bot.runup then
+						local back = rrr_clamp(edge - t.dir*4, cur.x1 - 0.5, cur.x2 - 0.5)
+						if math.abs(back - cx) < 0.5 or (cx - back)*t.dir < 0 then
+							bot.runup = nil
+						else
+							tx = back
+						end
+					end
+				end
+				local d = tx - cx
+				if bot.runup then
+					rrr_steer(input, cx, tx, 0.1)
+				elseif (not t.under and d*t.dir <= 0.3) or math.abs(d) < 0.3 then
+					input.jump = true
+					if not t.under then
+						rrr_steer(input, cx, cx + t.dir, 0)
+					end
+				else
+					rrr_steer(input, cx, tx, 0.1)
+				end
+			end
+		end
+	else
+		--in the air
+		if not bot.air then
+			bot.air = bot.pending or {}
+			bot.pending = nil
+		end
+		local N = bot.air.seg
+		if N then
+			if feet < N.y - 0.05 then
+				--above it: get over it (the middle of a small one), or after whoever it's jumping at
+				local want = cx
+				if bot.air.chase and not bot.air.chase.dead then
+					want = rrr_center(bot.air.chase)
+				elseif bot.air.home and goalx then
+					want = goalx
+				end
+				local tx = rrr_clamp(want, N.x1 - 1 + 0.6, N.x2 - 0.6)
+				if N.x2 - N.x1 < 3 then
+					tx = (N.x1 + N.x2)/2 - 0.5
+				end
+				rrr_steer(input, cx, tx, 0.1)
+			elseif bot.air.gap and bot.air.dir then
+				rrr_steer(input, cx, cx + bot.air.dir, 0)
+			end
+			--keep holding jump while going up (a full jump over a gap, high enough over a platform)
+			if p.speedy < 0 and ((bot.air.gap and not bot.air.down) or feet > N.y - 1.6) then
+				input.jump = true
+			end
+		else
+			if p.speedy < 0 then
+				input.jump = true
+			end
+		end
+		--missed and coming down over a pit: back to where it came from
+		if p.speedy > 0 and bot.lastground and not rrr_segbelow(S, cx, feet) and (not N or feet > N.y + 0.05) then
+			local G = bot.lastground
+			input.left, input.right = false, false
+			rrr_steer(input, cx, rrr_clamp(cx, G.x1 - 1 + 0.6, G.x2 - 0.6), 0.05)
+		elseif not N then
+			if g.kind == "enemy" then
+				rrr_steer(input, cx, rrr_center(g.target), 0.2)
+			elseif goalx then
+				rrr_steer(input, cx, goalx, 0.3)
+			end
+		end
+	end
+
+	--dodge (it decides once per projectile if it sees it in time)
+	local incoming = cur and rrr_incoming(S, p)
+	if incoming and not bot.sawincoming then
+		bot.willdodge = math.random() < bot.level.dodge
+	end
+	bot.sawincoming = incoming
+	if incoming and bot.willdodge then
+		input.jump = true
+	end
+
+	--a tanooki statue in the way: jump over it
+	if cur and (input.left or input.right) and not p.starred then
+		local dir = 1
+		if input.left then
+			dir = -1
+		end
+		for _, e in ipairs(rrr_enemies(S, i)) do
+			local ahead = (rrr_center(e) - cx)*dir
+			if e.statue and ahead > 0 and ahead < 2 and math.abs(rrr_feet(e) - feet) < 1 then
+				input.jump = true
+			end
+		end
+	end
+
+	--someone coming down on its head: step out from under them
+	if bot.level.dodgestomps and cur and not p.starred then
+		for _, e in ipairs(rrr_enemies(S, i)) do
+			local above = p.y - rrr_feet(e)
+			if e.speedy > 0 and not rrr_dangerous(e) and above > 0 and above < 2.5 and math.abs(rrr_center(e) - cx) < 1.3 then
+				input.left, input.right = false, false
+				if rrr_center(e) > cx then
+					input.left = true
+				else
+					input.right = true
+				end
+			end
+		end
+	end
+
+	--blue shell: slide when running at full speed toward someone
+	if p.size == 14 and g.kind == "enemy" and math.abs(p.speedx) >= maxrunspeed - 0.1 and math.abs(rrr_center(g.target) - cx) < 8 then
+		input.down = true
+	end
+
+	--stuck against something: jump, and if that doesn't help, go somewhere else
+	if (input.left or input.right) and cur then
+		if math.abs(p.x - bot.lastx) < 0.02 then
+			bot.stuck = bot.stuck + dt
+			if bot.stuck > 0.4 then
+				input.jump = true
+			end
+			if bot.stuck > 2 then
+				rrr_setgoal(S, bot, {kind = "wander"})
+				bot.wanderseg = nil
+				bot.think = 2
+				bot.stuck = 0
+			end
+		else
+			bot.stuck = 0
+		end
+	end
+	bot.lastx = p.x
+
+	--a new jump needs the button to be let go first
+	if input.jump and bot.prevjump and cur and not p.jumping and not p.falling then
+		input.jump = false
+	end
+
+	--never walk off an edge into a pit (planned jumps over it are fine)
+	if cur and not (input.jump and not bot.prevjump) then
+		local column
+		if input.right and cx > cur.x2 - 0.7 then
+			column = cur.x2 + 1
+		elseif input.left and cx < cur.x1 - 1 + 0.7 then
+			column = cur.x1 - 1
+		end
+		if column and not rrr_solid(column, cur.y) and rrr_landing(S, column, cur.y) == nil then
+			input.left, input.right = false, false
+		end
+	end
+	rrr_applyinputs(p, bot)
+end
+
+-------------------------------
+--  HOOKS INTO THE GAME CODE  --
+-------------------------------
+
+--bots press buttons instead of the keyboard or a controller
+do
+	local originalcheckkey = checkkey
+	function checkkey(s, i, n)
+		local S = rrr_state()
+		if S and S.bots[i] then
+			return S.bots[i].input[n] == true
+		end
+		return originalcheckkey(s, i, n)
+	end
+end
+
+--keys bound to a bot do nothing (pause still works for everyone)
+do
+	local originalgetcontrolbindings = getcontrolbindings
+	function getcontrolbindings(player, name)
+		local S = rrr_state()
+		if S and S.bots[player] and name ~= "pause" then
+			return {}
+		end
+		return originalgetcontrolbindings(player, name)
+	end
+end
+
+--sliding past the corner of a ? block of the battle (the edge of it, no hit) makes the bump sound,
+--so a jump that only caught the corner doesn't go by silently
+function cornerslide(x, y, p)
+	local S = rrr_state()
+	if S and S.blockat[x] and S.blockat[x][y] then
+		playsound(blockhitsound)
+	end
+end
+
+do --(each hook keeps its original to itself: the file can only have 200 locals at once)
+	--a player's own thrown enemy (a custom character's fireenemy) never hurts that player, even one that hurts players
+	local originalglobalcollide = mario.globalcollide
+	function mario:globalcollide(a, b)
+		if a == "enemy" and b and b.fireballthrower == self and rrr_state() then
+			return true --passes through
+		end
+		return originalglobalcollide(self, a, b)
+	end
+end
+
+do --(each hook keeps its original to itself: the file can only have 200 locals at once)
+	local originalhitblock = hitblock
+	function hitblock(x, y, t, v)
+		local S = rrr_state()
+		if S and rrr_hitblock(S, x, y, t) then
+			return
+		end
+		return originalhitblock(x, y, t, v)
+	end
+end
+
+do
+	local originaldie = mario.die
+	function mario:die(how)
+		local S = rrr_state()
+		if not S then
+			return originaldie(self, how)
+		end
+		if self.dead or (S.over and how ~= "pit") then
+			return
+		end
+		local r = originaldie(self, how)
+		if self.dead then
+			rrr_ondeath(S, self)
+		end
+		return r
+	end
+end
+
+--no grow or shrink animation in a battle (they freeze the whole game): the new size is there right away,
+--and the player blinks invincible for a moment, just like after getting hit
+local function rrr_instantinvincible(p)
+	noupdate = false
+	p.animation = "invincible"
+	p.invincible = true
+	p.animationtimer = rrr_invinciblestart()
+	p.drawable = true
+	p:endsizechange() --no grow or shrink animation here: ducking comes back straight away
+end
+
+do
+	local originalgrow = mario.grow
+	function mario:grow(update)
+		local S = rrr_state()
+		if not S then
+			return originalgrow(self, update)
+		end
+		local oldsize = self.size
+		local wasanimating = self.animation and self.animation ~= "invincible"
+		--a power-up (not a mushroom) while small goes straight to that power-up, whatever the physics
+		--(the game only does that with mario maker physics, so it gets them for this one power-up)
+		local oldphysics = mariomakerphysics
+		if self.size == 1 and update and update ~= 2 then
+			mariomakerphysics = true
+		end
+		local r = originalgrow(self, update)
+		mariomakerphysics = oldphysics
+		if self.animation == "grow1" or self.animation == "grow2" then
+			if self.animation == "grow1" then
+				self.animationstate = self.animationmisc
+			end
+			self:setsize(self.size)
+			rrr_instantinvincible(self)
+		elseif not wasanimating and (self.size ~= oldsize or update) then
+			rrr_instantinvincible(self) --already powered up: the new power-up was set right away
+		end
+		return r
+	end
+end
+
+do
+	local originalshrink = mario.shrink
+	function mario:shrink()
+		local S = rrr_state()
+		if not S then
+			return originalshrink(self)
+		end
+		--above super (fire, leaf, suits...): back to super, whatever the physics
+		--(the game only does that with mario maker physics, so it gets them for this one hit)
+		local oldphysics = mariomakerphysics
+		if self.size > 2 then
+			mariomakerphysics = true
+		end
+		local r = originalshrink(self)
+		mariomakerphysics = oldphysics
+		if self.animation == "shrink" then
+			self.animationstate = self.animationmisc
+			if self.largeshrink then
+				self.size = 2
+				self:setsize(2)
+				self.largeshrink = false
+			else
+				self:setsize(1)
+			end
+			rrr_instantinvincible(self)
+		elseif self.animation == "invincible" then
+			rrr_instantinvincible(self) --1 second, not the game's usual 2
+		end
+		return r
+	end
+end
+
+do
+	local originalrespawn = mario.respawn
+	function mario:respawn()
+		local S = rrr_state()
+		if not S then
+			return originalrespawn(self)
+		end
+		rrr_respawn(S, self)
+	end
+end
+
+--nobody being alive doesn't end a battle, the minigame does (see mario:die)
+function minigame_keepplaying()
+	return rrr_state() ~= nil
+end
+
+--------------------
+--  KONAMI CODE  --
+--------------------
+--a person who is out can come back once with 3 lives: up up down down left right left right run jump
+--(run and jump take the places of b and a), typed with that player's own controls
+
+local RRR_KONAMI = {"up", "up", "down", "down", "left", "right", "left", "right", "run", "jump"}
+local RRR_KONAMI_LIVES = 3
+local RRR_KONAMI_KEYS = {up = upkey, down = downkey, left = leftkey, right = rightkey, run = runkey, jump = jumpkey}
+local RRR_KONAMI_ORDER = {"up", "down", "left", "right", "run", "jump"} --checked in this order when two go down in one frame
+
+local function rrr_konamirevive(S, i)
+	S.out[i] = false
+	for k = #S.outorder, 1, -1 do
+		if S.outorder[k] == i then
+			table.remove(S.outorder, k)
+		end
+	end
+	S.konami[i].used = true
+	mariolives[i] = RRR_KONAMI_LIVES
+	if S.watch == i then
+		S.watch = nil
+	end
+	rrr_respawn(S, objects["player"][i])
+	playsound(oneupsound)
+	rrr_banner(S, "p" .. i .. " is back!", 2)
+end
+
+local function rrr_updatekonami(S)
+	for i = 1, RRR_PLAYERS do
+		local K = S.konami[i]
+		if not S.bots[i] and K and objects["player"][i] then
+			for _, name in ipairs(RRR_KONAMI_ORDER) do
+				local down = RRR_KONAMI_KEYS[name](i) == true
+				if down and not K.held[name] then
+					--a press: the next one in the code, or start over (that press can be the first one again)
+					if RRR_KONAMI[K.progress+1] == name then
+						K.progress = K.progress + 1
+					elseif RRR_KONAMI[1] == name then
+						K.progress = 1
+					else
+						K.progress = 0
+					end
+					if K.progress == #RRR_KONAMI then
+						K.progress = 0
+						if S.out[i] and not K.used and not S.over then
+							rrr_konamirevive(S, i)
+						end
+					end
+				end
+				K.held[name] = down
+			end
+		end
+	end
+end
+
+-----------
+--  HUD  --
+-----------
+
+local function rrr_drawhud(S)
+	local slot = width*16/RRR_PLAYERS
+	for i = 1, RRR_PLAYERS do
+		local x = math.floor(slot*(i-1) + slot/2 - 28)
+		local color = {255, 255, 255}
+		if S.out[i] then
+			color = {120, 120, 120}
+		end
+		love.graphics.setColor(90, 90, 90) --(a black player still shows on a black sky)
+		love.graphics.rectangle("fill", (x-1)*scale, 7*scale, 9*scale, 9*scale)
+		love.graphics.setColor(255, 255, 255)
+		if mariocolors[i] then
+			love.graphics.setColor(mariocolors[i][1])
+		end
+		love.graphics.rectangle("fill", x*scale, 8*scale, 7*scale, 7*scale)
+		love.graphics.setColor(color)
+		local lives = "out"
+		if not S.out[i] then
+			lives = "*" .. (mariolives[i] or 0)
+		end
+		properprintFbackground("p" .. i .. " " .. lives, (x+10)*scale, 8*scale)
+		local second = "ko " .. S.kos[i]
+		if S.bots[i] then
+			second = "cpu " .. second
+		end
+		love.graphics.setColor(170, 170, 170)
+		if S.out[i] then
+			love.graphics.setColor(100, 100, 100)
+		end
+		properprintFbackground(second, (x+10)*scale, 18*scale)
+	end
+	if S.timeleft then
+		local t = math.max(0, math.ceil(S.timeleft))
+		love.graphics.setColor(255, 255, 255)
+		if t <= 30 and S.timeleft > 0 and math.floor(S.timeleft*4) % 2 == 0 then
+			love.graphics.setColor(255, 90, 90)
+		end
+		local s = "time " .. t
+		properprintFbackground(s, (width*8 - #s*4)*scale, 30*scale)
+	end
+	love.graphics.setColor(255, 255, 255)
+end
+
+--counts in real time (not game time), a pause or a hitch doesn't eat into it
+--the timer's low time warning: below this, the battle music speeds up (if it has a fast version)
+local RRR_LOWTIME = 100
+
+--the battle music has a fast version (song-fast.ogg next to a custom song, overworld-fast.ogg and so on for the built-in ones)
+local function rrr_hasfastmusic()
+	return custommusic and music.loaded[music:variant(custommusic, "-fast")] ~= nil
+end
+
+--with the timer below RRR_LOWTIME: the low time sound, then the fast music. Without a fast version the music just keeps going.
+--the game picks the fast music (and the fast star theme) from mariotime, which minigames don't count down themselves,
+--so it follows the battle's timer from then on
+local function rrr_updatelowtime(S)
+	if not S.timeleft or S.over or S.starting then
+		return
+	end
+	if not S.lowtime then
+		if S.timeleft < RRR_LOWTIME and rrr_hasfastmusic() then
+			S.lowtime = {waiting = true}
+			mariotime = math.max(S.timeleft, 0.01)
+			stopmusic()
+			playsound(lowtimesound)
+			queuelowtime = true --nothing starts the music (a star for example) until the low time sound is done
+		end
+		return
+	end
+	mariotime = math.max(S.timeleft, 0.01)
+	if S.lowtime.waiting and not lowtimesound:isPlaying() then
+		S.lowtime.waiting = false
+		queuelowtime = false
+		updatemusicpriority() --the fast music, or the fast star theme if someone has a star
+	end
+end
+
+local function rrr_updatecountdown(S)
+	local C = S.countdown
+	if not C or C.finished then
+		return
+	end
+	local now = love.timer.getTime()
+	C.elapsed = C.elapsed + math.min(now - C.last, 0.1)
+	C.last = now
+	if not S.starting then
+		--"go!" stays up for a second
+		if C.elapsed >= RRR_COUNTDOWN + 1 then
+			C.finished = true
+		end
+		return
+	end
+	if C.elapsed >= RRR_COUNTDOWN then
+		S.starting = nil
+		C.shown = "go!"
+		playsound(countdowngosound)
+		for i = 1, RRR_PLAYERS do
+			local p = objects["player"][i]
+			if p then
+				p.controlsenabled = true
+			end
+		end
+		playmusic()
+		return
+	end
+	local number = tostring(RRR_COUNTDOWN - math.floor(C.elapsed)) --3, then 2, then 1
+	if C.shown ~= number then
+		C.shown = number
+		playsound(countdownbeepsound)
+	end
+	if music:getPlaying() then
+		stopmusic() --(resuming from the pause menu starts the music)
+	end
+end
+
+local function rrr_drawcountdown(S)
+	local C = S.countdown
+	if not (C and C.shown) or C.finished then
+		return
+	end
+	local alpha = 255
+	if C.shown == "go!" then
+		alpha = 255*math.max(0, math.min(1, (RRR_COUNTDOWN + 1 - C.elapsed)/0.3))
+	end
+	local size = 3
+	local s = C.shown
+	love.graphics.setColor(255, 255, 255, alpha)
+	properprintFbackground(s, (width*8 - utf8.len(s)*4*size)*scale, (height*8 - 5*size - 16)*scale, nil, nil, size)
+	love.graphics.setColor(255, 255, 255)
+end
+
+local function rrr_drawoverlay(S)
+	rrr_drawcountdown(S)
+	local B = S.banner
+	if B then
+		local alpha = 255
+		if B.t > B.duration - 0.3 then
+			alpha = 255*math.max(0, (B.duration - B.t)/0.3)
+		end
+		love.graphics.setColor(255, 255, 255, alpha)
+		local s = B.text
+		properprintFbackground(s, (width*8 - utf8.len(s)*4)*scale, (height*8 - 24)*scale)
+	end
+	love.graphics.setColor(255, 255, 255)
+end
+
+--the viewport of a player who is out follows someone who isn't
+local function rrr_viewtarget(i)
+	local S = rrr_state()
+	if not S then
+		return nil
+	end
+	local owner = splitscreen_viewplayer(i)
+	if not S.out[owner] then
+		return nil
+	end
+	if S.watch and rrr_alive(S, S.watch) then
+		return objects["player"][S.watch]
+	end
+	for j = 1, RRR_PLAYERS do
+		if not S.out[j] and objects["player"][j] and not objects["player"][j].dead then
+			S.watch = j
+			return objects["player"][j]
+		end
+	end
+	return nil
+end
+
+local function rrr_viewhud(i, view, owner)
+	local S = rrr_state()
+	if not (S and S.out[owner]) then
+		return
+	end
+	local target = rrr_viewtarget(i)
+	if target and target.playernumber ~= owner then
+		local s = "watching p" .. target.playernumber
+		love.graphics.setColor(200, 200, 200)
+		properprintFbackground(s, (view.x + view.w/2 - #s*4)*scale, (view.y + view.h - 22)*scale)
+		love.graphics.setColor(255, 255, 255)
+	end
+end
+
+----------------
+--  THE GAME  --
+----------------
+
+local function rrr_cleanup()
+	rrr_restoremusic()
+	if minigamestate and minigamestate.lowtime then
+		queuelowtime = false
+	end
+	if minigamestate and minigamestate.battle then
+		rrr_stopclear(minigamestate)
+	end
+	if rrr_saved_split then
+		SPLITSCREENISBACK = rrr_saved_split.on
+		rrr_saved_split = nil
+	end
+	splitscreenviewplayers = nil
+	splitscreenviewtarget = nil
+	splitscreenviewhud = nil
+	splitscreen_reset()
+end
+
+local function rrr_endbattle(S, winner)
+	S.over = {winner = winner, t = 0}
+	S.winner = winner
+	if winner then
+		rrr_banner(S, "p" .. winner .. " wins!", 99)
+	else
+		rrr_banner(S, "draw!", 99)
+	end
+	for i = 1, RRR_PLAYERS do
+		local p = objects["player"][i]
+		if p then
+			rrr_endstar(p)
+		end
+	end
+	stopmusic()
+	rrr_startclear(S)
+	--the record is the most knockouts of a person (or of the winner if only bots played)
+	local best = 0
+	local humans = false
+	for i = 1, RRR_PLAYERS do
+		if not S.bots[i] then
+			humans = true
+			best = math.max(best, S.kos[i])
+		end
+	end
+	if not humans and winner then
+		best = S.kos[winner]
+	end
+	S.score = best
+	S.result = "lose" --a draw
+	if winner then
+		S.result = "win"
+	end
+	--the results screen comes once the battle clear theme is done (update)
+end
+
+local function rrr_timeup(S)
+	--most lives left wins, then most knockouts, still a tie: draw
+	local best, bestlives, bestkos, tie = nil, -1, -1, false
+	for i = 1, RRR_PLAYERS do
+		if not S.out[i] then
+			local lives = mariolives[i] or 0
+			if objects["player"][i] and not objects["player"][i].dead then
+				lives = lives + 0.5 --alive right now beats waiting for a respawn
+			end
+			if lives > bestlives or (lives == bestlives and S.kos[i] > bestkos) then
+				best, bestlives, bestkos, tie = i, lives, S.kos[i], false
+			elseif lives == bestlives and S.kos[i] == bestkos then
+				tie = true
+			end
+		end
+	end
+	if tie then
+		best = nil
+	end
+	rrr_banner(S, "time up!", 1.5)
+	S.endbattle(S, best)
+end
+
+addminigame({
+	id = RRR_ID,
+	savename = "Rival Rumble Royale",
+	name = "rival rumble royale",
+	--the description box is 16 characters wide (with its scrollbar) and doesn't keep spaces at the start of a line,
+	--so the files in the example's pack folder start with a dash, and long paths are split after a slash
+	description = "last one standing wins! grab power-ups from the ? blocks and knock everyone else out.\n\ncustom music: put .ogg songs in sounds/rivalrumbleroyalemusic in the game, or in alesans_entities/rivalrumbleroyalemusic in your save folder (%appdata%/mari0 on windows). every song shows up in the battle music list.\n\nan example of what can go in one of those folders:\nmy_song.ogg\nmy pack/\n-pack.json\n-boss.ogg\n-boss-intro.ogg\n-star.ogg\n-win.ogg\n\na folder is a music pack, listed as \"my pack- boss\". a song's -intro plays once before it. pack.json is optional and sets the pack's name, its place in the list, the song names, and the songs for \"starman theme\" (the star theme) and \"battle clear\" (the win fanfare), like star and win here. a pack without pack.json uses starmusic.ogg and battleclear.ogg for those. see README.md in sounds/minigames.",
+	tagline = "last mario standing!",
+	usesplayer = true,
+	players = RRR_PLAYERS,
+	keepphysics = true, --the game's own physics, not the mario maker physics the other minigames use
+	resultsilent = RRR_RESULT_TIME,
+	scorelabel = "knockouts",
+	drawhud = rrr_drawhud,
+	options = {
+		--the first players are people, the rest are bots
+		{type = "dropdown", key = "humans", label = "How many players are human?", entries = {"1 (p2-4 bots)", "2 (p3-4 bots)", "3 (p4 bot)", "4 (no bots)"}, default = 1},
+		{type = "dropdown", key = "botlevel", label = "Bot difficulty", entries = (function()
+			local names = {}
+			for i, level in ipairs(RRR_BOTLEVELS) do
+				names[i] = level.name
+			end
+			return names
+		end)(), default = 2},
+		{type = "dropdown", key = "theme", label = "Battle theme", entries = (function()
+			local names = {}
+			for i, theme in ipairs(RRR_THEMES) do
+				names[i] = theme.name
+			end
+			return names
+		end)(), default = 1},
+		{type = "dropdown", key = "music", label = "Battle music", entries = rrr_musiclabels, wide = true, default = 1},
+		{type = "checkbox", key = "botsplit", label = "Bot Splitscreen", default = true},
+		{type = "slider", key = "lives", label = "Starting lives", min = 5, max = 100, step = 1, default = 10},
+		{type = "sliderbox", key = "timelimit", checkkey = "timer", label = "Timer", min = 100, max = 1000, step = 10, default = 300, checkdefault = false},
+	},
+
+	createmap = function(S, opts)
+		rrr_cleanup() --a restart from the pause menu
+		local theme = RRR_THEMES[opts.theme or 1] or RRR_THEMES[1]
+		S.battle = true
+		S.theme = theme
+		S.endbattle = rrr_endbattle
+		--a new arena every time (the fixed one for the theme if the generator keeps failing)
+		local built = false
+		for try = 1, RRR_GEN_TRIES do
+			local layout = rrr_generatelayout(theme)
+			if layout then
+				rrr_buildmap(S, theme, layout)
+				rrr_buildnavigation(S)
+				if rrr_arenaok(S) then
+					built = true
+					break
+				end
+			end
+		end
+		if not built then
+			rrr_buildmap(S, theme, rrr_tallfixedlayout(RRR_LAYOUTS[theme.layout]))
+			rrr_buildnavigation(S)
+		end
+
+		--theme
+		spriteset = theme.spriteset
+		if theme.backgroundrgb then
+			background = 4
+			backgroundrgbon = true
+			backgroundrgb = theme.backgroundrgb
+			backgroundcolor[4] = theme.backgroundrgb
+		else
+			background = theme.background
+			backgroundrgbon = false
+		end
+		portalgun = false
+
+		--players and lives
+		S.bots = {}
+		S.kos = {}
+		S.out = {}
+		S.outorder = {}
+		S.lasthit = {}
+		S.konami = {}
+		for i = 1, RRR_PLAYERS do
+			S.konami[i] = {progress = 0, held = {}, used = false}
+		end
+		local humans = {}
+		local humancount = opts.humans or 1
+		for i = 1, RRR_PLAYERS do
+			if i > humancount then
+				S.bots[i] = rrr_newbot(opts.botlevel or 2)
+			else
+				table.insert(humans, i)
+			end
+			S.kos[i] = 0
+		end
+		infinitelives = false
+		mariolivecount = math.floor(opts.lives or 5)
+		mariolives = {}
+		mariosizes = {}
+		for i = 1, RRR_PLAYERS do
+			mariolives[i] = mariolivecount
+			mariosizes[i] = 1
+		end
+		if opts.timer then
+			S.timeleft = opts.timelimit or 300
+		end
+
+		--split screen for every person (all bots: one screen that follows whoever is left)
+		rrr_saved_split = {on = SPLITSCREENISBACK}
+		SPLITSCREENISBACK = true
+		if #humans == 0 then
+			humans = {1}
+		end
+		splitscreenviewplayers = humans
+		if opts.botsplit ~= false then
+			splitscreenviewplayers = {}
+			for i = 1, RRR_PLAYERS do
+				table.insert(splitscreenviewplayers, i)
+			end
+		end
+		splitscreenviewtarget = rrr_viewtarget
+		splitscreenviewhud = rrr_viewhud
+
+		--music
+		local list = rrr_musiclist()
+		local entry = list[opts.music or 1]
+		if not (entry and rrr_fileexists(entry.path)) then
+			entry = list[1] --the song is gone (files moved since the menu was open)
+		end
+		rrr_setupmusic(S, entry)
+
+		local spawn = S.spawns[1]
+		startx = spawn.x - 0.5
+		starty = spawn.y + 1
+	end,
+
+	postload = function(S)
+		for i = 1, RRR_PLAYERS do
+			local p = objects["player"][i]
+			local spawn = S.spawns[i] or S.spawns[1]
+			if p then
+				p.portalgun = false
+				p.x = spawn.x - 0.5 - p.width/2
+				p.y = spawn.y - p.height
+				p.speedx, p.speedy = 0, 0
+				p.controlsenabled = false
+				--a player that never fell has no gravity of its own yet, the physics then treats the first jump as
+				--walking off a ledge (the falling pose all the way up). The same value the physics would use anyway
+				p.gravity = p.gravity or yacceleration
+				if spawn.x > mapwidth/2 then
+					p.animationdirection = "left"
+				end
+			end
+		end
+		--the countdown: nobody moves and no music until "go!"
+		S.starting = true
+		S.countdown = {elapsed = 0, last = love.timer.getTime(), shown = false}
+		stopmusic()
+		splitscreen_reset()
+	end,
+
+	update = function(S, dt)
+		if S.banner then
+			S.banner.t = S.banner.t + dt
+			if S.banner.t >= S.banner.duration then
+				S.banner = nil
+			end
+		end
+
+		rrr_updatecountdown(S)
+
+		rrr_updateblocks(S, dt)
+		rrr_updatekonami(S)
+
+		if S.over then
+			S.over.t = S.over.t + dt
+			if rrr_updateclear(S, dt) and S.over.t > 1 and not S.finish then
+				minigame_finish(S.result, 0, false)
+			end
+		else
+			if S.timeleft and not S.starting then
+				S.timeleft = S.timeleft - dt
+				if S.timeleft <= 0 then
+					S.timeleft = 0
+					rrr_timeup(S)
+				end
+				rrr_updatelowtime(S)
+			end
+			if not S.over then
+				rrr_updatecombat(S, dt)
+			end
+		end
+
+		for i = 1, RRR_PLAYERS do
+			local p = objects["player"][i]
+			if p and S.bots[i] then
+				rrr_botupdate(S, i, p, dt)
+			end
+			--nobody gets out of the arena sideways
+			if p and not p.dead then
+				if p.x < 0 then
+					p.x = 0
+					p.speedx = math.max(0, p.speedx)
+				elseif p.x + p.width > mapwidth then
+					p.x = mapwidth - p.width
+					p.speedx = math.min(0, p.speedx)
+				end
+			end
+		end
+	end,
+
+	--the freeze at the end doesn't stop players who are dying: they finish falling off the screen
+	frozenupdate = function(S, dt)
+		for i = 1, RRR_PLAYERS do
+			local p = objects["player"][i]
+			if p and p.dead and (p.animation == "death" or p.animation == "deathpit") then
+				p.animationtimer = p.animationtimer + dt
+				p.animationstate = "dead"
+				p:setquad()
+				if p.animation == "death" and p.animationtimer > deathanimationjumptime then
+					if p.animationtimer - dt < deathanimationjumptime then
+						p.speedy = -deathanimationjumpforce
+					end
+					p.speedy = p.speedy + deathgravity*dt
+					p.y = p.y + p.speedy*dt
+				end
+			end
+		end
+	end,
+
+	drawtiles = function(S)
+		rrr_drawblocks(S)
+	end,
+
+	drawoverlay = rrr_drawoverlay,
+
+	resultheadline = function(S)
+		if S.winner then
+			return "p" .. S.winner .. " wins!"
+		end
+		return "draw!"
+	end,
+
+	cleanup = rrr_cleanup,
+})
+
+end --do (rival rumble royale)

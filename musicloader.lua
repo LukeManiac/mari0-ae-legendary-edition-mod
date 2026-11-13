@@ -17,6 +17,26 @@ local musicpath = "sounds/%s.ogg"
 
 local intromusic = false --{intro name, started music}
 
+--"sounds/x.ogg" -> "sounds/x-intro.ogg" (.mp3 too), built-in names without an extension get the suffix at the end ("starmusic" -> "starmusic-intro")
+function music:variant(name, suffix)
+	local ext = name:sub(-4, -1):lower()
+	if ext == ".ogg" or ext == ".mp3" then
+		return name:sub(1, -5) .. suffix .. name:sub(-4, -1)
+	end
+	return name .. suffix
+end
+
+--the intro of the fast version: "x-fastintro.ogg" or "x-introfast.ogg" (loaded as "x-fastintro.ogg" either way), nil if there's none
+function music:fastintrofile(musicfile)
+	for _, suffix in ipairs({"-fastintro", "-introfast"}) do
+		local file = self:variant(musicfile, suffix)
+		if love.filesystem.getInfo(file) then
+			return file
+		end
+	end
+	return nil
+end
+
 function music:init()
 	intromusic = false --music that is currently in it's intro phase
 end
@@ -40,6 +60,11 @@ function music:load(musicfile) -- can take a single file string or an array of f
 		if love.filesystem.getInfo(musicfile:sub(1, -5) .. "-intro" .. musicfile:sub(-4, -1)) then
 			self:preloadintro(musicfile:sub(1, -5) .. "-intro" .. musicfile:sub(-4, -1))
 		end
+		--load the fast music's intro
+		local fastintro = self:fastintrofile(musicfile)
+		if fastintro then
+			self:preloadintro(fastintro, self:variant(musicfile, "-fastintro"))
+		end
 	end
 end
 
@@ -60,16 +85,37 @@ function music:preloadintro(musicfile, name)
 	end
 end
 
+--"x-fast.ogg" -> "x.ogg" (.mp3 too, "starmusic-fast" -> "starmusic"), nil if it isn't a fast version
+function music:normalname(name)
+	local ext = name:sub(-4, -1):lower()
+	if (ext == ".ogg" or ext == ".mp3") and name:sub(-9, -5) == "-fast" then
+		return name:sub(1, -10) .. name:sub(-4, -1)
+	elseif name:sub(-5, -1) == "-fast" then
+		return name:sub(1, -6)
+	end
+	return nil
+end
+
+--the intro that plays before a song: "x-intro", or "x-fastintro" before the fast version "x-fast"
+function music:introname(name)
+	local normal = self:normalname(name)
+	if normal then
+		return self:variant(normal, "-fastintro")
+	end
+	return self:variant(name, "-intro")
+end
+
 function music:play(name, isfast, nointro)
-	local filename = name
 	local isintro = false
 	if name and soundenabled then
 		--find fast
 		intromusic = false
-		if isfast and self.loaded[name:sub(1, -5) .. "-fast" .. name:sub(-4, -1)] then
-			name = name:sub(1, -5) .. "-fast" .. name:sub(-4, -1)
-		elseif (not nointro) and self.loaded[name:sub(1, -5) .. "-intro" .. name:sub(-4, -1)] then
-			name = name:sub(1, -5) .. "-intro" .. name:sub(-4, -1)
+		if isfast and self.loaded[self:variant(name, "-fast")] then
+			name = self:variant(name, "-fast")
+		end
+		local filename = name --what plays after the intro
+		if (not nointro) and self.loaded[self:introname(name)] then
+			name = self:introname(name)
 			isintro = true
 		end
 		if self.loaded[name] then
@@ -96,18 +142,20 @@ end
 function music:stop(name, isfast)
 	if name then
 		--find fast
-		if isfast and self.loaded[name:sub(1, -5) .. "-fast" .. name:sub(-4, -1)] then
-			name = name:sub(1, -5) .. "-fast" .. name:sub(-4, -1)
-		elseif intromusic and name == intromusic[2] then
-			name = name:sub(1, -5) .. "-intro" .. name:sub(-4, -1)
+		if isfast and self.loaded[self:variant(name, "-fast")] then
+			name = self:variant(name, "-fast")
+		end
+		--an intro (normal or fast) that's still playing stops too
+		if intromusic and name == intromusic[2] then
+			if self.loaded[intromusic[1]] then
+				love.audio.stop(self.loaded[intromusic[1]])
+			end
+			self:disableintromusic()
 		end
 		if self.loaded[name] then
 			love.audio.stop(self.loaded[name])
 		elseif self.loaded[musicpath:format(name)] then
 			love.audio.stop(self.loaded[musicpath:format(name)])
-		end
-		if intromusic and name == intromusic[1] then
-			self:disableintromusic()
 		end
 	end
 end

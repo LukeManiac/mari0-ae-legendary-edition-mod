@@ -1,5 +1,19 @@
 mario = class:new()
 
+--the p-speed sound is one sound for every player: it keeps going while anyone (other than skip) is a raccoon or tanooki
+--at p-speed or flying, and only stops once nobody is
+local function raccoonplaning(skip)
+	if not (objects and objects["player"]) then
+		return false
+	end
+	for _, p in pairs(objects["player"]) do
+		if p ~= skip and (p.size == 6 or p.size == 9) and (p.planemode or p.raccoonfly) and not p.dead then
+			return true
+		end
+	end
+	return false
+end
+
 function mario:init(x, y, i, animation, size, t, properties)
 	self.playernumber = i or 1
 	if bigmario then
@@ -470,6 +484,7 @@ function mario:init(x, y, i, animation, size, t, properties)
 end
 
 function mario:update(dt)
+	self.stompsnap = false --what p-speed was like before this frame's landing (see floorcollide)
 	--RACCOON STUFF
 	if self.float and not self.raccoonfly then
 		if self.gravitydir == "up" then
@@ -499,10 +514,12 @@ function mario:update(dt)
 	if self.size == 6 or self.size == 9 or self.size == 10 then --be able to fly when runing for whatever seconds
 		if self.animationstate == "running" then
 			if math.abs(self.speedx) >= 8.9 then
-				self.planetimer = self.planetimer + dt
-				if self.planetimer > 1.1 then
+				self.planetimer = math.min(self.planetimer + dt, raccoonplanefull)
+				if self.planetimer >= raccoonplanefull then
 					if self.playraccoonplanesound and self.size ~= 10 then
-						playsound(raccoonplanesound)
+						if not raccoonplanesound:isPlaying() then --(still going: landing at p-speed, or someone else)
+							playsound(raccoonplanesound)
+						end
 						self.playraccoonplanesound = false
 					end
 					self.planemode = true
@@ -510,7 +527,9 @@ function mario:update(dt)
 			end
 		else
 			if self.animationstate ~= "jumping" and self.raccoonfly == false then
-				raccoonplanesound:stop()
+				if not raccoonplaning(self) then
+					raccoonplanesound:stop()
+				end
 				self.planemode = false
 			end
 			self.playraccoonplanesound = true
@@ -525,21 +544,28 @@ function mario:update(dt)
 			self.raccoonflyingtimer = self.raccoonflyingtimer + dt
 			if self.raccoonflyingtimer < self.characterdata.raccoonflytime then
 				-- removed continuous hold-to-fly-higher; now discrete jump presses only (SMB3 style)
-				if self.falling and self.speedy > 0 then
-					self.raccoonflyframe = 1
-					self.raccoonflyanimationprogress = 1
-					self.raccoonflaptimer = 0
-				elseif self.raccoonflaptimer and self.raccoonflaptimer > 0 then
-					-- animate only during the short flap window started by jump()
-					self.raccoonflaptimer = self.raccoonflaptimer - dt
-					self.raccoonflyanimationprogress = self.raccoonflyanimationprogress + (math.abs(1)+4)/5*dt*self.characterdata.runanimationspeed
-					while self.raccoonflyanimationprogress >= 4 do
-						self.raccoonflyanimationprogress = self.raccoonflyanimationprogress - 3
+				if self.raccoonflaptimer and self.raccoonflaptimer > 0 then
+					--a flap (started by jump()) plays the whole flying animation once, frame by frame, even when the
+					--player starts falling before it's done. Pressing jump again during it keeps the animation going
+					--from where it is (it only starts over from the first frame once the flapping stops)
+					self.raccoonflaptimer = math.max(0, self.raccoonflaptimer - dt)
+					local frames = 3
+					local fly = self.characterdata.raccoon and self.characterdata.raccoon.fly and self.characterdata.raccoon.fly[1]
+					if type(fly) == "table" and #fly > 0 then
+						frames = #fly
 					end
-					if self.raccoonflyframe == 4 then
-						self.raccoonflyframe = 1
+					self.raccoonflyanimationprogress = self.raccoonflyanimationprogress + frames/raccoonflaptime*dt
+					while self.raccoonflyanimationprogress >= frames+1 do
+						self.raccoonflyanimationprogress = self.raccoonflyanimationprogress - frames
 					end
 					self.raccoonflyframe = math.floor(self.raccoonflyanimationprogress)
+					if self.raccoonflaptimer == 0 then
+						self.raccoonflyframe = 1
+						self.raccoonflyanimationprogress = 1
+					end
+				elseif self.falling and self.speedy > 0 then
+					self.raccoonflyframe = 1
+					self.raccoonflyanimationprogress = 1
 				end
 			else
 				self.raccoonflyingtimer = 0
@@ -586,8 +612,8 @@ function mario:update(dt)
 			end
 		end
 	end
-	if raccoonplanesound:isPlaying() and (self.planemode == false or (self.size ~= 6 and self.size ~= 9))	then
-		raccoonplanesound:stop() --stops raccoon flying sound
+	if raccoonplanesound:isPlaying() and not raccoonplaning() then
+		raccoonplanesound:stop() --stops raccoon flying sound (once nobody is at p-speed or flying any more)
 	end
 	
 	--falling state
@@ -1219,6 +1245,9 @@ function mario:update(dt)
 				self:shrink()
 			else
 				self.colors = self.basecolors
+				if self.statue then
+					self.colors = self.characterdata.statuecolor
+				end
 			end
 			
 			self.starred = false
@@ -1855,6 +1884,7 @@ function mario:update(dt)
 			else
 				self:setsize(1)
 			end
+			self:endsizechange()
 		end
 		return
 	elseif self.animation == "invincible" then
@@ -1866,7 +1896,7 @@ function mario:update(dt)
 		
 		if actualanimtimer - dt < invincibletime2 and actualanimtimer > invincibletime2 then
 			self.animation = false
-			if not levelfinished then --stay invincible if level is finished
+			if not levelfinished and not self.statue then --stay invincible if level is finished (or as a statue)
 				self.invincible = false
 			end
 			self.drawable = true
@@ -1905,6 +1935,7 @@ function mario:update(dt)
 			self.animation = false
 			noupdate = false
 			self:setsize(self.size)
+			self:endsizechange()
 		end
 		return
 		
@@ -1921,6 +1952,7 @@ function mario:update(dt)
 			noupdate = false
 			self.animationtimer = 0
 			self:setsize(self.size)
+			self:endsizechange()
 		end
 		return
 	elseif self.animation == "door" then
@@ -3787,9 +3819,8 @@ function mario:jump(force)
 		if self.raccoonfly and (self.size == 6 or self.size == 9) then --fly as raccoon Mario (SMB3 style discrete flaps)
 			self.speedy = math.min(-self.characterdata.raccoonflyjumpforce, self.speedy)
 			playsound(raccoonswingsound)
-			self.raccoonflyframe = 1
-			self.raccoonflyanimationprogress = 1
-			self.raccoonflaptimer = 0.3
+			--the flap goes on for another raccoonflaptime, the animation keeps going from where it is
+			self.raccoonflaptimer = raccoonflaptime
 			self:setquad()
 		end	
 		self.redseesaw = false
@@ -4188,6 +4219,12 @@ function mario:grow(update)
 			self:setsize(update)
 		end
 	else
+		--ducking and the blinking after a hit come back once the grow animation is done (see endsizechange)
+		local blinking = false
+		if self.animation == "invincible" then
+			blinking = self.animationtimer
+		end
+		self.sizechange = {duck = self.ducking, blinking = blinking}
 		if self.ducking then --stop small mario ducking
 			self:duck(false)
 		end
@@ -4209,18 +4246,41 @@ function mario:grow(update)
 		elseif (self.size == 8 or self.size == 16) then
 			self.animation = false
 			noupdate = false
+			self:endsizechange()
 		else
 			self:setsize(2)
 			self.animation = "grow2"
 		end
-		if self.size ~= 6 then
+		if self.size ~= 6 and self.size ~= 9 and not raccoonplaning(self) then
 			raccoonplanesound:stop() --stops raccoon flying sound
 		end
 	end
 end
 
+--a grow or shrink animation is over: the player ducks again if they were ducking (and the new size can duck),
+--and the blinking after a hit goes on where it was if it was going when they grew
+function mario:endsizechange()
+	local c = self.sizechange
+	self.sizechange = nil
+	if not c then
+		return
+	end
+	if c.blinking and not self.animation then
+		self.animation = "invincible"
+		self.invincible = true
+		self.animationtimer = c.blinking
+	end
+	local size = self.size
+	if c.duck and not self.ducking and (size > 1 or self.characterdata.smallducking) and size ~= 5 and size ~= 8 and size ~= 16
+		and not self.jumping and not self.falling then
+		self:duck(true, size)
+	end
+end
+
 function mario:shrink()
-	raccoonplanesound:stop() --stops raccoon flying sound
+	if not raccoonplaning(self) then
+		raccoonplanesound:stop() --stops raccoon flying sound (not someone else's)
+	end
 	
 	if self.animation then
 		return
@@ -4237,6 +4297,7 @@ function mario:shrink()
 		return false
 	end
 	self.animationmisc = self.animationstate
+	self.sizechange = {duck = self.ducking} --ducking comes back once the shrink animation is done (see endsizechange)
 	
 	playsound(shrinksound)
 
@@ -4566,6 +4627,30 @@ function mario:setsize(size, oldsize)
 	if self.shoe then
 		self:shoed(self.shoe)
 	end
+	
+	--animations the new form doesn't have end right away (a tail whip when getting hit out of the raccoon suit,
+	--a flight, a float), so the quad below is one the new form really has
+	if size ~= 6 and size ~= 9 and size ~= 10 then
+		self.spinanimationtimer = raccoonspintime
+		self.spinanimationprogress = 1
+		self.spinframez = 1
+		if objects and objects["mariotail"] then
+			for _, tail in pairs(objects["mariotail"]) do
+				if tail.player == self then
+					tail.destroy = true --the tail whip stops hitting things too
+				end
+			end
+		end
+		if self.float then
+			self.float = false
+			self.floattimer = 0
+			self.ignoregravity = false
+		end
+		self.raccoonfly = false
+		self.raccoonflaptimer = 0
+		self.raccoonflyframe = 1
+		self.raccoonflyanimationprogress = 1
+	end
 	if self.pointingangle then
 		self:setquad(nil, size)
 	end
@@ -4584,6 +4669,11 @@ function mario:floorcollide(a, b)
 	local anim = self.animationstate
 	local jump = self.jumping
 	local fall = self.falling
+	--p-speed as it was before this landing (a stomp keeps it, see keeppspeed). The first landing of the frame counts
+	if not self.stompsnap then
+		self.stompsnap = true
+		self.snapplane, self.snapfly, self.snapflap = self.planemode, self.raccoonfly, self.raccoonflaptimer
+	end
 	
 	if self:globalcollide(a, b) then
 		return false
@@ -4815,7 +4905,13 @@ function mario:floorcollide(a, b)
 			self.planetimer = 0
 		end
 		
-		if self.planemode and (math.abs(self.speedx) <= 8.9 or self.animationstate ~= "running") then
+		if self.planemode and (self.size == 6 or self.size == 9) and math.abs(self.speedx) >= 8.9 then
+			--raccoon or tanooki landing at p-speed: still at p-speed, with a full p-meter (the flight is over)
+			self.planetimer = raccoonplanefull
+			self.raccoonfly = false
+			self.raccoonflyingtimer = 0
+			self.raccoonflaptimer = 0
+		elseif self.planemode and (math.abs(self.speedx) <= 8.9 or self.animationstate ~= "running") then
 			self.planemode = false
 			self.raccoonfly = false
 			self.raccoonflyingtimer = 0
@@ -5093,6 +5189,30 @@ function mario:purplegel(dir)
 	self.jumping = false
 end
 
+function mario:addstompcombo()
+	if minigameplaying then
+		--minigames: nth enemy stomped since last landing = n points, shown as "+n"
+		marioscore = marioscore + self.combo
+		table.insert(scrollingscores, scrollingscore:new("+" .. self.combo, self.x, self.y))
+		self.combo = self.combo + 1
+		return
+	end
+	--enemies stomped in a row without landing: 100, 200, 400, 500, 800, 1000, 2000, 4000, 5000, 8000, then a 1up each
+	if self.combo <= #mariocombo then
+		addpoints(mariocombo[self.combo], self.x, self.y)
+		self.combo = self.combo + 1
+	else
+		if mariolivecount ~= false then
+			for i = 1, players do
+				mariolives[i] = mariolives[i]+1
+			end
+			respawnplayers()
+		end
+		table.insert(scrollingscores, scrollingscore:new("1up", self.x, self.y))
+		playsound(oneupsound)
+	end
+end
+
 function mario:stompenemy(a, b)
 	local bounce = false
 	local function setanim()
@@ -5112,15 +5232,7 @@ function mario:stompenemy(a, b)
 				dir = "left"
 			end
 			b:shotted(dir)
-			if self.combo < #mariocombo then
-				addpoints(mariocombo[self.combo], self.x, self.y)
-			else
-				if mariolivecount ~= false then
-					mariolives[self.playernumber] = mariolives[self.playernumber]+1
-				end
-				table.insert(scrollingscores, scrollingscore:new("1up", self.x, self.y))
-				playsound(oneupsound)
-			end
+			self:addstompcombo()
 			playsound(stompsound)
 			
 			bounce = true
@@ -5141,10 +5253,7 @@ function mario:stompenemy(a, b)
 				b:stomp(self.x, self)
 				
 				if b.speedx == 0 or (b.flying and b.small == false) then
-					addpoints(mariocombo[self.combo], self.x, self.y)
-					if self.combo < #mariocombo then
-						self.combo = self.combo + 1
-					end
+					self:addstompcombo()
 				
 					local grav = self.gravity or yacceleration
 					
@@ -5182,20 +5291,7 @@ function mario:stompenemy(a, b)
 				end
 			elseif b.stompable then
 				b:stomp(self.x, self)
-				if self.combo < #mariocombo then
-					addpoints(mariocombo[self.combo], self.x, self.y)
-					if not b.stompcombosuppressor then
-						self.combo = self.combo + 1
-					end
-				else
-					if mariolivecount ~= false then
-						for i = 1, players do
-							mariolives[i] = mariolives[i]+1
-						end
-					end
-					table.insert(scrollingscores, scrollingscore:new("1up", self.x, self.y))
-					playsound(oneupsound)
-				end
+				self:addstompcombo()
 				if not b.nostompsound then
 					playsound(stompsound)
 				end
@@ -5215,10 +5311,7 @@ function mario:stompenemy(a, b)
 			b:stomp(self.x, self)
 			
 			if b.speedx == 0 or ((b.t == "redflying" or b.t == "flying" or b.t == "flying2") and b.small == false) then
-				addpoints(mariocombo[self.combo], self.x, self.y)
-				if self.combo < #mariocombo then
-					self.combo = self.combo + 1
-				end
+				self:addstompcombo()
 			
 				local grav = self.gravity or yacceleration
 				if self.gravitydir == "up" then
@@ -5257,18 +5350,7 @@ function mario:stompenemy(a, b)
 			end
 		else
 			b:stomp(self.x, self)
-			if self.combo < #mariocombo then
-				addpoints(mariocombo[self.combo], self.x, self.y)
-				if a ~= "bulletbill" then
-					self.combo = self.combo + 1
-				end
-			else
-				if mariolivecount ~= false then
-					mariolives[self.playernumber] = mariolives[self.playernumber]+1
-				end
-				table.insert(scrollingscores, scrollingscore:new("1up", self.x, self.y))
-				playsound(oneupsound)
-			end
+			self:addstompcombo()
 			if not b.nostompsound then
 				playsound(stompsound)
 			end
@@ -5311,6 +5393,20 @@ function mario:stompenemy(a, b)
 	end
 end
 
+--bouncing off an enemy at p-speed (raccoon or tanooki) keeps p-speed and refills it: a full p-meter,
+--and a flight that was going on gets its whole flying time back
+function mario:keeppspeed(plane, fly, flaptimer)
+	if plane and (self.size == 6 or self.size == 9) and not self.dead and not self.yoshi then
+		self.planemode = true
+		self.planetimer = raccoonplanefull
+		self.raccoonfly = fly
+		self.raccoonflyingtimer = 0
+		self.raccoonflaptimer = flaptimer
+		self.animationstate = "jumping" --in the air at p-speed (falling would end it)
+		self:setquad()
+	end
+end
+
 function mario:stompbounce(a, b) --bounce off of enemy (koopaling in shell for example)
 	local grav = self.gravity or yacceleration
 	if self.gravitydir == "up" then
@@ -5344,6 +5440,31 @@ function mario:stompbounce(a, b) --bounce off of enemy (koopaling in shell for e
 	if b.stompbouncex then
 		self.speedx = ((self.x+self.width/2)-(b.x+b.width/2))*bounceheight*b.stompbouncex --bounce horizontally aswell, SMB3 style
 	end
+end
+
+--every stomp (any enemy, wherever the game notices it) keeps p-speed: the landing that comes with it this frame
+--may have switched it off already, so p-speed from before that landing counts
+local function pspeedbeforestomp(self)
+	if self.stompsnap then
+		return self.snapplane, self.snapfly, self.snapflap
+	end
+	return self.planemode, self.raccoonfly, self.raccoonflaptimer
+end
+
+local stompenemy_ = mario.stompenemy
+function mario:stompenemy(...)
+	local plane, fly, flaptimer = pspeedbeforestomp(self)
+	local r = stompenemy_(self, ...)
+	self:keeppspeed(plane, fly, flaptimer)
+	return r
+end
+
+local stompbounce_ = mario.stompbounce
+function mario:stompbounce(...)
+	local plane, fly, flaptimer = pspeedbeforestomp(self)
+	local r = stompbounce_(self, ...)
+	self:keeppspeed(plane, fly, flaptimer)
+	return r
 end
 
 function mario:rightcollide(a, b, passive)
@@ -6359,6 +6480,7 @@ function mario:ceilcollide(a, b)
 			end
 			
 			--Check if it should bounce the block next to it, or push mario instead (Hello, devin hitch!)
+			--(a minigame can react to the push with cornerslide(x, y, player), a sound for example)
 			if self.gravitydir ~= "up" and self.size ~= 8 and self.size ~= 16 and not b.UPSIDEDOWNSLOPE then
 				if self.x < x-22/16 then
 					--check if block left of it is a better fit
@@ -6370,6 +6492,9 @@ function mario:ceilcollide(a, b)
 							self.x = x-28/16
 							if self.speedx > 0 then
 								self.speedx = 0
+							end
+							if cornerslide then
+								cornerslide(x, y, self)
 							end
 							return false
 						end					
@@ -7426,7 +7551,10 @@ function mario:die(how)
 			everyonedead = false
 		end
 	end
-	
+	if minigame_keepplaying and minigame_keepplaying() then
+		everyonedead = false --the minigame decides when it's over (battle royale)
+	end
+
 	self.animationmisc = nil
 	if everyonedead then
 		self.animationmisc = "everyonedead"

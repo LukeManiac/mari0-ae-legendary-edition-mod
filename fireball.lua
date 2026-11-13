@@ -140,7 +140,7 @@ function fireball:update(dt)
 		self.lifetime = self.lifetime - dt
 	end
 	
-	if ((self.lifetime and self.lifetime < 0) or self.x < xscroll-1 or self.x > xscroll+width+1 or self.y > mapheight) and self.active then
+	if ((self.lifetime and self.lifetime < 0) or projectileoffscreenx(self.x) or self.y > mapheight) and self.active then
 		if self.fireballthrower then
 			self.fireballthrower:fireballcallback()
 		end

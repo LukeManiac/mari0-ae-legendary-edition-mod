@@ -568,6 +568,12 @@ function game_update(dt)
 			end
 		end
 		
+		--the fast music starts as soon as the low time sound is done (even while the timer is stopped, in a pipe for example)
+		if queuelowtime and not lowtimesound:isPlaying() and (not levelfinished) then
+			queuelowtime = false
+			updatemusicpriority()
+		end
+		
 		if (notime == false or breakoutmode) and mariotime ~= 0 then
 			if not infinitetime then
 				if realtime then --mario maker time
@@ -577,16 +583,8 @@ function game_update(dt)
 				end
 			end
 			
-			if queuelowtime then
-				queuelowtime = queuelowtime - 2.5*dt
-			end
 			if mariotime > 0 and (mariotime < 99 and mariotime + 2.5*dt >= 99 and GOTTAGOFAST and (mariotime + 2.5*dt > 99 or not GOTTAGOFASTINSTANT)) and (not dcplaying) and (not levelfinished) and not nolowtime then
 				startlowtime()
-			end
-			
-			if queuelowtime and queuelowtime < 0 and (not levelfinished) then
-				queuelowtime = false
-				updatemusicpriority()
 			end
 			
 			if mariotime <= 0 then
@@ -2065,6 +2063,11 @@ function game_draw()
 			drawmaptiles("main", xscroll, yscroll)
 		end
 
+		--minigames (behind every object)
+		if minigameplaying then
+			minigame_drawtiles()
+		end
+
 		--Moving Tiles (tilemoving)
 		for j, w in pairs(objects["tilemoving"]) do
 			w:draw()
@@ -2764,6 +2767,8 @@ function game_draw()
 				love.graphics.draw(oneuptextimage, math.floor((scrollingscores[i].x-xscroll)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale), 0, scale, scale)
 			elseif scrollingscores[i].i == "3up" then
 				love.graphics.draw(threeuptextimage, math.floor((scrollingscores[i].x-xscroll)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale), 0, scale, scale)
+			elseif type(scrollingscores[i].i) == "string" and string.sub(scrollingscores[i].i, 1, 1) == "+" then
+				properprint(scrollingscores[i].i, math.floor((scrollingscores[i].x-xscroll-0.4)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale))
 			end
 		end
 		
@@ -8730,8 +8735,14 @@ function controlbindingmatcheskey(player, name, key)
 	return false
 end
 
+--the players whose controls count for pausing: at least player 1, even with no player in the level
+--(minigames without one: Snake Slither Scramble, Boo Baffler Bash, Block Beat Bonanza)
+function controlplayers()
+	return math.max(players or 0, 1)
+end
+
 function isPauseKey(key)
-	for i = 1, players do
+	for i = 1, controlplayers() do
 		if controlbindingmatcheskey(i, "pause", key) then
 			return true
 		end
@@ -8928,7 +8939,7 @@ end
 
 function game_joystickpressed( joystick, button )
 	--pause with controller
-	for i = 1, players do
+	for i = 1, controlplayers() do
 		if controlbindingmatchesjoy(i, "pause", joystick, button) then
 			game_keypressed("escape")
 			break
@@ -8942,7 +8953,7 @@ function game_joystickpressed( joystick, button )
 			end
 		end
 		--select pause options
-		for i = 1, players do
+		for i = 1, controlplayers() do
 			local haspausebinding = hasjoystickbuttonbinding(i, "pause")
 			if (haspausebinding or i == 1) and controlbindingmatchesjoy(i, "jump", joystick, button) then
 				game_keypressed("return")
@@ -10688,7 +10699,7 @@ function startlowtime()
 	stopmusic()
 	love.audio.stop()
 	playsound(lowtimesound)
-	queuelowtime = 7.5
+	queuelowtime = true
 end
 
 --replace any characters that may mess with level saving

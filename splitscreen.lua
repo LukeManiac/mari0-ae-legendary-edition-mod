@@ -19,6 +19,44 @@ splitscreencurves = {
 	function(t) return math.sqrt(1-(t-1)^2) end, --circ
 }
 
+--a minigame can pick which players get a viewport (splitscreenviewplayers = {1, 3}, a single one is fine too)
+--and who a viewport follows (splitscreenviewtarget(view) returns a player object, or nil for the viewport's own player)
+splitscreenviewplayers = nil
+splitscreenviewtarget = nil
+splitscreenviewhud = nil --function(view index, view, player number), drawn after the lives of a viewport
+
+function splitscreen_viewcount()
+	if splitscreenviewplayers then
+		return #splitscreenviewplayers
+	end
+	return players or 0
+end
+
+--the player number a viewport belongs to
+function splitscreen_viewplayer(i)
+	if splitscreenviewplayers then
+		return splitscreenviewplayers[i]
+	end
+	return i
+end
+
+--the player a viewport's camera follows
+function splitscreen_viewtarget(i)
+	local p
+	if splitscreenviewtarget then
+		p = splitscreenviewtarget(i)
+	end
+	return p or objects["player"][splitscreen_viewplayer(i)]
+end
+
+--projectiles thrown by players disappear once they leave the camera, with split screen that's the whole level
+function projectileoffscreenx(x)
+	if splitscreenactive() then
+		return x < -1 or x > mapwidth+1
+	end
+	return x < xscroll-1 or x > xscroll+width+1
+end
+
 function splitscreen_reset()
 	splitcamx = {}
 	splitcamy = {}
@@ -40,7 +78,12 @@ function splitscreenactive()
 	if autoscrolling then
 		return false
 	end
-	if (not players) or players < 2 or players > 4 then
+	local count = splitscreen_viewcount()
+	local mincount = 2 --a minigame's list of viewports can have a single one
+	if splitscreenviewplayers then
+		mincount = 1
+	end
+	if (not players) or count < mincount or count > 4 then
 		return false
 	end
 	if not (objects and objects["player"]) then
@@ -62,7 +105,10 @@ function getsplitscreenviews()
 	end
 	local W, H = width*16, height*16
 	local views = {}
-	if players == 2 then
+	local count = splitscreen_viewcount()
+	if count == 1 then
+		views[1] = {x = 0, y = 0, w = W, h = H, lives = "centerbottom"}
+	elseif count == 2 then
 		-- top / bottom
 		if HorizontalSplitScreen then
 			views[1] = {x = 0, y = 0, w = W, h = H/2, lives = "centerbottom"}
@@ -71,7 +117,7 @@ function getsplitscreenviews()
 			views[1] = {x = 0, y = 0, w = W/2, h = H, lives = "centerbottom"}
 			views[2] = {x = W/2, y = 0, w = W/2, h = H, lives = "centerbottom"}
 		end
-	elseif players == 3 then
+	elseif count == 3 then
 		-- P1 top-left, P2 top-right, P3 full bottom
 		if HorizontalSplitScreen then
 			views[1] = {x = 0, y = 0, w = W/2, h = H/2, lives = "centerbottom"}
@@ -96,8 +142,8 @@ function getsplitscreenviewscached()
 		return nil
 	end
 	local c = splitscreenviewscache
-	if not c or c.players ~= players or c.horizontal ~= HorizontalSplitScreen or c.width ~= width or c.height ~= height then
-		c = {players = players, horizontal = HorizontalSplitScreen, width = width, height = height, views = getsplitscreenviews()}
+	if not c or c.players ~= players or c.count ~= splitscreen_viewcount() or c.horizontal ~= HorizontalSplitScreen or c.width ~= width or c.height ~= height then
+		c = {players = players, count = splitscreen_viewcount(), horizontal = HorizontalSplitScreen, width = width, height = height, views = getsplitscreenviews()}
 		splitscreenviewscache = c
 	end
 	return c.views
@@ -111,8 +157,8 @@ function splitscreen_update(dt)
 	local resnap = not splitscreenwasactive
 	splitscreenwasactive = true
 
-	for i = 1, players do
-		local p = objects["player"][i]
+	for i = 1, #views do
+		local p = splitscreen_viewtarget(i)
 		local view = views[i]
 		local dead = p.dead --only .dead counts, not .drawable
 		local shouldfade = dead and not everyonedead
@@ -334,7 +380,7 @@ function splitscreen_beginview(split, view)
 	-- viewports matching the game window aspect (e.g. 2x2) render at half scale and stay there
 	local gameaspect = (width * 16) / (height * 16)
 	local viewaspect = view.w / view.h
-	if math.abs(viewaspect - gameaspect) < 1e-6 then
+	if math.abs(viewaspect - gameaspect) < 1e-6 and view.w < width*16 then --(a single full screen viewport stays at full scale)
 		renderscale = math.max(scale / 2, 1)
 		viewrangemul = basescale / renderscale
 		-- do not scale back up
@@ -421,7 +467,8 @@ end
 
 --same info as drawmultiHUD, but placed inside of the viewport of the player
 function splitscreen_drawlives(i, view)
-	local p = objects["player"][i]
+	local playeri = splitscreen_viewplayer(i)
+	local p = objects["player"][playeri]
 	local livesdisplay = (mariolivecount ~= false)
 	if not livesdisplay then
 		for j = 1, players do
@@ -433,6 +480,9 @@ function splitscreen_drawlives(i, view)
 		end
 	end
 	if not livesdisplay then
+		if splitscreenviewhud then
+			splitscreenviewhud(i, view, playeri)
+		end
 		return
 	end
 
@@ -443,9 +493,9 @@ function splitscreen_drawlives(i, view)
 
 	local s
 	if mariolivecount ~= false then
-		s = "p" .. i .. " * " .. mariolives[i]
+		s = "p" .. playeri .. " * " .. mariolives[playeri]
 	else
-		s = "p" .. i
+		s = "p" .. playeri
 	end
 	local hp, key
 	if p.health and p.characterdata.healthimg then
@@ -494,7 +544,7 @@ function splitscreen_drawlives(i, view)
 		love.graphics.setColor(0, 0, 0)
 		love.graphics.rectangle("fill", (cx-1)*scale, (cy-1)*scale, 9*scale, 9*scale)
 	end
-	love.graphics.setColor(mariocolors[i][1])
+	love.graphics.setColor(mariocolors[playeri][1])
 	love.graphics.rectangle("fill", cx*scale, cy*scale, 7*scale, 7*scale)
 	love.graphics.setColor(255, 255, 255, 255)
 	cy = cy + 10
@@ -506,6 +556,9 @@ function splitscreen_drawlives(i, view)
 	if key then
 		love.graphics.draw(keyuiimg, keyuiquad[spriteset or 1][coinframe or 1], cx*scale, cy*scale, 0, scale, scale)
 		properprintfunc(key, (cx+9)*scale, cy*scale)
+	end
+	if splitscreenviewhud then
+		splitscreenviewhud(i, view, playeri)
 	end
 end
 

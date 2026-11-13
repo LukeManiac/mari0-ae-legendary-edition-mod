@@ -1182,7 +1182,8 @@ local nitpickkeys = {
 	"invinciblesnake",
 	"multiplejumping",
 	"probabilitypasser",
-	"immortalcombometer"
+	"immortalcombometer",
+	"removecooldowns"
 }
 
 function generatenitpicksfile()

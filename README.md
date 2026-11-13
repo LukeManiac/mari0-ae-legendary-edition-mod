@@ -366,12 +366,175 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `multiplejumping`: In Jumping Juggle Jamboree, every jump press gives a full-height jump, even in mid-air, and landing on the ground adds a point and jumps you back up.
 - `probabilitypasser`: In Snake Slither Scramble, the ? block and the Starman appear straight away whenever there isn't one on the screen.
 - `immortalcombometer`: The bonus meter in Boo Baffler Bash always stays full.
+- `removecooldowns`: The ? blocks in Rival Rumble Royale have no cooldown, so every hit gives an item.
 
 ---
 
 # Changelog
 
 All notable releases and updates to **Legendary Edition** are documented here.
+
+## v1.1.1
+
+### 🧩 New Features
+
+#### 🥊 Rival Rumble Royale
+
+A four-player battle minigame inspired by the battle mode of Super Mario 4 Jugadores. Grab power-ups from the ? blocks and knock everyone else out. The last one standing wins.
+
+**Players and settings**
+
+* Four players battle in every round. Any players that aren't human are bots.
+* **How many players are human?:** 1 (P2 to P4 are bots), 2 (P3 and P4 are bots), 3 (P4 is a bot) or 4 (no bots).
+* **Bot difficulty:** Easy, Normal (the default), Expert, Super Expert or Godmode. Harder bots make up their minds faster, shoot more often and from further away, dodge more projectiles, and run from danger sooner. Easy bots sometimes stand around for a moment. Super Expert and Godmode bots aim where you're about to be. Godmode bots also go for ? blocks most of the time and step out of the way when someone drops onto their head.
+* **Battle theme:** Overworld, Underground, Castle, Portal or Night Overworld (the Overworld with a grey palette and a black sky).
+* **Battle music:** Overworld, Underground, Castle, or any custom song (see **Custom Music** below). Long names are shortened in the closed dropdown, and the list opens wide enough to show them in full.
+* **Bot Splitscreen:** On by default. Gives the bots their own viewports as well, so you can watch them. When it's off, only the human players get a viewport.
+* **Starting lives:** A slider from 5 to 100, 10 by default.
+* **Timer:** A checkbox with a slider from 100 to 1000 seconds, in steps of 10. The slider only works while the box is ticked.
+* Split screen is always on, whatever the `splitscreenmultiplayer` nitpick is set to. With one viewport, it fills the whole screen.
+* The battle uses the game's own physics instead of the Super Mario Maker physics the other minigames use.
+
+**Starting a battle**
+
+* P1 spawns at the top left of the arena, P2 at the top right, P3 at the bottom left and P4 at the bottom right.
+* A countdown in real time shows **3**, **2** and **1** (one second each, with the new `countdownbeep.ogg`), then **go!** (with the new `countdowngo.ogg`). Nobody can move before **go!**, and the music only starts then.
+
+**Arenas**
+
+* Every battle gets a new arena in its theme's style, 40 tiles wide and 30 tiles high, with the camera scrolling up and down. Both halves of the arena mirror each other, so it's fair.
+* The Overworld has pipes, hills, bushes, trees and clouds. The Underground has a brick ceiling and pipes. The Castle has lava pits. The Portal test chamber has a pillar in the middle.
+* Platforms are stacked up to near the top of the arena, each one 3 or 4 tiles above the last. The rare block sits over the highest platform in the middle.
+* Every arena is checked before the battle starts: every spawn has ground under it, every ? block can be hit from below, and there is a route to every spawn and block (the same routes the bots use). If 40 arenas in a row fail the check, the theme's fixed arena is used instead.
+
+**? Blocks**
+
+* When a ? block is ready, a roulette of its items is drawn on the block, changing every 0.2 seconds. It's drawn behind everything else.
+* When a block is on cooldown, it shows the seconds left. It can still be bumped, but nothing comes out.
+* **Spawn blocks:** One sits 3 tiles above each spawn. 10-second cooldown. Fire Flower, Hammer Suit or Boomerang Flower.
+* **? blocks:** 15-second cooldown. Super Leaf, Tanooki Suit or Superball Flower.
+* **Rare block:** 30-second cooldown. Blue Shell, Super Star or Cape Feather.
+
+**Power-ups and getting hurt**
+
+* Power-ups apply instantly, without the grow or shrink animation. Getting a power-up while small gives you that power-up straight away, not just Super form.
+* Getting a power-up, respawning or taking damage gives you 1 second of invincibility. The blinking animation starts at 2.2.
+* Hits always damage instead of killing outright, under any physics. A powered-up player drops to Super form, a Super player drops to small, and a small player dies.
+* Fireballs, superballs, hammers, boomerangs and tails hurt every player except the one who threw them.
+* A player with a Super Star, or in a Blue Shell at full speed, hurts anyone who touches them and can be hurt. Two Blue Shells that meet bounce off each other.
+* A Tanooki Suit player in statue mode can't be hurt, and hurts anyone who touches them.
+* Any player can stomp on another player's head and bounce off it, like bouncing off an enemy. The player underneath only takes damage when they can be hurt. The player on top never gets hurt by the stomp, even when landing on a Super Star or a fast Blue Shell. After a stomp, those two players can't hurt each other by touching for 0.25 seconds.
+* Bots also follow the `infinitefireballs` nitpick. Without it, they only press fire when a shot can actually come out. With it, they shoot faster, but never more than about as fast as someone can mash the button.
+
+**Lives, knockouts and winning**
+
+* A player who loses their last life is out. Their viewport follows someone who's still in the battle and shows "watching pN".
+* A knockout counts for the player who hit you, if you die within 4 seconds of their hit (falling into a pit, for example). The HUD shows every player's lives and knockouts, and marks the bots with "CPU".
+* A human player who is out can type the Konami code with their own controls to come back with 3 lives, once per battle: **Up, Up, Down, Down, Left, Right, Left, Right, Run, Jump**.
+* When only one player is left, the music stops and the battle clear theme plays in the arena: `levelend.ogg`, or the music pack's own one (see **Custom Music** below), with its `-intro` first if it has one. A battle clear theme longer than 15 seconds gets cut off. Once it ends, the game fades to the results screen, which says "pN wins!" and stays up for 4 seconds without a sound.
+* When the timer runs out, "time up!" shows for a moment. The player with the most lives left wins (being alive at that moment beats waiting to respawn), then the one with the most knockouts. If it's still a tie, the battle is a draw: the battle clear theme still plays, and the results screen says "draw!".
+* When the timer drops below 100 and the battle music has a fast version (`song-fast.ogg` next to a custom song, or the built-in `-fast` versions), the music stops, `lowtimesound` plays, and the fast version takes over as soon as the sound ends (with its `-fastintro` if it has one). The star theme speeds up too. Without a fast version, the normal music just keeps playing.
+* The score is the most knockouts any human player got (or the winner's knockouts, if only bots played). The victory screen labels it "knockouts".
+
+**Custom Music**
+
+* Custom music goes in `sounds/rivalrumbleroyalemusic` in the game, or in `alesans_entities/rivalrumbleroyalemusic` in the save folder (`%appdata%/mari0` on Windows). The game makes the save folder one the first time the minigames menu lists the music. The minigame's description also explains this, with an example.
+* Every `.ogg` file becomes an option in the **Battle music** dropdown. A folder is a music pack, and its songs are listed as "Pack name- Song name", for example "Kirby VRC6 Music- Nightmare".
+* `song-intro.ogg` plays once before `song.ogg`.
+* `pack.json` is optional and sets the pack's name, its place in the list, the names of its songs, and the pack's own star theme and battle clear theme:
+
+  ```json
+  {
+      "name": "Kirby VRC6 Music",
+      "order": 1,
+      "Starman Theme": "kirby star",
+      "Battle Clear": "level clear",
+      "songs": [
+          ["boss", "Boss"],
+          ["skybattle", "Battle Across The Sky"]
+      ]
+  }
+  ```
+
+  Packs with an `order` come first (lowest first), and the rest come after them. Packs with the same `order`, or no `order`, are sorted alphabetically by their name in the list. A broken `pack.json` is ignored.
+* `"Starman Theme"` names a song of the pack that replaces the star theme while a song from that pack is playing. Its `-intro` works too (`kirby star-intro.ogg`).
+* `"Battle Clear"` names a song of the pack that plays in the arena when the battle ends, instead of `levelend.ogg`. Its `-intro` works too.
+* Song names in both keys can be written with or without `.ogg`, and the key names don't care about capitals. Neither song shows up in the list.
+* If a key is missing, names a file that isn't in the pack, or the pack has no `pack.json`, the pack's `starmusic.ogg` (with `starmusic-intro.ogg`) or `battleclear.ogg` is used instead. If that isn't in the pack either, the built-in star theme or `levelend.ogg` is used.
+* Without `pack.json`, names come from the folder and file names ("my_song.ogg" becomes "My Song").
+* `overworld.ogg`, `underground.ogg` or `castle.ogg` placed directly in a music folder replaces the built-in song. Inside a pack folder, they're songs of that pack instead ("My Pack- Overworld"), and the built-in songs stay.
+* If a song or pack in the save folder has the same name in the list as one in the game, the save folder's one is used.
+* `pack.json` files are included for **Kirby VRC6 Music**, **Castlevania VRC6 Music** and **Super Mario Bros. 2 Remade**. The songs themselves aren't included. `sounds/rivalrumbleroyalemusic/README.md` explains all of this.
+
+Example of what a music folder can hold:
+
+```
+rivalrumbleroyalemusic/
+├── my_song.ogg
+└── my pack/
+    ├── pack.json        "Starman Theme": "star", "Battle Clear": "win"
+    ├── boss.ogg
+    ├── boss-intro.ogg
+    ├── star.ogg
+    └── win.ogg
+```
+
+**Bots**
+
+* Bots find their way around the arena with routes between platforms. They jump gaps (backing up for a run-up when a gap is wide), drop down from platforms, and won't walk off an edge into a pit.
+* They go for items and ? blocks, especially when small, and fight whoever is closest. They leave an item or block they can't reach in 6 seconds alone for 10 seconds.
+* They jump over projectiles coming at them, run from Super Stars and fast Blue Shells, and jump over Tanooki statues in their way.
+
+**Other**
+
+* The minigame's graphic shows Mario, Luigi, Toad and Toadette, with Mario and Luigi wearing the standard hat.
+* Jumping on the first frame after **go!** now shows the jump pose instead of the falling pose.
+
+#### ⚙️ Minigame Nitpicks
+
+* `removecooldowns`: The ? blocks in Rival Rumble Royale have no cooldown. Every hit gives an item, and the block shows its roulette again straight away. **Generate Nitpicks File** adds it to an existing file.
+
+#### 🎮 Minigames
+
+* Minigame settings can now be sliders, or a checkbox with a slider next to it that only works while the box is ticked. Right-click a slider to type a number.
+* Dropdown entries can now come from a function, so a list can depend on files. Entries are shown in lowercase because the old font draws some capitals as symbols.
+* Wide dropdowns shorten long entries while closed (the pack name is shortened first), then open to the left, wide enough to show the full names.
+* A minigame can now have up to four players, keep the game's own physics instead of Super Mario Maker physics, and set its own victory sound, headline and score label.
+* A minigame can keep some things moving while the game is frozen at the end (like players who are still dying), and can undo its changes when it returns to the menu.
+* A minigame can now draw right after the tiles, behind every object.
+* A minigame can play its own jingle in the game and then show a silent results screen for a set number of seconds (`resultsilent`).
+* Words in a minigame's description that are longer than a line (like a long folder name) are now split over several lines, so they don't run under the scrollbar.
+
+#### 🖥️ Splitscreen
+
+* Minigames can choose which players get a viewport, which player each viewport follows, and extra HUD for each viewport. A single viewport is allowed, and fills the whole screen.
+
+#### 🎵 Music
+
+* `-intro` and `-fast` versions now also work for built-in music names, for example `starmusic-intro`.
+* In normal levels, the fast music now starts as soon as the low time sound ends, instead of after a fixed wait of about 3 seconds that only matched the default sound. It also starts while the timer is stopped, in a pipe for example.
+* Custom music's fast version can now have its own intro, including a mappack's `music` folder and `music.ogg`/`music1.ogg` files, in `.ogg` or `.mp3`. `song-fastintro.ogg` (or `song-introfast.ogg`) plays once before `song-fast.ogg` when the time runs low, the same way `song-intro.ogg` plays before `song.ogg`. Fast intros don't show up as separate songs in the editor's music list. Stopping the music while an intro is playing now stops the intro too.
+
+### 🐛 Bug Fixes
+
+* In splitscreen, player fireballs, superballs, iceballs, hammers and boomerangs no longer disappear as soon as they leave the shared camera. They now last as long as they're inside the level.
+* A player's boomerang now only disappears when it gets back to the player who threw it. Before, it disappeared on contact with any other player, so other players could catch it.
+* If the Super Star wears off while the player is a Tanooki statue, they now go back to the statue colours instead of their normal ones.
+* When the blinking invincibility ends while the player is a Tanooki statue, they now stay invincible. Before, enemies could hurt a statue once the blinking was over.
+* Stomping enemies in a row without landing gives 100, 200, 400, 500, 800, 1000, 2000, 4000, 5000 and 8000 points again, then a 1up for each stomp after that. Before, the nth stomp only gave n points ("+1", "+2"...). Minigames still count stomps that way.
+* Changing form now ends any animation the new form doesn't have, and sets the new form's sprite straight away. For example, getting hit during a tail whip ends the whip, and its hitbox stops hitting things. A raccoon flight or a float ends the same way.
+* Dropdowns in a minigame's settings no longer disappear when the description above them is long. They used to stay where they were before the panel was scrolled.
+
+### ✨ Improvements
+
+#### 🦝 Raccoon and Tanooki
+
+* Landing while at P-speed and still running at full speed keeps P-speed on, with a full P-meter. Before, every landing switched it off. Any flight still ends when you land.
+* Running on the ground at full speed keeps P-speed on for as long as you keep running. In the air, the P-meter drains as before.
+* Stomping an enemy at P-speed keeps P-speed and refills it: the P-meter goes back to full, and a flight gets its whole flying time back. This works for every enemy, not just custom ones.
+* The P-meter now has a maximum: 1.1 seconds of running at full speed fills it, which is where P-speed starts. It's set with `raccoonplanefull` in `variables.lua`.
+* Each flap while flying now plays the whole flying animation, all 3 frames, over `raccoonflaptime` (0.3 seconds, in `variables.lua`). It keeps playing even when you start falling. Before, it went back to the first frame as soon as you started falling.
+* Pressing jump again while flapping keeps the animation going from the frame it's on, instead of starting it over. It only goes back to the first frame once you stop flapping.
 
 ## v1.1.0
 

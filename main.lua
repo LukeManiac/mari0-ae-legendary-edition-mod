@@ -1060,6 +1060,8 @@ function love.load()
 	bulletbillsound = newsound("bulletbill")
 	dialogsound = newsound("dialog")
 	beepsound = newsound("beep")
+	countdownbeepsound = newsound("countdownbeep")
+	countdowngosound = newsound("countdowngo")
 	iciclesound = newsound("icicle")
 	thwompsound = newsound("thwomp")
 	boomerangsound = newsound("boomerang")
@@ -3651,6 +3653,7 @@ function loadnitpicks()
 		MultipleJumping = t.multiplejumping
 		ProbabilityPasser = t.probabilitypasser
 		ImmortalComboMeter = t.immortalcombometer
+		RemoveCooldowns = t.removecooldowns
 	end
 end
 

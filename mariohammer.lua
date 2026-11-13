@@ -61,7 +61,7 @@ function mariohammer:update(dt)
 		self.timer = self.timer - hammeranimationspeed
 	end
 	
-	if self.x < xscroll-1 or self.x > xscroll+width+1 or self.y > mapheight and self.active then
+	if projectileoffscreenx(self.x) or self.y > mapheight and self.active then
 		self.mariohammerthrower:mariohammercallback()
 		self.destroy = true
 	end

@@ -670,7 +670,7 @@ function loadcustommusic()
 	local files = love.filesystem.getDirectoryItems(mappackfolder .. "/" .. mappack .. "/music")
 	for i, s in pairs(files) do
 		if s:sub(-4) == ".mp3" or s:sub(-4) == ".ogg" then
-			if not (s:sub(-9, -5) == "-fast" or s:sub(-10, -5) == "-intro") then
+			if not (s:sub(-9, -5) == "-fast" or s:sub(-10, -5) == "-intro" or s:sub(-14, -5) == "-fastintro" or s:sub(-14, -5) == "-introfast") then
 				table.insert(custommusiclist, "music/" .. s)
 			end
 		end
