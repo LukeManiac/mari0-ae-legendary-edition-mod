@@ -4271,8 +4271,9 @@ function mario:endsizechange()
 		self.animationtimer = c.blinking
 	end
 	local size = self.size
+	--in the air too: a duck jump stays a duck jump (ducking only ends on landing, see mario:update)
 	if c.duck and not self.ducking and (size > 1 or self.characterdata.smallducking) and size ~= 5 and size ~= 8 and size ~= 16
-		and not self.jumping and not self.falling then
+		and not self.shoe and not self.statue then
 		self:duck(true, size)
 	end
 end
@@ -4297,7 +4298,8 @@ function mario:shrink()
 		return false
 	end
 	self.animationmisc = self.animationstate
-	self.sizechange = {duck = self.ducking} --ducking comes back once the shrink animation is done (see endsizechange)
+	local wasducking = self.ducking
+	self.sizechange = nil --a straight change below keeps ducking itself (setsize), only the animation needs it put back
 	
 	playsound(shrinksound)
 
@@ -4329,6 +4331,7 @@ function mario:shrink()
 		return
 	end
 	
+	self.sizechange = {duck = wasducking} --ducking comes back once the shrink animation is done (see endsizechange)
 	self.size = 1
 	self:setsize(1)
 	

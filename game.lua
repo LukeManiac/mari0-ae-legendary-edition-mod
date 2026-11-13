@@ -30,6 +30,14 @@ function game_load(suspended, deletesuspend)
 	suspendpromptcurve = random_motion_curve()
 	suspendprompttimer = 0
 	suspendpromptduration = pausemenuduration
+	--minigames: "save highscore?" after confirming a quit, on top of the quit prompt (highscorepromptquit: "menu" or "desktop")
+	highscoreprompt = false
+	lasthighscoreprompt = false
+	highscorepromptcurve = random_motion_curve()
+	highscoreprompttimer = 0
+	highscorepromptduration = pausemenuduration
+	highscorepromptquit = false
+	highscorepromptselected = 1
 
 	scrollingstart = scrollingstartv --when the scrolling begins to set in (Both of these take the player who is the farthest on the left)
 	scrollingcomplete = scrollingcompletev --when the scrolling will be as fast as mario can run
@@ -336,10 +344,15 @@ function game_update(dt)
 		suspendpromptcurve = random_motion_curve()
 		lastsuspendprompt = suspendprompt
 	end
+	if highscoreprompt ~= lasthighscoreprompt then
+		highscorepromptcurve = random_motion_curve()
+		lasthighscoreprompt = highscoreprompt
+	end
 	pausemenuopentimer = math.max(0, math.min(pausemenuopentimer + (dt * (pausemenuopen and 1 or -1)), pausemenuopenduration))
 	menuprompttimer = math.max(0, math.min(menuprompttimer + (dt * (menuprompt and 1 or -1)), menupromptduration))
 	desktopprompttimer = math.max(0, math.min(desktopprompttimer + (dt * (desktopprompt and 1 or -1)), desktoppromptduration))
 	suspendprompttimer = math.max(0, math.min(suspendprompttimer + (dt * (suspendprompt and 1 or -1)), suspendpromptduration))
+	highscoreprompttimer = math.max(0, math.min(highscoreprompttimer + (dt * (highscoreprompt and 1 or -1)), highscorepromptduration))
 
 	--controls popup of the pause menu
 	controlspopup_update()
@@ -3377,68 +3390,37 @@ function game_draw()
 		drawcontrolsoverlay()
 
 		if menuprompttimer > 0 then
-			drawprompt(menuprompttimer, menupromptduration, menuprompt, menupromptcurve)
-			properprintF(TEXT["quit to menu?"], (width*8*scale)-utf8.len(TEXT["quit to menu?"])*4*scale, (112*scale)-10*scale)
-			if pausemenuselected2 == 1 then
-				properprintF(">", (width*8*scale)-51*scale, (112*scale)+4*scale)
-				love.graphics.setColor(255, 255, 255, 255)
-				properprintF(TEXT["yes"], (width*8*scale)-44*scale, (112*scale)+4*scale)
-				love.graphics.setColor(100, 100, 100, 255)
-				properprintF(TEXT["no"], (width*8*scale)+28*scale, (112*scale)+4*scale) 
-			else
-				properprintF(">", (width*8*scale)+20*scale, (112*scale)+4*scale)
-				love.graphics.setColor(100, 100, 100, 255)
-				properprintF(TEXT["yes"], (width*8*scale)-44*scale, (112*scale)+4*scale)
-				love.graphics.setColor(255, 255, 255, 255)
-				properprintF(TEXT["no"], (width*8*scale)+28*scale, (112*scale)+4*scale)
-			end
-
+			local lines, options = {prompttext("quit to menu?")}, {prompttext("yes"), prompttext("no")}
+			drawprompt(menuprompttimer, menupromptduration, menuprompt, menupromptcurve, #lines + #options)
+			drawpromptcontent(lines, options, pausemenuselected2)
 			love.graphics.pop()
 		end
 		
 		if desktopprompttimer > 0 then
-			drawprompt(desktopprompttimer, desktoppromptduration, desktopprompt, desktoppromptcurve)
-			properprintF(TEXT["quit to desktop?"], (width*8*scale)-utf8.len(TEXT["quit to desktop?"])*4*scale, (112*scale)-10*scale)
-			if pausemenuselected2 == 1 then
-				properprintF(">", (width*8*scale)-51*scale, (112*scale)+4*scale)
-				love.graphics.setColor(255, 255, 255, 255)
-				properprintF(TEXT["yes"], (width*8*scale)-44*scale, (112*scale)+4*scale)
-				love.graphics.setColor(100, 100, 100, 255)
-				properprintF(TEXT["no"], (width*8*scale)+28*scale, (112*scale)+4*scale)
-			else
-				properprintF(">", (width*8*scale)+20*scale, (112*scale)+4*scale)
-				love.graphics.setColor(100, 100, 100, 255)
-				properprintF(TEXT["yes"], (width*8*scale)-44*scale, (112*scale)+4*scale)
-				love.graphics.setColor(255, 255, 255, 255)
-				properprintF(TEXT["no"], (width*8*scale)+28*scale, (112*scale)+4*scale)
-			end
-
+			local lines, options = {prompttext("quit to desktop?")}, {prompttext("yes"), prompttext("no")}
+			drawprompt(desktopprompttimer, desktoppromptduration, desktopprompt, desktoppromptcurve, #lines + #options)
+			drawpromptcontent(lines, options, pausemenuselected2)
 			love.graphics.pop()
 		end
 		
 		if suspendprompttimer > 0 then
-			drawprompt(suspendprompttimer, suspendpromptduration, suspendprompt, suspendpromptcurve)
+			local lines
 			if alwaysdeletesuspend then
-				properprintF(TEXT["suspend game? this can"], (width*8*scale)-utf8.len(TEXT["suspend game? this can"])*4*scale, (112*scale)-20*scale)
-				properprintF(TEXT["only be loaded once!"], (width*8*scale)-utf8.len(TEXT["only be loaded once!"])*4*scale, (112*scale)-10*scale)
+				lines = {prompttext("suspend game? this can"), prompttext("only be loaded once!")}
 			else
-				properprintF(TEXT["save game? this will"], (width*8*scale)-utf8.len(TEXT["save game? this will"])*4*scale, (112*scale)-20*scale)
-				properprintF(TEXT["overwrite last save."], (width*8*scale)-utf8.len(TEXT["overwrite last save."])*4*scale, (112*scale)-10*scale)
+				lines = {prompttext("save game? this will"), prompttext("overwrite last save.")}
 			end
-			if pausemenuselected2 == 1 then
-				properprintF(">", (width*8*scale)-51*scale, (112*scale)+4*scale)
-				love.graphics.setColor(255, 255, 255, 255)
-				properprintF(TEXT["yes"], (width*8*scale)-44*scale, (112*scale)+4*scale)
-				love.graphics.setColor(100, 100, 100, 255)
-				properprintF(TEXT["no"], (width*8*scale)+28*scale, (112*scale)+4*scale)
-			else
-				properprintF(">", (width*8*scale)+20*scale, (112*scale)+4*scale)
-				love.graphics.setColor(100, 100, 100, 255)
-				properprintF(TEXT["yes"], (width*8*scale)-44*scale, (112*scale)+4*scale)
-				love.graphics.setColor(255, 255, 255, 255)
-				properprintF(TEXT["no"], (width*8*scale)+28*scale, (112*scale)+4*scale)
-			end
+			local options = {prompttext("yes"), prompttext("no")}
+			drawprompt(suspendprompttimer, suspendpromptduration, suspendprompt, suspendpromptcurve, #lines + #options)
+			drawpromptcontent(lines, options, pausemenuselected2)
+			love.graphics.pop()
+		end
 
+		--on top of the quit prompt it came from
+		if highscoreprompttimer > 0 then
+			local lines, options = {prompttext("save highscore?")}, {prompttext("yes"), prompttext("no"), prompttext("cancel")}
+			drawprompt(highscoreprompttimer, highscorepromptduration, highscoreprompt, highscorepromptcurve, #lines + #options)
+			drawpromptcontent(lines, options, highscorepromptselected)
 			love.graphics.pop()
 		end
 	end
@@ -3449,11 +3431,17 @@ function game_draw()
 	end
 end
 
-function drawprompt(timer, duration, open, curve)
+--a prompt string in the current language (or as it is when the language doesn't have it)
+function prompttext(s)
+	return (TEXT and TEXT[s]) or s
+end
+
+--rows: how many lines of text and options the prompt holds, it grows taller to fit them
+function drawprompt(timer, duration, open, curve, rows)
 	local winwidth, winheight = getproperwindowsize()
 	prompttimer = motion_curve(timer / duration, curve, open, not open, true, true)
 	promptwidth = winwidth/2
-    promptheight = winheight/4
+    promptheight = math.max(winheight/4, ((rows or 0)*PROMPT_ROW + PROMPT_GAP + 20)*scale)
     promptradius = get_corner_radius(promptwidth, promptheight) / 2
     prevlinewidth = love.graphics.getLineWidth()
     --every prompt has its own black background, it fades in and out together with the scaling
@@ -3470,6 +3458,61 @@ function drawprompt(timer, duration, open, curve)
     love.graphics.setColor(255, 255, 255, 255)
     love.graphics.rectangle("line", (winwidth-promptwidth)/2, (winheight-promptheight)/2, promptwidth, promptheight, promptradius)
     love.graphics.setLineWidth(prevlinewidth)
+end
+
+PROMPT_ROW = 10 --a line of a prompt, in game pixels
+PROMPT_GAP = 4 --between the text and the options
+
+--a prompt's text centred in its box, then its options one under the other, the selected one with a ">" next to it
+--(call after drawprompt, before love.graphics.pop)
+function drawpromptcontent(lines, options, selected)
+	local winwidth, winheight = getproperwindowsize()
+	local cx = winwidth/2
+	local y = winheight/2 - ((#lines + #options)*PROMPT_ROW + PROMPT_GAP - 2)*scale/2
+	love.graphics.setColor(255, 255, 255, 255)
+	for _, line in ipairs(lines) do
+		properprintF(line, cx - utf8.len(line)*4*scale, y)
+		y = y + PROMPT_ROW*scale
+	end
+	y = y + PROMPT_GAP*scale
+	for i, option in ipairs(options) do
+		local x = cx - utf8.len(option)*4*scale
+		if i == selected then
+			love.graphics.setColor(255, 255, 255, 255)
+			properprintF(">", x - 10*scale, y)
+		else
+			love.graphics.setColor(100, 100, 100, 255)
+		end
+		properprintF(option, x, y)
+		y = y + PROMPT_ROW*scale
+	end
+	love.graphics.setColor(255, 255, 255, 255)
+end
+
+--up and down through a prompt's options (true when the key moved the selection)
+function promptnavigate(key, selected, count)
+	if key == "up" or key == "w" then
+		return math.max(1, selected - 1), true
+	elseif key == "down" or key == "s" then
+		return math.min(count, selected + 1), true
+	end
+	return selected, false
+end
+
+--which option of a prompt (laid out by drawpromptcontent) is at window pixel x, y, or nil
+function promptoptionat(x, y, lines, options)
+	local winwidth, winheight = getproperwindowsize()
+	local cx = winwidth/2
+	local top = winheight/2 - ((#lines + #options)*PROMPT_ROW + PROMPT_GAP - 2)*scale/2
+	top = top + (#lines*PROMPT_ROW + PROMPT_GAP)*scale
+	for i, option in ipairs(options) do
+		local oy = top + (i-1)*PROMPT_ROW*scale
+		local half = (utf8.len(option)*4 + 12)*scale --the ">" included
+		if x >= cx - half and x <= cx + half and y >= oy - scale and y < oy + (PROMPT_ROW - 1)*scale then
+			return i
+		end
+	end
+	return nil
 end
 
 function drawentity(j, w, i, v, currentscissor, drop)
@@ -5516,13 +5559,50 @@ function game_keypressed(key, textinput)
 		return --leaving or restarting a minigame
 	end
 	if pausemenuopen then
+		local confirmkey = (key == "return" or key == "enter" or key == "kpenter" or key == " ")
+		--"save highscore?" sits on top of the quit prompt, so it goes first
+		if highscoreprompt or highscoreprompttimer > 0 then
+			if highscoreprompt and highscoreprompttimer >= highscorepromptduration then
+				local moved
+				highscorepromptselected, moved = promptnavigate(key, highscorepromptselected, 3)
+				if moved then
+					return
+				end
+				if confirmkey then
+					if highscorepromptselected == 3 then
+						--cancel: back to the pause menu, both prompts close
+						highscoreprompt = false
+						menuprompt = false
+						desktopprompt = false
+					else
+						if highscorepromptselected == 1 then
+							minigame_recordscore()
+						end
+						if highscorepromptquit == "desktop" then
+							love.audio.stop()
+							love.event.quit()
+						else
+							--the pause menu and both prompts stay up while the screen fades out
+							minigame_exit()
+						end
+					end
+				elseif key == "escape" then
+					highscoreprompt = false --back to the quit prompt
+				end
+			end
+			return
+		end
 		if menuprompttimer >= menupromptduration then
-			if (key == "left" or key == "a") then
-				pausemenuselected2 = 1
-			elseif (key == "right" or key == "d") then
-				pausemenuselected2 = 2
-			elseif (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
-				if pausemenuselected2 == 1 then
+			local moved
+			pausemenuselected2, moved = promptnavigate(key, pausemenuselected2, 2)
+			if moved then
+				return
+			elseif confirmkey then
+				if pausemenuselected2 == 1 and minigame_canrecordscore() then
+					highscoreprompt = true
+					highscorepromptquit = "menu"
+					highscorepromptselected = 1
+				elseif pausemenuselected2 == 1 then
 					if SERVER then
 						stopmusic()
 						love.audio.stop()
@@ -5566,12 +5646,16 @@ function game_keypressed(key, textinput)
 			end
 			return
 		elseif desktopprompttimer >= desktoppromptduration then
-			if (key == "left" or key == "a") then
-				pausemenuselected2 = 1
-			elseif (key == "right" or key == "d") then
-				pausemenuselected2 = 2
-			elseif (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
-				if pausemenuselected2 == 1 then
+			local moved
+			pausemenuselected2, moved = promptnavigate(key, pausemenuselected2, 2)
+			if moved then
+				return
+			elseif confirmkey then
+				if pausemenuselected2 == 1 and minigame_canrecordscore() then
+					highscoreprompt = true
+					highscorepromptquit = "desktop"
+					highscorepromptselected = 1
+				elseif pausemenuselected2 == 1 then
 					love.audio.stop()
 					love.event.quit()
 				else
@@ -5582,11 +5666,11 @@ function game_keypressed(key, textinput)
 			end
 			return
 		elseif suspendprompttimer >= suspendpromptduration then
-			if (key == "left" or key == "a") then
-				pausemenuselected2 = 1
-			elseif (key == "right" or key == "d") then
-				pausemenuselected2 = 2
-			elseif (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
+			local moved
+			pausemenuselected2, moved = promptnavigate(key, pausemenuselected2, 2)
+			if moved then
+				return
+			elseif confirmkey then
 				if dcplaying or minigameplaying then
 					suspendprompt = false
 				elseif pausemenuselected2 == 1 then
@@ -8598,6 +8682,9 @@ function properprint2(s, x, y)
 end
 
 function playsound(sound)
+	if minigamesoundmuted then --a minigame's silent freeze (see minigame_finish): nothing new plays, nothing stops
+		return
+	end
 	if soundenabled then
 		if sound.stop then --string?
 			sound:stop()

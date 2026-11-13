@@ -431,10 +431,10 @@ A four-player battle minigame inspired by the battle mode of Super Mario 4 Jugad
 * A player who loses their last life is out. Their viewport follows someone who's still in the battle and shows "watching pN".
 * A knockout counts for the player who hit you, if you die within 4 seconds of their hit (falling into a pit, for example). The HUD shows every player's lives and knockouts, and marks the bots with "CPU".
 * A human player who is out can type the Konami code with their own controls to come back with 3 lives, once per battle: **Up, Up, Down, Down, Left, Right, Left, Right, Run, Jump**.
-* When only one player is left, the music stops and the battle clear theme plays in the arena: `levelend.ogg`, or the music pack's own one (see **Custom Music** below), with its `-intro` first if it has one. A battle clear theme longer than 15 seconds gets cut off. Once it ends, the game fades to the results screen, which says "pN wins!" and stays up for 4 seconds without a sound.
-* When the timer runs out, "time up!" shows for a moment. The player with the most lives left wins (being alive at that moment beats waiting to respawn), then the one with the most knockouts. If it's still a tie, the battle is a draw: the battle clear theme still plays, and the results screen says "draw!".
+* When only one player is left, everything freezes for 3 seconds, except the players who are still dying. Sounds that are already playing carry on, but nothing new plays and nothing is stopped. Then the game fades to the results screen, which says "pN wins!" and plays the battle clear theme: `levelend.ogg`, or the music pack's own one (see **Custom Music** below), with its `-intro` first if it has one. The results screen stays up until the theme ends, and for at least 4 seconds. A battle clear theme longer than 15 seconds gets cut off.
+* When the timer runs out, "time up!" shows for a moment. The player with the most lives left wins (being alive at that moment beats waiting to respawn), then the one with the most knockouts. If it's still a tie, the battle is a draw. Either way, the music stops and the battle clear theme plays in the arena. Once it ends, the game fades to the results screen, which says "pN wins!" or "draw!" and stays up for 4 seconds without a sound.
 * When the timer drops below 100 and the battle music has a fast version (`song-fast.ogg` next to a custom song, or the built-in `-fast` versions), the music stops, `lowtimesound` plays, and the fast version takes over as soon as the sound ends (with its `-fastintro` if it has one). The star theme speeds up too. Without a fast version, the normal music just keeps playing.
-* The score is the most knockouts any human player got (or the winner's knockouts, if only bots played). The victory screen labels it "knockouts".
+* The score is every human player's knockouts added up. Bots' knockouts don't count (if only bots played, it's the winner's knockouts). It's kept up to date during the battle, so quitting from the pause menu can save it. The victory screen labels it "knockouts".
 
 **Custom Music**
 
@@ -458,7 +458,7 @@ A four-player battle minigame inspired by the battle mode of Super Mario 4 Jugad
 
   Packs with an `order` come first (lowest first), and the rest come after them. Packs with the same `order`, or no `order`, are sorted alphabetically by their name in the list. A broken `pack.json` is ignored.
 * `"Starman Theme"` names a song of the pack that replaces the star theme while a song from that pack is playing. Its `-intro` works too (`kirby star-intro.ogg`).
-* `"Battle Clear"` names a song of the pack that plays in the arena when the battle ends, instead of `levelend.ogg`. Its `-intro` works too.
+* `"Battle Clear"` names a song of the pack that plays when the battle ends, instead of `levelend.ogg`. Its `-intro` works too.
 * Song names in both keys can be written with or without `.ogg`, and the key names don't care about capitals. Neither song shows up in the list.
 * If a key is missing, names a file that isn't in the pack, or the pack has no `pack.json`, the pack's `starmusic.ogg` (with `starmusic-intro.ogg`) or `battleclear.ogg` is used instead. If that isn't in the pack either, the built-in star theme or `levelend.ogg` is used.
 * Without `pack.json`, names come from the folder and file names ("my_song.ogg" becomes "My Song").
@@ -503,6 +503,9 @@ rivalrumbleroyalemusic/
 * A minigame can keep some things moving while the game is frozen at the end (like players who are still dying), and can undo its changes when it returns to the menu.
 * A minigame can now draw right after the tiles, behind every object.
 * A minigame can play its own jingle in the game and then show a silent results screen for a set number of seconds (`resultsilent`).
+* A minigame can end with a silent freeze: the game stands still, sounds that are already playing carry on, and no new sounds play until the results screen.
+* A minigame can play its own music on the results screen (`resultmusic`), and the screen stays up for as long as the minigame says.
+* Quitting a minigame from the pause menu, to the menu or to the desktop, now asks "save highscore?" once you confirm. **Yes** saves your score and then quits, **No** quits without saving it, and **Cancel** closes both prompts and takes you back to the pause menu. Escape takes you back to the quit prompt.
 * Words in a minigame's description that are longer than a line (like a long folder name) are now split over several lines, so they don't run under the scrollbar.
 
 #### 🖥️ Splitscreen
@@ -523,9 +526,18 @@ rivalrumbleroyalemusic/
 * When the blinking invincibility ends while the player is a Tanooki statue, they now stay invincible. Before, enemies could hurt a statue once the blinking was over.
 * Stomping enemies in a row without landing gives 100, 200, 400, 500, 800, 1000, 2000, 4000, 5000 and 8000 points again, then a 1up for each stomp after that. Before, the nth stomp only gave n points ("+1", "+2"...). Minigames still count stomps that way.
 * Changing form now ends any animation the new form doesn't have, and sets the new form's sprite straight away. For example, getting hit during a tail whip ends the whip, and its hitbox stops hitting things. A raccoon flight or a float ends the same way.
+* Changing form while ducking in mid-air (a duck jump into a power-up, for example) now keeps you ducking once the grow or shrink animation ends. Before, you only ducked again if you were on the ground.
 * Dropdowns in a minigame's settings no longer disappear when the description above them is long. They used to stay where they were before the panel was scrolled.
 
 ### ✨ Improvements
+
+#### ⏸️ Pause Menu
+
+* The options in the pause menu's prompts (quit to menu, quit to desktop and save game) are now listed one under the other instead of side by side, and you move between them with Up and Down (or W and S). The prompt box grows taller to fit them.
+
+#### 🟨 Block Beat Bonanza
+
+* The revive prompt now looks and animates like the pause menu's prompts. It scales in and out with a random motion curve over a dimmed screen, and its options are listed one under the other. Like the pause menu's prompts, it only takes input once it's fully open. You move between the options with Up and Down, and clicking one still works.
 
 #### 🦝 Raccoon and Tanooki
 

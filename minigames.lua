@@ -1103,6 +1103,7 @@ function minigame_exit()
 	return startwarpfade(function()
 		pausemenuopen = false
 		menuprompt = false
+		highscoreprompt = false
 		pausedaudio = nil
 		stopmusic()
 		love.audio.stop()
@@ -1154,6 +1155,14 @@ function minigame_returntomenu()
 	loadminigames()
 end
 
+--quitting from the pause menu asks "save highscore?" while a run is going that isn't saved yet
+function minigame_canrecordscore()
+	if not (minigameplaying and minigamestate and minigamecurrent) then
+		return false
+	end
+	return not minigamestate.recorded
+end
+
 --ends the current run: wait (optionally freezing the game and stopping the audio), then fade to the win/lose screen
 function minigame_finish(result, delay, freeze)
 	local S = minigamestate
@@ -1161,7 +1170,9 @@ function minigame_finish(result, delay, freeze)
 		return
 	end
 	S.finish = {result = result, timer = delay or 0, freeze = freeze}
-	if freeze then
+	if freeze == "silent" then
+		minigamesoundmuted = true
+	elseif freeze then
 		stopmusic()
 		love.audio.stop()
 	end
@@ -1199,6 +1210,8 @@ function minigame_createmap()
 	pausemenuopentimer = 0
 	menuprompttimer = 0
 	desktopprompttimer = 0
+	highscoreprompt = false
+	highscoreprompttimer = 0
 	suspendprompttimer = 0
 	mariotimelimit = 400
 	background = 1
@@ -1539,7 +1552,17 @@ function minigame_levelscreen_load(reason)
 		end
 		minigame_recordscore()
 		local silent = minigamecurrent and minigamecurrent.resultsilent --the minigame already played its own jingle
-		if not silent then
+		--or the minigame plays its own music on this screen, and says how long the screen stays up
+		local ownmusic = false
+		if minigamecurrent and minigamecurrent.resultmusic and minigamestate then
+			stopmusic()
+			love.audio.stop()
+			ownmusic = minigamecurrent.resultmusic(minigamestate)
+			if ownmusic then
+				silent = false
+			end
+		end
+		if not silent and not ownmusic then
 			stopmusic()
 			love.audio.stop()
 		end
@@ -1550,7 +1573,9 @@ function minigame_levelscreen_load(reason)
 		else --"minigamelose" or the player's death
 			minigamescreen = "lose"
 		end
-		if silent then
+		if ownmusic then
+			blacktime = ownmusic + warpfadetime
+		elseif silent then
 			--no sound, the results stay up for resultsilent seconds (or just the fade when it's true)
 			blacktime = warpfadetime
 			if type(silent) == "number" then
@@ -1583,6 +1608,10 @@ end
 function minigame_levelscreen_update(dt)
 	if minigamescreen == "win" then
 		confetti_update(dt)
+	end
+	local def = minigamecurrent
+	if minigamescreen and minigamescreen ~= "intro" and def and def.resultupdate and minigamestate then
+		def.resultupdate(minigamestate, dt)
 	end
 end
 
@@ -4227,6 +4256,8 @@ local function beat_gameover(S)
 	if AlwaysInfiniteLives or S.revivescore >= BEAT_REVIVE_COST then
 		S.phase = "revive"
 		S.revivechoice = 1 --1 = yes, 2 = no
+		--opens and closes like the pause menu's prompts (see beat_updateprompt)
+		S.reviveprompt = {open = true, timer = 0, curve = random_motion_curve()}
 	else
 		S.phase = "over"
 		minigame_finish("lose", 1)
@@ -4234,6 +4265,10 @@ local function beat_gameover(S)
 end
 
 local function beat_revive(S, accept)
+	if S.reviveprompt then
+		S.reviveprompt.open = false --it shrinks away over whatever comes next
+		S.reviveprompt.curve = random_motion_curve()
+	end
 	if accept then
 		--spend the points from the revive-check score, the real score stays the same
 		--(free with infinite lives)
@@ -4280,13 +4315,27 @@ local function beat_press(S, i)
 	end
 end
 
---revive prompt layout (game pixels)
-local function beat_promptboxes()
-	local cx, y = width*8, 160
-	return {
-		{x = cx-44, y = y+14, w = 36, h = 13, accept = true, text = "yes"},
-		{x = cx+8, y = y+14, w = 36, h = 13, accept = false, text = "no"},
-	}, cx, y
+--the revive prompt's text and options (drawn with the pause menu's drawprompt and drawpromptcontent)
+local function beat_promptcontent()
+	return {"revive? (+" .. BEAT_REVIVE_LIVES .. " lives)"}, {prompttext("yes"), prompttext("no")}
+end
+
+--the prompt's timer, like the pause menu's prompts: up while open, down while closing
+local function beat_updateprompt(S, dt)
+	local P = S.reviveprompt
+	if not P then
+		return
+	end
+	P.timer = math.max(0, math.min(P.timer + dt*(P.open and 1 or -1), pausemenuduration))
+	if not P.open and P.timer <= 0 then
+		S.reviveprompt = nil
+	end
+end
+
+--answers only count once the prompt is fully open (the same as the pause menu's prompts)
+local function beat_promptready(S)
+	local P = S.reviveprompt
+	return S.phase == "revive" and P ~= nil and P.open and P.timer >= pausemenuduration
 end
 
 addminigame({
@@ -4312,6 +4361,7 @@ addminigame({
 	end,
 
 	update = function(S, dt)
+		beat_updateprompt(S, dt)
 		for i = 1, 4 do
 			S.lit[i] = math.max(0, S.lit[i]-dt)
 		end
@@ -4364,10 +4414,11 @@ addminigame({
 			return
 		end
 		if S.phase == "revive" then
-			for i, b in ipairs(beat_promptboxes()) do
-				if x >= b.x and x <= b.x+b.w and y >= b.y and y <= b.y+b.h then
-					beat_revive(S, b.accept)
-					return
+			if beat_promptready(S) then
+				local lines, options = beat_promptcontent()
+				local i = promptoptionat(x*scale, y*scale, lines, options)
+				if i then
+					beat_revive(S, i == 1)
 				end
 			end
 			return
@@ -4382,9 +4433,13 @@ addminigame({
 
 	keypressed = function(S, key)
 		if S.phase == "revive" then
-			if key == "left" or key == "a" or controlbindingmatcheskey(1, "left", key) then
+			if not beat_promptready(S) then
+				return true
+			end
+			--up and down, like the pause menu's prompts
+			if key == "up" or key == "w" or controlbindingmatcheskey(1, "up", key) then
 				S.revivechoice = 1
-			elseif key == "right" or key == "d" or controlbindingmatcheskey(1, "right", key) then
+			elseif key == "down" or key == "s" or controlbindingmatcheskey(1, "down", key) then
 				S.revivechoice = 2
 			elseif key == "return" or key == "enter" or key == "kpenter" or key == " " or controlbindingmatcheskey(1, "jump", key) then
 				beat_revive(S, S.revivechoice == 1)
@@ -4419,21 +4474,18 @@ addminigame({
 	end,
 
 	drawoverlay = function(S)
-		if S.phase == "revive" then
-			local boxes, cx, y = beat_promptboxes()
-			love.graphics.setColor(0, 0, 0, 210)
-			love.graphics.rectangle("fill", (cx-90)*scale, (y-6)*scale, 180*scale, 40*scale, 4*scale)
-			centerprintline("revive? (+" .. BEAT_REVIVE_LIVES .. " lives)", cx, y)
-			for i, b in ipairs(boxes) do
-				local selected = (S.revivechoice == i)
-				love.graphics.setColor(selected and {255, 230, 80} or {120, 120, 120})
-				love.graphics.rectangle("line", b.x*scale, b.y*scale, b.w*scale, b.h*scale, 2*scale)
-				centerprintline(b.text, b.x + b.w/2, b.y + 3, selected and {255, 230, 80} or {200, 200, 200})
-			end
-		elseif S.phase == "watch" or S.phase == "watchwait" then
+		if S.phase == "watch" or S.phase == "watchwait" then
 			centerprintline("watch!", width*8, 172)
 		elseif S.phase == "input" then
 			centerprintline("your turn!", width*8, 172, {255, 230, 80})
+		end
+		--the revive prompt, drawn and animated like the pause menu's prompts
+		local P = S.reviveprompt
+		if P and P.timer > 0 then
+			local lines, options = beat_promptcontent()
+			drawprompt(P.timer, pausemenuduration, P.open, P.curve, #lines + #options)
+			drawpromptcontent(lines, options, S.revivechoice)
+			love.graphics.pop()
 		end
 	end,
 
@@ -4460,6 +4512,7 @@ local RRR_COUNTDOWN = 3 --"3", "2", "1" (a second each, real time), then "go!" a
 local RRR_HIT_CREDIT = 4 --dying this soon after a hit (falling in a pit for example) is a knockout for the hitter
 local RRR_RESULT_TIME = 4 --the results screen (the battle clear theme already played in the arena)
 local RRR_CLEAR_MAX = 15 --a battle clear theme longer than this gets cut off
+local RRR_KO_FREEZE = 3 --the last knockout freezes the arena for this long before the results screen
 local RRR_DEFAULT_CLEAR = "sounds/levelend.ogg"
 local RRR_MUSIC_NAME = "rivalrumbleroyalemusic"
 local RRR_MUSIC_FOLDER = "sounds/" .. RRR_MUSIC_NAME
@@ -5860,6 +5913,17 @@ local function rrr_updatecombat(S, dt)
 	end
 end
 
+--every person's knockouts added up (bots don't count): the score, kept up to date so quitting can save it
+local function rrr_humankos(S)
+	local total = 0
+	for i = 1, RRR_PLAYERS do
+		if not S.bots[i] then
+			total = total + (S.kos[i] or 0)
+		end
+	end
+	return total
+end
+
 local function rrr_checkwinner(S)
 	if S.over then
 		return
@@ -5871,7 +5935,7 @@ local function rrr_checkwinner(S)
 		end
 	end
 	if #alive <= 1 then
-		S.endbattle(S, alive[1])
+		S.endbattle(S, alive[1], #alive == 1) --the last one standing: a knockout win
 	end
 end
 
@@ -5897,6 +5961,7 @@ local function rrr_ondeath(S, p)
 	local hit = S.lasthit[i]
 	if hit and S.time - hit.t <= RRR_HIT_CREDIT and hit.by ~= i then
 		S.kos[hit.by] = S.kos[hit.by] + 1
+		S.score = rrr_humankos(S)
 	end
 	S.lasthit[i] = nil
 	if (mariolives[i] or 0) <= 0 then
@@ -6973,35 +7038,43 @@ local function rrr_cleanup()
 	splitscreen_reset()
 end
 
-local function rrr_endbattle(S, winner)
+local function rrr_endbattle(S, winner, knockout)
 	S.over = {winner = winner, t = 0}
 	S.winner = winner
+	S.knockoutend = knockout
 	if winner then
 		rrr_banner(S, "p" .. winner .. " wins!", 99)
 	else
 		rrr_banner(S, "draw!", 99)
 	end
-	for i = 1, RRR_PLAYERS do
-		local p = objects["player"][i]
-		if p then
-			rrr_endstar(p)
+	if knockout then
+		--everything stands still for a moment (except the players who are dying), with no new sounds and nothing
+		--stopped, then the results screen, where the battle clear theme plays (resultmusic)
+		minigame_finish("win", RRR_KO_FREEZE, "silent")
+	else
+		for i = 1, RRR_PLAYERS do
+			local p = objects["player"][i]
+			if p then
+				rrr_endstar(p)
+			end
 		end
+		stopmusic()
+		rrr_startclear(S)
 	end
-	stopmusic()
-	rrr_startclear(S)
-	--the record is the most knockouts of a person (or of the winner if only bots played)
-	local best = 0
+	--the record is the knockouts of every person added up (or the winner's if only bots played)
 	local humans = false
 	for i = 1, RRR_PLAYERS do
 		if not S.bots[i] then
 			humans = true
-			best = math.max(best, S.kos[i])
 		end
 	end
-	if not humans and winner then
-		best = S.kos[winner]
+	if humans then
+		S.score = rrr_humankos(S)
+	elseif winner then
+		S.score = S.kos[winner]
+	else
+		S.score = 0
 	end
-	S.score = best
 	S.result = "lose" --a draw
 	if winner then
 		S.result = "win"
@@ -7207,7 +7280,7 @@ addminigame({
 
 		if S.over then
 			S.over.t = S.over.t + dt
-			if rrr_updateclear(S, dt) and S.over.t > 1 and not S.finish then
+			if not S.knockoutend and rrr_updateclear(S, dt) and S.over.t > 1 and not S.finish then
 				minigame_finish(S.result, 0, false)
 			end
 		else
@@ -7266,6 +7339,31 @@ addminigame({
 	end,
 
 	drawoverlay = rrr_drawoverlay,
+
+	--after a knockout win the battle clear theme plays on the results screen, which stays up until it's done
+	resultmusic = function(S)
+		if not S.knockoutend then
+			return nil --time up: the clear theme already played in the arena
+		end
+		rrr_startclear(S)
+		local C = S.clear
+		local length = 0
+		if soundenabled then
+			if C.intro then
+				length = length + C.intro:getDuration("seconds")
+			end
+			if C.main then
+				length = length + C.main:getDuration("seconds")
+			end
+		end
+		return math.max(RRR_RESULT_TIME, math.min(length, RRR_CLEAR_MAX))
+	end,
+
+	resultupdate = function(S, dt)
+		if S.knockoutend and S.clear and rrr_updateclear(S, dt) then
+			rrr_stopclear(S) --done, or cut off at RRR_CLEAR_MAX
+		end
+	end,
 
 	resultheadline = function(S)
 		if S.winner then
