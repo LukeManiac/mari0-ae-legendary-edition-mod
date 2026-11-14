@@ -3156,10 +3156,6 @@ function lerp(start, stop, step)
     return start + (stop - start) * step
 end
 
-function properlerp(start, stop, step)
-	return lerp(start, stop, step)
-end
-
 function rgb_to_hsv(colour)
     local r = colour[1] / 255
     local g = colour[2] / 255

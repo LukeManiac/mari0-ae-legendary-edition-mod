@@ -6366,17 +6366,18 @@ do
 		"Master", "Grandmaster", "Champion", "Conqueror", "Legend",
 		"Mythical", "Immortal", "Godlike", "Omnipotent", "THE UNDEFEATABLE",
 	}
+	--every anchor has every stat (the blend needs both ends). The skills that make a bot scary
+	--(sight, stompdodge, focus, bold, aerial) only start at Expert, then climb steeply to the top
 	local RRR_BOTANCHORS = {
 		[1] = {think = 1.6, fire = 2.5, dodge = 0, range = 4, flee = 2, dawdle = 0.6, lead = 0, sight = 2, stompdodge = 0, focus = 0, bold = 0, aerial = 0, aggro = 0},
-		[5] = {think = 0.8, fire = 1.2, dodge = 0.15, range = 7, flee = 4, dawdle = 0.3, lead = 0}, --the old "easy"
-		[10] = {think = 0.45, fire = 0.7, dodge = 0.5, range = 10, flee = 6, dawdle = 0.1, lead = 0}, --the old "normal"
-		[15] = {think = 0.25, fire = 0.35, dodge = 0.9, range = 12, flee = 7, dawdle = 0, lead = 0}, --the old "expert"
-		[20] = {think = 0.12, fire = 0.18, dodge = 1, range = 16, flee = 9, dawdle = 0, lead = 0.3}, --the old "super expert"
-		[23] = {think = 0.05, fire = 0.1, dodge = 1, range = 40, flee = 12, dawdle = 0, lead = 0.4}, --the old "godmode"
+		[5] = {think = 0.8, fire = 1.2, dodge = 0.15, range = 7, flee = 4, dawdle = 0.3, lead = 0, sight = 2.8, stompdodge = 0, focus = 0, bold = 0, aerial = 0, aggro = 0},
+		[10] = {think = 0.45, fire = 0.7, dodge = 0.5, range = 10, flee = 6, dawdle = 0.1, lead = 0, sight = 3.5, stompdodge = 0, focus = 0, bold = 0, aerial = 0, aggro = 0},
+		[15] = {think = 0.22, fire = 0.32, dodge = 0.92, range = 12, flee = 7, dawdle = 0, lead = 0.15, sight = 4.5, stompdodge = 0.35, focus = 0.4, bold = 0.3, aerial = 0.3, aggro = 0.2},
+		[20] = {think = 0.08, fire = 0.14, dodge = 1, range = 18, flee = 9, dawdle = 0, lead = 0.35, sight = 6, stompdodge = 0.9, focus = 0.85, bold = 1, aerial = 0.8, aggro = 0.75},
+		[23] = {think = 0.05, fire = 0.07, dodge = 1, range = 40, flee = 12, dawdle = 0, lead = 0.45, sight = 7.5, stompdodge = 1, focus = 1, bold = 1, aerial = 1, aggro = 0.95},
 		[25] = {think = 0.04, fire = 0.03, dodge = 1, range = 60, flee = 14, dawdle = 0, lead = 0.55, sight = 9, stompdodge = 1, focus = 1, bold = 1, aerial = 1, aggro = 1},
 	}
 	local RRR_BOTGREED = {[23] = 0.8, [24] = 0.85, [25] = 0.9} --the rest pick at random
-	local RRR_BOTDODGESTOMPS_FROM = 22
 	local anchors = {}
 	for i in pairs(RRR_BOTANCHORS) do
 		table.insert(anchors, i)
@@ -6389,7 +6390,8 @@ do
 			local t = (i-i1)/(i2-i1)
 			local level = {name = RRR_BOTLEVELNAMES[i], greed = RRR_BOTGREED[i], dodgestomps = i >= RRR_BOTDODGESTOMPS_FROM}
 			for k, v in pairs(s1) do
-				level[k] = v + (s2[k]-v)*t
+				local v2 = s2[k] or v --(a stat missing from the next anchor stays flat instead of crashing)
+				level[k] = v + (v2-v)*t
 			end
 			RRR_BOTLEVELS[i] = level
 		end

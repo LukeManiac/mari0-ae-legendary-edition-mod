@@ -392,7 +392,7 @@ A four-player battle minigame inspired by the battle mode of Super Mario 4 Jugad
 
 * Four players battle in every round. Any players that aren't human are bots.
 * **How many players are human?:** 1 (P2 to P4 are bots), 2 (P3 and P4 are bots), 3 (P4 is a bot) or 4 (no bots).
-* **Bot difficulty:** Easy, Normal (the default), Expert, Super Expert or Godmode. Harder bots make up their minds faster, shoot more often and from further away, dodge more projectiles, and run from danger sooner. Easy bots sometimes stand around for a moment. Super Expert and Godmode bots aim where you're about to be. Godmode bots also go for ? blocks most of the time and step out of the way when someone drops onto their head.
+* **Bot difficulty:** 25 levels, from Complete Noob to THE UNDEFEATABLE, with Skilled as the default (see **Bot Difficulty** below). The dropdown colours them from green for the weakest to dark red for the strongest.
 * **Battle theme:** Overworld, Underground, Castle, Portal or Night Overworld (the Overworld with a grey palette and a black sky).
 * **Battle music:** Overworld, Underground, Castle, or any custom song (see **Custom Music** below). Long names are shortened in the closed dropdown, and the list opens wide enough to show them in full.
 * **Bot Splitscreen:** On by default. Gives the bots their own viewports as well, so you can watch them. When it's off, only the human players get a viewport.
@@ -498,6 +498,55 @@ rivalrumbleroyalemusic/
 * They go for items and ? blocks, especially when small, and fight whoever is closest. They leave an item or block they can't reach in 6 seconds alone for 10 seconds.
 * They jump over projectiles coming at them, run from Super Stars and fast Blue Shells, and jump over Tanooki statues in their way.
 
+**Bot Difficulty**
+
+There are 25 levels. Each one is a little better than the last, and the stats of the levels between the anchors (1, 5, 10, 15, 20, 23 and 25) are blended between them, so there are no big jumps. Up to Skilled, bots get faster and sharper. From Expert up, they start learning tricks, and by the top they're crazy good.
+
+| # | Level | What it's like |
+|---|-------|----------------|
+| 1 | Complete Noob | Slow to decide, often stands around, barely shoots, never dodges. |
+| 2 | Clueless | |
+| 3 | Rookie | |
+| 4 | Beginner | |
+| 5 | Amateur | The old **Easy**. Still stands around sometimes and dodges about one projectile in seven. |
+| 6 | Trainee | |
+| 7 | Apprentice | |
+| 8 | Novice | |
+| 9 | Learner | |
+| 10 | Skilled | The default, and the old **Normal**. Dodges half the projectiles it sees. |
+| 11 | Competent | |
+| 12 | Experienced | |
+| 13 | Veteran | |
+| 14 | Elite | |
+| 15 | Expert | The old **Expert**, plus the first tricks: it starts aiming ahead, spotting stomps from above and fighting in the air. |
+| 16 | Master | |
+| 17 | Grandmaster | |
+| 18 | Champion | |
+| 19 | Conqueror | |
+| 20 | Legend | Stronger than the old **Super Expert**. Almost always dodges stomps, hunts the weakest player, fights instead of looting once powered up. |
+| 21 | Mythical | |
+| 22 | Immortal | |
+| 23 | Godlike | Stronger than the old **Godmode**. Every trick, every time. |
+| 24 | Omnipotent | |
+| 25 | THE UNDEFEATABLE | Reacts in a few hundredths of a second, sees projectiles from 9 tiles away and shoots from anywhere in the arena. |
+
+What changes as the level goes up:
+
+* **Thinking:** How long a bot takes to make up its mind, from 1.6 seconds down to 0.04.
+* **Shooting:** The wait between shots, from 2.5 seconds down to 0.03, and how far away it starts shooting, from 4 tiles to the whole arena.
+* **Dodging:** The chance it jumps over a projectile coming at it, from never to always, and how far away it spots one, from 2 tiles to 9.
+* **Running away:** How close a Super Star or fast Blue Shell gets before it runs, from 2 tiles to 14.
+* **Standing around:** Low levels sometimes stand still for a moment when they make up their minds. It gets rarer after Skilled and stops at Expert.
+* **Aiming ahead:** From Expert up, it aims where you're about to be, up to just over half a second ahead.
+* **Stomp dodging:** From Expert up, it can step out from under someone coming down on its head. A Legend almost always does, and from Godlike up it always does, spotting the stomp from further up.
+* **Focus:** From Expert up, it can pick the weakest target it can hurt (small, nearly out of lives, not blinking) instead of the closest one. It also leaves items that someone else will clearly reach first, and once it's powered up, it only bothers with the rare block.
+* **Aggression:** From Expert up, once it's powered up and someone is close by, it can fight them instead of going off for items and ? blocks. At the top, it always does.
+* **Fighting in the air:** From Expert up, it can hop up to shoot someone standing a little above it, shoot down at someone below, shoot while jumping, and jump at someone who's in the air too.
+* **Boldness:** From Expert up, it can stay put instead of running from a Super Star or fast Blue Shell while it's still blinking after a hit, since nothing can hurt it then. From Legend up, it always does.
+* **Greed:** Godlike, Omnipotent and THE UNDEFEATABLE go for ? blocks most of the time (80%, 85% and 90%) when they aren't busy fighting. The rest pick how greedy they are at random.
+
+All bots stick with the item, ? block or player they're going for unless another one is clearly closer, so they don't flip between two.
+
 **Other**
 
 * The minigame's graphic shows Mario, Luigi, Toad and Toadette, with Mario and Luigi wearing the standard hat.
@@ -566,6 +615,7 @@ Two new nitpicks for the camera. Both are just `true` or `false`. **Generate Nit
 * `backwardsmoothing`: Takes how far the smoothed camera trails behind and puts the camera that far ahead instead (the normal position minus the smoothed position's difference from it), so the camera leads in the direction you're moving.
 * `backwardsmoothing` only works with `camerasmoothing` on. If it's on without it, a notice tells you to enable `camerasmoothing` when the game starts.
 * The smoothed camera never goes past the edges of the course, and splitscreen viewports are smoothed too. The camera is never smoothed in the editor, and anything that moves the camera on its own (loading a map, a camera snap) starts the smoothing over from there.
+* Rival Rumble Royale keeps every camera snapped to its player for the whole 3-2-1 countdown, so the battle always opens with the cameras already in place, even when it's restarted from the pause menu. Smoothing takes over at **go!**.
 
 #### 👾 Update When Size Change
 
