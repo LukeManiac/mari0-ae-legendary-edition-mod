@@ -321,23 +321,15 @@ local function drawdropdownentry(entry, x, y, maxchars)
 	properprint(entry, x*scale, y*scale)
 end
 
-local function setdropdownentrycolor(self, entry, index)
-	if self.entrycolors and index and self.entrycolors[index] then
-		local c = self.entrycolors[index]
-		love.graphics.setColor(c[1], c[2], c[3], 255)
-	elseif self.coloredtext then
+local function setdropdownentrycolor(self, entry)
+	if self.coloredtext then
 		if entry == "black" then
-			love.graphics.setColor(80, 80, 80, 255)
+			love.graphics.setColor(80, 80, 80)
 		else
-			local c = textcolors[entry]
-			if c then
-				love.graphics.setColor(c[1], c[2], c[3], 255)
-			else
-				love.graphics.setColor(255, 255, 255, 255)
-			end
+			love.graphics.setColor(textcolors[entry])
 		end
 	else
-		love.graphics.setColor(255, 255, 255, 255)
+		love.graphics.setColor(255, 255, 255)
 	end
 end
 
@@ -494,23 +486,15 @@ function guielement:draw(a, offx, offy)
 		
 		local s = self.entries[self.var]
 		if self.extended then
-			love.graphics.setColor(127, 127, 127, 255)
-		elseif self.entrycolors and self.entrycolors[self.var] then
-			local c = self.entrycolors[self.var]
-			love.graphics.setColor(c[1], c[2], c[3], 255)
+			love.graphics.setColor(127, 127, 127)
 		elseif self.coloredtext then
 			if s == "black" then
-				love.graphics.setColor(80, 80, 80, 255)
+				love.graphics.setColor(80, 80, 80)
 			else
-				local c = textcolors[s]
-				if c then
-					love.graphics.setColor(c[1], c[2], c[3], 255)
-				else
-					love.graphics.setColor(255, 255, 255, 255)
-				end
+				love.graphics.setColor(textcolors[s])
 			end
 		else
-			love.graphics.setColor(255, 255, 255, 255)
+			love.graphics.setColor(255, 255, 255)
 		end
 
 		if self.displayentries then s = self.displayentries[self.var] end
@@ -555,9 +539,9 @@ function guielement:draw(a, offx, offy)
 				love.graphics.polygon("fill", ax-3*scale, ay-2*scale, ax+3*scale, ay-2*scale, ax, ay+3*scale)
 				love.graphics.setColor(0, 0, 0)
 				love.graphics.rectangle("fill", (self.x+1)*scale, (-self.scroll+1)*scale, (1+self.width*8)*scale, 9*scale)
+				love.graphics.setColor(127, 127, 127)
 				local selected = self.entries[self.var]
 				if self.displayentries then selected = self.displayentries[self.var] end
-				setdropdownentrycolor(self, selected, self.var)
 				drawdropdownentry(selected, self.x+1, -self.scroll+2, self.width)
 				for i = 1, #self.entries do
 					local rowy = (2+10*i)-self.scroll
@@ -565,14 +549,13 @@ function guielement:draw(a, offx, offy)
 						if high ~= i then
 							love.graphics.setColor(0, 0, 0)
 							love.graphics.rectangle("fill", (self.x+1)*scale, ((1+i*10)-self.scroll)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
+							love.graphics.setColor(255, 255, 255)
+						else
+							love.graphics.setColor(0, 0, 0)
 						end
 						local entry = self.entries[i]
 						if self.displayentries then entry = self.displayentries[i] end
-						if high == i then
-							love.graphics.setColor(0, 0, 0)
-						else
-							setdropdownentrycolor(self, entry, i)
-						end
+						if high ~= i then setdropdownentrycolor(self, entry) else love.graphics.setColor(0, 0, 0) end
 						drawdropdownentry(entry, self.x+1, rowy, self.width+1)
 					end
 				end
@@ -586,7 +569,7 @@ function guielement:draw(a, offx, offy)
 						love.graphics.setColor(0, 0, 0)
 						love.graphics.rectangle("fill", (self.x+1)*scale, ((self.y+2+i*10)-(11+(10*#self.entries)))*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
 						local s = self.entries[i]
-						setdropdownentrycolor(self, s, i)
+						setdropdownentrycolor(self, s)
 						if self.displayentries then s = self.displayentries[i] end
 						drawdropdownentry(s, self.x+1, (self.y+3+10*i)-(11+(10*#self.entries)), self.width+1)
 					else
@@ -604,7 +587,7 @@ function guielement:draw(a, offx, offy)
 					if high ~= i then
 						love.graphics.setColor(0, 0, 0)
 						love.graphics.rectangle("fill", (self.x+1)*scale, (listtop+(i-1)*10)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
-						setdropdownentrycolor(self, s, i)
+						setdropdownentrycolor(self, s)
 						if self.displayentries then s = self.displayentries[i] end
 						drawdropdownentry(s, self.x+1, listtop+1+(i-1)*10, self.width+1)
 					else
@@ -998,11 +981,6 @@ function guielement:click(x, y, button)
 					self:open()
 				end
 			else
-				--mouse wheel only scrolls the list view (never changes the selected choice)
-				if self.scrollbar and (button == "wu" or button == "wd") then
-					self.scrollbar:click(x, y, button)
-					return true
-				end
 				if self.scrollbar then
 					self.scrollbar:click(x, y, button)
 					if x > (self.x+(13+self.width*8))*scale and x < (self.x+(13+self.width*8)+8)*scale then
@@ -1725,17 +1703,14 @@ function guielement:updatePos()
 	if self.type == "dropdown" then
 		if 10*(#self.entries+1) > height*16 then
 			local yrange = (((#self.entries+1)*10)-(height*16)+1)
-			local oldvalue = (self.scrollbar and self.scrollbar.value) or 0
-			local wasactive = self.extended or (self.scrollbar and self.scrollbar.active)
 			self.cutoff = true
-			self.scrollbar = guielement:new("scrollbar", self.x+(self.width*8+13), 0, height*16, 8, 40, oldvalue, "ver")
-			self.scrollbar.active = not not wasactive
+			self.scroll = 0
+			self.scrollbar = guielement:new("scrollbar", self.x+(self.width*8+13), 0, height*16, 8, 40, 0, "ver")
+			self.scrollbar.active = false
 			self.scrollbar.yrange = self.scrollbar.yrange + self.scrollbar.height
 			self.scrollbar.height = math.max(30, math.min(1, (height*16)/(yrange+(height*16)))*(height*16))
 			self.scrollbar.yrange = self.scrollbar.yrange - self.scrollbar.height
-			--scroll the view by about 3 rows per wheel notch (not jump the whole list / selection)
-			self.scrollbar.scrollstep = math.max(0.0001, math.min(0.35, 30/yrange))
-			self.scroll = self.scrollbar.value*yrange
+			self.scrollbar.scrollstep = math.max(0.0001, 73/yrange)
 		end
 		if not self.cutoff and self.y+10*(#self.entries+1) > height*16 then
 			self.multiy = {self.y, height*16-(10*(#self.entries+1))}
