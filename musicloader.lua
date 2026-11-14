@@ -354,6 +354,30 @@ function music:fakefast(name, rate, classic, file)
 	source:setLooping(true)
 	source:setPitch(self.pitch*self.pitchmul[fastname])
 	self.loaded[fastname] = source
+
+	--also make a fakefast intro so the sped-up song still plays its intro first
+	local introfile = self:variant(file, "-intro")
+	if love.filesystem.getInfo(introfile) then
+		local fastintro = self:variant(name, "-fastintro")
+		if not self.loaded[fastintro] then
+			local introstretched = nil
+			if not classic then
+				introstretched = self:getstretched(introfile, rate)
+			end
+			local introsource
+			if introstretched then
+				introsource = love.audio.newSource(introstretched)
+				self.pitchmul[fastintro] = 1
+			else
+				introsource = love.audio.newSource(introfile, "stream")
+				self.pitchmul[fastintro] = rate
+			end
+			--intros do not loop
+			introsource:setPitch(self.pitch*self.pitchmul[fastintro])
+			self.loaded[fastintro] = introsource
+		end
+	end
+
 	return fastname
 end
 
@@ -365,6 +389,14 @@ function music:unfakefast(name)
 		end
 		self.loaded[fastname] = nil
 		self.pitchmul[fastname] = nil
+	end
+	local fastintro = self:variant(name, "-fastintro")
+	if self.pitchmul[fastintro] then
+		if self.loaded[fastintro] then
+			self.loaded[fastintro]:stop()
+		end
+		self.loaded[fastintro] = nil
+		self.pitchmul[fastintro] = nil
 	end
 end
 

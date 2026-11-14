@@ -4653,8 +4653,8 @@ local RRR_LAYOUTS = {
 		"X                                      X",
 		"X                                      X",
 		"X  1                                2  X",
-		"#########LLL################LLL#########",
-		"#########LLL################LLL#########",
+		"########################################",
+		"########################################",
 	},
 	--portal: a test chamber with a pillar splitting the floor
 	lab = {
@@ -4726,8 +4726,8 @@ local RRR_SD_LAYOUTS = {
 		"X                       X",
 		"X                       X",
 		"X 3                   4 X",
-		"###########LLL###########",
-		"###########LLL###########",
+		"#########################",
+		"#########################",
 	},
 	lab = {
 		"XXXXXXXXXXXXXXXXXXXXXXXXX",
@@ -4759,7 +4759,7 @@ local RRR_THEMES = {
 		platform = {49, 49, 49}, pipe = RRR_GREENPIPE},
 	{name = "Castle", layout = "castle", spriteset = 3, background = 2, ground = 29, block = 29, brick = 122, used = 117,
 		platform = {122, 122, 122}, pipe = RRR_GRAYPIPE, lava = {107, 120}},
-	{name = "Portal", layout = "lab", spriteset = 1, backgroundrgb = {36, 40, 48}, ground = 140, block = 154, brick = 141, used = 113,
+	{name = "Portal", layout = "lab", spriteset = 1, background = 2, ground = 140, block = 154, brick = 141, used = 113,
 		platform = {141, 141, 141}, pipe = RRR_GRAYPIPE, decor = "lab"},
 	{name = "Night Overworld", layout = "field", spriteset = 3, background = 2, ground = 92, block = 29, brick = 122, used = 117,
 		platform = {89, 90, 91}, pipe = RRR_GRAYPIPE, decor = "clouds"},
@@ -5391,6 +5391,23 @@ local function rrr_buildmap(S, theme, layout)
 		end
 	end
 	rrr_decorate(S, rows, theme)
+
+	--castle: rising water at the bottom, covering ~75% of the ground area
+	--y is half a tile below the top of the overall ground (the topmost # row)
+	if theme.layout == "castle" then
+		local groundtop = mapheight - 1 --first ground row (1-based)
+		local watery = groundtop - 0.5 --half a tile below the top surface
+		local waterh = 3 --covers the ground rows and a bit more
+		local waterw = mapwidth - 2 --inside the walls
+		local r = {nil, nil, waterw .. "|" .. waterh .. "|1|" .. (watery - (groundtop - 1)) .. "|lava|0.75|0|false|0"}
+		--format: w|h|rx|ry|type|fill|fillspeed|oscillate|wait
+		--rx,ry relative to the entity's cox,coy; place the entity at left wall +1, groundtop
+		if not objects["risingwater"] then
+			objects["risingwater"] = {}
+		end
+		table.insert(objects["risingwater"], risingwater:new(2, groundtop, r))
+	end
+
 	return rows
 end
 
@@ -7069,36 +7086,7 @@ end
 -----------
 
 local function rrr_drawhud(S)
-	local slot = width*16/RRR_PLAYERS
-	for i = 1, RRR_PLAYERS do
-		local x = math.floor(slot*(i-1) + slot/2 - 28)
-		local color = {255, 255, 255}
-		if S.out[i] then
-			color = {120, 120, 120}
-		end
-		love.graphics.setColor(90, 90, 90) --(a black player still shows on a black sky)
-		love.graphics.rectangle("fill", (x-1)*scale, 7*scale, 9*scale, 9*scale)
-		love.graphics.setColor(255, 255, 255)
-		if mariocolors[i] then
-			love.graphics.setColor(mariocolors[i][1])
-		end
-		love.graphics.rectangle("fill", x*scale, 8*scale, 7*scale, 7*scale)
-		love.graphics.setColor(color)
-		local lives = "out"
-		if not S.out[i] then
-			lives = "*" .. (mariolives[i] or 0)
-		end
-		properprintFbackground("p" .. i .. " " .. lives, (x+10)*scale, 8*scale)
-		local second = "ko " .. S.kos[i]
-		if S.bots[i] then
-			second = "cpu " .. second
-		end
-		love.graphics.setColor(170, 170, 170)
-		if S.out[i] then
-			love.graphics.setColor(100, 100, 100)
-		end
-		properprintFbackground(second, (x+10)*scale, 18*scale)
-	end
+	--custom player slots removed: use the built-in multiplayer lives HUD (drawmultiHUD) instead
 	if S.suddendeath then
 		local s = "sudden death"
 		love.graphics.setColor(255, 90, 90)
@@ -7203,7 +7191,11 @@ local function rrr_updatecountdown(S)
 		end
 		if S.suddendeath then
 			mariotime = 1
-			rrrx.startlowtime(S) --sudden death: the low time sound, then the fast music
+			--no lowtimesound on sudden death go!: just switch to the fast music
+			rrrx.ensurefastmusic()
+			S.lowtime = {waiting = false}
+			queuelowtime = false
+			updatemusicpriority()
 		else
 			playmusic()
 			--a song without a fast version gets one made up when the time runs low: stretching it takes a moment,
@@ -7338,6 +7330,8 @@ local function rrr_endbattle(S, winner, knockout)
 	if knockout then
 		--everything stands still for a moment: no music, no new sounds, no controls, nothing moves or animates,
 		--then the results screen, where the battle clear theme plays (resultmusic)
+		playsound(boomsound)
+		earthquake = 10
 		minigame_finish("win", RRR_KO_FREEZE, "hard")
 	else
 		for i = 1, RRR_PLAYERS do
@@ -7427,6 +7421,8 @@ local function rrr_timeup(S)
 		--everything stands still until the fade to the sudden death arena (rrrx.updatesdpending)
 		S.sdpending = {t = 0}
 		S.finalcount = nil
+		playsound(boomsound)
+		earthquake = 10
 		minigame_freeze()
 		rrr_banner(S, "time up!", RRR_K.SD_ANNOUNCE)
 		return
@@ -7655,6 +7651,28 @@ addminigame({
 		S.countdown = {elapsed = 0, last = love.timer.getTime(), shown = false}
 		stopmusic()
 		splitscreen_reset()
+		--instasnap cameras to the players as soon as the minigame starts
+		if splitscreenactive() and splitscreenviewplayers then
+			for i, pn in ipairs(splitscreenviewplayers) do
+				local p = objects["player"][pn]
+				if p then
+					local views = getsplitscreenviews and getsplitscreenviews()
+					local view = views and views[i]
+					if view then
+						splitscreen_updatecamera(i, view, p, nil, 0, true)
+					else
+						--fallback: set splitcam directly
+						local mul = 1
+						local vw = (width*16)/math.max(1, #splitscreenviewplayers)/16
+						local vh = height
+						splitcamx[i] = math.max(0, math.min(mapwidth - vw, p.x + p.width/2 - vw/2))
+						splitcamy[i] = math.max(0, math.min(mapheight - vh - 1, (p.y + p.height/2) - vh/2 - 0.5))
+					end
+				end
+			end
+		else
+			camerasnap(nil, nil, true)
+		end
 	end,
 
 	update = function(S, dt)
@@ -7705,10 +7723,18 @@ addminigame({
 		end
 	end,
 
-	--while it's frozen (minigame_freeze): only the banners and the wait for sudden death, nothing in the arena
+	--while it's frozen (minigame_freeze): banners, wait for sudden death, and death animations (so the last KO finishes)
 	frozenupdate = function(S, dt)
 		rrrx.updatebanner(S, dt)
 		rrrx.updatesdpending(S, dt)
+		--keep death animations moving during the freeze before victory / sudden death
+		if objects and objects["player"] then
+			for _, p in pairs(objects["player"]) do
+				if p and (p.dead or p.animation == "death" or p.animation == "deathpit") then
+					p:update(dt)
+				end
+			end
+		end
 	end,
 
 	drawtiles = function(S)
