@@ -292,7 +292,19 @@ function guielement:update(dt)
 			end
 			if self.scrollbar then
 				self.scrollbar:update(dt)
-				self.scroll = self.scrollbar.value*(((#self.entries+1)*10)-(height*16)+1)
+				local range = ((#self.entries+1)*10)-(height*16)+1
+				if self.wheelanim then
+					if self.scrollbar.dragging then
+						self.wheelanim = nil --dragging the scrollbar takes over
+					else
+						local pos, done = gui_wheelanimposition(self.wheelanim, love.timer.getTime())
+						if done then
+							self.wheelanim = nil
+						end
+						self.scrollbar.value = math.max(0, math.min(1, pos/range))
+					end
+				end
+				self.scroll = self.scrollbar.value*range
 			end
 			if self.multiy then
 				if not self.dropup then
@@ -1522,10 +1534,66 @@ function guielement:setentrycolors(colors)
 	self.entrycolors = colors
 end
 
---dropdown: scroll a long (cut off) list with the mouse wheel, the way a classic web page does:
---straight away, by exactly how far the wheel turned (mousewheelamount, from love.wheelmoved),
---DROPDOWN_WHEEL_PIXELS screen pixels per notch, so a fine scrolling wheel or a touchpad moves it a little
-DROPDOWN_WHEEL_PIXELS = 100 --screen pixels per notch, what browsers scroll a page by
+--dropdown: scroll a long (cut off) list with the mouse wheel, the way a web browser does (Chromium's wheel scrolling):
+--every notch moves the target DROPDOWN_WHEEL_PIXELS screen pixels (times how far the wheel turned, mousewheelamount,
+--so a fine scrolling wheel or a touchpad moves it a little), and the list slides there on an ease-in-out curve,
+--cubic-bezier(0.42, 0, 0.58, 1), that takes sqrt(distance in screen pixels)/60 seconds, at most 0.2.
+--a notch that comes in while the list is still sliding moves the target further and the slide carries on
+--from the speed it has, instead of starting again from a standstill
+DROPDOWN_WHEEL_PIXELS = 100 --screen pixels per notch, what browsers on windows scroll by
+local WHEEL_DURATION_DIVISOR = 60
+local WHEEL_DURATION_MAX = 12 --sqrt(distance) is capped at this before dividing, so a slide is 0.2 s at most
+
+--y of a cubic-bezier(x1, y1, x2, y2) timing curve at x (0-1)
+local function cubicbezier(x1, y1, x2, y2, x)
+	local function bez(a, b, t)
+		return 3*a*t*(1-t)^2 + 3*b*t^2*(1-t) + t^3
+	end
+	--find the curve's t for this x: newton first, bisection if it doesn't settle
+	local t = x
+	for _ = 1, 8 do
+		local err = bez(x1, x2, t) - x
+		if math.abs(err) < 1e-6 then
+			return bez(y1, y2, t)
+		end
+		local slope = 3*x1*(1-t)^2 + 6*(x2-x1)*t*(1-t) + 3*(1-x2)*t^2
+		if math.abs(slope) < 1e-6 then
+			break
+		end
+		t = t - err/slope
+	end
+	local lo, hi = 0, 1
+	t = x
+	for _ = 1, 30 do
+		local v = bez(x1, x2, t)
+		if math.abs(v-x) < 1e-6 then
+			break
+		end
+		if v < x then
+			lo = t
+		else
+			hi = t
+		end
+		t = (lo+hi)/2
+	end
+	return bez(y1, y2, t)
+end
+
+--where a wheel slide is at time now (game pixels), and whether it has finished
+function gui_wheelanimposition(anim, now)
+	local t = (now - anim.start)/anim.duration
+	if t >= 1 then
+		return anim.to, true
+	end
+	t = math.max(0, t)
+	return anim.from + (anim.to-anim.from)*cubicbezier(0.42, anim.y1, 0.58, 1, t), false
+end
+
+--how long a slide over this many game pixels takes
+local function wheelduration(distance)
+	return math.min(math.sqrt(math.abs(distance)*scale), WHEEL_DURATION_MAX)/WHEEL_DURATION_DIVISOR
+end
+
 function guielement:wheelscroll(button)
 	if not (self.cutoff and self.scrollbar) then
 		return
@@ -1538,8 +1606,26 @@ function guielement:wheelscroll(button)
 	if button == "wu" then
 		pixels = -pixels
 	end
-	self.scrollbar.value = math.max(0, math.min(1, self.scrollbar.value + pixels/range))
-	self.scroll = self.scrollbar.value*range
+	local now = love.timer.getTime()
+	local anim = self.wheelanim
+	local current = self.scroll or 0
+	local velocity = 0 --game pixels per second
+	if anim then
+		local a = gui_wheelanimposition(anim, now - 0.001)
+		local b = gui_wheelanimposition(anim, now)
+		current = b
+		velocity = (b-a)/0.001
+	end
+	local target = math.max(0, math.min(range, ((anim and anim.to) or current) + pixels))
+	local delta = target - current
+	if math.abs(delta) < 0.01 then
+		return --already at the end
+	end
+	local duration = wheelduration(delta)
+	--the curve's first control point is tilted so the slide starts at the speed it already had
+	local slope = velocity*duration/delta
+	slope = math.max(-1000, math.min(1000, slope))
+	self.wheelanim = {from = current, to = target, start = now, duration = duration, y1 = 0.42*slope}
 	self.keycursor = nil --the hovered option takes over again
 end
 
@@ -1553,6 +1639,7 @@ function guielement:close()
 		opened_dropdown = false
 	end
 	self.keycursor = nil
+	self.wheelanim = nil
 	if self.scrollbar then
 		self.scrollbar.active = false
 	end
@@ -1584,6 +1671,7 @@ function guielement:scrolltocursor()
 		end
 		self.scrollbar.value = math.max(0, math.min(1, scroll/range))
 		self.scroll = self.scrollbar.value*range
+		self.wheelanim = nil --the keyboard jumps straight there
 	end
 end
 
@@ -1747,6 +1835,7 @@ function guielement:updatePos()
 			local yrange = (((#self.entries+1)*10)-(height*16)+1)
 			self.cutoff = true
 			self.scroll = 0
+			self.wheelanim = nil
 			self.scrollbar = guielement:new("scrollbar", self.x+(self.width*8+13), 0, height*16, 8, 40, 0, "ver")
 			self.scrollbar.active = false
 			self.scrollbar.yrange = self.scrollbar.yrange + self.scrollbar.height
