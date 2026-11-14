@@ -5992,6 +5992,13 @@ local function rrr_itemicon(name)
 end
 
 --hit from below (or by a tail): bounce, and give out the item on show when the block is ready
+--a block that's ready again starts its roulette over from the first item, on its own clock
+--(so blocks whose cooldowns end at different times never cycle in step)
+function rrrx.restartroulette(b)
+	b.roulette = 1
+	b.roulettet = 0
+end
+
 local function rrr_hitblock(S, x, y, hitter)
 	local b = S.blockat[x] and S.blockat[x][y]
 	local breakable = inmap(x, y) and tilequads[map[x][y][1]] and tilequads[map[x][y][1]].breakable
@@ -6016,7 +6023,9 @@ local function rrr_hitblock(S, x, y, hitter)
 		bounce.content = b.def.items[b.roulette]
 		bounce.content2 = 2 --as if a big player hit it, so it's never a mushroom
 		playsound(mushroomappearsound)
-		if not RemoveCooldowns then --removecooldowns nitpick: the block is ready again straight away
+		if RemoveCooldowns then --removecooldowns nitpick: the block is ready again straight away
+			rrrx.restartroulette(b)
+		else
 			b.cooldown = b.def.cooldown
 			map[x][y][1] = S.theme.used
 		end
@@ -6041,6 +6050,7 @@ local function rrr_updateblocks(S, dt)
 			if b.cooldown <= 0 then
 				b.cooldown = 0
 				map[b.x][b.y][1] = RRR_QUESTIONBLOCK
+				rrrx.restartroulette(b)
 				changed = true
 			end
 		else
