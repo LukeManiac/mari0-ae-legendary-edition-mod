@@ -609,7 +609,6 @@ function minigame_buildgui(force)
 				opts[opt.key] = v
 				el.var = v
 			end, opts[opt.key], unpack(entries))
-			el.entrycolors = opt.colors --a colour for every entry (optional)
 			if opt.wide and w > closedw then
 				--long entries: shortened while closed, the list opens wide enough for the full names
 				el.closedwidth = closedw
@@ -7585,14 +7584,6 @@ addminigame({
 				names[i] = level.name
 			end
 			return names
-		end)(), colors = (function()
-			--green for the weakest, through yellow and orange, down to dark red for the strongest
-			local colors = {}
-			for i = 1, #RRR_BOTLEVELS do
-				local c = hsv_lerp({0, 255, 0}, {127, 0, 0}, (i-1)/(#RRR_BOTLEVELS-1))
-				colors[i] = {round(c[1]), round(c[2]), round(c[3])}
-			end
-			return colors
 		end)(), wide = true, default = RRR_BOTLEVEL_DEFAULT},
 		{type = "dropdown", key = "theme", label = "Battle theme", entries = (function()
 			local names = {}

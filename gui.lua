@@ -321,10 +321,8 @@ local function drawdropdownentry(entry, x, y, maxchars)
 	properprint(entry, x*scale, y*scale)
 end
 
-local function setdropdownentrycolor(self, entry, i)
-	if self.entrycolors and self.entrycolors[i] then
-		love.graphics.setColor(self.entrycolors[i])
-	elseif self.coloredtext then
+local function setdropdownentrycolor(self, entry)
+	if self.coloredtext then
 		if entry == "black" then
 			love.graphics.setColor(80, 80, 80)
 		else
@@ -489,8 +487,6 @@ function guielement:draw(a, offx, offy)
 		local s = self.entries[self.var]
 		if self.extended then
 			love.graphics.setColor(127, 127, 127)
-		elseif self.entrycolors and self.entrycolors[self.var] then
-			love.graphics.setColor(self.entrycolors[self.var])
 		elseif self.coloredtext then
 			if s == "black" then
 				love.graphics.setColor(80, 80, 80)
@@ -559,7 +555,7 @@ function guielement:draw(a, offx, offy)
 						end
 						local entry = self.entries[i]
 						if self.displayentries then entry = self.displayentries[i] end
-						if high ~= i then setdropdownentrycolor(self, entry, i) else love.graphics.setColor(0, 0, 0) end
+						if high ~= i then setdropdownentrycolor(self, entry) else love.graphics.setColor(0, 0, 0) end
 						drawdropdownentry(entry, self.x+1, rowy, self.width+1)
 					end
 				end
@@ -573,7 +569,7 @@ function guielement:draw(a, offx, offy)
 						love.graphics.setColor(0, 0, 0)
 						love.graphics.rectangle("fill", (self.x+1)*scale, ((self.y+2+i*10)-(11+(10*#self.entries)))*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
 						local s = self.entries[i]
-						setdropdownentrycolor(self, s, i)
+						setdropdownentrycolor(self, s)
 						if self.displayentries then s = self.displayentries[i] end
 						drawdropdownentry(s, self.x+1, (self.y+3+10*i)-(11+(10*#self.entries)), self.width+1)
 					else
@@ -591,7 +587,7 @@ function guielement:draw(a, offx, offy)
 					if high ~= i then
 						love.graphics.setColor(0, 0, 0)
 						love.graphics.rectangle("fill", (self.x+1)*scale, (listtop+(i-1)*10)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
-						setdropdownentrycolor(self, s, i)
+						setdropdownentrycolor(self, s)
 						if self.displayentries then s = self.displayentries[i] end
 						drawdropdownentry(s, self.x+1, listtop+1+(i-1)*10, self.width+1)
 					else
