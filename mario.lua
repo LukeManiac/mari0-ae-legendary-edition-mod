@@ -6708,6 +6708,18 @@ function mario:leftcollide(a, b)
 	end
 end
 
+--true if the tile can be bonked from below (semisolids only count if their bottom is solid)
+local function solidceilingtile(x, y)
+	local t = tilequads[map[x][y][1]]
+	if t.collision ~= true then
+		return false
+	end
+	if t.platformdown then
+		return true
+	end
+	return not (t.platform or t.platformleft or t.platformright)
+end
+
 function mario:ceilcollide(a, b)
 	if self:globalcollide(a, b) then
 		return false
@@ -6991,7 +7003,7 @@ function mario:ceilcollide(a, b)
 			if self.gravitydir ~= "up" and self.size ~= 8 and self.size ~= 16 and not b.UPSIDEDOWNSLOPE then
 				if self.x < x-22/16 then
 					--check if block left of it is a better fit
-					if x > 1 and tilequads[map[x-1][y][1]].collision == true then
+					if x > 1 and solidceilingtile(x-1, y) then
 						x = x - 1
 					else
 						local col = checkrect(x-28/16, self.y, self.width, self.height, {"exclude", self}, true, "ignoreplatforms")
@@ -7008,7 +7020,7 @@ function mario:ceilcollide(a, b)
 					end
 				elseif self.x > x-6/16 then
 					--check if block right of it is a better fit
-					if x < mapwidth and tilequads[map[x+1][y][1]].collision == true then
+					if x < mapwidth and solidceilingtile(x+1, y) then
 						x = x + 1
 					else
 						local col = checkrect(x, self.y, self.width, self.height, {"exclude", self}, true, "ignoreplatforms")

@@ -609,6 +609,7 @@ The flagpole now waits for everyone in multiplayer, instead of ending the course
 * Changing form while you're blinking after a hit now keeps your invincibility timer: once the grow animation ends, the blinking carries on from where it was.
 * Finishing a course (at the flagpole, the axe or a levelball) now takes every player off their Lakitu cloud, quietly, so the cloud doesn't follow you through the ending.
 * Dropdowns in a minigame's settings no longer disappear when the description above them is long. They used to stay where they were before the panel was scrolled.
+* Corner clipping now works next to semisolid tiles. When you hit the corner of a block, the game checks whether the tile beside it is a better fit to bonk. It used to count any tile with collision, so a semisolid next to the block (a treetop, for example) bonked you instead of pushing you past the corner. Now only tiles that are solid from below count: semisolids are skipped unless they're solid on their bottom side (`platformdown`).
 
 ### ✨ Improvements
 
