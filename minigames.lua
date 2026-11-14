@@ -7464,6 +7464,7 @@ local function rrr_cleanup()
 	splitscreenviewtarget = nil
 	splitscreenviewhud = nil
 	splitscreen_reset()
+	camerasmoothingforcesnap = false
 end
 
 local function rrr_endbattle(S, winner, knockout)
@@ -7807,6 +7808,9 @@ addminigame({
 		S.countdown = {elapsed = 0, last = love.timer.getTime(), shown = false}
 		stopmusic()
 		splitscreen_reset()
+		--the cameras stay snapped to the players for the whole countdown, even with camerasmoothing on
+		--(the viewport layout can still settle in the first frames, which would otherwise ease), "go!" lets go
+		camerasmoothingforcesnap = true
 		--instasnap cameras to the players as soon as the minigame starts
 		--(also clear camerasmoothing state so it doesn't ease from the previous level)
 		if splitscreenactive() and splitscreenviewplayers then

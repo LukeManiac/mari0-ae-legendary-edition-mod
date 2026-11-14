@@ -267,7 +267,7 @@ function splitscreen_update(dt)
 		if (not dead) or (not splitcamx[i]) then
 			splitscreen_updatecamera(i, view, p, f, dt, revived or resnap or camerasmoothingforcesnap)
 		end
-		local mul = (splitscreencanvases[i] and splitscreencanvases[i].viewrangemul) or 1
+		local mul = (splitscreencanvases[i] and splitscreencanvases[i].viewrangemul) or splitscreen_rangemul(view) --(before its first draw, a viewport has no canvas yet)
 		camerasmoothing_apply("view" .. i, splitcamx, splitcamy, i, dt,
 			math.max(0, mapwidth-view.w/16*screenzoom2*mul), math.max(0, mapheight-view.h/16*screenzoom2*mul-1))
 
@@ -276,7 +276,7 @@ function splitscreen_update(dt)
 end
 
 function splitscreen_updatecamera(i, view, p, f, dt, snap)
-	local mul = (splitscreencanvases[i] and splitscreencanvases[i].viewrangemul) or 1
+	local mul = (splitscreencanvases[i] and splitscreencanvases[i].viewrangemul) or splitscreen_rangemul(view) --(before its first draw, a viewport has no canvas yet)
 	local vw = view.w/16*screenzoom2*mul
 	local vh = view.h/16*screenzoom2*mul
 	local maxx = math.max(0, mapwidth-vw)
@@ -431,7 +431,7 @@ end
 
 --enemies spawn when they get into view, so every viewport has to do that
 function splitscreen_spawn(i, view, f)
-	local mul = (splitscreencanvases[i] and splitscreencanvases[i].viewrangemul) or 1
+	local mul = (splitscreencanvases[i] and splitscreencanvases[i].viewrangemul) or splitscreen_rangemul(view) --(before its first draw, a viewport has no canvas yet)
 	local vw = view.w/16*screenzoom2*mul
 	local vh = view.h/16*screenzoom2*mul
 	local x1 = math.max(1, math.floor(splitcamx[i]))
