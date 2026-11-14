@@ -493,6 +493,12 @@ function game_update(dt)
 		end
 		return
 	end
+	
+	--earthquake reset
+	if earthquake > 0 then
+		earthquake = math.max(0, earthquake-dt*earthquake*2-0.001)
+		sunrot = sunrot + dt
+	end
 
 	--a minigame's hard freeze before its results screen (see minigame_finish): nothing moves or animates
 	if minigameplaying and minigame_hardfrozen() then
@@ -502,12 +508,6 @@ function game_update(dt)
 
 	--animationS
 	animationsystem_update(dt)
-	
-	--earthquake reset
-	if earthquake > 0 then
-		earthquake = math.max(0, earthquake-dt*earthquake*2-0.001)
-		sunrot = sunrot + dt
-	end
 	
 	--animate animated tiles because I say so
 	for i = 1, #animatedtiles do
