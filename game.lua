@@ -9678,8 +9678,11 @@ function updatewhensizechange_update(dt)
 	local list = objects["enemy"]
 	local any = false
 	local delete
-	local count = #list --(the ones spawned this frame start next frame, like they do normally)
-	for j = 1, count do
+	--(enemies spawned during this go get updated in it too, the same as in the normal update: a spawner can count on
+	--what it just spawned having run once before anything's drawn)
+	local j = 0
+	while j < #list do
+		j = j + 1
 		local w = list[j]
 		if w and w.updatewhensizechange then
 			any = true
