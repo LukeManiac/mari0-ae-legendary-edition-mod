@@ -292,7 +292,21 @@ function guielement:update(dt)
 			end
 			if self.scrollbar then
 				self.scrollbar:update(dt)
-				self.scroll = self.scrollbar.value*(((#self.entries+1)*10)-(height*16)+1)
+				local range = ((#self.entries+1)*10)-(height*16)+1
+				if self.scrolltarget and not self.scrollbar.dragging then
+					--glide to where the wheel sent the list, fast at first and settling in (ease-out), like a web page
+					self.scrolltime = self.scrolltime + dt
+					local t = math.min(1, self.scrolltime/DROPDOWN_WHEEL_DURATION)
+					local eased = 1 - (1-t)^3
+					local scroll = self.scrollfrom + (self.scrolltarget-self.scrollfrom)*eased
+					if t >= 1 then
+						self.scrolltarget = nil
+					end
+					self.scrollbar.value = math.max(0, math.min(1, scroll/range))
+				else
+					self.scrolltarget = nil --dragging the scrollbar takes over
+				end
+				self.scroll = self.scrollbar.value*range
 			end
 			if self.multiy then
 				if not self.dropup then
@@ -1522,10 +1536,12 @@ function guielement:setentrycolors(colors)
 	self.entrycolors = colors
 end
 
---dropdown: scroll a long (cut off) list with the mouse wheel
---every step of the wheel (mousewheelamount, from love.wheelmoved) scrolls DROPDOWN_WHEEL_PIXELS,
---so a fine scrolling wheel or a touchpad moves it a little and a fast flick moves it a lot
+--dropdown: scroll a long (cut off) list with the mouse wheel, smoothly like a web page
+--every step of the wheel (mousewheelamount, from love.wheelmoved) moves the target DROPDOWN_WHEEL_PIXELS,
+--so a fine scrolling wheel or a touchpad moves it a little and a fast flick moves it a lot,
+--and the list glides there (guielement:update), steps that come in while it's still moving add up
 DROPDOWN_WHEEL_PIXELS = 30 --three entries per notch, like most systems scroll text
+DROPDOWN_WHEEL_DURATION = 0.2 --seconds the list takes to glide to where the wheel sent it
 function guielement:wheelscroll(button)
 	if not (self.cutoff and self.scrollbar) then
 		return
@@ -1538,8 +1554,11 @@ function guielement:wheelscroll(button)
 	if button == "wu" then
 		pixels = -pixels
 	end
-	self.scrollbar.value = math.max(0, math.min(1, self.scrollbar.value + pixels/range))
-	self.scroll = self.scrollbar.value*range
+	--a new step starts its glide from where the list is now, towards the old target plus the new step
+	local from = self.scrolltarget or self.scroll or 0
+	self.scrolltarget = math.max(0, math.min(range, from + pixels))
+	self.scrollfrom = self.scroll or 0
+	self.scrolltime = 0
 	self.keycursor = nil --the hovered option takes over again
 end
 
@@ -1553,6 +1572,7 @@ function guielement:close()
 		opened_dropdown = false
 	end
 	self.keycursor = nil
+	self.scrolltarget = nil
 	if self.scrollbar then
 		self.scrollbar.active = false
 	end
@@ -1584,6 +1604,7 @@ function guielement:scrolltocursor()
 		end
 		self.scrollbar.value = math.max(0, math.min(1, scroll/range))
 		self.scroll = self.scrollbar.value*range
+		self.scrolltarget = nil --the keyboard jumps straight there
 	end
 end
 
@@ -1747,6 +1768,7 @@ function guielement:updatePos()
 			local yrange = (((#self.entries+1)*10)-(height*16)+1)
 			self.cutoff = true
 			self.scroll = 0
+			self.scrolltarget = nil
 			self.scrollbar = guielement:new("scrollbar", self.x+(self.width*8+13), 0, height*16, 8, 40, 0, "ver")
 			self.scrollbar.active = false
 			self.scrollbar.yrange = self.scrollbar.yrange + self.scrollbar.height
