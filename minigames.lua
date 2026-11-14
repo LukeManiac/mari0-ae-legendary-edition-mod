@@ -571,6 +571,9 @@ function minigame_buildgui(force)
 				opts[opt.key] = v
 				el.var = v
 			end, opts[opt.key], unpack(entries))
+			if opt.entrycolors then
+				el.entrycolors = opt.entrycolors
+			end
 			if opt.wide and w > closedw then
 				--long entries: shortened while closed, the list opens wide enough for the full names
 				el.closedwidth = closedw
@@ -651,6 +654,9 @@ function minigame_menu_update(dt)
 					el.width, el.x, el.displayentries = el.closedwidth, el.basex, el.shortentries
 				end
 				el:updatePos()
+				if el.scrollbar and el.extended then
+					el.scrollbar.active = true
+				end
 			end
 		end
 		el:update(dt)
@@ -1288,6 +1294,11 @@ function minigame_createmap()
 	--unless the minigame keeps the game's own physics (the ones game_load picked)
 	if not def.keepphysics then
 		currentphysics = 6
+		setphysics(currentphysics)
+	end
+	--JJJ / RRR: never run under portal physics; fall back to Mari0
+	if (def.id == "jumping_juggle_jamboree" or def.id == "rival_rumble_royale") and (portalphysics or currentphysics == 7) then
+		currentphysics = 1
 		setphysics(currentphysics)
 	end
 
@@ -6068,13 +6079,38 @@ local function rrr_updatecombat(S, dt)
 	--stomps first: anyone can bounce off anyone's head, like off an enemy. The one underneath only takes
 	--damage when it can be hurt (a star or the blinking after a hit just means a bounce), and the one on top
 	--never gets hurt by the stomp, even landing on a star or a fast blue shell
+	--Mario Maker style bounce (same idea as JJJ): high bounce if jump held, otherwise maker bounce
 	for i = 1, RRR_PLAYERS do
 		for j = 1, RRR_PLAYERS do
 			local a, v = list[i], list[j]
 			if touching(i, j) and not rrr_dangerous(a) and rrr_stomping(a, v, dt) and not rrr_stompgrace(S, i, j) then
 				S.stompgrace[i .. "," .. j] = S.time + RRR_STOMP_GRACE
-				rrr_hurt(S, v, a)
-				a:stompbounce("player", {stompbouncesound = true})
+				local vbot = S.bots[j]
+				if not (vbot and vbot.level and vbot.level.stompresistant) then
+					rrr_hurt(S, v, a)
+				end
+				local grav = a.gravity or yacceleration
+				if a.characterdata then
+					grav = a.characterdata.yacceleration or grav
+				end
+				local held = jumpkey(a.playernumber)
+				local bouncespeed = math.sqrt(2 * grav * bounceheight)
+				if held then
+					bouncespeed = math.sqrt(2 * grav * bounceheighthigh)
+				else
+					bouncespeed = math.sqrt(2 * grav * bounceheightmaker)
+				end
+				a.speedy = -bouncespeed
+				a.falling = true
+				a.landed = false
+				a.jumping = held
+				if not held then
+					a:stopjump()
+				end
+				if a.animationstate == "idle" or a.animationstate == "running" or a.animationstate == "sliding" then
+					a.animationstate = "jumping"
+					a:setquad()
+				end
 				playsound(stompsound)
 			end
 		end
@@ -6270,16 +6306,46 @@ local RRR_SPINNERS = {[6] = true, [9] = true, [10] = true} --leaf, tanooki, cape
 --lead: aims where the target will be this many seconds from now
 --greed: how often it goes for a block instead of a fight (at random between 0.3 and 0.7 when not set)
 --dodgestomps: steps out from under anyone coming down on its head
-local RRR_BOTLEVELS = {
-	{name = "easy", think = 0.8, fire = 1.2, dodge = 0.15, range = 7, flee = 4, dawdle = 0.3, lead = 0},
-	{name = "normal", think = 0.45, fire = 0.7, dodge = 0.5, range = 10, flee = 6, dawdle = 0.1, lead = 0},
-	{name = "expert", think = 0.25, fire = 0.35, dodge = 0.9, range = 12, flee = 7, dawdle = 0, lead = 0},
-	{name = "super expert", think = 0.12, fire = 0.18, dodge = 1, range = 16, flee = 9, dawdle = 0, lead = 0.3},
-	{name = "godmode", think = 0.05, fire = 0.1, dodge = 1, range = 40, flee = 12, dawdle = 0, lead = 0.4, greed = 0.8, dodgestomps = true},
+--bot difficulties as dictionaries, sampled from RRR_BOTLEVELS (Complete Noob → THE UNDEFEATABLE)
+local RRR_BOTLEVEL_NAMES = {
+	"Complete Noob", "Clueless", "Rookie", "Beginner", "Amateur",
+	"Trainee", "Apprentice", "Novice", "Learner", "Skilled",
+	"Competent", "Experienced", "Veteran", "Elite", "Expert",
+	"Master", "Grandmaster", "Champion", "Conqueror", "Legend",
+	"Mythical", "Immortal", "Godlike", "Omnipotent", "THE UNDEFEATABLE",
 }
 
+local function rrr_botlevelstats(i, n)
+	local t = (i - 1) / math.max(1, n - 1)
+	local function lerp(a, b) return a + (b - a) * t end
+	return {
+		name = RRR_BOTLEVEL_NAMES[i],
+		think = lerp(1.2, 0.03),
+		fire = lerp(1.5, 0.08),
+		dodge = lerp(0.05, 1),
+		range = lerp(5, 45),
+		flee = lerp(3, 14),
+		dawdle = lerp(0.35, 0),
+		lead = lerp(0, 0.5),
+		greed = t > 0.7 and lerp(0.4, 0.85) or nil,
+		dodgestomps = t > 0.75,
+		--levels above Master (index 16) are stompresistant
+		stompresistant = i > 16,
+	}
+end
+
+local RRR_BOTLEVELS = {}
+local RRR_BOTLEVEL_COLORS = {}
+for i = 1, #RRR_BOTLEVEL_NAMES do
+	RRR_BOTLEVELS[i] = rrr_botlevelstats(i, #RRR_BOTLEVEL_NAMES)
+	--green [0,255,0] → dark red [127,0,0]
+	local t = (i - 1) / math.max(1, #RRR_BOTLEVEL_NAMES - 1)
+	local c = hsv_lerp({0, 255, 0}, {127, 0, 0}, t)
+	RRR_BOTLEVEL_COLORS[i] = {math.floor(c[1] + 0.5), math.floor(c[2] + 0.5), math.floor(c[3] + 0.5)}
+end
+
 local function rrr_newbot(level)
-	level = RRR_BOTLEVELS[level] or RRR_BOTLEVELS[2]
+	level = RRR_BOTLEVELS[level] or RRR_BOTLEVELS[8]
 	return {
 		level = level,
 		dawdle = 0,
@@ -6815,22 +6881,31 @@ local function rrr_botupdate(S, i, p, dt)
 		input.down = true
 	end
 
-	--stuck against something: jump, and if that doesn't help, go somewhere else
-	if (input.left or input.right) and cur then
-		if math.abs(p.x - bot.lastx) < 0.02 then
-			bot.stuck = bot.stuck + dt
-			if bot.stuck > 0.4 then
-				input.jump = true
-			end
-			if bot.stuck > 2 then
-				rrr_setgoal(S, bot, {kind = "wander"})
-				bot.wanderseg = nil
-				bot.think = 2
-				bot.stuck = 0
-			end
-		else
-			bot.stuck = 0
+	--stuck / idle: jump if pressing into a wall, and force a new goal if the bot has barely moved
+	if math.abs(p.x - bot.lastx) < 0.02 then
+		bot.stuck = bot.stuck + dt
+		bot.idle = (bot.idle or 0) + dt
+		if (input.left or input.right) and cur and bot.stuck > 0.35 then
+			input.jump = true
 		end
+		--standing still for too long (even without holding a direction): pick a new goal and jump
+		if bot.idle > 1.2 then
+			rrr_setgoal(S, bot, {kind = "wander"})
+			bot.wanderseg = nil
+			bot.think = 0
+			bot.dawdle = 0
+			bot.stuck = 0
+			bot.idle = 0
+			input.jump = true
+			if math.random() < 0.5 then
+				input.left = true
+			else
+				input.right = true
+			end
+		end
+	else
+		bot.stuck = 0
+		bot.idle = 0
 	end
 	bot.lastx = p.x
 
@@ -7473,7 +7548,7 @@ addminigame({
 				names[i] = level.name
 			end
 			return names
-		end)(), default = 2},
+		end)(), default = 8, entrycolors = RRR_BOTLEVEL_COLORS, wide = true},
 		{type = "dropdown", key = "theme", label = "Battle theme", entries = (function()
 			local names = {}
 			for i, theme in ipairs(RRR_THEMES) do
