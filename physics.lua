@@ -48,7 +48,9 @@
 --33: TRACK
 local rotatepoint, getslopey
 
-function physicsupdate(dt)
+--only: optional, function(type, object) -> whether that object moves this time (everything still collides with it).
+--Used for the enemies with updatewhensizechange while the game is frozen for a size change (see game_update)
+function physicsupdate(dt, only)
 	local lobjects = objects
 	
 	for j, w in kpairs(lobjects, objectskeys) do
@@ -56,7 +58,7 @@ function physicsupdate(dt)
 			for i, v in pairs(w) do
 				local oldspeedx = v.speedx
 				local oldspeedy = v.speedy
-				if ((v.static == false) or (v.activestatic == true)) and v.active then
+				if ((v.static == false) or (v.activestatic == true)) and v.active and ((not only) or only(j, v)) then
 					--GRAVITY
 					local oldx = v.oldxplatform or v.x
 					local oldy = v.oldyplatform or v.y

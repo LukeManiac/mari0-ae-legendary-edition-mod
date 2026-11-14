@@ -572,6 +572,8 @@ function game_update(dt)
 				v:update(dt)
 			end
 		end
+		--enemies with updatewhensizechange keep going (see updatewhensizechange_update)
+		updatewhensizechange_update(dt)
 		-- viewports (cameras + fades) must still update even when entities are frozen
 		if splitscreenactive() then
 			splitscreen_update(dt)
@@ -9662,6 +9664,44 @@ function respawnplayers()
 		if mariolives[i] == 1 and objects["player"].dead then
 			objects["player"][i]:respawn()
 		end
+	end
+end
+
+--UPDATEWHENSIZECHANGE (a custom enemy property, set in the enemy's JSON): the enemy keeps updating and moving while
+--the game is frozen for a size change. The enemies it spawns (spawnenemy, spawnchildren) and the ones it transforms
+--into get it too (see enemy.lua). Everything else stays frozen, but they still collide with it
+local function updatewhensizechange_only(t, v)
+	return t == "enemy" and v.updatewhensizechange
+end
+
+function updatewhensizechange_update(dt)
+	local list = objects["enemy"]
+	local any = false
+	local delete
+	local count = #list --(the ones spawned this frame start next frame, like they do normally)
+	for j = 1, count do
+		local w = list[j]
+		if w and w.updatewhensizechange then
+			any = true
+			local deleteobject = w.instantdelete
+			if not deleteobject and w.update then
+				deleteobject = w:update(dt) or w.instantdelete
+			end
+			if deleteobject then
+				w.delete = true
+				if not delete then delete = {} end
+				table.insert(delete, j)
+			end
+		end
+	end
+	if delete then
+		table.sort(delete, function(a, b) return a > b end)
+		for _, j in ipairs(delete) do
+			table.remove(list, j)
+		end
+	end
+	if any then
+		physicsupdate(dt, updatewhensizechange_only)
 	end
 end
 

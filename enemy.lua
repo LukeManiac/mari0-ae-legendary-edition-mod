@@ -504,6 +504,9 @@ function enemy:init(x, y, t, a, properties)
 					a = {}
 				end
 				local temp = enemy:new(self.x+self.width/2+.5+offsetx, self.y+self.height+offsety, self.spawnchildren[i], a)
+				if self.updatewhensizechange then
+					temp.updatewhensizechange = true --(it passes on to the children)
+				end
 				if self.spawnchildrenparent then
 					temp.parent = self
 				end
@@ -3600,6 +3603,9 @@ function enemy:spawnenemy(t)
 	
 	local temp = enemy:new(self.x+self.width/2+.5+xoffset, self.y+self.height+yoffset, t, {}, properties)
 	temp.justspawned = true
+	if self.updatewhensizechange then
+		temp.updatewhensizechange = true --(it passes on to the enemies it spawns)
+	end
 
 	if not self.spawnpassedparametersbeforespawn then
 		if self.spawnpassedparameters then --pass parameters
@@ -3675,6 +3681,9 @@ function enemy:transform(t, returntransform, death)
 
 	local temp = enemy:new(self.x+self.width/2+.5+xoffset, self.y+self.height+yoffset, t, {}, properties)
 	temp.justspawned = true
+	if self.updatewhensizechange then
+		temp.updatewhensizechange = true --(it passes on to what it transforms into)
+	end
 	
 	--set parameters after spawn
 	if not self.transformpassedparametersbeforespawn then

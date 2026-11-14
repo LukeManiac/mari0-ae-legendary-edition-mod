@@ -567,6 +567,18 @@ Two new nitpicks for the camera. Both are just `true` or `false`. **Generate Nit
 * `backwardsmoothing` only works with `camerasmoothing` on. If it's on without it, a notice tells you to enable `camerasmoothing` when the game starts.
 * The smoothed camera never goes past the edges of the course, and splitscreen viewports are smoothed too. The camera is never smoothed in the editor, and anything that moves the camera on its own (loading a map, a camera snap) starts the smoothing over from there.
 
+#### 👾 Update When Size Change
+
+A new custom enemy property, `updatewhensizechange`. Set it to `true` in the enemy's JSON file, and the enemy keeps updating and moving while the game is frozen for a power-up or a hit.
+
+```json
+"updatewhensizechange": true
+```
+
+* Enemies it spawns (`spawnenemy` and `spawnchildren`) and enemies it transforms into keep updating too, even if their own JSON doesn't have it. They pass it on in the same way.
+* Everything else stays frozen, but these enemies still collide with it, including the players.
+* With `dontfreezeonsizechange`, nothing else freezes, so every enemy keeps updating anyway.
+
 #### 🏃 No Air Speed Cap
 
 A new nitpick, `noairspeedcap`, lifts the classic air speed cap. Normally, if you're moving slower than walking speed in the air, holding run only gets you up to walking speed, and only a run you already had when you jumped carries on at full speed. With `noairspeedcap`, holding run in the air always speeds you up to full running speed, like in Super Mario Maker 2. **Generate Nitpicks File** adds it to an existing file.
