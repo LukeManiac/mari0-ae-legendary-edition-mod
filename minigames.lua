@@ -423,52 +423,84 @@ function minigame_updatescroll()
 	minigamescroll = math.max(0, minigamescroll)
 end
 
---a long description (with its settings) gets a scrollbar
-local function descmaxheight()
-	return math.floor((height or 14)*16/2/DESC_LINE)*DESC_LINE
-end
+--the panel on the right: the description, the settings and the highscores, each in its own box of the same height
+--(just the description and the highscores when a minigame has no settings), each scrolls on its own
+local panellayout
+do
+	local PANEL_TOP, PANEL_BOTTOM = DESC_Y, 216 --216 is the bottom of the mappack menu area
+	local PANEL_GAP = 4 --between two boxes
 
---lays out the description and the game mode settings as one block (content y, not scrolled)
-local function layoutcontent(def, layout, narrow)
-	local space = 0
-	if narrow then
-		space = SCROLLBAR_SPACE
-	end
-	layout.space = space
-	layout.lines = wraptext(def.description, math.floor((DESC_W-6-space)/8))
-	layout.items = {}
-	local y = DESC_Y + DESC_LINE*#layout.lines
-	if #def.options > 0 then
-		y = y + GUI_PADDING
-		for _, opt in ipairs(def.options) do
-			local item = {opt = opt, y = y}
-			if opt.type == "checkbox" then
-				item.labellines = wraptext(opt.label, CHECKBOX_LABEL_CHARS - math.ceil(space/8))
-				item.height = math.max(9, DESC_LINE*#item.labellines-1)
-			else --dropdown or slider, the label sits above it
-				item.labellines = wraptext(opt.label, math.floor((DESC_W-6-space)/8))
-				item.height = DESC_LINE*#item.labellines + 11
+	--top and bottom of every box (game pixels)
+	local function panelboxes(def)
+		local keys = {"desc", "score"}
+		if #def.options > 0 then
+			keys = {"desc", "opts", "score"}
+		end
+		local n = #keys
+		local h = math.floor((PANEL_BOTTOM - PANEL_TOP - PANEL_GAP*(n-1))/n)
+		local boxes = {}
+		for i, key in ipairs(keys) do
+			local top = PANEL_TOP + (i-1)*(h + PANEL_GAP)
+			local bottom = top + h
+			if i == n then
+				bottom = PANEL_BOTTOM --any pixels the division left over
 			end
-			table.insert(layout.items, item)
-			y = y + item.height + GUI_PADDING
+			boxes[key] = {top = top, bottom = bottom, viewh = bottom - top}
+		end
+		return boxes
+	end
+
+	--description text, narrower when it needs a scrollbar so nothing runs under it
+	local function layoutdesc(def, box)
+		for _, space in ipairs({0, SCROLLBAR_SPACE}) do
+			box.space = space
+			box.lines = wraptext(def.description, math.floor((DESC_W-6-space)/8))
+			box.contenth = DESC_LINE*#box.lines + 1
+			if box.contenth <= box.viewh then
+				break
+			end
 		end
 	end
-	layout.contenth = y - DESC_Y
-end
 
-local function panellayout(def)
-	local layout = {}
-	--the description and the settings together never take more than half of the game height
-	local maxh = descmaxheight()
-	layoutcontent(def, layout, false)
-	if layout.contenth > maxh then
-		--narrower, so nothing runs under the scrollbar
-		layoutcontent(def, layout, true)
+	--game mode settings (content y, not scrolled), narrower when they need a scrollbar
+	local function layoutopts(def, box)
+		for _, space in ipairs({0, SCROLLBAR_SPACE}) do
+			box.space = space
+			box.items = {}
+			local y = box.top + GUI_PADDING
+			for _, opt in ipairs(def.options) do
+				local item = {opt = opt, y = y}
+				if opt.type == "checkbox" then
+					item.labellines = wraptext(opt.label, CHECKBOX_LABEL_CHARS - math.ceil(space/8))
+					item.height = math.max(9, DESC_LINE*#item.labellines-1)
+				else --dropdown or slider, the label sits above it
+					item.labellines = wraptext(opt.label, math.floor((DESC_W-6-space)/8))
+					item.height = DESC_LINE*#item.labellines + 11
+				end
+				table.insert(box.items, item)
+				y = y + item.height + GUI_PADDING
+			end
+			box.contenth = y - box.top
+			if box.contenth <= box.viewh then
+				break
+			end
+		end
 	end
-	layout.viewh = math.min(layout.contenth, maxh)
-	layout.maxscroll = layout.contenth - layout.viewh --in pixels
-	layout.bottom = DESC_Y + layout.viewh
-	return layout
+
+	panellayout = function(def)
+		local layout = panelboxes(def)
+		layoutdesc(def, layout.desc)
+		if layout.opts then
+			layoutopts(def, layout.opts)
+		end
+		for _, key in ipairs({"desc", "opts"}) do
+			local box = layout[key]
+			if box then
+				box.maxscroll = math.max(0, box.contenth - box.viewh) --in pixels
+			end
+		end
+		return layout
+	end
 end
 
 --"Castlevania VRC6 Music- Vampire Killer" in n characters: the pack name gets shortened first
@@ -486,6 +518,8 @@ function minigame_shortentry(s, n)
 	end
 	if name then
 		s = name
+	elseif s:sub(1, 4) == "the " then
+		s = s:sub(5) --"the undefeatable" -> "undefeatable"
 	end
 	return s:sub(1, n)
 end
@@ -540,8 +574,12 @@ function minigame_buildgui(force)
 	minigameguiid = def.id
 	minigamegui = {}
 	local layout = panellayout(def)
+	local optbox = layout.opts
+	if not optbox then
+		return
+	end
 	local opts = minigameoptions[def.id]
-	for _, item in ipairs(layout.items) do
+	for _, item in ipairs(optbox.items) do
 		local opt = item.opt
 		local el
 		if opt.type == "checkbox" then
@@ -562,7 +600,7 @@ function minigame_buildgui(force)
 			if (opts[opt.key] or 1) > #entries then
 				opts[opt.key] = 1 --the list got shorter (files were removed)
 			end
-			local panelw = math.floor((DESC_W-6-layout.space-13)/8) --the most characters that fit in the panel
+			local panelw = math.floor((DESC_W-6-optbox.space-13)/8) --the most characters that fit in the panel
 			local closedw = w
 			if opt.wide then
 				closedw = math.min(w, panelw)
@@ -571,6 +609,7 @@ function minigame_buildgui(force)
 				opts[opt.key] = v
 				el.var = v
 			end, opts[opt.key], unpack(entries))
+			el.entrycolors = opt.colors --a colour for every entry (optional)
 			if opt.wide and w > closedw then
 				--long entries: shortened while closed, the list opens wide enough for the full names
 				el.closedwidth = closedw
@@ -584,11 +623,11 @@ function minigame_buildgui(force)
 				el.displayentries = el.shortentries
 			end
 		elseif opt.type == "slider" then
-			el = minigame_newslider(opt, opts, DESC_X+3, item.y + DESC_LINE*#item.labellines, DESC_W-6-layout.space)
+			el = minigame_newslider(opt, opts, DESC_X+3, item.y + DESC_LINE*#item.labellines, DESC_W-6-optbox.space)
 		elseif opt.type == "sliderbox" then
 			--checkbox with a slider next to it, the slider only works while the box is ticked
 			local y = item.y + DESC_LINE*#item.labellines
-			local slider = minigame_newslider(opt, opts, DESC_X+16, y, DESC_W-19-layout.space)
+			local slider = minigame_newslider(opt, opts, DESC_X+16, y, DESC_W-19-optbox.space)
 			local box
 			box = guielement:new("checkbox", DESC_X+3, y, function(v)
 				opts[opt.checkkey] = v
@@ -657,36 +696,43 @@ function minigame_menu_update(dt)
 	end
 end
 
---scroll position (in lines) of the description and the highscores, smooth follows pos
-minigamepanelscroll = {desc = {pos = 0, smooth = 0}, score = {pos = 0, smooth = 0}}
-local SCOREBOX_BOTTOM = 216 --bottom of the mappack menu area
+--scroll position of the description and the settings (pixels) and the highscores (lines), smooth follows pos
+function minigame_newpanelscroll()
+	return {desc = {pos = 0, smooth = 0}, opts = {pos = 0, smooth = 0}, score = {pos = 0, smooth = 0}}
+end
+minigamepanelscroll = minigame_newpanelscroll()
 
---the highscores box fills the space left under the description
+--the highscores box: a title, then as many scores as fit
 local function scorebox(def, layout)
 	layout = layout or panellayout(def)
-	local box = {y = layout.bottom + 4}
+	local area = layout.score
+	local box = {y = area.top, h = area.viewh}
 	box.listy = box.y + 2 + DESC_LINE
 	box.scores = minigame_gethighscores(def)
-	box.visible = math.max(1, math.floor((SCOREBOX_BOTTOM - 1 - box.listy)/DESC_LINE))
+	box.visible = math.max(1, math.floor((area.bottom - 1 - box.listy)/DESC_LINE))
 	box.listh = box.visible*DESC_LINE
-	box.h = box.listy + box.listh + 1 - box.y
 	box.maxscroll = math.max(0, #box.scores - box.visible)
 	return box
 end
 
---the two scrollable areas of the panel (game pixels), each gets a gui scrollbar when it doesn't fit
+--the scrollable areas of the panel (game pixels), each gets a gui scrollbar when it doesn't fit
 local SCROLLBAR_W = 8
 local function panelareas(def, layout, box)
 	layout = layout or panellayout(def)
 	box = box or scorebox(def, layout)
-	return {
-		--description and settings: scrolled in pixels, one line per wheel notch
-		{key = "desc", top = DESC_Y, bottom = layout.bottom, tracky = DESC_Y+1, trackh = layout.viewh-2,
-			visible = layout.viewh, total = layout.contenth, max = layout.maxscroll, step = DESC_LINE},
-		--highscores: scrolled in lines
-		{key = "score", top = box.y, bottom = box.y+box.h, tracky = box.listy+1, trackh = box.listh-2,
-			visible = box.visible, total = #box.scores, max = box.maxscroll, step = 1},
-	}
+	local areas = {}
+	--description and settings: scrolled in pixels, one line per wheel notch
+	for _, key in ipairs({"desc", "opts"}) do
+		local b = layout[key]
+		if b then
+			table.insert(areas, {key = key, top = b.top, bottom = b.bottom, tracky = b.top+1, trackh = b.viewh-2,
+				visible = b.viewh, total = b.contenth, max = b.maxscroll, step = DESC_LINE})
+		end
+	end
+	--highscores: scrolled in lines
+	table.insert(areas, {key = "score", top = box.y, bottom = box.y+box.h, tracky = box.listy+1, trackh = box.listh-2,
+		visible = box.visible, total = #box.scores, max = box.maxscroll, step = 1})
+	return areas
 end
 
 minigamescrollbars = {} --gui scrollbars by area key
@@ -749,8 +795,11 @@ function minigame_placegui()
 	if not def then
 		return
 	end
-	local layout = panellayout(def)
-	local offset = minigamepanelscroll.desc.smooth
+	local optbox = panellayout(def).opts
+	if not optbox then
+		return
+	end
+	local offset = minigamepanelscroll.opts.smooth
 	for _, el in ipairs(minigamegui) do
 		el.y = (el.basey or el.y) - offset
 		--a closed dropdown whose list would go past the bottom of the screen opens upwards from where it is now
@@ -764,7 +813,7 @@ function minigame_placegui()
 		end
 		--hidden above or below the panel: can't be clicked
 		local h = (el.type == "dropdown") and 11 or 9
-		el.panelvisible = el.y + h > DESC_Y and el.y < layout.bottom
+		el.panelvisible = el.y + h > optbox.top and el.y < optbox.bottom
 	end
 end
 
@@ -784,42 +833,57 @@ local function drawpanel()
 	end
 	local layout = panellayout(def)
 
-	--description and game modes, scrolled together inside a box of at most half the game height
-	love.graphics.setColor(0, 0, 0, 200)
-	love.graphics.rectangle("fill", DESC_X*scale, DESC_Y*scale, DESC_W*scale, (layout.bottom-DESC_Y)*scale)
 	local sx, sy, sw, sh = love.graphics.getScissor()
-	love.graphics.setScissor(DESC_X*scale, DESC_Y*scale, DESC_W*scale, layout.viewh*scale)
+	local function restorescissor()
+		if sx then
+			love.graphics.setScissor(sx, sy, sw, sh)
+		else
+			love.graphics.setScissor()
+		end
+	end
+
+	--description, scrolled inside its box
+	local desc = layout.desc
+	love.graphics.setColor(0, 0, 0, 200)
+	love.graphics.rectangle("fill", DESC_X*scale, desc.top*scale, DESC_W*scale, desc.viewh*scale)
+	love.graphics.setScissor(DESC_X*scale, desc.top*scale, DESC_W*scale, desc.viewh*scale)
 	local offset = minigamepanelscroll.desc.smooth
 	love.graphics.setColor(255, 255, 255)
-	for i, line in ipairs(layout.lines) do
-		local y = DESC_Y+1+(i-1)*DESC_LINE-offset
-		if y > DESC_Y-DESC_LINE and y < layout.bottom then
+	for i, line in ipairs(desc.lines) do
+		local y = desc.top+1+(i-1)*DESC_LINE-offset
+		if y > desc.top-DESC_LINE and y < desc.bottom then
 			properprintF(line, (DESC_X+3)*scale, round(y*scale))
 		end
 	end
-	love.graphics.setColor(200, 200, 200)
-	for _, item in ipairs(layout.items) do
-		local x = (item.opt.type == "checkbox") and CHECKBOX_LABEL_X or DESC_X+3
-		for j, line in ipairs(item.labellines) do
-			properprintF(line, x*scale, round((item.y+1+(j-1)*DESC_LINE-offset)*scale))
-		end
-	end
-	--gui elements (an open dropdown is drawn later, on top of everything)
-	local ontop
-	for _, el in ipairs(minigamegui) do
-		if el.extended or (el.listvalue and el.listvalue > 0) then
-			ontop = el
-		else
-			el:draw()
-		end
-	end
-	if sx then
-		love.graphics.setScissor(sx, sy, sw, sh)
-	else
-		love.graphics.setScissor()
-	end
+	restorescissor()
 	if minigamescrollbars.desc then
 		minigamescrollbars.desc:draw()
+	end
+
+	--game mode settings, scrolled inside their own box
+	--(an open dropdown is drawn later by minigame_menu_drawdropdown, on top of the tabs)
+	local optbox = layout.opts
+	if optbox then
+		love.graphics.setColor(0, 0, 0, 200)
+		love.graphics.rectangle("fill", DESC_X*scale, optbox.top*scale, DESC_W*scale, optbox.viewh*scale)
+		love.graphics.setScissor(DESC_X*scale, optbox.top*scale, DESC_W*scale, optbox.viewh*scale)
+		offset = minigamepanelscroll.opts.smooth
+		love.graphics.setColor(200, 200, 200)
+		for _, item in ipairs(optbox.items) do
+			local x = (item.opt.type == "checkbox") and CHECKBOX_LABEL_X or DESC_X+3
+			for j, line in ipairs(item.labellines) do
+				properprintF(line, x*scale, round((item.y+1+(j-1)*DESC_LINE-offset)*scale))
+			end
+		end
+		for _, el in ipairs(minigamegui) do
+			if not (el.extended or (el.listvalue and el.listvalue > 0)) then
+				el:draw()
+			end
+		end
+		restorescissor()
+		if minigamescrollbars.opts then
+			minigamescrollbars.opts:draw()
+		end
 	end
 	local box = scorebox(def, layout)
 
@@ -828,7 +892,6 @@ local function drawpanel()
 	love.graphics.rectangle("fill", DESC_X*scale, box.y*scale, DESC_W*scale, box.h*scale)
 	love.graphics.setColor(255, 255, 255)
 	properprintF(T("highscores"), (DESC_X+3)*scale, (box.y+2)*scale)
-	local sx, sy, sw, sh = love.graphics.getScissor()
 	love.graphics.setScissor(DESC_X*scale, box.listy*scale, DESC_W*scale, box.listh*scale)
 	love.graphics.setColor(160, 160, 160)
 	if #box.scores == 0 then
@@ -842,18 +905,24 @@ local function drawpanel()
 			properprintF(i .. ". " .. formatscore(box.scores[i]), (DESC_X+3)*scale, round(y*scale))
 		end
 	end
-	if sx then
-		love.graphics.setScissor(sx, sy, sw, sh)
-	else
-		love.graphics.setScissor()
-	end
+	restorescissor()
 	--scrollbar when there are more scores than fit
 	if minigamescrollbars.score then
 		minigamescrollbars.score:draw()
 	end
 
-	if ontop then
-		ontop:draw()
+	love.graphics.setColor(255, 255, 255)
+end
+
+--an open (or opening/closing) settings dropdown, drawn by the mappack menu after its tabs so the list covers them
+function minigame_menu_drawdropdown()
+	if not (menusettled() and minigamelist[minigameselection]) then
+		return
+	end
+	for _, el in ipairs(minigamegui) do
+		if el.extended or (el.listvalue and el.listvalue > 0) then
+			el:draw()
+		end
 	end
 	love.graphics.setColor(255, 255, 255)
 end
@@ -935,7 +1004,7 @@ local function changeselection(i)
 		minigameselection = i
 		minigame_updatescroll()
 		minigame_buildgui()
-		minigamepanelscroll = {desc = {pos = 0, smooth = 0}, score = {pos = 0, smooth = 0}}
+		minigamepanelscroll = minigame_newpanelscroll()
 		minigamescrollbars = {}
 	end
 end
@@ -1023,7 +1092,8 @@ function minigame_menu_mousepressed(x, y, button)
 			return true
 		end
 		local def = minigamelist[minigameselection]
-		local inpanel = def and y >= DESC_Y*scale and y < panellayout(def).bottom*scale --settings scrolled out of view can't be clicked
+		local optbox = def and panellayout(def).opts
+		local inpanel = optbox and y >= optbox.top*scale and y < optbox.bottom*scale --settings scrolled out of view can't be clicked
 		for _, el in ipairs(minigamegui) do
 			if inpanel and el.active and el:inhighlight(x, y) then
 				el:click(x, y, button)
@@ -6270,16 +6340,49 @@ local RRR_SPINNERS = {[6] = true, [9] = true, [10] = true} --leaf, tanooki, cape
 --lead: aims where the target will be this many seconds from now
 --greed: how often it goes for a block instead of a fight (at random between 0.3 and 0.7 when not set)
 --dodgestomps: steps out from under anyone coming down on its head
-local RRR_BOTLEVELS = {
-	{name = "easy", think = 0.8, fire = 1.2, dodge = 0.15, range = 7, flee = 4, dawdle = 0.3, lead = 0},
-	{name = "normal", think = 0.45, fire = 0.7, dodge = 0.5, range = 10, flee = 6, dawdle = 0.1, lead = 0},
-	{name = "expert", think = 0.25, fire = 0.35, dodge = 0.9, range = 12, flee = 7, dawdle = 0, lead = 0},
-	{name = "super expert", think = 0.12, fire = 0.18, dodge = 1, range = 16, flee = 9, dawdle = 0, lead = 0.3},
-	{name = "godmode", think = 0.05, fire = 0.1, dodge = 1, range = 40, flee = 12, dawdle = 0, lead = 0.4, greed = 0.8, dodgestomps = true},
-}
+local RRR_BOTLEVEL_DEFAULT = 10 --skilled
+local RRR_BOTLEVELS = {}
+do
+	--weakest first, the stats of the levels between two anchors are blended between them
+	local RRR_BOTLEVELNAMES = {
+		"Complete Noob", "Clueless", "Rookie", "Beginner", "Amateur",
+		"Trainee", "Apprentice", "Novice", "Learner", "Skilled",
+		"Competent", "Experienced", "Veteran", "Elite", "Expert",
+		"Master", "Grandmaster", "Champion", "Conqueror", "Legend",
+		"Mythical", "Immortal", "Godlike", "Omnipotent", "THE UNDEFEATABLE",
+	}
+	local RRR_BOTANCHORS = {
+		[1] = {think = 1.6, fire = 2.5, dodge = 0, range = 4, flee = 2, dawdle = 0.6, lead = 0},
+		[5] = {think = 0.8, fire = 1.2, dodge = 0.15, range = 7, flee = 4, dawdle = 0.3, lead = 0}, --the old "easy"
+		[10] = {think = 0.45, fire = 0.7, dodge = 0.5, range = 10, flee = 6, dawdle = 0.1, lead = 0}, --the old "normal"
+		[15] = {think = 0.25, fire = 0.35, dodge = 0.9, range = 12, flee = 7, dawdle = 0, lead = 0}, --the old "expert"
+		[20] = {think = 0.12, fire = 0.18, dodge = 1, range = 16, flee = 9, dawdle = 0, lead = 0.3}, --the old "super expert"
+		[23] = {think = 0.05, fire = 0.1, dodge = 1, range = 40, flee = 12, dawdle = 0, lead = 0.4}, --the old "godmode"
+		[25] = {think = 0.03, fire = 0.07, dodge = 1, range = 60, flee = 14, dawdle = 0, lead = 0.5},
+	}
+	local RRR_BOTGREED = {[23] = 0.8, [24] = 0.85, [25] = 0.9} --the rest pick at random
+	local RRR_BOTDODGESTOMPS_FROM = 22
+	local anchors = {}
+	for i in pairs(RRR_BOTANCHORS) do
+		table.insert(anchors, i)
+	end
+	table.sort(anchors)
+	for a = 1, #anchors-1 do
+		local i1, i2 = anchors[a], anchors[a+1]
+		local s1, s2 = RRR_BOTANCHORS[i1], RRR_BOTANCHORS[i2]
+		for i = i1, i2 do
+			local t = (i-i1)/(i2-i1)
+			local level = {name = RRR_BOTLEVELNAMES[i], greed = RRR_BOTGREED[i], dodgestomps = i >= RRR_BOTDODGESTOMPS_FROM}
+			for k, v in pairs(s1) do
+				level[k] = v + (s2[k]-v)*t
+			end
+			RRR_BOTLEVELS[i] = level
+		end
+	end
+end
 
 local function rrr_newbot(level)
-	level = RRR_BOTLEVELS[level] or RRR_BOTLEVELS[2]
+	level = RRR_BOTLEVELS[level] or RRR_BOTLEVELS[RRR_BOTLEVEL_DEFAULT]
 	return {
 		level = level,
 		dawdle = 0,
@@ -7482,7 +7585,15 @@ addminigame({
 				names[i] = level.name
 			end
 			return names
-		end)(), default = 2},
+		end)(), colors = (function()
+			--green for the weakest, through yellow and orange, down to dark red for the strongest
+			local colors = {}
+			for i = 1, #RRR_BOTLEVELS do
+				local c = hsv_lerp({0, 255, 0}, {127, 0, 0}, (i-1)/(#RRR_BOTLEVELS-1))
+				colors[i] = {round(c[1]), round(c[2]), round(c[3])}
+			end
+			return colors
+		end)(), wide = true, default = RRR_BOTLEVEL_DEFAULT},
 		{type = "dropdown", key = "theme", label = "Battle theme", entries = (function()
 			local names = {}
 			for i, theme in ipairs(RRR_THEMES) do
@@ -7561,7 +7672,7 @@ addminigame({
 		local humancount = opts.humans or 1
 		for i = 1, RRR_PLAYERS do
 			if i > humancount then
-				S.bots[i] = rrr_newbot(opts.botlevel or 2)
+				S.bots[i] = rrr_newbot(opts.botlevel or RRR_BOTLEVEL_DEFAULT)
 			else
 				table.insert(humans, i)
 			end

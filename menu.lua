@@ -2495,6 +2495,11 @@ function menu_draw()
 		love.graphics.setColor(colors[3][2])
 		properprint("minigames", 234*scale, 6*scale)
 		
+		--an open minigame settings dropdown goes over the tabs
+		if mappacktype == "minigames" then
+			minigame_menu_drawdropdown()
+		end
+		
 		if downloadingmappack then
 			renderoverlay((onlinedlc and (onlineassetlist[onlinemappackselection].downloadable and "downloading asset" or "opening link") or "loading mappacks") .. "...", true, true)
 		end
