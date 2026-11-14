@@ -370,7 +370,7 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `classicspeedupfastmusic`: In Rival Rumble Royale, a song without a fast version is just played faster, which also makes it higher.
 - `modernsizechangeanimation`: Powering up and down uses a Super Mario Maker 2 style animation instead of the classic one.
 - `noairspeedcap`: Holding run in the air speeds you up to full running speed, even if you jumped from below walking speed.
-- `dontfreezeonsizechange`: Powering up and down doesn't freeze the game. The animation plays while everything keeps moving, and you can't be touched until it's done.
+- `dontfreezeonsizechange`: Powering up and down only freezes the player it happens to, like in SMBX2. Everything else keeps moving, and that player can't be touched until the animation is done.
 
 ---
 
@@ -546,11 +546,12 @@ A new nitpick, `modernsizechangeanimation`, swaps the classic power-up and power
 
 #### ❄️ Don't Freeze On Size Change
 
-A new nitpick, `dontfreezeonsizechange`, stops power-ups and getting hit from freezing the game. Nothing stops, not even the player whose size is changing. **Generate Nitpicks File** adds it to an existing file.
+A new nitpick, `dontfreezeonsizechange`, stops power-ups and getting hit from freezing the whole game. Like in SMBX2, only the player whose size is changing stops, in place, while enemies, other players and everything else keep going. **Generate Nitpicks File** adds it to an existing file.
 
-* You become the new size straight away, so your hitbox and movement are the new size's from the start. The animation only changes how you look while you keep moving.
+* You become the new size straight away and hang still where you are until the animation ends, then carry on with the speed you had.
+* The after-size-change jump still works: press jump in mid-air while a power-up is changing your size, and you jump silently as soon as you're free. Nothing else you press does anything until then.
 * It works with both the classic animations and `modernsizechangeanimation`, and each one lasts as long as it does with the freeze.
-* Until the animation is over, you're intangible: you still stand on and bump into the course (tiles, platforms, springs, doors and so on), but you pass through enemies, items and other players, and nothing can hurt you.
+* Until the animation is over, you're intangible: enemies, items and other players pass through you, and nothing can hurt you. The course itself (tiles, platforms, springs, doors and so on) still counts as solid.
 * Getting hit gives you the usual blinking once the animation is over. Blinking you already had carries on through a power-up.
 * Ducking carries on straight away, since nothing has to stand up for the animation.
 * Leaving Mega Mario after a hit takes you straight to big, with the blinking.

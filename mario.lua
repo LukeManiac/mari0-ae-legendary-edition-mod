@@ -485,11 +485,14 @@ end
 
 function mario:update(dt)
 	if self.sizefx then
-		--dontfreezeonsizechange: the size change only shows, and can't be touched or hurt until it's done
+		--dontfreezeonsizechange: only this player stands still for the animation (everything else goes on, like
+		--SMBX2), and can't be touched or hurt until it's done
 		self.invincible = true
 		self.sizefx.timer = self.sizefx.timer + dt
 		if self.sizefx.timer >= self:sizefxtime() then
 			self:endsizefx()
+		else
+			return
 		end
 	end
 	self.stompsnap = false --what p-speed was like before this frame's landing (see floorcollide)
@@ -3870,6 +3873,9 @@ function mario:jump(force)
 		return
 	end
 
+	if self.sizefx and not (self:sizechangejumps() or force) then
+		return --(dontfreezeonsizechange: frozen, except for the after-size-change jump)
+	end
 	if ((not noupdate or self:sizechangejumps()) and self.controlsenabled) or force then
 		--a jump during a size change (classic or modern animation) leaves the pose alone: the animation keeps showing its own
 		local sizechangejump = self:sizechangejumps()
@@ -4097,7 +4103,7 @@ function mario:jump(force)
 		end
 	end
 	
-	if not noupdate and self.controlsenabled then
+	if not noupdate and not self.sizefx and self.controlsenabled then
 		if not self.water then
 			if self.springgreen then
 				self.springgreenhigh = true
@@ -4141,6 +4147,9 @@ function mario:wag() --raccoon
 end
 
 function mario:rightkey()
+	if self.sizefx then
+		return false --(dontfreezeonsizechange: frozen in place)
+	end
 	if self.controlsenabled and self.vine then
 		if self.vineside == "left" then
 			if self.size == -1 then --mini mario
@@ -4158,6 +4167,9 @@ function mario:rightkey()
 end
 
 function mario:leftkey()
+	if self.sizefx then
+		return false --(dontfreezeonsizechange: frozen in place)
+	end
 	if self.controlsenabled and self.vine then
 		if self.vineside == "right" then
 			if self.size == -1 then --mini mario
@@ -4175,6 +4187,9 @@ function mario:leftkey()
 end
 
 function mario:upkey()
+	if self.sizefx then
+		return false --(dontfreezeonsizechange: frozen in place)
+	end
 	if not self.controlsenabled then
 		return
 	end
@@ -4211,6 +4226,9 @@ function mario:upkey()
 end
 
 function mario:downkey()
+	if self.sizefx then
+		return false --(dontfreezeonsizechange: frozen in place)
+	end
 	if not self.controlsenabled then
 		return
 	end
@@ -4527,9 +4545,11 @@ function mario:endmodernsize()
 	self:endsizechange()
 end
 
---DONTFREEZEONSIZECHANGE (the nitpick): a size change doesn't freeze anything. The player is the new size straight
---away and keeps moving, the animation (classic or modern) is only drawn over them (see drawplayer in game.lua),
---and until it's over they can't be hurt and only touch the course itself (see sizefxsolid and handlegroup)
+--DONTFREEZEONSIZECHANGE (the nitpick): a size change only freezes the player it happens to (like SMBX2), everything
+--else goes on. The player is the new size straight away and stands still where they are (static, keeping their
+--speed for afterwards), the animation (classic or modern) is only drawn over them (see drawplayer in game.lua),
+--and until it's over they can't be hurt and only touch the course itself (see sizefxsolid and handlegroup).
+--The only thing they can do is the after-size-change jump (see mario:sizechangejumps)
 
 function sizechangefreezes()
 	return not DontFreezeOnSizeChange
@@ -4550,9 +4570,14 @@ function mario:startsizefx(from, kind, hit)
 			kind = "down"
 		end
 	end
-	self.sizefx = {from = from, kind = kind, hit = hit, timer = 0}
+	local static = self.static
+	if self.sizefx then
+		static = self.sizefx.static --(a size change on top of one: it was already frozen)
+	end
+	self.sizefx = {from = from, kind = kind, hit = hit, timer = 0, static = static}
 	self.invincible = true
 	self.drawable = true
+	self.static = true --(frozen in place: physics leaves them where they are, and their speed comes back afterwards)
 end
 
 --how long the animation is, the same as with the freeze
@@ -4573,6 +4598,7 @@ end
 function mario:endsizefx()
 	local F = self.sizefx
 	self.sizefx = nil
+	self.static = F.static
 	if F.hit and ((not self.animation) or self.animation == "invincible") then
 		self.animation = "invincible"
 		self.invincible = true
@@ -4686,6 +4712,7 @@ end
 function mario:sizechangejumps()
 	return self.animation == "grow1" or self.animation == "grow2"
 		or (self.animation == "modernsize" and self.modernsize ~= nil and not self.modernsize.hit)
+		or (self.sizefx ~= nil and not self.sizefx.hit)
 end
 
 function mario:endsizechange()
@@ -7941,7 +7968,10 @@ function mario:die(how)
 	if (CLIENT or SERVER) and self.playernumber > 1 and not self.netaction then
 		return
 	end
-	self.sizefx = nil --(dontfreezeonsizechange)
+	if self.sizefx then --(dontfreezeonsizechange)
+		self.static = self.sizefx.static
+		self.sizefx = nil
+	end
 	
 	if how ~= "pit" and how ~= "time" and how ~= "lava" and how ~= "killscript" and not self.dead then
 		animationsystem_playerhurttrigger(self.playernumber)
@@ -8180,6 +8210,9 @@ function mario:emancipate(a)
 end
 
 function mario:shootportal(i)
+	if self.sizefx then
+		return false --(dontfreezeonsizechange: frozen in place)
+	end
 	if (not self.controlsenabled) or self.vine or self.fence then
 		return false
 	end
@@ -8249,6 +8282,9 @@ function mario:removeportals(i, preplaced)
 end
 
 function mario:use()
+	if self.sizefx then
+		return false --(dontfreezeonsizechange: frozen in place)
+	end
 	if (not self.controlsenabled) or (self.fence) then
 		return false
 	end
@@ -9067,6 +9103,9 @@ local function gettable(v, i)
 end
 
 function mario:button(b)
+	if self.sizefx then
+		return false --(dontfreezeonsizechange: frozen in place)
+	end
 	if noupdate or (not self.controlsenabled) then
 		return false
 	end
@@ -9145,6 +9184,9 @@ function mario:button(b)
 end
 
 function mario:buttonrelease(b)
+	if self.sizefx then
+		return false --(dontfreezeonsizechange: frozen in place)
+	end
 	if noupdate or (not self.controlsenabled) then
 		return false
 	end
@@ -9313,6 +9355,9 @@ function mario:canfire()
 end
 
 function mario:fire()
+	if self.sizefx then
+		return false --(dontfreezeonsizechange: frozen in place)
+	end
 	if (not noupdate) and self.controlsenabled and self.ducking == false and (not self.statue) and (not self.groundpounding) and (not self.clearpipe) then
 		if self.yoshi then
 			if upkey(self.playernumber) then
