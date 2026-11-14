@@ -12,6 +12,7 @@ music = {
 	list_fast = {},
 	pitch = 1,
 	pitchmul = {}, --a song's own pitch on top of music.pitch (a made-up fast version, see music:fakefast)
+	FAKEFAST_RATE = 1.25, --how much faster a made-up fast version is (see music:fakefast)
 }
 
 local musicpath = "sounds/%s.ogg"
@@ -330,22 +331,24 @@ end
 --returns the fast version's name; music:unfakefast takes it away again
 --classic: just play the song faster, which raises its pitch too (the classicspeedupfastmusic nitpick).
 --Otherwise it's time-stretched to keep its pitch (falling back to the classic way if that can't be done)
-function music:fakefast(name, rate, classic)
+--file: the song it's made from, when that isn't name itself ("starmusic" made from a mappack's starmusic.ogg)
+function music:fakefast(name, rate, classic, file)
 	local fastname = self:variant(name, "-fast")
-	if self.loaded[fastname] or not love.filesystem.getInfo(name) then
+	file = file or name
+	if self.loaded[fastname] or not love.filesystem.getInfo(file) then
 		return fastname --a real one (or nothing to make one from)
 	end
-	rate = rate or 1.25
+	rate = rate or self.FAKEFAST_RATE
 	local stretched = nil
 	if not classic then
-		stretched = self:getstretched(name, rate)
+		stretched = self:getstretched(file, rate)
 	end
 	local source
 	if stretched then
 		source = love.audio.newSource(stretched)
 		self.pitchmul[fastname] = 1 --already faster, at the same pitch
 	else
-		source = love.audio.newSource(name, "stream")
+		source = love.audio.newSource(file, "stream")
 		self.pitchmul[fastname] = rate
 	end
 	source:setLooping(true)
@@ -363,6 +366,14 @@ function music:unfakefast(name)
 		self.loaded[fastname] = nil
 		self.pitchmul[fastname] = nil
 	end
+end
+
+--a star theme without a fast version: starmusic-fast becomes the star theme (file) sped up, in place of whatever it was
+function music:fakefaststar(file)
+	self:stop("starmusic-fast")
+	self.loaded["starmusic-fast"] = nil
+	self.pitchmul["starmusic-fast"] = nil
+	self:fakefast("starmusic", self.FAKEFAST_RATE, ClassicSpeedUpFastMusic, file)
 end
 
 function music:playingmusic()

@@ -20,6 +20,7 @@ Every `.ogg` file becomes an option in the dropdown. A folder is a music pack, a
 | `song.ogg` | A song (loops) |
 | `song-intro.ogg` | Optional. Plays once before `song.ogg` |
 | `starmusic.ogg` | Optional. Replaces the star theme while a song from this pack is picked (`starmusic-intro.ogg` works too) |
+| `starmusic-fast.ogg` | Optional. The star theme when time is low. Without it, `starmusic.ogg` gets sped up instead |
 | `battleclear.ogg` | Optional. The win fanfare on the victory screen for this pack, instead of the default one |
 | `pack.json` | Optional. The pack's name, its place in the list and the songs' names (see below) |
 

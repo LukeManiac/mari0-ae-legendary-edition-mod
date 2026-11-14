@@ -600,17 +600,23 @@ end
 function loadcustomsounds(forcebuiltins)
 	local starmusicexists = not forcebuiltins and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/sounds/starmusic.ogg")
 	local starmusicfastexists = not forcebuiltins and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/sounds/starmusic-fast.ogg")
-	if starmusicexists and starmusicfastexists then
-		music:preload(mappackfolder .. "/" .. mappack .. "/sounds/starmusic.ogg", "starmusic")
-		music:preload(mappackfolder .. "/" .. mappack .. "/sounds/starmusic-fast.ogg", "starmusic-fast")
+	if starmusicexists then
+		local starpath = mappackfolder .. "/" .. mappack .. "/sounds/starmusic.ogg"
+		music:preload(starpath, "starmusic")
+		if starmusicfastexists then
+			music:unfakefast("starmusic")
+			music:preload(mappackfolder .. "/" .. mappack .. "/sounds/starmusic-fast.ogg", "starmusic-fast")
+		else
+			--no starmusic-fast.ogg: starmusic.ogg sped up (see music:fakefast)
+			music:fakefaststar(starpath)
+		end
 		customstarmusic = true
 	else
-		if starmusicexists then
-			notice.new("can't load custom starmusic.ogg\nstarmusic-fast.ogg is missing!", notice.red, 6)
-		elseif starmusicfastexists then
+		if starmusicfastexists then
 			notice.new("can't load custom starmusic-fast.ogg\nstarmusic.ogg is missing!", notice.red, 6)
 		end
 		if customstarmusic then
+			music:unfakefast("starmusic")
 			music:preload("sounds/starmusic.ogg", "starmusic")
 			music:preload("sounds/starmusic-fast.ogg", "starmusic-fast")
 		end

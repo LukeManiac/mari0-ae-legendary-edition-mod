@@ -1151,6 +1151,7 @@ function minigame_stopsounds()
 end
 
 function minigame_returntomenu()
+	minigamesoundmuted = false
 	minigame_stopsounds()
 	minigame_cleanup()
 	minigameplaying = false
@@ -1178,15 +1179,41 @@ function minigame_canrecordscore()
 	return not minigamestate.recorded
 end
 
+--true while a minigame stands completely still (minigame_freeze)
+function minigame_hardfrozen()
+	local S = minigamestate
+	if not (minigameplaying and S) then
+		return false
+	end
+	return S.frozen == true
+end
+
+--stands the minigame completely still: the music stops, no new sounds play, the controls are off and nothing moves or
+--animates. Only the minigame's frozenupdate runs (its own timers, like a banner's), and the wait of minigame_finish.
+--It lasts until the minigame's level is loaded again or the results screen comes
+function minigame_freeze()
+	local S = minigamestate
+	if not S or S.frozen then
+		return
+	end
+	S.frozen = true
+	stopmusic()
+	minigamesoundmuted = true
+	for _, p in pairs(objects and objects["player"] or {}) do
+		p.controlsenabled = false
+	end
+end
+
 --ends the current run: wait (optionally freezing the game and stopping the audio), then fade to the win/lose screen
+--freeze "hard": minigame_freeze for the wait
 function minigame_finish(result, delay, freeze)
 	local S = minigamestate
 	if not S or S.finish then
 		return
 	end
 	S.finish = {result = result, timer = delay or 0, freeze = freeze}
-	if freeze == "silent" then
-		minigamesoundmuted = true
+	if freeze == "hard" then
+		minigame_freeze()
 	elseif freeze then
 		stopmusic()
 		love.audio.stop()
@@ -1209,6 +1236,7 @@ end
 
 function minigame_createmap()
 	local def = minigamecurrent
+	minigamesoundmuted = false
 
 	--always the built-in daily challenge music
 	custommusics = custommusics or {}
@@ -1291,10 +1319,35 @@ function minigame_postload()
 	end
 end
 
+--the wait after minigame_finish, then the fade to the results screen
+function minigame_updatefinish(S, dt)
+	S.finish.timer = S.finish.timer - dt
+	if S.finish.timer <= 0 and not S.finish.fading then
+		minigame_recordscore()
+		local reason = "minigamelose"
+		if S.finish.result == "win" then
+			reason = "minigamewin"
+		end
+		if startwarpfade(function() levelscreen_load(reason) end) ~= false then
+			S.finish.fading = true
+		end
+	end
+end
+
 function minigame_update(dt)
 	local S, def = minigamestate, minigamecurrent
 	if not (S and def) then
 		return false
+	end
+	if S.frozen then
+		--nothing moves or animates (game_update stops right after this, see minigame_freeze)
+		if S.finish then
+			minigame_updatefinish(S, dt)
+		end
+		if def.frozenupdate then
+			def.frozenupdate(S, dt)
+		end
+		return true
 	end
 	if not def.usesplayer then
 		hideplayers()
@@ -1310,14 +1363,7 @@ function minigame_update(dt)
 	end
 
 	if S.finish then
-		S.finish.timer = S.finish.timer - dt
-		if S.finish.timer <= 0 and not S.finish.fading then
-			minigame_recordscore()
-			local reason = (S.finish.result == "win") and "minigamewin" or "minigamelose"
-			if startwarpfade(function() levelscreen_load(reason) end) ~= false then
-				S.finish.fading = true
-			end
-		end
+		minigame_updatefinish(S, dt)
 		if S.finish.freeze then
 			if def.frozenupdate then
 				def.frozenupdate(S, dt) --what keeps moving while the game stands still
@@ -1547,6 +1593,7 @@ local function confetti_draw()
 end
 
 function minigame_levelscreen_load(reason)
+	minigamesoundmuted = false --the freeze before this screen is over (see minigame_finish)
 	minigame_stopsounds()
 	music:disableintromusic()
 	levelscreenimagecheck = false
@@ -5042,10 +5089,15 @@ local function rrr_restoremusic()
 			if music.loaded["starmusic-intro"] then
 				music.loaded["starmusic-intro"]:stop()
 			end
+			if music.loaded["starmusic-fast"] then
+				music.loaded["starmusic-fast"]:stop()
+			end
 		end
 		if rrr_saved.star then
 			music.loaded["starmusic"] = rrr_saved.star
 			music.loaded["starmusic-intro"] = rrr_saved.starintro
+			music.loaded["starmusic-fast"] = rrr_saved.starfast
+			music.pitchmul["starmusic-fast"] = rrr_saved.starfastpitch
 		end
 		rrr_saved = nil
 	end
@@ -5068,12 +5120,26 @@ local function rrr_setupmusic(S, entry)
 	if entry.star then
 		local source = rrr_newsource(entry.star, true)
 		if source then
-			rrr_saved = {star = music.loaded["starmusic"], starintro = music.loaded["starmusic-intro"]}
+			rrr_saved = {star = music.loaded["starmusic"], starintro = music.loaded["starmusic-intro"],
+				starfast = music.loaded["starmusic-fast"], starfastpitch = music.pitchmul["starmusic-fast"]}
 			music.loaded["starmusic"] = source
 			music.loaded["starmusic-intro"] = nil
 			local intro = music:variant(entry.star, "-intro")
 			if rrr_fileexists(intro) then
 				music.loaded["starmusic-intro"] = rrr_newsource(intro, false)
+			end
+			--the fast star theme (low time): the pack's own -fast version, or its star theme sped up
+			local fast = music:variant(entry.star, "-fast")
+			local fastsource = nil
+			if rrr_fileexists(fast) then
+				fastsource = rrr_newsource(fast, true)
+			end
+			if fastsource then
+				music:stop("starmusic-fast")
+				music.loaded["starmusic-fast"] = fastsource
+				music.pitchmul["starmusic-fast"] = nil
+			else
+				music:fakefaststar(entry.star)
 			end
 		end
 	end
@@ -7270,9 +7336,9 @@ local function rrr_endbattle(S, winner, knockout)
 		rrr_banner(S, "draw!", 99)
 	end
 	if knockout then
-		--everything stands still for a moment (except the players who are dying), with no new sounds and nothing
-		--stopped, then the results screen, where the battle clear theme plays (resultmusic)
-		minigame_finish("win", RRR_KO_FREEZE, "silent")
+		--everything stands still for a moment: no music, no new sounds, no controls, nothing moves or animates,
+		--then the results screen, where the battle clear theme plays (resultmusic)
+		minigame_finish("win", RRR_KO_FREEZE, "hard")
 	else
 		for i = 1, RRR_PLAYERS do
 			local p = objects["player"][i]
@@ -7307,23 +7373,46 @@ end
 --sudden death: what carries over from the battle into the sudden death arena (createmap reads it, the level is loaded again)
 rrrx.carry = nil
 
---the fade to the sudden death arena: a new level, with the knockouts, who's out and the viewports carried over
+--the fade to the sudden death arena: a new level, with the knockouts and who's out carried over (one shared screen there)
 function rrrx.startsuddendeath(S)
 	startwarpfade(function()
 		if minigamestate ~= S or S.over or not minigameplaying then
 			return --the battle ended while the screen faded out (someone fell in a pit with their last life)
 		end
-		local views = {}
-		for _, pn in ipairs(splitscreenviewplayers or {}) do
-			table.insert(views, pn)
-		end
 		local konamiused = {}
 		for i = 1, RRR_PLAYERS do
 			konamiused[i] = S.konami[i].used
 		end
-		rrrx.carry = {kos = S.kos, out = S.out, outorder = S.outorder, konamiused = konamiused, views = views}
+		rrrx.carry = {kos = S.kos, out = S.out, outorder = S.outorder, konamiused = konamiused}
 		startlevel("minigame")
 	end, false, true)
+end
+
+--the banner's time on screen
+function rrrx.updatebanner(S, dt)
+	if S.banner then
+		S.banner.t = S.banner.t + dt
+		if S.banner.t >= S.banner.duration then
+			S.banner = nil
+		end
+	end
+end
+
+--time up with more than one player still in (frozen, see rrr_timeup): "time up!", "sudden death!", then the fade to its arena
+function rrrx.updatesdpending(S, dt)
+	local P = S.sdpending
+	if not P or S.over then
+		return
+	end
+	P.t = P.t + dt
+	if not P.announced and P.t >= RRR_K.SD_ANNOUNCE then
+		P.announced = true
+		rrr_banner(S, "sudden death!", 99)
+	end
+	if not P.fading and P.t >= RRR_K.SD_DELAY then
+		P.fading = true
+		rrrx.startsuddendeath(S)
+	end
 end
 
 local function rrr_timeup(S)
@@ -7335,15 +7424,11 @@ local function rrr_timeup(S)
 		end
 	end
 	if stillin > 1 then
+		--everything stands still until the fade to the sudden death arena (rrrx.updatesdpending)
 		S.sdpending = {t = 0}
 		S.finalcount = nil
+		minigame_freeze()
 		rrr_banner(S, "time up!", RRR_K.SD_ANNOUNCE)
-		for i = 1, RRR_PLAYERS do
-			local p = objects["player"][i]
-			if p then
-				p.controlsenabled = false
-			end
-		end
 		return
 	end
 
@@ -7505,35 +7590,25 @@ addminigame({
 		end
 
 		--split screen for every person (all bots: one screen that follows whoever is left)
-		rrr_saved_split = {on = SPLITSCREENISBACK}
-		SPLITSCREENISBACK = true
-		if #humans == 0 then
-			humans = {1}
-		end
-		splitscreenviewplayers = humans
-		if opts.botsplit ~= false then
-			splitscreenviewplayers = {}
-			for i = 1, RRR_PLAYERS do
-				table.insert(splitscreenviewplayers, i)
-			end
-		end
+		rrr_saved_split = {on = SPLITSCREENISBACK} --(put back by rrr_cleanup)
 		if carry then
-			--the viewports of the players still in (the last one stays even if its player is out, it watches)
-			local list = {}
-			for _, pn in ipairs(carry.views) do
-				if not S.out[pn] then
-					table.insert(list, pn)
+			--sudden death: the whole arena fits on one screen, so everyone shares it
+			SPLITSCREENISBACK = false
+		else
+			SPLITSCREENISBACK = true
+			if #humans == 0 then
+				humans = {1}
+			end
+			splitscreenviewplayers = humans
+			if opts.botsplit ~= false then
+				splitscreenviewplayers = {}
+				for i = 1, RRR_PLAYERS do
+					table.insert(splitscreenviewplayers, i)
 				end
 			end
-			if #list == 0 and carry.views[1] then
-				list = {carry.views[1]}
-			end
-			if #list > 0 then
-				splitscreenviewplayers = list
-			end
+			splitscreenviewtarget = rrr_viewtarget
+			splitscreenviewhud = rrr_viewhud
 		end
-		splitscreenviewtarget = rrr_viewtarget
-		splitscreenviewhud = rrr_viewhud
 
 		--music
 		local list = rrr_musiclist()
@@ -7583,12 +7658,7 @@ addminigame({
 	end,
 
 	update = function(S, dt)
-		if S.banner then
-			S.banner.t = S.banner.t + dt
-			if S.banner.t >= S.banner.duration then
-				S.banner = nil
-			end
-		end
+		rrrx.updatebanner(S, dt)
 
 		rrr_updatecountdown(S)
 
@@ -7596,24 +7666,12 @@ addminigame({
 		rrr_updatekonami(S)
 		rrrx.updateviews(S)
 
-		if S.sdpending and not S.over then
-			--time up with more than one player still in: "time up!", "sudden death!", then the fade to its arena
-			local P = S.sdpending
-			P.t = P.t + dt
-			if not P.announced and P.t >= RRR_K.SD_ANNOUNCE then
-				P.announced = true
-				rrr_banner(S, "sudden death!", 99)
-			end
-			if not P.fading and P.t >= RRR_K.SD_DELAY then
-				P.fading = true
-				rrrx.startsuddendeath(S)
-			end
-		elseif S.over then
+		if S.over then
 			S.over.t = S.over.t + dt
 			if not S.knockoutend and rrr_updateclear(S, dt) and S.over.t > 1 and not S.finish then
 				minigame_finish(S.result, 0, false)
 			end
-		else
+		elseif not S.sdpending then --(time up for sudden death: frozen, see frozenupdate)
 			--(the timer only goes down while the battle is on: not once it's over, nor during the countdown)
 			if S.timeleft and not S.starting then
 				S.timeleft = S.timeleft - dt
@@ -7647,23 +7705,10 @@ addminigame({
 		end
 	end,
 
-	--the freeze at the end doesn't stop players who are dying: they finish falling off the screen
+	--while it's frozen (minigame_freeze): only the banners and the wait for sudden death, nothing in the arena
 	frozenupdate = function(S, dt)
-		for i = 1, RRR_PLAYERS do
-			local p = objects["player"][i]
-			if p and p.dead and (p.animation == "death" or p.animation == "deathpit") then
-				p.animationtimer = p.animationtimer + dt
-				p.animationstate = "dead"
-				p:setquad()
-				if p.animation == "death" and p.animationtimer > deathanimationjumptime then
-					if p.animationtimer - dt < deathanimationjumptime then
-						p.speedy = -deathanimationjumpforce
-					end
-					p.speedy = p.speedy + deathgravity*dt
-					p.y = p.y + p.speedy*dt
-				end
-			end
-		end
+		rrrx.updatebanner(S, dt)
+		rrrx.updatesdpending(S, dt)
 	end,
 
 	drawtiles = function(S)

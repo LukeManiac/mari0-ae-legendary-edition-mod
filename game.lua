@@ -493,7 +493,13 @@ function game_update(dt)
 		end
 		return
 	end
-	
+
+	--a minigame's hard freeze before its results screen (see minigame_finish): nothing moves or animates
+	if minigameplaying and minigame_hardfrozen() then
+		minigame_update(dt)
+		return
+	end
+
 	--animationS
 	animationsystem_update(dt)
 	
@@ -5594,8 +5600,8 @@ function updatespritebatch(camx, camy)
 end
 
 function game_keypressed(key, textinput)
-	if minigameplaying and warpfade then
-		return --leaving or restarting a minigame
+	if minigameplaying and (warpfade or minigame_hardfrozen()) then
+		return --leaving or restarting a minigame, or frozen before its results screen
 	end
 	if pausemenuopen then
 		local confirmkey = (key == "return" or key == "enter" or key == "kpenter" or key == " ")
@@ -6049,6 +6055,9 @@ function stoptestinglevel()
 end
 
 function game_keyreleased(key, unicode)
+	if minigameplaying and minigame_hardfrozen() then
+		return --frozen before the results screen (see minigame_finish)
+	end
 	for i = 1, players do
 		if controlbindingmatcheskey(i, "jump", key) then
 			local player = objects["player"][i]
@@ -6143,7 +6152,7 @@ end
 
 function game_mousepressed(x, y, button)
 	local s = ""
-	if minigameplaying and warpfade then
+	if minigameplaying and (warpfade or minigame_hardfrozen()) then
 		return
 	end
 	if pausemenuopen then
@@ -6991,6 +7000,9 @@ function changeswitchstate(color, perma, flipblocks)
 end
 
 function game_mousereleased(x, y, button)
+	if minigameplaying and minigame_hardfrozen() then
+		return --frozen before the results screen (see minigame_finish)
+	end
 	if button == "l" then
 		if playertype == "minecraft" then
 			breakingblockX = false
@@ -9064,6 +9076,10 @@ function joystickaxisdown(player, name)
 end
 
 function game_joystickpressed( joystick, button )
+	if minigameplaying and minigame_hardfrozen() then
+		return --frozen before the results screen: no controls at all (see minigame_finish)
+	end
+
 	--pause with controller
 	for i = 1, controlplayers() do
 		if controlbindingmatchesjoy(i, "pause", joystick, button) then
@@ -9190,6 +9206,9 @@ function game_joystickpressed( joystick, button )
 end
 
 function game_joystickreleased( joystick, button )
+	if minigameplaying and minigame_hardfrozen() then
+		return --frozen before the results screen (see minigame_finish)
+	end
 	for i = 1, players do
 		if (not noupdate) and objects then --objects["player"][i].controlsenabled then --and (not objects["player"][i].vine) and (not objects["player"][i].fence) then
 			if editormode and (editormenuopen or rightclickmenuopen) then
