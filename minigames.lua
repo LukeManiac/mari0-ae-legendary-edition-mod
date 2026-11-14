@@ -7652,6 +7652,7 @@ addminigame({
 		stopmusic()
 		splitscreen_reset()
 		--instasnap cameras to the players as soon as the minigame starts
+		--(also clear camerasmoothing state so it doesn't ease from the previous level)
 		if splitscreenactive() and splitscreenviewplayers then
 			for i, pn in ipairs(splitscreenviewplayers) do
 				local p = objects["player"][pn]
@@ -7668,10 +7669,16 @@ addminigame({
 						splitcamx[i] = math.max(0, math.min(mapwidth - vw, p.x + p.width/2 - vw/2))
 						splitcamy[i] = math.max(0, math.min(mapheight - vh - 1, (p.y + p.height/2) - vh/2 - 0.5))
 					end
+					if camerasmoothingstate then
+						camerasmoothingstate["view" .. i] = nil
+					end
 				end
 			end
 		else
 			camerasnap(nil, nil, true)
+			if camerasmoothingstate then
+				camerasmoothingstate["shared"] = nil
+			end
 		end
 	end,
 
