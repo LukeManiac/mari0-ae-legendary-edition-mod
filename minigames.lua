@@ -688,7 +688,13 @@ function minigame_menu_update(dt)
 				else
 					el.width, el.x, el.displayentries = el.closedwidth, el.basex, el.shortentries
 				end
+				--updatePos makes a new list scrollbar (switched off, at the top), so the open list keeps its own
+				local oldbar = el.scrollbar
 				el:updatePos()
+				if oldbar and el.scrollbar and el.scrollbar ~= oldbar then
+					el.scrollbar.value = oldbar.value
+					el.scrollbar.active = el.extended
+				end
 			end
 		end
 		el:update(dt)
@@ -1019,7 +1025,16 @@ end
 --mouse wheel over the description or the highscores scrolls it (x, y in scaled pixels)
 function minigame_menu_wheel(x, y, button)
 	local def = minigamelist[minigameselection]
-	if not (def and menusettled()) or openminigamedropdown() or scrollbardragging() then
+	--an open dropdown keeps the wheel: a long list scrolls with its own scrollbar,
+	--a short one ignores it (letting it through would move the highlighted option like the arrow keys)
+	local dd = openminigamedropdown()
+	if dd then
+		if dd.cutoff then
+			dd:click(x, y, button)
+		end
+		return true
+	end
+	if not (def and menusettled()) or scrollbardragging() then
 		return false
 	end
 	--wheel events can arrive with converted coordinates, so read the cursor directly

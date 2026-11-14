@@ -321,8 +321,17 @@ local function drawdropdownentry(entry, x, y, maxchars)
 	properprint(entry, x*scale, y*scale)
 end
 
-local function setdropdownentrycolor(self, entry)
-	if self.coloredtext then
+--a dropdown can colour its entries: dropdown.entrycolors = {[entry number] = {r, g, b}, ...}
+--(set it straight on the element or with dropdown:setentrycolors), entries without a colour use the usual one
+local function getdropdownentrycolor(self, i)
+	return self.entrycolors and i and self.entrycolors[i]
+end
+
+local function setdropdownentrycolor(self, entry, i)
+	local color = getdropdownentrycolor(self, i)
+	if color then
+		love.graphics.setColor(color)
+	elseif self.coloredtext then
 		if entry == "black" then
 			love.graphics.setColor(80, 80, 80)
 		else
@@ -487,6 +496,8 @@ function guielement:draw(a, offx, offy)
 		local s = self.entries[self.var]
 		if self.extended then
 			love.graphics.setColor(127, 127, 127)
+		elseif getdropdownentrycolor(self, self.var) then
+			love.graphics.setColor(getdropdownentrycolor(self, self.var))
 		elseif self.coloredtext then
 			if s == "black" then
 				love.graphics.setColor(80, 80, 80)
@@ -555,7 +566,7 @@ function guielement:draw(a, offx, offy)
 						end
 						local entry = self.entries[i]
 						if self.displayentries then entry = self.displayentries[i] end
-						if high ~= i then setdropdownentrycolor(self, entry) else love.graphics.setColor(0, 0, 0) end
+						if high ~= i then setdropdownentrycolor(self, entry, i) else love.graphics.setColor(0, 0, 0) end
 						drawdropdownentry(entry, self.x+1, rowy, self.width+1)
 					end
 				end
@@ -569,7 +580,7 @@ function guielement:draw(a, offx, offy)
 						love.graphics.setColor(0, 0, 0)
 						love.graphics.rectangle("fill", (self.x+1)*scale, ((self.y+2+i*10)-(11+(10*#self.entries)))*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
 						local s = self.entries[i]
-						setdropdownentrycolor(self, s)
+						setdropdownentrycolor(self, s, i)
 						if self.displayentries then s = self.displayentries[i] end
 						drawdropdownentry(s, self.x+1, (self.y+3+10*i)-(11+(10*#self.entries)), self.width+1)
 					else
@@ -587,7 +598,7 @@ function guielement:draw(a, offx, offy)
 					if high ~= i then
 						love.graphics.setColor(0, 0, 0)
 						love.graphics.rectangle("fill", (self.x+1)*scale, (listtop+(i-1)*10)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
-						setdropdownentrycolor(self, s)
+						setdropdownentrycolor(self, s, i)
 						if self.displayentries then s = self.displayentries[i] end
 						drawdropdownentry(s, self.x+1, listtop+1+(i-1)*10, self.width+1)
 					else
@@ -981,6 +992,11 @@ function guielement:click(x, y, button)
 					self:open()
 				end
 			else
+				if (button == "wu" or button == "wd") and self.scrollbar then
+					--the wheel scrolls a long list by as much as the wheel actually turned
+					self:wheelscroll(button)
+					return true
+				end
 				if self.scrollbar then
 					self.scrollbar:click(x, y, button)
 					if x > (self.x+(13+self.width*8))*scale and x < (self.x+(13+self.width*8)+8)*scale then
@@ -1499,6 +1515,32 @@ function guielement:open(keyboard)
 	else
 		self.keycursor = nil
 	end
+end
+
+--dropdown: colours for its entries ({[entry number] = {r, g, b}, ...}, nil for none)
+function guielement:setentrycolors(colors)
+	self.entrycolors = colors
+end
+
+--dropdown: scroll a long (cut off) list with the mouse wheel
+--every step of the wheel (mousewheelamount, from love.wheelmoved) scrolls DROPDOWN_WHEEL_PIXELS,
+--so a fine scrolling wheel or a touchpad moves it a little and a fast flick moves it a lot
+DROPDOWN_WHEEL_PIXELS = 30 --three entries per notch, like most systems scroll text
+function guielement:wheelscroll(button)
+	if not (self.cutoff and self.scrollbar) then
+		return
+	end
+	local range = ((#self.entries+1)*10)-(height*16)+1
+	if range <= 0 then
+		return
+	end
+	local pixels = (mousewheelamount or 1)*DROPDOWN_WHEEL_PIXELS
+	if button == "wu" then
+		pixels = -pixels
+	end
+	self.scrollbar.value = math.max(0, math.min(1, self.scrollbar.value + pixels/range))
+	self.scroll = self.scrollbar.value*range
+	self.keycursor = nil --the hovered option takes over again
 end
 
 --dropdown: close the list without picking anything

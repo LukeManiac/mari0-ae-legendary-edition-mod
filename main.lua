@@ -2549,6 +2549,9 @@ function love.mousemoved(x, y, dx, dy, istouch)
 end
 
 function love.wheelmoved(x, y)
+	--how far the wheel turned (1 for a notch, less or more for fine scrolling wheels and touchpads),
+	--for things that scroll by the real distance instead of one step per event (like long dropdown lists)
+	mousewheelamount = math.abs((x ~= 0) and x or y)
 	if x > 0 then
         love.mousepressed(love.mouse.getX(), love.mouse.getY(), "wr")
     elseif x < 0 then
@@ -2558,6 +2561,7 @@ function love.wheelmoved(x, y)
     elseif y < 0 then
         love.mousepressed(love.mouse.getX(), love.mouse.getY(), "wd")
     end
+	mousewheelamount = nil
 end
 
 function love.filedropped(file)
