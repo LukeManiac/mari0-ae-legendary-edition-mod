@@ -1141,6 +1141,7 @@ function game_update(dt)
 	end
 	
 	--SCROLLING
+	camerasmoothing_restore("shared", splitxscroll, splityscroll, 1) --(the camera logic works on the real camera)
 	updatecenteredcameraalive()
 	
 	
@@ -1423,6 +1424,11 @@ function game_update(dt)
 		yscroll = math.min(mapheight-height, ypanstart + ypandiff*i)
 		splityscroll[1] = yscroll
 	end
+
+	--camerasmoothing: what's shown (and used until the next frame) is the smoothed camera
+	camerasmoothing_apply("shared", splitxscroll, splityscroll, 1, dt,
+		math.max(0, mapwidth-width*screenzoom2), math.max(0, mapheight-height*screenzoom2-1))
+	xscroll, yscroll = splitxscroll[1], splityscroll[1]
 
 	updateenemycamerarelativepositions()
 	
@@ -9657,6 +9663,54 @@ function respawnplayers()
 			objects["player"][i]:respawn()
 		end
 	end
+end
+
+--CAMERA SMOOTHING (the camerasmoothing and backwardsmoothing nitpicks). Every frame the camera logic works out where
+--the camera really goes (the original), and the smoothed camera eases towards it (camerasmoothingspeed, in
+--variables.lua). camerasmoothing shows the smoothed camera, which trails behind. backwardsmoothing shows the
+--original minus (smoothed - original), so the camera leads ahead by as much as it would trail.
+--The original is put back before the camera logic runs again; if anything else moved the camera in between
+--(a level load, camerasnap...), smoothing starts over from there
+camerasmoothingstate = {}
+
+function camerasmoothing_restore(key, tx, ty, i)
+	local c = camerasmoothingstate[key]
+	if not c then
+		return
+	end
+	if tx[i] == c.shownx and ty[i] == c.showny then
+		tx[i], ty[i] = c.origx, c.origy
+	else
+		camerasmoothingstate[key] = nil
+	end
+end
+
+function camerasmoothing_apply(key, tx, ty, i, dt, maxx, maxy)
+	if (not CameraSmoothing) or editormode or (not tx[i]) or (not ty[i]) then
+		camerasmoothingstate[key] = nil
+		return
+	end
+	local ox, oy = tx[i], ty[i]
+	local c = camerasmoothingstate[key]
+	if not c then
+		c = {smoothx = ox, smoothy = oy}
+		camerasmoothingstate[key] = c
+	else
+		local k = 1 - math.exp(-camerasmoothingspeed*dt)
+		c.smoothx = c.smoothx + (ox - c.smoothx)*k
+		c.smoothy = c.smoothy + (oy - c.smoothy)*k
+	end
+	local sx, sy = c.smoothx, c.smoothy
+	if BackwardSmoothing then
+		sx = ox - (c.smoothx - ox)
+		sy = oy - (c.smoothy - oy)
+	end
+	--never further out than the camera could go (or than the original already is)
+	sx = math.max(math.min(0, ox), math.min(math.max(maxx, ox), sx))
+	sy = math.max(math.min(0, oy), math.min(math.max(maxy, oy), sy))
+	c.origx, c.origy = ox, oy
+	c.shownx, c.showny = sx, sy
+	tx[i], ty[i] = sx, sy
 end
 
 function cameraxpan(target, t)

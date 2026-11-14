@@ -371,6 +371,8 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `modernsizechangeanimation`: Powering up and down uses a Super Mario Maker 2 style animation instead of the classic one.
 - `noairspeedcap`: Holding run in the air speeds you up to full running speed, even if you jumped from below walking speed.
 - `dontfreezeonsizechange`: Powering up and down only freezes the player it happens to, like in SMBX2. Everything else keeps moving, and that player can't be touched until the animation is done.
+- `camerasmoothing`: The camera eases after where it's going instead of moving rigidly, so it trails slightly behind.
+- `backwardsmoothing`: The camera leads ahead by as much as `camerasmoothing` would make it trail. Requires `camerasmoothing`.
 
 ---
 
@@ -555,6 +557,15 @@ A new nitpick, `dontfreezeonsizechange`, stops power-ups and getting hit from fr
 * Getting hit gives you the usual blinking once the animation is over. Blinking you already had carries on through a power-up.
 * Ducking carries on straight away, since nothing has to stand up for the animation.
 * Leaving Mega Mario after a hit takes you straight to big, with the blinking.
+
+#### 🎥 Camera Smoothing
+
+Two new nitpicks for the camera. Both are just `true` or `false`. **Generate Nitpicks File** adds them to an existing file.
+
+* `camerasmoothing`: The camera still works out where it would normally go, but what you see eases towards that instead of jumping straight there, so it trails slightly behind when it moves. How fast it catches up is `camerasmoothingspeed` in `variables.lua` (8 by default, higher is faster).
+* `backwardsmoothing`: Takes how far the smoothed camera trails behind and puts the camera that far ahead instead (the normal position minus the smoothed position's difference from it), so the camera leads in the direction you're moving.
+* `backwardsmoothing` only works with `camerasmoothing` on. If it's on without it, a notice tells you to enable `camerasmoothing` when the game starts.
+* The smoothed camera never goes past the edges of the course, and splitscreen viewports are smoothed too. The camera is never smoothed in the editor, and anything that moves the camera on its own (loading a map, a camera snap) starts the smoothing over from there.
 
 #### 🏃 No Air Speed Cap
 

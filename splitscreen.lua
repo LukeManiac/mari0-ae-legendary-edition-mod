@@ -263,9 +263,13 @@ function splitscreen_update(dt)
 		end
 
 		--camera, it stays where it is while the player is dead (until they revive)
+		camerasmoothing_restore("view" .. i, splitcamx, splitcamy, i) --(camerasmoothing, see game.lua)
 		if (not dead) or (not splitcamx[i]) then
 			splitscreen_updatecamera(i, view, p, f, dt, revived or resnap)
 		end
+		local mul = (splitscreencanvases[i] and splitscreencanvases[i].viewrangemul) or 1
+		camerasmoothing_apply("view" .. i, splitcamx, splitcamy, i, dt,
+			math.max(0, mapwidth-view.w/16*screenzoom2*mul), math.max(0, mapheight-view.h/16*screenzoom2*mul-1))
 
 		splitscreen_spawn(i, view, f)
 	end

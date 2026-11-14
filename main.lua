@@ -3658,6 +3658,11 @@ function loadnitpicks()
 		ModernSizeChangeAnimation = t.modernsizechangeanimation
 		NoAirSpeedCap = t.noairspeedcap
 		DontFreezeOnSizeChange = t.dontfreezeonsizechange
+		CameraSmoothing = t.camerasmoothing
+		BackwardSmoothing = t.backwardsmoothing
+		if BackwardSmoothing and not CameraSmoothing then
+			notice.new("backwardsmoothing needs camerasmoothing:\nenable camerasmoothing to use it!", notice.red, 6)
+		end
 	end
 end
 
