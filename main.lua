@@ -3657,6 +3657,7 @@ function loadnitpicks()
 		ClassicSpeedUpFastMusic = t.classicspeedupfastmusic
 		ModernSizeChangeAnimation = t.modernsizechangeanimation
 		NoAirSpeedCap = t.noairspeedcap
+		DontFreezeOnSizeChange = t.dontfreezeonsizechange
 	end
 end
 

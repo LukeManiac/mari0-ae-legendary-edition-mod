@@ -558,8 +558,19 @@ function game_update(dt)
 		for i, v in pairs(objects["checkpointflag"]) do
 			v:update(dt)
 		end
+		--only the players whose size is changing (everyone else is frozen with the game)
+		local changing = false
 		for i, v in pairs(objects["player"]) do
-			v:update(dt)
+			if v:sizechanging() then
+				changing = true
+				v:update(dt)
+			end
+		end
+		if not changing then
+			--(nobody's size is changing any more, but the game is still frozen: everyone, so it can't get stuck)
+			for i, v in pairs(objects["player"]) do
+				v:update(dt)
+			end
 		end
 		-- viewports (cameras + fades) must still update even when entities are frozen
 		if splitscreenactive() then
@@ -570,6 +581,9 @@ function game_update(dt)
 		updateenemycamerarelativepositions()
 		return
 	end
+	
+	--multiplayer flagpole: waiting for the others (see flagpole_update)
+	flagpole_update(dt)
 	
 	--timer	
 	if editormode == false and not minigameplaying then
@@ -3678,7 +3692,20 @@ function drawentity(j, w, i, v, currentscissor, drop)
 	end
 end
 
+--dontfreezeonsizechange: a size-changing player is drawn the way the animation shows them (see mario:sizefxlook)
 function drawplayer(i, x, y, r, pad, drop)
+	local v = objects["player"][i]
+	local look = v and v.sizefx and v:sizefxlook()
+	if not look then
+		return drawplayer_draw(i, x, y, r, pad, drop)
+	end
+	local saved = v:applysizefxlook(look)
+	local result = drawplayer_draw(i, x, y, r, pad, drop)
+	v:restoresizefxlook(saved)
+	return result
+end
+
+function drawplayer_draw(i, x, y, r, pad, drop)
 	local v = objects["player"][i]
 
 	local px, py = x or v.x, y or v.y
@@ -4535,6 +4562,7 @@ function startlevel(level, reason)
 	--MISC VARS
 	everyonedead = false
 	levelfinished = false
+	flagpolewaiting = false
 	coinanimation = 1
 	flaganimation = 1
 	flagx = false

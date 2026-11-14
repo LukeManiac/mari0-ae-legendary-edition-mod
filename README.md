@@ -134,7 +134,7 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 * You can now change controls midgame.
 * Added custom categories for custom enemies. Set donotcategoriseenemyfolders to true to disable enemies being categorised by folders.
 * Saving the game via pause menu no longer quits to menu.
-* Added the mappack `disabletransition` setting, which instantly completes transitions between maps during gameplay. It can be managed in the Course Maker with the **Skip trans.** setting. Editor transitions, including transitions while testing a level, remain enabled.
+* Added the mappack `disabletransition` setting, which instantly completes transitions between maps during gameplay. It can be managed in the Course Maker with the **Skip trans.** setting. Editor transitions, including transitions while testing a course, remain enabled.
 * Tanooki Mario enters statue mode when you press **Run** while holding **Down**. Release **Run** to exit statue mode.
 * The editor panels fade in while zooming in when opened, and fade out while zooming out when closed. Each transition lasts half a second and uses a random motion curve.
 * New nitpick `displayhiddenenemiesinspawner`, you already know what it does. Use with caution!
@@ -187,7 +187,7 @@ The first release of **Legendary Edition**, a community-made expansion and modif
   * Neon-chase: Wet neon night with teal shadows, magenta highlights, pixel rain and a few anamorphic bokeh specks.
   * Old-film: Sepia silent-movie look with gate weave, lamp flicker, grain, vignette, scratches and dust.
   * Pip-Boy: Fallout terminal: bulging green phosphor tube with rounded black corners, banded tones, heavy scanlines, a slow rolling refresh band, glow and flicker.
-  * Pixel Grain: Posterises each channel to a few levels and hides the banding with ordered Bayer dither.
+  * Pixel Grain: Posterises each channel to a few courses and hides the banding with ordered Bayer dither.
   * Poison: Sickly grade with a slow pulse and pixel bubbles rising through the frame.
   * Posterize: Photoshop-style posterize, splitting each 8-bit channel into equal tone ranges.
   * Sin City: Crushed blacks, blown whites and one colour left alive: red. Everything else is pushed to hard black and white, with a faint halo around the brights, film grain and a heavy vignette.
@@ -217,10 +217,10 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 * Fixed a confusing mechanic where autodelete-able enemies would instantly vanish when a player died in multiplayer splitscreen.
 * Fixed an issue where game saving would sometimes be counted as successful, even if it doesn't save successfully.
 * Fixed editor scrolling staying blocked after renaming a saved object and closing the editor.
-* Level screens now fade to black before loading the next map.
+* Course screens now fade to black before loading the next map.
 * Selecting a map in the editor now fades the full screen to black before loading.
 * Pipe entries without a matching exit marker now use a vignette transition centered on the player's spawn animation.
-* Level music now resumes when fast star music ends.
+* Course music now resumes when fast star music ends.
 * Objects marked for instant deletion are removed immediately.
 * Enemies with `xrelativetocamera` and/or `yrelativetocamera` now stick perfectly to the camera each frame. Both their graphic and hitbox stay at the specified camera-relative position without lag.
 * Fixed a bug that let Mario midair-jump after bouncing off an enemy while wearing a Goomba shoe, stiletto, or dry bones shell.
@@ -319,7 +319,7 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `mariomakergravity`: Uses the Super Mario Bros. maximum vertical speed.
 - `dontpauseonunfocus`: Prevents the game from pausing when another window takes focus from it.
 - `firebuttoncannonhelmet`: Fires the cannon helmet with the fire button instead of its automatic firing behaviour.
-- `pipesineditor`: Loads pipe entities while editing a level.
+- `pipesineditor`: Loads pipe entities while editing a course.
 - `noonlinemultiplayernames`: Hides online multiplayer names.
 - `letterbox`: Set `letterboxfullscreen` to the supplied value, either `true` or `false`, when this key exists.
 - `customportalcolors`: Uses the configured portal colours in single-player.
@@ -370,6 +370,7 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `classicspeedupfastmusic`: In Rival Rumble Royale, a song without a fast version is just played faster, which also makes it higher.
 - `modernsizechangeanimation`: Powering up and down uses a Super Mario Maker 2 style animation instead of the classic one.
 - `noairspeedcap`: Holding run in the air speeds you up to full running speed, even if you jumped from below walking speed.
+- `dontfreezeonsizechange`: Powering up and down doesn't freeze the game. The animation plays while everything keeps moving, and you can't be touched until it's done.
 
 ---
 
@@ -434,7 +435,7 @@ A four-player battle minigame inspired by the battle mode of Super Mario 4 Jugad
 * A player who loses their last life is out. Once their death animation is over, their viewport is removed, and the other viewports slide and resize into the new layout with the same random motion curves as the pause menu. The last viewport is never removed: if its player is out, it follows someone who's still in the battle and shows "watching pN".
 * A knockout counts for the player who hit you, if you die within 4 seconds of their hit (falling into a pit, for example). The HUD shows every player's lives and knockouts, and marks the bots with "CPU".
 * A human player who is out can type the Konami code with their own controls to come back with 3 lives (1 in sudden death), once per battle: **Up, Up, Down, Down, Left, Right, Left, Right, Run, Jump**. Their viewport comes back with them.
-* When only one player is left, everything freezes for 3 seconds, except the players who are still dying. Sounds that are already playing carry on, but nothing new plays and nothing is stopped. Then the game fades to the results screen, which says "pN wins!" and plays the battle clear theme: `levelend.ogg`, or the music pack's own one (see **Custom Music** below), with its `-intro` first if it has one. The results screen stays up until the theme ends, and for at least 4 seconds. A battle clear theme longer than 15 seconds gets cut off.
+* When only one player is left, everything freezes for 3 seconds, except the players who are still dying. Sounds that are already playing carry on, but nothing new plays and nothing is stopped. Then the game fades to the results screen, which says "pN wins!" and plays the battle clear theme: `bowserend.ogg`, or the music pack's own one (see **Custom Music** below), with its `-intro` first if it has one. The results screen stays up until the theme ends, and for at least 4 seconds. A battle clear theme longer than 15 seconds gets cut off.
 * With less than 5 seconds left, the timer turns into a big number in the middle of the screen, drawn the same way as the countdown at the start, and `countdownbeepsound` plays every time it changes. The timer stops as soon as the battle is over.
 * When the timer runs out with more than one player still in, it's **sudden death**:
   * "time up!" shows, then "sudden death!" 1.5 seconds later. Nobody can move in the meantime.
@@ -458,7 +459,7 @@ A four-player battle minigame inspired by the battle mode of Super Mario 4 Jugad
       "name": "Kirby VRC6 Music",
       "order": 1,
       "Starman Theme": "kirby star",
-      "Battle Clear": "level clear",
+      "Battle Clear": "course clear",
       "songs": [
           ["boss", "Boss"],
           ["skybattle", "Battle Across The Sky"]
@@ -468,13 +469,13 @@ A four-player battle minigame inspired by the battle mode of Super Mario 4 Jugad
 
   Packs with an `order` come first (lowest first), and the rest come after them. Packs with the same `order`, or no `order`, are sorted alphabetically by their name in the list. A broken `pack.json` is ignored.
 * `"Starman Theme"` names a song of the pack that replaces the star theme while a song from that pack is playing. Its `-intro` works too (`kirby star-intro.ogg`).
-* `"Battle Clear"` names a song of the pack that plays when the battle ends, instead of `levelend.ogg`. Its `-intro` works too.
+* `"Battle Clear"` names a song of the pack that plays when the battle ends, instead of `bowserend.ogg`. Its `-intro` works too.
 * Song names in both keys can be written with or without `.ogg`, and the key names don't care about capitals. Neither song shows up in the list.
-* If a key is missing, names a file that isn't in the pack, or the pack has no `pack.json`, the pack's `starmusic.ogg` (with `starmusic-intro.ogg`) or `battleclear.ogg` is used instead. If that isn't in the pack either, the built-in star theme or `levelend.ogg` is used.
+* If a key is missing, names a file that isn't in the pack, or the pack has no `pack.json`, the pack's `starmusic.ogg` (with `starmusic-intro.ogg`) or `battleclear.ogg` is used instead. If that isn't in the pack either, the built-in star theme or `bowserend.ogg` is used.
 * Without `pack.json`, names come from the folder and file names ("my_song.ogg" becomes "My Song").
 * `overworld.ogg`, `underground.ogg` or `castle.ogg` placed directly in a music folder replaces the built-in song. Inside a pack folder, they're songs of that pack instead ("My Pack- Overworld"), and the built-in songs stay.
 * If a song or pack in the save folder has the same name in the list as one in the game, the save folder's one is used.
-* `pack.json` files are included for **Kirby VRC6 Music**, **Castlevania VRC6 Music** and **Super Mario Bros. 2 Remade**. The songs themselves aren't included. `RIVALRUMBLEROYALE_README.md` explains all of this.
+* `RIVALRUMBLEROYALE_README.md` explains all of this.
 
 Example of what a music folder can hold:
 
@@ -527,7 +528,7 @@ rivalrumbleroyalemusic/
 #### 🎵 Music
 
 * `-intro` and `-fast` versions now also work for built-in music names, for example `starmusic-intro`.
-* In normal levels, the fast music now starts as soon as the low time sound ends, instead of after a fixed wait of about 3 seconds that only matched the default sound. It also starts while the timer is stopped, in a pipe for example.
+* In normal courses, the fast music now starts as soon as the low time sound ends, instead of after a fixed wait of about 3 seconds that only matched the default sound. It also starts while the timer is stopped, in a pipe for example.
 * Custom music's fast version can now have its own intro, including a mappack's `music` folder and `music.ogg`/`music1.ogg` files, in `.ogg` or `.mp3`. `song-fastintro.ogg` (or `song-introfast.ogg`) plays once before `song-fast.ogg` when the time runs low, the same way `song-intro.ogg` plays before `song.ogg`. Fast intros don't show up as separate songs in the editor's music list. Stopping the music while an intro is playing now stops the intro too.
 
 #### 🍄 Modern Size Change Animation
@@ -540,14 +541,41 @@ A new nitpick, `modernsizechangeanimation`, swaps the classic power-up and power
 * **Big type to big type** (big to fire, fire to hammer, hammer to boomerang, fire to big and so on): the new and old sprite sheets and colours take turns: new, old, new, old, and the animation ends as soon as it reaches the last new one (`modernsizesuitparts`). Getting hit as a power-up in Mari0-Maker physics, which drops you to big, plays this too.
 * A custom power-up that gives you a fire enemy plays the big-to-big animation into its own colours. If you're already fire and it has no colours of its own, you get the power straight away, without an animation or a freeze.
 * Mega Mario, classic huge Mario and characters with health keep their own effects, and minigames keep their instant power-ups.
+* The classic after-size-change jump works during the modern animation too. If you press jump in mid-air while a power-up is changing your size, you get a silent jump as soon as the animation ends, the same as with the classic animation. Like the classic shrink animation, getting hit doesn't allow it.
+* Jumping while your size is changing no longer changes your sprite. The animation keeps showing the pose you were in, and the jumping pose only shows once the game unfreezes. This works the same with or without `modernsizechangeanimation`.
+
+#### ❄️ Don't Freeze On Size Change
+
+A new nitpick, `dontfreezeonsizechange`, stops power-ups and getting hit from freezing the game. Nothing stops, not even the player whose size is changing. **Generate Nitpicks File** adds it to an existing file.
+
+* You become the new size straight away, so your hitbox and movement are the new size's from the start. The animation only changes how you look while you keep moving.
+* It works with both the classic animations and `modernsizechangeanimation`, and each one lasts as long as it does with the freeze.
+* Until the animation is over, you're intangible: you still stand on and bump into the course (tiles, platforms, springs, doors and so on), but you pass through enemies, items and other players, and nothing can hurt you.
+* Getting hit gives you the usual blinking once the animation is over. Blinking you already had carries on through a power-up.
+* Ducking carries on straight away, since nothing has to stand up for the animation.
+* Leaving Mega Mario after a hit takes you straight to big, with the blinking.
 
 #### 🏃 No Air Speed Cap
 
 A new nitpick, `noairspeedcap`, lifts the classic air speed cap. Normally, if you're moving slower than walking speed in the air, holding run only gets you up to walking speed, and only a run you already had when you jumped carries on at full speed. With `noairspeedcap`, holding run in the air always speeds you up to full running speed, like in Super Mario Maker 2. **Generate Nitpicks File** adds it to an existing file.
 
+#### 🏁 Multiplayer Flagpole
+
+The flagpole now waits for everyone in multiplayer, instead of ending the course for whoever got there first.
+
+* The first player to grab the flagpole hangs on where they grabbed it, and the flag stays at the top. The timer stops, but the music keeps playing.
+* The flag animation starts as soon as every player is either on the flagpole or dead. If everyone who hasn't grabbed it dies, it starts straight away.
+* If that hasn't happened `flagpolewaittime` seconds after the first grab (5 by default, in `variables.lua`), the flag animation starts anyway. Players who aren't on the flagpole keep playing until the course ends.
+* A player who dies respawns at the furthest player, the same as before, and they still respawn after the flag animation has started. If the furthest player has already grabbed the flagpole, they respawn at the checkpoint they reached in that area, or at the start if there isn't one.
+* The music stops when the flag animation starts, not when someone grabs the flagpole. The course end sound plays then too.
+* Everyone on the flagpole slides down from where they grabbed it and walks to the castle. Every grab gives its own flag points, but the flag shows the first player's score.
+* The first player to grab the flagpole runs the course end: the flag coming down, the time bonus, the castle flag and the fireworks. Everyone else just walks off and stops, so the time bonus doesn't count down any faster.
+* In single player, the flag animation starts the moment you grab the flagpole, the same as before.
+
 ### 🐛 Bug Fixes
 
-* In splitscreen, player fireballs, superballs, iceballs, hammers and boomerangs no longer disappear as soon as they leave the shared camera. They now last as long as they're inside the level.
+* In splitscreen, the player who uses the mouse now aims exactly at the cursor. Before, the aim was worked out as if there were one full screen, so it was off everywhere but the top-left viewport, and more so in viewports that show more of the course.
+* In splitscreen, player fireballs, superballs, iceballs, hammers and boomerangs no longer disappear as soon as they leave the shared camera. They now last as long as they're inside the course.
 * A player's boomerang now only disappears when it gets back to the player who threw it. Before, it disappeared on contact with any other player, so other players could catch it.
 * If the Super Star wears off while the player is a Tanooki statue, they now go back to the statue colours instead of their normal ones.
 * When the blinking invincibility ends while the player is a Tanooki statue, they now stay invincible. Before, enemies could hurt a statue once the blinking was over.
@@ -555,7 +583,7 @@ A new nitpick, `noairspeedcap`, lifts the classic air speed cap. Normally, if yo
 * Changing form now ends any animation the new form doesn't have, and sets the new form's sprite straight away. For example, getting hit during a tail whip ends the whip, and its hitbox stops hitting things. A raccoon flight or a float ends the same way.
 * Changing form while ducking now keeps you ducking, like picking up a power-up in Rival Rumble Royale. This works on the ground and in mid-air (a duck jump into a power-up, for example). Power-ups that only flash your colours (a Fire Flower when you're already big, for example) keep the duck the whole time. The classic small-to-big and big-to-small animations still show you standing, then you duck again as soon as they end. Your feet stay in the same place throughout. Before, you only ducked again afterwards if you were on the ground.
 * Changing form while you're blinking after a hit now keeps your invincibility timer: once the grow animation ends, the blinking carries on from where it was.
-* Finishing a level (at the flagpole, the axe or a levelball) now takes every player off their Lakitu cloud, quietly, so the cloud doesn't follow you through the ending.
+* Finishing a course (at the flagpole, the axe or a levelball) now takes every player off their Lakitu cloud, quietly, so the cloud doesn't follow you through the ending.
 * Dropdowns in a minigame's settings no longer disappear when the description above them is long. They used to stay where they were before the panel was scrolled.
 
 ### ✨ Improvements

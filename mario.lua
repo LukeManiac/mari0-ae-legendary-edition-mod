@@ -484,6 +484,14 @@ function mario:init(x, y, i, animation, size, t, properties)
 end
 
 function mario:update(dt)
+	if self.sizefx then
+		--dontfreezeonsizechange: the size change only shows, and can't be touched or hurt until it's done
+		self.invincible = true
+		self.sizefx.timer = self.sizefx.timer + dt
+		if self.sizefx.timer >= self:sizefxtime() then
+			self:endsizefx()
+		end
+	end
 	self.stompsnap = false --what p-speed was like before this frame's landing (see floorcollide)
 	--RACCOON STUFF
 	if self.float and not self.raccoonfly then
@@ -1486,8 +1494,18 @@ function mario:update(dt)
 		end
 		return
 	elseif self.animation == "flag" then
+		if flagpolewaiting then
+			--holding on where they grabbed it until everyone's on the flagpole or flagpolewaittime is up (see flagpole_update)
+			self.climbframe = 2
+			self.animationdirection = "right"
+			self.animationstate = "climbing"
+			self:setquad()
+			return
+		end
 		if self.animationtimer < flagdescendtime then 	
-			flagimgy = flagy-10+1/16 + flagydistance * (self.animationtimer/flagdescendtime)
+			if self.flagleader then
+				flagimgy = flagy-10+1/16 + flagydistance * (self.animationtimer/flagdescendtime)
+			end
 			self.y = self.y + flagydistance/flagdescendtime * dt
 			
 			self.animationtimer = self.animationtimer + dt
@@ -1510,7 +1528,9 @@ function mario:update(dt)
 			self:setquad()
 			
 			if self.animationtimer >= flagdescendtime then
-				flagimgy = flagy-10+1/16 + flagydistance
+				if self.flagleader then
+					flagimgy = flagy-10+1/16 + flagydistance
+				end
 				self.pointingangle = math.pi/2
 				self.animationdirection = "left"
 				self.x = flagx + 6/16
@@ -1538,7 +1558,9 @@ function mario:update(dt)
 			self.fireenemyride = false
 			self.active = false
 			self:duck(true)
-			if mariotime > 0 then
+			if not self.flagleader then
+				--the others on the flagpole just stop: the first one to grab it runs the level end
+			elseif mariotime > 0 then
 				playsound(scoreringsound)
 				subtractscore = true
 				subtracttimer = 0
@@ -1550,13 +1572,22 @@ function mario:update(dt)
 		if (self.x >= flagx + add and self.active) or (self.speedx == 0 and self.animationstate ~= "climbing" and self.active) then
 			self.drawable = false
 			self.active = false
-			if mariotime > 0 then
+			if not self.flagleader then
+				--(see above)
+			elseif mariotime > 0 then
 				playsound(scoreringsound)
 				subtractscore = true
 				subtracttimer = 0
 			else
 				castleflagmove = true
 			end
+		end
+		
+		if not self.flagleader then
+			if self.animationstate == "running" then
+				self:runanimation(dt)
+			end
+			return
 		end
 		
 		if subtractscore == true and mariotime >= 0 then
@@ -2884,7 +2915,13 @@ function mario:updateangle()
 	if playermouses(self.playernumber) then
 		local scale = scale
 		if shaders and shaders.scale then scale = shaders.scale end
-		self.pointingangle = math.atan2(self.x+self.portalsourcex-xscroll-(love.mouse.getX()/screenzoom/16/scale), (self.y+self.portalsourcey-yscroll-.5)-(love.mouse.getY()/screenzoom/16/scale))
+		--where the mouse is in the level: in splitscreen, inside of this player's own viewport (see splitscreen_mouseworld)
+		local mx, my = splitscreen_mouseworld(self, scale)
+		if not mx then
+			mx = xscroll+love.mouse.getX()/screenzoom/16/scale
+			my = yscroll+love.mouse.getY()/screenzoom/16/scale
+		end
+		self.pointingangle = math.atan2(self.x+self.portalsourcex-mx, (self.y+self.portalsourcey-.5)-my)
 	elseif #getcontrolbindings(self.playernumber, "aimx") > 0 or #getcontrolbindings(self.playernumber, "aimy") > 0 then
 		local x = getjoystickaimaxis(self.playernumber, "aimx")
 		local y = getjoystickaimaxis(self.playernumber, "aimy")
@@ -3833,7 +3870,9 @@ function mario:jump(force)
 		return
 	end
 
-	if ((not noupdate or self.animation == "grow1" or self.animation == "grow2") and self.controlsenabled) or force then
+	if ((not noupdate or self:sizechangejumps()) and self.controlsenabled) or force then
+		--a jump during a size change (classic or modern animation) leaves the pose alone: the animation keeps showing its own
+		local sizechangejump = self:sizechangejumps()
 		if self.cappy then
 			self.cappy:jump()
 		end
@@ -3845,7 +3884,9 @@ function mario:jump(force)
 			playsound(raccoonswingsound)
 			--the flap goes on for another raccoonflaptime, the animation keeps going from where it is
 			self.raccoonflaptimer = raccoonflaptime
-			self:setquad()
+			if not sizechangejump then
+				self:setquad()
+			end
 		end	
 		self.redseesaw = false
 		
@@ -3903,8 +3944,10 @@ function mario:jump(force)
 						self.swimpush = ((self.swimpush-1)%3)+1
 					end
 				end
-				self.animationstate = "jumping"
-				self:setquad()
+				if not sizechangejump then
+					self.animationstate = "jumping"
+					self:setquad()
+				end
 			end
 		else
 			if (self.gravitydir == "left" or self.gravitydir == "right") and self.speedx ~= 0 then
@@ -3942,10 +3985,10 @@ function mario:jump(force)
 					self.speedy = -30
 				end]]
 				
-				if ( ((self.animation ~= "grow1" and self.animation ~= "grow2") or self.falling)
-					and (self.falling == false or self.animation == "grow1" or self.animation == "grow2" or (self.shoe and (not self.yoshi) and self.landed)) )
+				if ( ((not sizechangejump) or self.falling)
+					and (self.falling == false or sizechangejump or (self.shoe and (not self.yoshi) and self.landed)) )
 					or ( (self.characterdata.doublejump or self.characterdata.dbljmppls) and (not self.hasdoublejumped) ) then
-					if self.animation ~= "grow1" and self.animation ~= "grow2" and (not self.characterdata.nojumpsound) then
+					if (not sizechangejump) and (not self.characterdata.nojumpsound) then
 						if self.size == 1 then
 							playsound(jumpsound)
 						elseif self.size == -1 then
@@ -4000,12 +4043,14 @@ function mario:jump(force)
 					end
 					self.jumping = true
 					self.landed = false
-					self.animationstate = "jumping"
-					self.jumpframe = 1
-					self.jumpanimationprogress = 1
-					self.fallframe = 1
-					self.fallanimationprogress = 1
-					self:setquad()
+					if not sizechangejump then
+						self.animationstate = "jumping"
+						self.jumpframe = 1
+						self.jumpanimationprogress = 1
+						self.fallframe = 1
+						self.fallanimationprogress = 1
+						self:setquad()
+					end
 
 					--high blue gel jump
 					if portalphysics then
@@ -4258,7 +4303,12 @@ function mario:grow(update)
 		self.size = target
 		self:setsize(target)
 		self.invincible = false
-		self:startmodernsize(from, false)
+		if sizechangefreezes() then
+			self:startmodernsize(from, false)
+		else
+			self:endsizechange()
+			self:startsizefx(from, "modern", false)
+		end
 		if self.size ~= 6 and self.size ~= 9 and not raccoonplaning(self) then
 			raccoonplanesound:stop() --stops raccoon flying sound
 		end
@@ -4278,6 +4328,7 @@ function mario:grow(update)
 		end
 		self.sizechange = {duck = self.ducking, blinking = blinking}
 		--(ducking stays on through grow2, which only flashes colours; grow1 stands, see below)
+		local from = self:sizesnapshot()
 		local oldsize = self.size
 		if ((self.size == 1 and (not update or (update == 3 and (not mariomakerphysics)))) or (self.size == 2 and not update)) and update ~= -1 and update ~= 8 and update ~= 12 and update ~= 16 then
 			self.size = self.size + 1
@@ -4288,6 +4339,19 @@ function mario:grow(update)
 		
 		self.drawable = true
 		self.invincible = false
+		if (not sizechangefreezes()) and self.size ~= 8 and self.size ~= 16 then
+			--dontfreezeonsizechange: nothing stops, the animation only shows (see mario:startsizefx)
+			local kind = "grow2"
+			if self.size == 2 or self.size == -1 or (oldsize <= 1 and self.size == 12) then
+				kind = "grow1"
+			end
+			self:endsizechange()
+			self:startsizefx(from, kind, false)
+			if self.size ~= 6 and self.size ~= 9 and not raccoonplaning(self) then
+				raccoonplanesound:stop() --stops raccoon flying sound
+			end
+			return
+		end
 		self.animationtimer = 0
 		noupdate = true
 		
@@ -4463,6 +4527,167 @@ function mario:endmodernsize()
 	self:endsizechange()
 end
 
+--DONTFREEZEONSIZECHANGE (the nitpick): a size change doesn't freeze anything. The player is the new size straight
+--away and keeps moving, the animation (classic or modern) is only drawn over them (see drawplayer in game.lua),
+--and until it's over they can't be hurt and only touch the course itself (see sizefxsolid and handlegroup)
+
+function sizechangefreezes()
+	return not DontFreezeOnSizeChange
+end
+
+--what a size-changing player still collides with: the course's solid things (tiles, platforms, springs, doors...)
+sizefxsolid = {[2] = true, [7] = true, [9] = true, [10] = true, [12] = true, [15] = true, [19] = true, [22] = true,
+	[23] = true, [25] = true, [26] = true, [28] = true, [32] = true, [33] = true}
+
+--from: a snapshot from before the change (the player is already the new size). kind: "modern" (the
+--modernsizechangeanimation nitpick picks up, down or suit), "grow1", "grow2" or "shrink". hit: blinking afterwards
+function mario:startsizefx(from, kind, hit)
+	if kind == "modern" then
+		kind = "suit"
+		if self:sizerank(self.size) > self:sizerank(from.size) then
+			kind = "up"
+		elseif self:sizerank(self.size) < self:sizerank(from.size) then
+			kind = "down"
+		end
+	end
+	self.sizefx = {from = from, kind = kind, hit = hit, timer = 0}
+	self.invincible = true
+	self.drawable = true
+end
+
+--how long the animation is, the same as with the freeze
+function mario:sizefxtime()
+	local kind = self.sizefx.kind
+	if kind == "up" then
+		return #modernsizegrowscales*modernsizechangeparttime
+	elseif kind == "down" then
+		return #modernsizeshrinkscales*modernsizechangeparttime
+	elseif kind == "suit" then
+		return (modernsizesuitparts-1)*modernsizechangeparttime
+	elseif kind == "shrink" then
+		return shrinktime
+	end
+	return growtime
+end
+
+function mario:endsizefx()
+	local F = self.sizefx
+	self.sizefx = nil
+	if F.hit and ((not self.animation) or self.animation == "invincible") then
+		self.animation = "invincible"
+		self.invincible = true
+		self.animationtimer = invincibletime - invincibletime2
+	elseif self.animation == "invincible" or levelfinished then
+		self.invincible = true --(the blinking from before goes on)
+	elseif not self.animation then
+		self.invincible = false
+	end --(any other animation, the flagpole for example, keeps what it set)
+end
+
+--how the player looks right now, or nil for how they really are: snap (a snapshot to show, "to" for the new
+--size as it is now), scaley (squash and stretch from the bottom of the hitbox), anim (a pose), quadcenterY, colors
+function mario:sizefxlook()
+	local F = self.sizefx
+	local t = F.timer
+	local growanim = "grownogun"
+	if self.portalgun == true and not (playertype and playertype == "minecraft") then
+		growanim = "grow"
+	end
+	if F.kind == "up" then
+		local part = math.min(math.floor(t/modernsizechangeparttime)+1, #modernsizegrowscales)
+		return {snap = "to", scaley = modernsizegrowscales[part]}
+	elseif F.kind == "down" then
+		local part = math.min(math.floor(t/modernsizechangeparttime)+1, #modernsizeshrinkscales)
+		return {snap = F.from, scaley = modernsizeshrinkscales[part]}
+	elseif F.kind == "suit" then
+		local part = math.floor(t/modernsizechangeparttime)+1
+		if part % 2 == 0 then
+			return {snap = F.from}
+		end
+		return nil
+	elseif F.kind == "grow1" then
+		local frame = math.ceil(math.fmod(t, growframedelay*3)/growframedelay)
+		if frame == 3 then
+			return nil
+		elseif frame == 2 and self.size ~= -1 then
+			return {snap = F.from, anim = growanim, quadcenterY = self.characterdata.growquadcenterY}
+		end
+		return {snap = F.from}
+	elseif F.kind == "grow2" then
+		local frame = math.ceil(math.fmod(t, growframedelay*3)/growframedelay)
+		return {colors = self.characterdata.starcolors[math.max(frame, 1)]}
+	elseif F.kind == "shrink" then
+		local frame = math.ceil(math.fmod(t, growframedelay*3)/shrinkframedelay)
+		if frame == 1 then
+			return {snap = F.from}
+		elseif frame == 2 then
+			return {snap = "to", anim = growanim, quadcenterY = self.characterdata.shrinkquadcenterY2}
+		end
+	end
+	return nil
+end
+
+--puts the look on the player for drawing, with the feet where the player's are. Returns what to put back
+local sizefxlookfields = {"graphic", "colors", "quadcenterX", "quadcenterY", "offsetX", "offsetY", "quad",
+	"quadanim", "quadanimi", "quadframe", "sizechangescaley", "yoshiquad", "animationstate"}
+
+function mario:applysizefxlook(look)
+	local saved = {}
+	for _, k in ipairs(sizefxlookfields) do
+		saved[k] = self[k]
+	end
+	local snap = look.snap
+	if snap == "to" then
+		snap = self:sizesnapshot()
+	end
+	if snap then
+		self.graphic = snap.graphic
+		self.colors = snap.colors
+		self.quadcenterX = snap.quadcenterX
+		self.quadcenterY = look.quadcenterY or snap.quadcenterY
+		self.offsetX = snap.offsetX + (self.width - snap.width)*8
+		self.offsetY = snap.offsetY
+		self:setquad(look.anim, snap.size)
+		self.animationstate = saved.animationstate
+		self.yoshiquad = saved.yoshiquad
+		if look.scaley and self.gravitydir == "down" then
+			--(the same as mario:applysizesnapshot: the sprite's centre goes to the row at the bottom of the hitbox)
+			local shoeadd = 0
+			if self.shoeoffsetY and (not self.ducking) and (not self.clearpipe) then
+				shoeadd = self.shoeoffsetY
+			end
+			self.quadcenterY = self.quadcenterY + snap.height*16 + self.offsetY + shoeadd - 8
+			self.offsetY = 8 - snap.height*16 - shoeadd
+			self.sizechangescaley = look.scaley
+		end
+		--the snapshot's hitbox stands where the player's does
+		self.offsetY = self.offsetY - (self.height - snap.height)*16
+	end
+	if look.colors then
+		self.colors = look.colors
+	end
+	return saved
+end
+
+function mario:restoresizefxlook(saved)
+	for _, k in ipairs(sizefxlookfields) do
+		self[k] = saved[k]
+	end
+end
+
+--whether this player is in a size change animation (the game is frozen for it, see game_update)
+function mario:sizechanging()
+	return self.animation == "grow1" or self.animation == "grow2" or self.animation == "shrink"
+		or self.animation == "modernsize"
+end
+
+--the after-size-change jump (classic SMB): jumping in the air while the game is frozen for a power-up's size change
+--gives a silent jump once it's over. The modern animation allows it too (a hit's change doesn't, like the classic shrink)
+function mario:sizechangejumps()
+	return self.animation == "grow1" or self.animation == "grow2"
+		or (self.animation == "modernsize" and self.modernsize ~= nil and not self.modernsize.hit)
+end
+
 function mario:endsizechange()
 	local c = self.sizechange
 	self.sizechange = nil
@@ -4529,7 +4754,11 @@ function mario:shrink()
 		self.fireenemy = false
 		self.invincible = true
 		if from then
-			self:startmodernsize(from, true) --old and new suit take turns, then the blinking
+			if sizechangefreezes() then
+				self:startmodernsize(from, true) --old and new suit take turns, then the blinking
+			else
+				self:startsizefx(from, "modern", true)
+			end
 			return
 		end
 		self.animationtimer = invincibletime - invincibletime2
@@ -4545,11 +4774,38 @@ function mario:shrink()
 		self:setsize(1)
 		self.invincible = true
 		self.fireenemy = false
-		self:startmodernsize(from, true)
+		if sizechangefreezes() then
+			self:startmodernsize(from, true)
+		else
+			self:endsizechange()
+			self:startsizefx(from, "modern", true)
+		end
 		return
 	end
 	
 	self.sizechange = {duck = wasducking} --ducking comes back once the shrink animation is done (see endsizechange)
+	if not sizechangefreezes() then
+		--dontfreezeonsizechange: nothing stops, the animation only shows (see mario:startsizefx)
+		local from = self:sizesnapshot()
+		self.fireenemy = false
+		self.drawable = true
+		if self.largeshrink then
+			--(out of Mega Mario: straight to big, with the blinking)
+			self.largeshrink = false
+			self.size = 2
+			self:setsize(2)
+			self:endsizechange()
+			self.invincible = true
+			self.animationtimer = invincibletime - invincibletime2
+			self.animation = "invincible"
+			return
+		end
+		self.size = 1
+		self:setsize(1)
+		self:endsizechange()
+		self:startsizefx(from, "shrink", true)
+		return
+	end
 	if self.ducking then --the classic big-to-small animation stands
 		self:duck(false)
 	end
@@ -7685,6 +7941,7 @@ function mario:die(how)
 	if (CLIENT or SERVER) and self.playernumber > 1 and not self.netaction then
 		return
 	end
+	self.sizefx = nil --(dontfreezeonsizechange)
 	
 	if how ~= "pit" and how ~= "time" and how ~= "lava" and how ~= "killscript" and not self.dead then
 		animationsystem_playerhurttrigger(self.playernumber)
@@ -8526,7 +8783,7 @@ function levelfinish_uncloud(p)
 end
 
 function mario:flag()
-	if levelfinished then
+	if levelfinished or self.flagwaiting then
 		return
 	end
 	levelfinish_uncloud(self)
@@ -8561,37 +8818,42 @@ function mario:flag()
 	self.climbframe = 2
 	self.active = false
 	self:setquad()
-	levelfinished = true
-	levelfinishtype = "flag"
-	subtractscore = false
-	firework = false
-	castleflagy = castleflagstarty
-	objects["screenboundary"]["flag"].active = false
+	self.flagwaiting = true
+	
+	--the first one on the flagpole stops the timer and runs the level end (see the flag animation in mario:update)
+	local first = not flagpolewaiting
+	if first then
+		flagpolewaiting = {timer = 0}
+		self.flagleader = true
+		levelfinishtype = "flag"
+		subtractscore = false
+		firework = false
+		castleflagy = castleflagstarty
+		objects["screenboundary"]["flag"].active = false
+		
+		--time level completed in
+		realmariotime = mariotime
+	end
 	
 	--get score
-	flagscore = flagscores[1]
+	local score = flagscores[1]
 	for i = 1, #flagvalues do
 		if self.y < flagvalues[i]-13+flagy then
-			flagscore = flagscores[i+1]
+			score = flagscores[i+1]
 		else
 			break
 		end
 	end
 	
-	addpoints(flagscore)
-	
-	--get firework count
-	fireworkcount = tonumber(string.sub(math.ceil(mariotime), -1, -1))
-	if fireworkcount ~= 1 and fireworkcount ~= 3 and fireworkcount ~= 6 then
-		fireworkcount = 0
+	addpoints(score)
+	if first then
+		flagscore = score --(the one shown by the flag)
 	end
 	
-	if portalbackground then
-		fireworkcount = 0
+	--everyone's on the flagpole: the flag animation starts now (music stops there, so before this grab's sounds)
+	if flagpole_everyoneon() then
+		flagpole_start()
 	end
-	
-	stopmusic()
-	love.audio.stop()
 	
 	--one up at the top of the flag
 	if mariomakerphysics and self.y < flagvalues[#flagvalues]-13+flagy then
@@ -8607,9 +8869,61 @@ function mario:flag()
 	if self.largeshrink then
 		playsound(shrinksound)
 	end
+end
+
+--MULTIPLAYER FLAGPOLE: the first player on the flagpole holds on (and the music keeps going) until everyone else
+--is on it too or dead, or flagpolewaittime is up. Then the flag animation starts for everyone on the flagpole.
+--Anyone who isn't keeps playing (and respawns, see mario:respawn) until the course ends
+
+--whether everyone who hasn't grabbed the flagpole is dead (they don't get to respawn: the level is over)
+function flagpole_everyoneon()
+	for i = 1, players do
+		local p = objects["player"][i]
+		if p and not p.flagwaiting and not p.dead then
+			return false
+		end
+	end
+	return true
+end
+
+function flagpole_update(dt)
+	if not flagpolewaiting then
+		return
+	end
+	flagpolewaiting.timer = flagpolewaiting.timer + dt
+	if flagpolewaiting.timer >= flagpolewaittime or flagpole_everyoneon() then
+		flagpole_start()
+	end
+end
+
+function flagpole_start()
+	if not flagpolewaiting then
+		return
+	end
+	flagpolewaiting = false
+	levelfinished = true
 	
-	--time level completed in
-	realmariotime = mariotime
+	--everyone on the flagpole goes down it from where they grabbed it
+	for i = 1, players do
+		local p = objects["player"][i]
+		if p and p.flagwaiting then
+			p.animationtimer = 0
+			p.flagtimer = 0
+		end
+	end
+	
+	--get firework count
+	fireworkcount = tonumber(string.sub(math.ceil(mariotime), -1, -1))
+	if fireworkcount ~= 1 and fireworkcount ~= 3 and fireworkcount ~= 6 then
+		fireworkcount = 0
+	end
+	
+	if portalbackground then
+		fireworkcount = 0
+	end
+	
+	stopmusic()
+	love.audio.stop()
 
 	--kill shit
 	for i, v in pairs(objects["enemy"]) do
@@ -9302,7 +9616,8 @@ function mario:shootgel(i)
 end
 
 function mario:respawn()
-	if mariolivecount ~= false and (mariolives[self.playernumber] == 0 or levelfinished) then
+	--(after the flagpole, anyone who didn't get it keeps playing until the course ends)
+	if mariolivecount ~= false and (mariolives[self.playernumber] == 0 or (levelfinished and levelfinishtype ~= "flag")) then
 		return
 	end
 	
@@ -9343,7 +9658,12 @@ function mario:respawn()
 	self.invincible = true
 	self.animationtimer = invincibletime - invincibletime2
 	
-	if (not fastestplayer) or (fastestplayer.y >= mapheight) then
+	if fastestplayer and fastestplayer.flagwaiting then
+		--the furthest player already finished the course: back to the checkpoint (or the start), standing on it
+		local x, feety = respawncheckpoint()
+		self.x = x
+		self.y = feety-self.height
+	elseif (not fastestplayer) or (fastestplayer.y >= mapheight) then
 		self.x = startx
 		self.y = starty-1-self.height
 	else
@@ -9356,6 +9676,20 @@ function mario:respawn()
 	
 	self.controlsenabled = true
 	self.active = true
+end
+
+--where a player respawns when there's nobody to respawn at: the checkpoint reached in this sublevel, or the start.
+--The same place a course loading from there puts player 1 (game.lua: mario:new(startx-6/16, starty-1), and
+--mario:init stands them on y+1): returns x and where their feet go
+function respawncheckpoint()
+	local x, y = startx, starty
+	if checkpointx and checkpointsublevel == actualsublevel and checkpointpoints[checkpointx] then
+		x, y = checkpointx, checkpointpoints[checkpointx]
+		if objects["checkpointflag"][checkpointx] then
+			x = checkpointx - .5
+		end
+	end
+	return x-6/16, y
 end
 
 function mario:updateclimbwater()

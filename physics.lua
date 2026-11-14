@@ -408,7 +408,8 @@ function handlegroup(i, h, u, v, j, dt, passed)
 	local vercollision = false
 	for g, t in pairs(u) do
 		--    Same object?          Active                 Not masked
-		if (i ~= g or j ~= h) and t.active and (v.mask == nil or v.mask[t.category] ~= true) and (t.mask == nil or t.mask[v.category] ~= true) then
+		if (i ~= g or j ~= h) and t.active and (v.mask == nil or v.mask[t.category] ~= true) and (t.mask == nil or t.mask[v.category] ~= true)
+			and not ((v.sizefx and not sizefxsolid[t.category]) or (t.sizefx and not sizefxsolid[v.category])) then --(dontfreezeonsizechange)
 			local collision1, collision2 = checkcollision(v, t, h, g, j, i, dt, passed)
 			if collision1 then
 				horcollision = true

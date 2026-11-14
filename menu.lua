@@ -1186,7 +1186,8 @@ local nitpickkeys = {
 	"removecooldowns",
 	"classicspeedupfastmusic",
 	"modernsizechangeanimation",
-	"noairspeedcap"
+	"noairspeedcap",
+	"dontfreezeonsizechange"
 }
 
 function generatenitpicksfile()

@@ -448,6 +448,42 @@ function splitscreen_spawn(i, view, f)
 end
 
 --every viewport is drawn onto its own canvas, so scissors/stencils used while drawing the level can't leak into other viewports
+--where the mouse is in the level (in tiles), seen through the viewport of player p, or nil without split screen.
+--A viewport is drawn at view.x, view.y with its own camera (splitcamx/splitcamy), and shows rangemul times as much
+--(see splitscreen_beginview). s: the scale the mouse position is in
+function splitscreen_mouseworld(p, s)
+	local views = getsplitscreenviewscached()
+	if not views then
+		return nil
+	end
+	local index
+	for i = 1, #views do
+		if splitscreen_viewplayer(i) == p.playernumber then
+			index = i
+			break
+		end
+	end
+	if not index then
+		--no viewport of their own (a minigame's layout): the one that follows them
+		for i = 1, #views do
+			if splitscreen_viewtarget(i) == p then
+				index = i
+				break
+			end
+		end
+	end
+	if not index then
+		return nil
+	end
+	local view = views[index]
+	local mul = splitscreen_rangemul(view)
+	local camx = splitcamx[index] or splitxscroll[1]
+	local camy = splitcamy[index] or splityscroll[1]
+	local x = camx + (love.mouse.getX() - view.x*s)*mul/(16*screenzoom*s)
+	local y = camy + (love.mouse.getY() - view.y*s)*mul/(16*screenzoom*s)
+	return x, y
+end
+
 function splitscreen_beginview(split, view)
 	local basescale = scale
 	local renderscale = scale
