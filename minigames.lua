@@ -7201,9 +7201,6 @@ local function rrr_konamirevive(S, i)
 	else
 		mariolives[i] = RRR_KONAMI_LIVES
 	end
-	if S.watch == i then
-		S.watch = nil
-	end
 	rrrx.addview(S, i)
 	rrr_respawn(S, objects["player"][i])
 	playsound(oneupsound)
@@ -7769,8 +7766,7 @@ addminigame({
 					table.insert(splitscreenviewplayers, i)
 				end
 			end
-			splitscreenviewtarget = rrr_viewtarget
-			splitscreenviewhud = rrr_viewhud
+			--a viewport always follows its own player, even once they're out (no spectating someone else)
 		end
 
 		--music
