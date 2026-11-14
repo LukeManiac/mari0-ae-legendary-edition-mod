@@ -9734,6 +9734,9 @@ end
 --The original is put back before the camera logic runs again; if anything else moved the camera in between
 --(a level load, camerasnap...), smoothing starts over from there
 camerasmoothingstate = {}
+--while this is true, every smoothed camera sits exactly where the camera really is (no easing at all).
+--Rival Rumble Royale holds it during its countdown, so the battle opens with the cameras already on the players
+camerasmoothingforcesnap = false
 
 function camerasmoothing_restore(key, tx, ty, i)
 	local c = camerasmoothingstate[key]
@@ -9754,7 +9757,7 @@ function camerasmoothing_apply(key, tx, ty, i, dt, maxx, maxy)
 	end
 	local ox, oy = tx[i], ty[i]
 	local c = camerasmoothingstate[key]
-	if not c then
+	if (not c) or camerasmoothingforcesnap then
 		c = {smoothx = ox, smoothy = oy}
 		camerasmoothingstate[key] = c
 	else

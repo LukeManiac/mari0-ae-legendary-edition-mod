@@ -265,7 +265,7 @@ function splitscreen_update(dt)
 		--camera, it stays where it is while the player is dead (until they revive)
 		camerasmoothing_restore("view" .. i, splitcamx, splitcamy, i) --(camerasmoothing, see game.lua)
 		if (not dead) or (not splitcamx[i]) then
-			splitscreen_updatecamera(i, view, p, f, dt, revived or resnap)
+			splitscreen_updatecamera(i, view, p, f, dt, revived or resnap or camerasmoothingforcesnap)
 		end
 		local mul = (splitscreencanvases[i] and splitscreencanvases[i].viewrangemul) or 1
 		camerasmoothing_apply("view" .. i, splitcamx, splitcamy, i, dt,

@@ -6367,13 +6367,13 @@ do
 		"Mythical", "Immortal", "Godlike", "Omnipotent", "THE UNDEFEATABLE",
 	}
 	local RRR_BOTANCHORS = {
-		[1] = {think = 1.6, fire = 2.5, dodge = 0, range = 4, flee = 2, dawdle = 0.6, lead = 0},
+		[1] = {think = 1.6, fire = 2.5, dodge = 0, range = 4, flee = 2, dawdle = 0.6, lead = 0, sight = 2, stompdodge = 0, focus = 0, bold = 0, aerial = 0, aggro = 0},
 		[5] = {think = 0.8, fire = 1.2, dodge = 0.15, range = 7, flee = 4, dawdle = 0.3, lead = 0}, --the old "easy"
 		[10] = {think = 0.45, fire = 0.7, dodge = 0.5, range = 10, flee = 6, dawdle = 0.1, lead = 0}, --the old "normal"
 		[15] = {think = 0.25, fire = 0.35, dodge = 0.9, range = 12, flee = 7, dawdle = 0, lead = 0}, --the old "expert"
 		[20] = {think = 0.12, fire = 0.18, dodge = 1, range = 16, flee = 9, dawdle = 0, lead = 0.3}, --the old "super expert"
 		[23] = {think = 0.05, fire = 0.1, dodge = 1, range = 40, flee = 12, dawdle = 0, lead = 0.4}, --the old "godmode"
-		[25] = {think = 0.03, fire = 0.07, dodge = 1, range = 60, flee = 14, dawdle = 0, lead = 0.5},
+		[25] = {think = 0.04, fire = 0.03, dodge = 1, range = 60, flee = 14, dawdle = 0, lead = 0.55, sight = 9, stompdodge = 1, focus = 1, bold = 1, aerial = 1, aggro = 1},
 	}
 	local RRR_BOTGREED = {[23] = 0.8, [24] = 0.85, [25] = 0.9} --the rest pick at random
 	local RRR_BOTDODGESTOMPS_FROM = 22
@@ -6661,7 +6661,8 @@ local function rrr_botattack(S, p, bot, input, e, dt)
 	else
 		--stomp them
 		rrr_steer(input, cx, ex, 0.1)
-		if math.abs(dx) < 2.6 and dy > -2 and not e.falling and not e.jumping then
+		local grounded = not e.falling and not e.jumping
+		if math.abs(dx) < 2.6 and dy > -2 and (grounded or (dy > -0.5 and math.random() < bot.level.aerial)) then
 			input.jump = true
 		end
 	end
@@ -6676,7 +6677,7 @@ local function rrr_incoming(S, p)
 			if name ~= "mariotail" and owner and owner ~= p and rrr_isprojectile(name, o) and o.active ~= false and not o.destroy then
 				local ox = o.x + o.width/2
 				local toward = (o.speedx or 0) * (cx - ox) > 0
-				if toward and math.abs(ox - cx) < 3.5 and math.abs((o.y + o.height/2) - cy) < 1.4 then
+				if toward and math.abs(ox - cx) < sight and math.abs((o.y + o.height/2) - cy) < 1.4 then
 					return true
 				end
 			end
@@ -7308,6 +7309,7 @@ local function rrr_updatecountdown(S)
 	end
 	if C.elapsed >= RRR_COUNTDOWN then
 		S.starting = nil
+		camerasmoothingforcesnap = false --(the smoothed cameras carry on from where they're snapped)
 		C.shown = "go!"
 		playsound(countdowngosound)
 		for i = 1, RRR_PLAYERS do
