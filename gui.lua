@@ -998,6 +998,11 @@ function guielement:click(x, y, button)
 					self:open()
 				end
 			else
+				--mouse wheel only scrolls the list view (never changes the selected choice)
+				if self.scrollbar and (button == "wu" or button == "wd") then
+					self.scrollbar:click(x, y, button)
+					return true
+				end
 				if self.scrollbar then
 					self.scrollbar:click(x, y, button)
 					if x > (self.x+(13+self.width*8))*scale and x < (self.x+(13+self.width*8)+8)*scale then
@@ -1728,7 +1733,8 @@ function guielement:updatePos()
 			self.scrollbar.yrange = self.scrollbar.yrange + self.scrollbar.height
 			self.scrollbar.height = math.max(30, math.min(1, (height*16)/(yrange+(height*16)))*(height*16))
 			self.scrollbar.yrange = self.scrollbar.yrange - self.scrollbar.height
-			self.scrollbar.scrollstep = math.max(0.0001, 73/yrange)
+			--scroll the view by about 3 rows per wheel notch (not jump the whole list / selection)
+			self.scrollbar.scrollstep = math.max(0.0001, math.min(0.35, 30/yrange))
 			self.scroll = self.scrollbar.value*yrange
 		end
 		if not self.cutoff and self.y+10*(#self.entries+1) > height*16 then
