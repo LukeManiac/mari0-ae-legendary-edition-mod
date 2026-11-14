@@ -6671,7 +6671,8 @@ local function rrr_botattack(S, p, bot, input, e, dt)
 end
 
 --projectiles coming this way: jump
-local function rrr_incoming(S, p)
+local function rrr_incoming(S, p, sight)
+	sight = sight or 3.5 --(the old fixed distance, if no sight is given)
 	local cx, cy = rrr_center(p), p.y + p.height/2
 	for _, name in ipairs(RRR_PROJECTILES) do
 		for _, o in pairs(objects[name] or {}) do
@@ -6893,7 +6894,7 @@ local function rrr_botupdate(S, i, p, dt)
 	end
 
 	--dodge (it decides once per projectile if it sees it in time)
-	local incoming = cur and rrr_incoming(S, p)
+	local incoming = cur and rrr_incoming(S, p, bot.level.sight)
 	if incoming and not bot.sawincoming then
 		bot.willdodge = math.random() < bot.level.dodge
 	end
