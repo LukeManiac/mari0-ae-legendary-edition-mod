@@ -6388,7 +6388,7 @@ do
 		local s1, s2 = RRR_BOTANCHORS[i1], RRR_BOTANCHORS[i2]
 		for i = i1, i2 do
 			local t = (i-i1)/(i2-i1)
-			local level = {name = RRR_BOTLEVELNAMES[i], greed = RRR_BOTGREED[i], dodgestomps = i >= RRR_BOTDODGESTOMPS_FROM}
+			local level = {name = RRR_BOTLEVELNAMES[i], greed = RRR_BOTGREED[i]}
 			for k, v in pairs(s1) do
 				local v2 = s2[k] or v --(a stat missing from the next anchor stays flat instead of crashing)
 				level[k] = v + (v2-v)*t
@@ -6916,11 +6916,27 @@ local function rrr_botupdate(S, i, p, dt)
 		end
 	end
 
-	--someone coming down on its head: step out from under them
-	if bot.level.dodgestomps and cur and not p.starred then
+	--someone coming down on its head: step out from under them (it decides once per stomp, like a dodge,
+	--and the best bots see it coming from further up)
+	local stompthreat = false
+	if bot.level.stompdodge > 0 and cur and not p.starred then
 		for _, e in ipairs(rrr_enemies(S, i)) do
 			local above = p.y - rrr_feet(e)
-			if e.speedy > 0 and not rrr_dangerous(e) and above > 0 and above < 2.5 and math.abs(rrr_center(e) - cx) < 1.3 then
+			if e.speedy > 0 and not rrr_dangerous(e) and above > 0 and above < 2.5 + bot.level.stompdodge
+				and math.abs(rrr_center(e) - cx) < 1.3 then
+				stompthreat = true
+			end
+		end
+	end
+	if stompthreat and not bot.sawstomp then
+		bot.willdodgestomp = math.random() < bot.level.stompdodge
+	end
+	bot.sawstomp = stompthreat
+	if stompthreat and bot.willdodgestomp then
+		for _, e in ipairs(rrr_enemies(S, i)) do
+			local above = p.y - rrr_feet(e)
+			if e.speedy > 0 and not rrr_dangerous(e) and above > 0 and above < 2.5 + bot.level.stompdodge
+				and math.abs(rrr_center(e) - cx) < 1.3 then
 				input.left, input.right = false, false
 				if rrr_center(e) > cx then
 					input.left = true
