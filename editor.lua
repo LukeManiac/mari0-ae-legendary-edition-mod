@@ -306,7 +306,9 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	guielements["scrollfactor2xscrollbar"].buttonround = true
 	guielements["scrollfactor2yscrollbar"].buttonround = true
 	--right click typing (gui.lua) works in the units these sliders stand for
-	guielements["autoscrollingscrollbar"].valuefunction = function(self, v) return round(v*autoscrollingmaxspeed, 2) end
+	guielements["autoscrollingscrollbar"].min = autoscrollingminspeed
+	guielements["autoscrollingscrollbar"].max = autoscrollingmaxspeed
+	guielements["autoscrollingscrollbar"].valuefunction = function(self, v) return round(autoscrollingminspeed + v*(autoscrollingmaxspeed-autoscrollingminspeed), 2) end
 	guielements["autoscrollingscrollbar"].displayfunction = function(self, v) return formatscrollnumber(self:valuefunction(v)) end
 	for _, name in ipairs({"scrollfactorxscrollbar", "scrollfactoryscrollbar", "scrollfactor2xscrollbar", "scrollfactor2yscrollbar"}) do
 		guielements[name].valuefunction = function(self, v) return round((v*3)^2, 2) end
@@ -8925,7 +8927,7 @@ end
 
 function updatescrollfactor()
 	--not a scrollfactor lol
-	autoscrollingspeed = round(guielements["autoscrollingscrollbar"].value*autoscrollingmaxspeed, 2)
+	autoscrollingspeed = guielements["autoscrollingscrollbar"]:valuefunction(guielements["autoscrollingscrollbar"].value)
 
 	scrollfactor = round((guielements["scrollfactorxscrollbar"].value*3)^2, 2)
 	scrollfactory = round((guielements["scrollfactoryscrollbar"].value*3)^2, 2)
@@ -8947,7 +8949,9 @@ function reversescrollfactor2(s)
 end
 
 function reverseautoscrollingscrollbar(s)
-	return autoscrollingspeed/autoscrollingmaxspeed
+	local speed = tonumber(s or autoscrollingspeed) or autoscrollingdefaultspeed
+	speed = math.min(math.max(speed, autoscrollingminspeed), autoscrollingmaxspeed)
+	return (speed-autoscrollingminspeed)/(autoscrollingmaxspeed-autoscrollingminspeed)
 end
 
 function formatscrollnumber(i)

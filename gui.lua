@@ -1090,7 +1090,7 @@ function guielement:click(x, y, button)
 				else
 					if button == "r" then
 						--right click anywhere on a slider to type its value (enter sets it, escape cancels)
-						if self:insidertrack(x, y) and self.typeable ~= false and not android then
+						if self:isslider() and self:insidertrack(x, y) and not android then
 							self:starttyping()
 							return true
 						elseif self.inputting then
@@ -1867,6 +1867,20 @@ function guielement:sliderradius()
 		roundness = 0.15 --buttons use 0.15
 	end
 	return math.min(self.width, self.height)*scale*roundness
+end
+
+--a slider is a horizontal scrollbar that stands for a number; plain scrollbars (like the animation list's) only scroll
+function guielement:isslider()
+	if self.type ~= "scrollbar" or self.dir == "ver" or self.typeable == false then
+		return false
+	end
+	if self.typeable then
+		return true
+	end
+	if self.displayfunction or self.valuefunction or self.typefunc or self.rcrange or self.rightclickvalue then
+		return true
+	end
+	return self.min ~= nil and self.max ~= nil
 end
 
 --like inhighlight, but anywhere on a horizontal slider's track instead of only on its handle

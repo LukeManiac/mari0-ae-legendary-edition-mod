@@ -845,6 +845,7 @@ windspeedslow = 1 --1px every 2 frames
 
 autoscrollingdefaultspeed = 3
 autoscrollingmaxspeed = 8
+autoscrollingminspeed = -autoscrollingmaxspeed
 
 dropshadow = false
 dropshadowcolor = {0, 0, 0, 80}
