@@ -2453,6 +2453,39 @@ local function mp_tabrects()
 	return rects
 end
 
+--colour of the "files to create" count: each warning has a colour, and counts in between
+--blend between the two nearest ones (on a log scale, since the warnings go up by 10x)
+local function filecountcolour(count)
+	local stops = {
+		{MAPPACKCREATOR_FILEWARNING/10, {150, 150, 150}},
+		{MAPPACKCREATOR_FILEWARNING, {252, 152, 56}},
+		{MAPPACKCREATOR_FILEWARNING_BIG, {252, 80, 80}},
+		{MAPPACKCREATOR_FILEWARNING_HUGE, {255, 0, 0}},
+		{MAPPACKCREATOR_FILEWARNING_GOODGOD, {127, 0, 0}},
+	}
+	local function logof(n)
+		return math.log(math.max(n, 1))
+	end
+
+	if count <= stops[1][1] then
+		local c = stops[1][2]
+		return c[1], c[2], c[3]
+	end
+	for i = 2, #stops do
+		local from, to = stops[i-1], stops[i]
+		if count < to[1] then
+			local t = 1
+			if logof(to[1]) > logof(from[1]) then
+				t = (logof(count) - logof(from[1]))/(logof(to[1]) - logof(from[1]))
+			end
+			t = clamp(t, 0, 1)
+			return lerp(from[2][1], to[2][1], t), lerp(from[2][2], to[2][2], t), lerp(from[2][3], to[2][3], t)
+		end
+	end
+	local c = stops[#stops][2]
+	return c[1], c[2], c[3]
+end
+
 local function mp_draw()
 	drawpanel()
 
@@ -2502,17 +2535,8 @@ local function mp_draw()
 			love.graphics.setColor(150, 150, 150)
 			properprintF("none", 190*scale, 141*scale)
 		end
-		--grey, orange past the warning, red past the big warning
-		love.graphics.setColor(150, 150, 150)
-		if mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_GOODGOD then
-			love.graphics.setColor(127, 0, 0)
-        elseif mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
-			love.graphics.setColor(255, 0, 0)
-		elseif mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_BIG then
-			love.graphics.setColor(252, 80, 80)
-		elseif mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING then
-			love.graphics.setColor(252, 152, 56)
-		end
+		--fades from grey through orange and reds as the count passes each warning
+		love.graphics.setColor(filecountcolour(mpcheck.filecount))
 		properprintF("files to create: " .. mpcheck.filecount, 26*scale, 172*scale)
 	elseif mptab == "hud" then
 		if mp.use_character_name then
