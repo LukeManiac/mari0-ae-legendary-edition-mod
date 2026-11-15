@@ -167,12 +167,22 @@ local doubleinputcheck = false
 function guielement:update(dt)
 	if self.active then
 		if self.type == "scrollbar" then
+			--typing cursor: the same animation as text inputs
 			self.timer = self.timer + dt
-			local phase = (self.timer % (blinktime * 2)) / blinktime
-			if phase < 1 then
-				self.cursoralpha = 1
+			if self.inputting ~= self.lastinputting then
+				self.cursorcurve = random_motion_curve()
+				self.lastinputting = self.inputting
+				self.timer = 0
+				if self.inputting then
+					self.cursoralpha = 0
+				end
+			end
+			--full oscillation over 1 second (0 → 1 → 0), shaped by the random curve
+			local t = self.timer % 1
+			if t < 0.5 then
+				self.cursoralpha = motion_curve(t * 2, self.cursorcurve, false, true, true, true)
 			else
-				self.cursoralpha = 1 - (phase - 1)
+				self.cursoralpha = 1 - motion_curve((t - 0.5) * 2, self.cursorcurve, false, true, true, true)
 			end
 			if self.dragging then
 				if self.dir == "ver" then
@@ -867,11 +877,19 @@ function guielement:draw(a, offx, offy)
 				end
 				properprint(s, (self.x+self.xrange*self.value)*scale, (self.y+math.ceil((self.height-8)/2))*scale)
 
-				--cursor
-				if self.inputting and self.cursoralpha and self.cursoralpha > 0 then
-					love.graphics.setColor(255, 255, 255, self.cursoralpha * 255)
-					love.graphics.rectangle("fill", (self.x+self.xrange*self.value+string.len(self.textvalue)*8)*scale, (self.y+math.ceil((self.height-8)/2)-1)*scale, 2*scale, 9*scale)
+				--cursor: fades and glides like a text input's
+				if self.inputting then
+					local column = self:smoothcursor(string.len(self.textvalue), 1)
+					if self.cursoralpha and self.cursoralpha > 0 then
+						love.graphics.setColor(255, 255, 255, self.cursoralpha * 255)
+						love.graphics.rectangle("fill", (self.x+self.xrange*self.value+column*8)*scale, (self.y+math.ceil((self.height-8)/2)-1)*scale, 2*scale, 9*scale)
+					end
 				end
+			end
+			if not self.inputting then
+				--next time typing starts, the cursor starts where it is without gliding
+				self.cursortx = nil
+				self.cursoranim = nil
 			end
 
 			if pz ~= 1 then
@@ -1860,7 +1878,7 @@ end
 function guielement:starttyping()
 	self.dragging = false
 	self.inputting = true
-	self.textvalue = "" --typing replaces the value
+	self.textvalue = self:currentnumbertext() --starts with the slider's value, the cursor at the end
 	self.cursorblink = true
 	self.timer = 0
 	typingintextinput = true
@@ -1882,6 +1900,27 @@ function guielement:numberat(v)
 		return tonumber(s) or tonumber(s:match("%-?%d+%.?%d*"))
 	end
 	return nil
+end
+
+--the slider's value as text to type over: what it shows, else its range, else a percentage
+function guielement:currentnumbertext()
+	local n = self:numberat(self.value)
+	if n == nil then
+		local min, max = self.min, self.max
+		if not (min and max) and self.rcrange then
+			min, max = self.rcrange[1], self.rcrange[2]
+		end
+		if min and max then
+			n = min + self.value*(max-min)
+		else
+			n = self.value*100
+		end
+	end
+	n = round(n, 2)
+	if n == math.floor(n) then
+		return string.format("%d", n)
+	end
+	return tostring(n)
 end
 
 --turns a typed number into a slider position (0-1)
