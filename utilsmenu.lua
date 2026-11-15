@@ -2501,12 +2501,12 @@ local function mp_draw()
 		end
 		--grey, orange past the warning, red past the big warning
 		love.graphics.setColor(150, 150, 150)
-		if mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING then
-			love.graphics.setColor(255, 152, 56)
+		if mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
+			love.graphics.setColor(255, 0, 0)
 		elseif mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_BIG then
 			love.graphics.setColor(252, 80, 80)
-		elseif mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
-			love.graphics.setColor(252, 0, 0)
+		elseif mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING then
+			love.graphics.setColor(252, 152, 56)
 		end
 		properprintF("files to create: " .. mpcheck.filecount, 26*scale, 172*scale)
 	elseif mptab == "hud" then
