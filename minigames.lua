@@ -4879,6 +4879,12 @@ local function rrr_state()
 	return nil
 end
 
+--true while RRR is running with "None" picked as the battle music: no star theme then either (starmusicactive in game.lua)
+function rrr_nomusic()
+	local S = rrr_state()
+	return S ~= nil and S.nomusic == true
+end
+
 --player i's knockouts while RRR is running (nil otherwise), for drawmultiHUD in game.lua
 function rrr_hudkos(i)
 	local S = rrr_state()
@@ -7322,6 +7328,10 @@ end
 
 --the low time sound, then the fast music (rrr_updatelowtime starts it once the sound is done)
 function rrrx.startlowtime(S)
+	if S.nomusic then
+		S.lowtime = {waiting = false} --"None" battle music: no low time sound and no fast music, just quiet
+		return
+	end
 	rrrx.ensurefastmusic()
 	S.lowtime = {waiting = true}
 	stopmusic()
@@ -7841,6 +7851,7 @@ addminigame({
 		if choice == 1 then
 			--"None": no battle music (musici 1 is the game's own "no music", playmusic and stopmusic skip it)
 			rrr_setupmusic(S, nil)
+			S.nomusic = true --no star theme and no low time sound either (rrr_nomusic, rrrx.startlowtime)
 			musici = 1
 			custommusic = false
 			custommusici = false

@@ -9433,6 +9433,9 @@ function megamushroomactive()
 end
 
 function starmusicactive()
+	if rrr_nomusic and rrr_nomusic() then
+		return false --rival rumble royale with "None" picked as the battle music
+	end
 	for i = 1, players do
 		local p = objects["player"][i]
 		if p and p.starred and p.size ~= 8 and p.startimer < mariostarduration-mariostarrunout then
