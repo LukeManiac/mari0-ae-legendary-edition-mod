@@ -20,11 +20,32 @@ end
 set_language("english")
 
 local Languages, LanguageCount
+local LanguageList --the languages in a fixed order: {name = file name, display = shown name}
 local sel = 1
 local languagemenu_select
+
+--opening and closing animate like the pause menu prompts (drawprompt in game.lua)
+local languagemenushown = false --open as far as the animation knows, set by languagemenu_open/languagemenu_update
+local lastlanguagemenushown = false
+local languagemenucurve = random_motion_curve()
+local languagemenutimer = 0
+local languagemenuduration = pausemenuduration
+
+local function languagemenu_lines()
+	return {TEXT["language"] or "language"}
+end
+
+local function languagemenu_options()
+	local options = {}
+	for i, t in ipairs(LanguageList) do
+		options[i] = t.display
+	end
+	return options
+end
+
 function languagemenu_open()
 	--Load list of languages
-	if not Lanugages then
+	if not Languages then
 		Languages = {}
 		LanguageCount = 0
 		local files = love.filesystem.getDirectoryItems("languages")
@@ -42,89 +63,83 @@ function languagemenu_open()
 				Languages[j].name = w
 			end
 		end
+		LanguageList = {}
+		for name, t in pairs(Languages) do
+			table.insert(LanguageList, {name = name, display = t.name})
+		end
+		table.sort(LanguageList, function(a, b) return a.display:lower() < b.display:lower() end)
 	end
 
 	if not CurrentLanguage then
 		CurrentLanguage = "english"
 	end
 	--Find Current Selection
-	local i = 1
-	for name, t in pairs(Languages) do
-		if name == CurrentLanguage then
+	sel = 1
+	for i, t in ipairs(LanguageList) do
+		if t.name == CurrentLanguage then
 			sel = i
 			break
 		end
-		i = i + 1
 	end
+	languagemenushown = true
+end
+--open: whether the menu is open right now (it keeps drawing while it shrinks away after closing)
+function languagemenu_update(dt, open)
+	languagemenushown = (open == true)
+	if languagemenushown ~= lastlanguagemenushown then
+		languagemenucurve = random_motion_curve()
+		lastlanguagemenushown = languagemenushown
+	end
+	local direction = 1
+	if not languagemenushown then
+		direction = -1
+	end
+	languagemenutimer = math.max(0, math.min(languagemenutimer + dt*direction, languagemenuduration))
+end
+function languagemenu_visible()
+	return languagemenushown or languagemenutimer > 0
 end
 function languagemenu_draw()
-	--Darken Background
-	love.graphics.setColor(0, 0, 0, 100)
-	love.graphics.rectangle("fill", 0, 0, width*16*scale, 224*scale)
-	--Window
-	local w, h = 220, (LanguageCount+1)*10+10
-	local x, y = (width*16-w)/2, (height*16-h)/2
-	love.graphics.setColor(0, 0, 0)
-	love.graphics.rectangle("fill", x*scale, y*scale, w*scale, h*scale)
-	love.graphics.setColor(255, 255, 255)
-	drawrectangle(x+1, y+1, w-2, h-2)
-	--Text
-	properprintF(TEXT["language"], (x+(w-utf8.len(TEXT["language"])*8)/2)*scale, (y+6)*scale)
-	local i = 1
-	for name, t in pairs(Languages) do
-		love.graphics.setColor(100, 100, 100, 255)
-		if sel == i then
-			love.graphics.setColor(255, 255, 255)
-			properprintf(">", (x+6)*scale, (y+6+i*10)*scale)
-		end
-		properprintf(t.name, (x+16)*scale, (y+6+i*10)*scale)
-		i = i + 1
+	if not LanguageList or not languagemenu_visible() then
+		return
 	end
+	local lines, options = languagemenu_lines(), languagemenu_options()
+	drawprompt(languagemenutimer, languagemenuduration, languagemenushown, languagemenucurve, #lines + #options)
+	drawpromptcontent(lines, options, sel)
+	love.graphics.pop()
 end
 function languagemenu_keypressed(key)
-	if (key == "up" or key == "w") then
-		sel = math.max(1, sel-1)
-	elseif (key == "down" or key == "s") then
-		sel = math.min(LanguageCount, sel+1)
-	elseif (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
+	local moved
+	sel, moved = promptnavigate(key, sel, LanguageCount)
+	if moved then
+		return
+	end
+	if (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
 		return languagemenu_select()
 	elseif key == "escape" then
 		return true
 	end
 end
 function languagemenu_mousepressed(mx, my, button)
-	local w, h = 220, (LanguageCount+1)*10+10
-	local x, y = (width*16-w)/2, (height*16-h)/2
-	for i = 1, LanguageCount do
-		if mx > (x+6)*scale and my > (y+6+i*10)*scale and mx < (x+6+w)*scale and my < (y+16+i*10)*scale then
-			return languagemenu_select()
-		end
+	local i = promptoptionat(mx, my, languagemenu_lines(), languagemenu_options())
+	if i then
+		sel = i
+		return languagemenu_select()
 	end
 end
 function languagemenu_mousemoved(mx, my, dx, dy)
-	local w, h = 220, (LanguageCount+1)*10+10
-	local x, y = (width*16-w)/2, (height*16-h)/2
-	for i = 1, LanguageCount do
-		if mx > (x+6)*scale and my > (y+6+i*10)*scale and mx < (x+6+w)*scale and my < (y+16+i*10)*scale then
-			sel = i
-			break
-		end
+	local i = promptoptionat(mx, my, languagemenu_lines(), languagemenu_options())
+	if i then
+		sel = i
 	end
 end
-function languagemenu_update(dt)
-
-end
 function languagemenu_select()
-	local i = 1
-	for name, t in pairs(Languages) do
-		if i == sel then
-			CurrentLanguage = name
-			set_language(CurrentLanguage)
-			saveconfig()
-
-			return true
-		end
-		i = i + 1
+	local t = LanguageList[sel]
+	if t then
+		CurrentLanguage = t.name
+		set_language(CurrentLanguage)
+		saveconfig()
+		return true
 	end
 	return false
 end

@@ -1727,9 +1727,7 @@ function menu_update(dt)
 		blinktimer = blinktimer - 1
 	end
 
-	if languagemenuopen then
-		languagemenu_update(dt)
-	end
+	languagemenu_update(dt, languagemenuopen)
 end
 
 function menu_draw()
@@ -2955,7 +2953,7 @@ function menu_draw()
 	resetwarning_draw()
 	love.graphics.translate(0, yoffset*scale)
 	
-	if languagemenuopen then
+	if languagemenu_visible() then
 		languagemenu_draw()
 	end
 end
