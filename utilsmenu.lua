@@ -1584,10 +1584,10 @@ local function mp_validate()
 	local filecount = mp_filecount(v)
 	if filecount >= MAPPACKCREATOR_FILEWARNING then
 		local amount = "some"
-		if filecount >= MAPPACKCREATOR_FILEWARNING_BIG then
+		if filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
+			amount = "a ridiculously long amount of"
+        elseif filecount >= MAPPACKCREATOR_FILEWARNING_BIG then
 			amount = "a lot of"
-        elseif filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
-			amount = "a ridiculously long"
 		end
 		table.insert(requirements, "this will create " .. filecount .. " files. this will take " .. amount .. " time.")
 	end
