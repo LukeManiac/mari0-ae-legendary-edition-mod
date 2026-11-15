@@ -307,8 +307,10 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	guielements["scrollfactor2yscrollbar"].buttonround = true
 	--right click typing (gui.lua) works in the units these sliders stand for
 	guielements["autoscrollingscrollbar"].valuefunction = function(self, v) return round(v*autoscrollingmaxspeed, 2) end
+	guielements["autoscrollingscrollbar"].displayfunction = function(self, v) return formatscrollnumber(self:valuefunction(v)) end
 	for _, name in ipairs({"scrollfactorxscrollbar", "scrollfactoryscrollbar", "scrollfactor2xscrollbar", "scrollfactor2yscrollbar"}) do
 		guielements[name].valuefunction = function(self, v) return round((v*3)^2, 2) end
+		guielements[name].displayfunction = function(self, v) return formatscrollnumber(self:valuefunction(v)) end
 		guielements[name].releasefunc = function(self, v) levelmodified = true end
 	end
 	guielements["autoscrollingscrollbar"].releasefunc = function(self, v) levelmodified = true end
@@ -3162,7 +3164,6 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 				else
 					love.graphics.setColor(150, 150, 150, 255)
 				end
-				drawscrollfactorvalue(guielements["autoscrollingscrollbar"], autoscrollingspeed)
 
 				guielements["custombackgroundcheckbox"]:draw()
 				guielements["customforegroundcheckbox"]:draw()
@@ -3189,15 +3190,11 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 				else
 					love.graphics.setColor(150, 150, 150, 255)
 				end
-				drawscrollfactorvalue(guielements["scrollfactorxscrollbar"], scrollfactor)
-				drawscrollfactorvalue(guielements["scrollfactoryscrollbar"], scrollfactory)
 				if customforeground then
 					love.graphics.setColor(255, 255, 255, 255)
 				else
 					love.graphics.setColor(150, 150, 150, 255)
 				end
-				drawscrollfactorvalue(guielements["scrollfactor2xscrollbar"], scrollfactor2)
-				drawscrollfactorvalue(guielements["scrollfactor2yscrollbar"], scrollfactor2y)
 
 				love.graphics.setColor(255, 255, 255, 255)
 
