@@ -2454,7 +2454,7 @@ local function mp_tabrects()
 end
 
 --colour of the "files to create" count: each warning has a colour, and counts in between
---blend between the two nearest ones (on a log scale, since the warnings go up by 10x)
+--blend between the two nearest ones with hsv_lerp (on a log scale, since the warnings go up by 10x)
 local function filecountcolour(count)
 	local stops = {
 		{MAPPACKCREATOR_FILEWARNING/10, {150, 150, 150}},
@@ -2479,7 +2479,8 @@ local function filecountcolour(count)
 				t = (logof(count) - logof(from[1]))/(logof(to[1]) - logof(from[1]))
 			end
 			t = clamp(t, 0, 1)
-			return lerp(from[2][1], to[2][1], t), lerp(from[2][2], to[2][2], t), lerp(from[2][3], to[2][3], t)
+			local c = hsv_lerp(from[2], to[2], t) --through hue, like the fps counter
+			return c[1], c[2], c[3]
 		end
 	end
 	local c = stops[#stops][2]
