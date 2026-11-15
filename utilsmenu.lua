@@ -1246,8 +1246,8 @@ end
 ------------------------------------------------------------
 
 --option names match the python mappack creator, so project files work in both
-local PHYSICS = {"Mari0", "Super Mario Bros.", "Mari0 x Lost Levels", "Super Mario Bros. Lost Levels", "Mari0 x Super Mario Maker", "Super Mario Maker", "Portal"}
-local CAMERA = {"Default", "Centered", "No Backscroll"}
+local PHYSICS = {"Mari0", "SMB", "Mari0-SMB2J", "SMB2J", "Mari0-Maker", "Mario Maker", "Portal"}
+local CAMERA = {"Default", "Centered", "Forward Only"}
 local PORTALGUN = {"Normal", "None", "1 Only", "2 Only", "Gel"}
 local COLOURS = {"Black", "Blue", "Brown", "Gray", "Green", "Lime", "Maroon", "Orange", "Pink", "Purple", "Red", "Sky", "White", "Yellow"}
 local WHITE = 13
