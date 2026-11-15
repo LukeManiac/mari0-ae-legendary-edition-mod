@@ -1347,6 +1347,7 @@ function menu_load()
 	editormode = false
 	guielements = {}
 	gamestate = "menu"
+	utilsmenuopen = false
 
 	selection = 1
 	oldmouse = {love.mouse.getPosition()}
@@ -1471,7 +1472,7 @@ function menu_update(dt)
 	optionsmisc_update()
 	optionscheats_update()
 	optionscontrols_update()
-	if gamestate == "utils" then
+	if utilsmenuopen then
 		utilsmenu_update(dt)
 	end
 	
@@ -1656,7 +1657,7 @@ function menu_update(dt)
 	
 	--use mouse to select
 	local x, y = love.mouse.getPosition()
-	if (x ~= oldmouse[1] or y ~= oldmouse[2]) and gamestate == "menu" and (not DisableMouseInMainMenu) and (not languagemenuopen) then
+	if (x ~= oldmouse[1] or y ~= oldmouse[2]) and gamestate == "menu" and (not utilsmenuopen) and (not DisableMouseInMainMenu) and (not languagemenuopen) then
 		menu_updatemouseselection(x,y)
 	end
 	if (x ~= oldmouse[1] or y ~= oldmouse[2]) and resetwarningopen and gamestate == "options" and (not DisableMouseInMainMenu) and (not languagemenuopen) then
@@ -1868,7 +1869,9 @@ function menu_draw()
 	--custom foreground
 	rendercustomforeground(0,0)
 	
-	if gamestate == "menu" then
+	if utilsmenuopen then
+		utilsmenu_draw()
+	elseif gamestate == "menu" then
 		local x = (40-8*((titlewidth-176)/24))--position of title logo
 		love.graphics.draw(titleimage, titlequad[titleframe], x*scale, 24*scale, 0, scale, scale)
 		
@@ -2106,8 +2109,6 @@ function menu_draw()
 			properprintF(utf8.sub(currentmenutip, 1, math.floor((menutipoffset+(width*16))/8)+1), -menutipoffset*scale, 210*scale)
 		end
 		
-	elseif gamestate == "utils" then
-		utilsmenu_draw()
 	elseif gamestate == "mappackmenu" then
 		--background
 		love.graphics.setColor(0, 0, 0, 100)
@@ -3454,7 +3455,7 @@ function menu_keypressed(key, unicode)
 		resetwarning_keypressed(key)
 		return
 	end
-	if gamestate == "utils" then
+	if utilsmenuopen then
 		utilsmenu_keypressed(key)
 		return
 	end
@@ -4827,6 +4828,8 @@ function searchmappacks()
 		onlineupdatescroll()
 	end
 end
+
+require("utilsmenu")
 
 function brprint(text, y)
 	properprintFbackground(text, (width*16-#(text)*8-8)*scale, y*scale)

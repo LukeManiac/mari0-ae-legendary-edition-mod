@@ -2250,8 +2250,11 @@ end
 -- public functions (called from menu.lua)
 ------------------------------------------------------------
 
+--the utils menu lives inside the "menu" gamestate, so main.lua doesn't need to know about it
+utilsmenuopen = false
+
 function utilsmenu_open()
-	gamestate = "utils"
+	utilsmenuopen = true
 	page = "hub"
 	clearelements()
 end
@@ -2259,11 +2262,11 @@ end
 function utilsmenu_close()
 	clearelements()
 	page = "hub"
-	gamestate = "menu"
+	utilsmenuopen = false
 	selection = 5
 end
 
-local function inner_utilsmenu_openpage(name)
+inner_utilsmenu_openpage = function(name)
 	page = name
 	if name == "charformat" then
 		cf_build()
