@@ -12,6 +12,12 @@
 
 local CHARFOLDER = "alesans_entities/characters"
 local PROJECTFOLDER = "alesans_entities/mappackprojects"
+
+--mappack creator process warnings: nothing is blocked, the creator only warns when a mappack
+--would need at least this many course files (change these to taste)
+MAPPACKCREATOR_FILEWARNING = 1000 --"this will take some time"
+MAPPACKCREATOR_FILEWARNING_BIG = 10000 --"this will take a lot of time"
+MAPPACKCREATOR_FILEWARNING_HUGE = 100000 --"this will take tons of time"
 local RENDERFOLDER = "renders"
 
 local PX, PY, PH = 21, 16, 200 --panel position and height (width follows the screen)
@@ -1576,10 +1582,12 @@ local function mp_validate()
 	end
 
 	local filecount = mp_filecount(v)
-	if filecount >= 1000 then
+	if filecount >= MAPPACKCREATOR_FILEWARNING then
 		local amount = "some"
-		if filecount >= 10000 then
+		if filecount >= MAPPACKCREATOR_FILEWARNING_BIG then
 			amount = "a lot of"
+        elseif filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
+			amount = "a ridiculously long"
 		end
 		table.insert(requirements, "this will create " .. filecount .. " files. this will take " .. amount .. " time.")
 	end
@@ -2491,7 +2499,15 @@ local function mp_draw()
 			love.graphics.setColor(150, 150, 150)
 			properprintF("none", 190*scale, 141*scale)
 		end
+		--grey, orange past the warning, red past the big warning
 		love.graphics.setColor(150, 150, 150)
+		if mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING then
+			love.graphics.setColor(255, 152, 56)
+		elseif mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_BIG then
+			love.graphics.setColor(252, 80, 80)
+		elseif mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
+			love.graphics.setColor(252, 0, 0)
+		end
 		properprintF("files to create: " .. mpcheck.filecount, 26*scale, 172*scale)
 	elseif mptab == "hud" then
 		if mp.use_character_name then
