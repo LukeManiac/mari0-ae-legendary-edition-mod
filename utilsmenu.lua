@@ -1587,7 +1587,7 @@ local function mp_validate()
 		local amount = "some"
 		if filecount >= MAPPACKCREATOR_FILEWARNING_GOODGOD then
 			amount = "a ridiculously long"
-		if filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
+        elseif filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
 			amount = "a very long"
         elseif filecount >= MAPPACKCREATOR_FILEWARNING_BIG then
 			amount = "a lot of"
@@ -2506,7 +2506,7 @@ local function mp_draw()
 		love.graphics.setColor(150, 150, 150)
 		if mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_GOODGOD then
 			love.graphics.setColor(127, 0, 0)
-		elif mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
+        elseif mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
 			love.graphics.setColor(255, 0, 0)
 		elseif mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_BIG then
 			love.graphics.setColor(252, 80, 80)
