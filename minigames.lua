@@ -5150,9 +5150,9 @@ function rrr_musiclist()
 end
 
 local function rrr_musiclabels()
-	local labels = {}
+	local labels = {"None"} --no battle music (the star theme and the battle clear theme still play)
 	for i, entry in ipairs(rrr_musiclist()) do
-		labels[i] = entry.label
+		labels[i+1] = entry.label
 	end
 	return labels
 end
@@ -7694,7 +7694,8 @@ addminigame({
 			end
 			return names
 		end)(), default = 1},
-		{type = "dropdown", key = "music", label = "Battle music", entries = rrr_musiclabels, wide = true, default = 1},
+		--(a new key: "music" was the song's place in the list before "None" went at the top, an old save would be off by one)
+		{type = "dropdown", key = "battlemusic", label = "Battle music", entries = rrr_musiclabels, wide = true, default = 2},
 		{type = "checkbox", key = "botsplit", label = "Bot Splitscreen", default = true},
 		{type = "slider", key = "lives", label = "Starting lives", min = 5, max = 100, step = 1, default = 10},
 		{type = "sliderbox", key = "timelimit", checkkey = "timer", label = "Timer", min = 100, max = 1000, step = 10, default = 300, checkdefault = false},
@@ -7836,12 +7837,21 @@ addminigame({
 		end
 
 		--music
-		local list = rrr_musiclist()
-		local entry = list[opts.music or 1]
-		if not (entry and rrr_fileexists(entry.path)) then
-			entry = list[1] --the song is gone (files moved since the menu was open)
+		local choice = opts.battlemusic or 2
+		if choice == 1 then
+			--"None": no battle music (musici 1 is the game's own "no music", playmusic and stopmusic skip it)
+			rrr_setupmusic(S, nil)
+			musici = 1
+			custommusic = false
+			custommusici = false
+		else
+			local list = rrr_musiclist()
+			local entry = list[choice - 1]
+			if not (entry and rrr_fileexists(entry.path)) then
+				entry = list[1] --the song is gone (files moved since the menu was open)
+			end
+			rrr_setupmusic(S, entry)
 		end
-		rrr_setupmusic(S, entry)
 
 		local spawn = S.spawns[1]
 		startx = spawn.x - 0.5
