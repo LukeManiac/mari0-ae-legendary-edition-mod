@@ -338,6 +338,16 @@ local function drawdropdownentry(entry, x, y, maxchars)
 		love.graphics.setColor(r, g, b, a)
 	end
 	if type(entry) == "string" then
+		local length = utf8.len(entry)
+		if length and length ~= string.len(entry) then
+			--accents, cyrillic...: cut by character and print with the utf-8 printer
+			local stop = utf8.offset(entry, maxchars + 1)
+			if stop then
+				entry = entry:sub(1, stop - 1)
+			end
+			properprintF(entry, x*scale, y*scale)
+			return
+		end
 		entry = entry:sub(1, maxchars)
 	end
 	properprint(entry, x*scale, y*scale)

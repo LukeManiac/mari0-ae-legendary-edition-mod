@@ -34,9 +34,9 @@ end
 local page = "hub" --"hub", "charformat", "fontrender" or "mappack"
 local hubselection = 1
 local HUBITEMS = {
-	{text = "character formatter", page = "charformat", info = "split a character's\nsheets into colour layers"},
-	{text = "font renderer", page = "fontrender", info = "render text to a png\nwith this mappack's font"},
-	{text = "mappack creator", page = "mappack", info = "make a new mappack full\nof blank courses"},
+	{text = "character formatter", page = "charformat", info = "split a character's sheets into colour layers"},
+	{text = "font renderer", page = "fontrender", info = "render text to a png with this mappack's font"},
+	{text = "mappack creator", page = "mappack", info = "make a new mappack full of blank courses"},
 	{text = "back", info = "back to the title screen"},
 }
 
@@ -75,6 +75,25 @@ end
 --T with string.format, for text with %s in it
 local function TF(key, ...)
 	return string.format(T(key), ...)
+end
+
+--T on one line (some translations wrap with \n, which checkboxes can't do)
+function ui.line(key)
+	return (T(key):gsub("\n", " "))
+end
+
+--the first n characters of s, without cutting a utf-8 character in half like string.sub would
+function ui.cut(s, n)
+	local stop = utf8.offset(s, n + 1)
+	if stop then
+		return s:sub(1, stop - 1)
+	end
+	return s
+end
+
+--how wide a piece of text is in pixels
+function ui.textw(s)
+	return utf8.len(s)*8
 end
 
 --where a column of fields starts: after the longest label, but never left of minimum
@@ -140,14 +159,14 @@ end
 local function readjson(path)
 	local s = love.filesystem.read(path)
 	if not s then
-		return nil, "can't read " .. path
+		return nil, TF("can't read %s", path)
 	end
 	local oldcrash = JSONcrashgame
 	JSONcrashgame = false
 	local ok, result = pcall(function() return JSON:decode(s) end)
 	JSONcrashgame = oldcrash
 	if not ok or type(result) ~= "table" then
-		return nil, "that json file has an error in it"
+		return nil, T("that json file has an error in it")
 	end
 	return result
 end
@@ -276,7 +295,7 @@ local function confirmbutton(name, x, y, text, func)
 			func()
 		else
 			confirmuntil[name] = love.timer.getTime() + 3
-			el.text = "sure? click again"
+			el.text = T("sure? click again")
 		end
 	end, w)
 	el.textcolor = {255, 80, 80}
@@ -446,7 +465,7 @@ local function newstepper(name, x, y, digits, minimum, maximum, step, get, set, 
 		if n then
 			st.set(clamp(math.floor(n), minimum, maximum))
 		else
-			notice.new("that has to be a number!", notice.red, 3)
+			notice.new(T("that has to be a number!"), notice.red, 3)
 		end
 		closeinput(self)
 	end, tostring(stepperget(st)), digits, nil, nil, 0), tab)
@@ -583,8 +602,9 @@ local function hub_itemrect(i)
 	if i == #HUBITEMS then
 		y = y + 10
 	end
-	local x = 130 - utf8.len(item.text)*4
-	return x, y, utf8.len(item.text)*8
+	local text = T(item.text)
+	local x = 130 - utf8.len(text)*4
+	return x, y, utf8.len(text)*8
 end
 
 local function hub_draw()
@@ -592,7 +612,7 @@ local function hub_draw()
 	love.graphics.rectangle("fill", 21*scale, 16*scale, 218*scale, 200*scale)
 
 	love.graphics.setColor(255, 255, 255)
-	centredprint("utils", 130, 26)
+	centredprint(T("utils"), 130, 26)
 	love.graphics.setColor(60, 60, 60)
 	love.graphics.rectangle("fill", 30*scale, 37*scale, 200*scale, scale)
 
@@ -604,13 +624,13 @@ local function hub_draw()
 		else
 			love.graphics.setColor(100, 100, 100)
 		end
-		properprintF(item.text, x*scale, y*scale)
+		properprintF(T(item.text), x*scale, y*scale)
 	end
 
 	love.graphics.setColor(60, 60, 60)
 	love.graphics.rectangle("fill", 30*scale, 162*scale, 200*scale, scale)
 	love.graphics.setColor(170, 170, 170)
-	centredprint(HUBITEMS[hubselection].info, 130, 172)
+	centredprint(table.concat(wraptext(T(HUBITEMS[hubselection].info), 25), "\n"), 130, 172)
 end
 
 local function hub_activate()
@@ -679,12 +699,12 @@ local function cf_readcolors(folder)
 	end
 	local colors = config.colors
 	if type(colors) ~= "table" or #colors == 0 then
-		return nil, "config.json has no colors list"
+		return nil, T("config.json has no colors list")
 	end
 	local list = {}
 	for i, c in ipairs(colors) do
 		if type(c) ~= "table" or not (tonumber(c[1]) and tonumber(c[2]) and tonumber(c[3])) then
-			return nil, "colour " .. i .. " in config.json isn't r, g, b"
+			return nil, TF("colour %s in config.json isn't r, g, b", i)
 		end
 		list[i] = {tonumber(c[1]), tonumber(c[2]), tonumber(c[3])}
 	end
@@ -722,7 +742,7 @@ local function cf_job(name)
 		end
 	end
 
-	cf.status, cf.statuscolor = "copying files...", {255, 255, 255}
+	cf.status, cf.statuscolor = T("copying files..."), {255, 255, 255}
 	copyfolder(src, dst)
 	coroutine.yield()
 
@@ -731,7 +751,7 @@ local function cf_job(name)
 	local written = 0
 
 	for _, file in ipairs(sheets) do
-		cf.status = "splitting " .. file:lower()
+		cf.status = TF("splitting %s", file:lower())
 		local img = love.image.newImageData(src .. "/" .. file)
 		local w, h = img:getDimensions()
 		local layers = {}
@@ -782,9 +802,9 @@ local function cf_job(name)
 	end
 
 	cf.progress = nil
-	cf.status = "done! wrote " .. written .. " layers to " .. name:lower() .. "_formatted"
+	cf.status = TF("done! wrote %s layers to %s", written, name:lower() .. "_formatted")
 	cf.statuscolor = {100, 255, 100}
-	notice.new("formatted " .. name .. " (restart to play as it)", nil, 4)
+	notice.new(TF("formatted %s (restart to play as it)", name), nil, 4)
 	cf_scan()
 	cf_load()
 	if named["cf_char"] then
@@ -799,7 +819,7 @@ local function cf_start()
 	end
 	startjob(function() cf_job(name) end, function(err)
 		cf.progress = nil
-		cf.status = "failed: " .. err
+		cf.status = TF("failed: %s", err)
 		cf.statuscolor = {255, 80, 80}
 	end)
 end
@@ -807,6 +827,7 @@ end
 local function cf_build()
 	clearelements()
 	cf_scan()
+	ui.cfx = ui.columnx(114, T("character:"), T("colours:"))
 
 	if #cf.list > 0 then
 		local w = 8
@@ -815,8 +836,9 @@ local function cf_build()
 			w = math.max(w, math.min(20, utf8.len(v)))
 			display[i] = v:lower()
 		end
+		w = math.min(w, math.floor((panelright() - 5 - ui.cfx - 13)/8))
 		local drop
-		drop = add("cf_char", guielement:new("dropdown", 114, 35, w, function(i)
+		drop = add("cf_char", guielement:new("dropdown", ui.cfx, 35, w, function(i)
 			drop.var = i
 			cf.sel = i
 			cf.status = ""
@@ -825,9 +847,10 @@ local function cf_build()
 		drop.displayentries = display
 	end
 
-	add("cf_format", newbutton(26, 199, "format", cf_start))
-	add("cf_open", newbutton(80, 199, "open folder", function() openSaveFolder(CHARFOLDER) end))
-	add("back", newbutton(panelright()-40, 199, "back", function() utils_back() end))
+	ui.buttonrow(26, 199,
+		{"cf_format", T("format"), cf_start},
+		{"cf_open", T("open folder"), function() openSaveFolder(CHARFOLDER) end})
+	ui.addback()
 
 	cf_load()
 end
@@ -843,32 +866,32 @@ end
 
 local function cf_draw()
 	drawpanel()
-	drawtitle("character formatter")
+	drawtitle(T("character formatter"))
 
 	love.graphics.setColor(255, 255, 255)
-	properprintF("character:", 26*scale, 37*scale)
+	properprintF(T("character:"), 26*scale, 37*scale)
 
 	if #cf.list == 0 then
 		love.graphics.setColor(255, 80, 80)
-		properprintF("no characters found in\n" .. CHARFOLDER, 114*scale, 37*scale)
+		properprintF(T("no characters found in") .. "\n" .. CHARFOLDER, ui.cfx*scale, 37*scale)
 	else
 		love.graphics.setColor(255, 255, 255)
-		properprintF("colours:", 26*scale, 55*scale)
+		properprintF(T("colours:"), 26*scale, 55*scale)
 		if cf.colors then
 			for i, c in ipairs(cf.colors) do
-				drawswatch(114 + (i-1)*13, 53, 11, 11, c)
+				drawswatch(ui.cfx + (i-1)*13, 53, 11, 11, c)
 			end
 		elseif cf.error then
 			love.graphics.setColor(255, 80, 80)
-			properprintF(cf.error, 114*scale, 55*scale)
+			properprintF(cf.error, ui.cfx*scale, 55*scale)
 		end
 
 		love.graphics.setColor(255, 255, 255)
-		properprintF("sheets to split: " .. #cf.sheets, 26*scale, 72*scale)
+		properprintF(TF("sheets to split: %s", #cf.sheets), 26*scale, 72*scale)
 		love.graphics.setColor(150, 150, 150)
 		for i, file in ipairs(cf.sheets) do
 			if i > 14 then
-				properprintF("+" .. (#cf.sheets - 14) .. " more", 200*scale, (84 + 6*10)*scale)
+				properprintF(TF("+%s more", #cf.sheets - 14), 200*scale, (84 + 6*10)*scale)
 				break
 			end
 			local col = math.floor((i-1)/7)
@@ -877,9 +900,11 @@ local function cf_draw()
 		end
 
 		love.graphics.setColor(255, 255, 255)
-		properprintF("output:", 26*scale, 158*scale)
+		properprintF(T("output:"), 26*scale, 158*scale)
 		love.graphics.setColor(150, 150, 150)
-		properprintF((cf.list[cf.sel] or ""):lower() .. "_formatted", 90*scale, 158*scale)
+		local outx = ui.columnx(90, T("output:"))
+		local output = (cf.list[cf.sel] or ""):lower() .. "_formatted"
+		properprintF(ui.cut(output, math.floor((panelright() - 5 - outx)/8)), outx*scale, 158*scale)
 	end
 
 	if cf.progress then
@@ -890,7 +915,7 @@ local function cf_draw()
 		drawprogress(26, 172, panelwidth()-10, p, {60, 100, 255})
 	end
 	love.graphics.setColor(cf.statuscolor)
-	properprintF(cf.status:sub(1, 44), 26*scale, 184*scale)
+	properprintF(ui.cut(cf.status, 44), 26*scale, 184*scale)
 
 	drawelements()
 end
@@ -1040,7 +1065,7 @@ local function ta_keypressed(key)
 		end
 	elseif key == "c" and ctrl then
 		love.system.setClipboardText(ta_text())
-		notice.new("copied the text", nil, 2)
+		notice.new(T("copied the text"), nil, 2)
 	elseif key == "x" and ctrl then
 		love.system.setClipboardText(ta_text())
 		ta.chars, ta.cursor = {}, 0
@@ -1092,7 +1117,8 @@ local function ta_draw()
 
 	if #ta.chars == 0 and not ta.focus then
 		love.graphics.setColor(110, 110, 110)
-		properprintF("click here and type. enter makes a new line.", (x+3)*scale, (y+3)*scale)
+		local placeholder = wraptext(T("click here and type. enter makes a new line."), math.floor((w-6)/8))
+		properprintF(table.concat(placeholder, "\n"), (x+3)*scale, (y+3)*scale)
 		return
 	end
 
@@ -1227,7 +1253,7 @@ end
 
 local function fr_save(path)
 	if not fr.canvas then
-		notice.new("there's no text to render!", notice.red, 3)
+		notice.new(T("there's no text to render!"), notice.red, 3)
 		return false
 	end
 	love.filesystem.createDirectory(RENDERFOLDER)
@@ -1288,11 +1314,11 @@ local function fr_copy()
 	end
 	local command = fr_clipboardcommand(love.filesystem.getSaveDirectory() .. "/" .. path)
 	if not command then
-		notice.new("can't copy images on this system,\nsaved to " .. path .. " instead", notice.red, 4)
+		notice.new(TF("can't copy images on this system,\nsaved to %s instead", path), notice.red, 4)
 		return
 	end
 	love.thread.newThread(CLIPBOARD_THREAD):start(command, CLIPBOARD_CHANNEL)
-	notice.new("copying...", nil, 1)
+	notice.new(T("copying..."), nil, 1)
 end
 
 local function fr_slider(c, y)
@@ -1311,41 +1337,63 @@ local function fr_build()
 		fr.colorfrommappack = mappack
 	end
 
+	--each control starts after the one before it, so longer translations push the row along
+	local capstext, outlinetext, aligntext = ui.line("all caps"), ui.line("outline"), T("align:")
+	local outlinex = math.max(110, 26 + 9 + ui.textw(capstext) + 11)
+	local alignx = math.max(202, outlinex + 9 + ui.textw(outlinetext) + 11)
+	local aligndropx = math.max(252, alignx + ui.textw(aligntext) + 2)
+	local aligndisplay, alignwidth = {}, 6
+	for i, v in ipairs(FR_ALIGN) do
+		aligndisplay[i] = T(v)
+		alignwidth = math.max(alignwidth, utf8.len(aligndisplay[i]))
+	end
+
 	local caps, outline, align
 	caps = add("fr_caps", guielement:new("checkbox", 26, 101, function(v)
 		caps.var = v
 		fr.caps = v
-	end, fr.caps, "all caps"))
-	outline = add("fr_outline", guielement:new("checkbox", 110, 101, function(v)
+	end, fr.caps, capstext))
+	outline = add("fr_outline", guielement:new("checkbox", outlinex, 101, function(v)
 		outline.var = v
 		fr.outline = v
-	end, fr.outline, "outline"))
-	label(202, 102, "align:")
-	align = add("fr_align", guielement:new("dropdown", 252, 100, 6, function(i)
+	end, fr.outline, outlinetext))
+	label(alignx, 102, aligntext)
+	align = add("fr_align", guielement:new("dropdown", aligndropx, 100, alignwidth, function(i)
 		align.var = i
 		fr.align = i
 	end, fr.align, unpack(FR_ALIGN)))
+	align.displayentries = aligndisplay
 
 	for c = 1, 3 do
 		add("fr_slider" .. c, fr_slider(c, 115 + (c-1)*12))
 	end
 
-	add("fr_save", newbutton(26, 199, "save png", function()
-		local path = RENDERFOLDER .. "/text " .. os.date("%Y-%m-%d %H-%M-%S") .. ".png"
-		if fr_save(path) then
-			notice.new("saved to " .. path, nil, 4)
-		end
-	end))
-	add("fr_copy", newbutton(103, 199, "copy image", fr_copy))
-	add("fr_mappackcolour", newbutton(196, 199, "hud colour", function()
-		fr.color = {hudtextcolor[1], hudtextcolor[2], hudtextcolor[3]}
-		fr.outline = hudoutline or false
-		named["fr_outline"].var = fr.outline
-		for c = 1, 3 do
-			setslidervalue(named["fr_slider" .. c], fr.color[c])
-		end
-	end))
-	add("back", newbutton(panelright()-40, 199, "back", function() utils_back() end))
+	local buttons = {
+		{"fr_save", T("save png"), function()
+			local path = RENDERFOLDER .. "/text " .. os.date("%Y-%m-%d %H-%M-%S") .. ".png"
+			if fr_save(path) then
+				notice.new(TF("saved to %s", path), nil, 4)
+			end
+		end},
+		{"fr_copy", T("copy image"), fr_copy},
+		{"fr_mappackcolour", T("hud colour"), function()
+			fr.color = {hudtextcolor[1], hudtextcolor[2], hudtextcolor[3]}
+			fr.outline = hudoutline or false
+			named["fr_outline"].var = fr.outline
+			for c = 1, 3 do
+				setslidervalue(named["fr_slider" .. c], fr.color[c])
+			end
+		end},
+	}
+	--if the buttons would run into the back button, they go one row up and the preview gets shorter
+	local rowend = 26
+	for _, b in ipairs(buttons) do
+		rowend = rowend + 3 + ui.textw(b[2]) + 6
+	end
+	local backx = panelright() - 5 - (3 + ui.textw(T("back")))
+	fr.compact = rowend - 6 > backx - 4
+	ui.buttonrow(26, fr.compact and 187 or 199, unpack(buttons))
+	ui.addback()
 
 	fr.renderkey = nil
 end
@@ -1367,10 +1415,10 @@ end
 
 local function fr_draw()
 	drawpanel()
-	drawtitle("font renderer")
-	local fontname = "font: " .. tostring(mappack)
+	drawtitle(T("font renderer"))
+	local fontname = TF("font: %s", tostring(mappack))
 	love.graphics.setColor(150, 150, 150)
-	properprintF(fontname:sub(1, 26), (panelright() - 5 - math.min(26, utf8.len(fontname))*8)*scale, (PY+6)*scale)
+	properprintF(ui.cut(fontname, 26), (panelright() - 5 - math.min(26, utf8.len(fontname))*8)*scale, (PY+6)*scale)
 
 	--rgb letters next to the sliders, drawn like the skin options do
 	local letters = {"r", "g", "b"}
@@ -1389,6 +1437,9 @@ local function fr_draw()
 
 	--rendered preview, on the game's sky so the black outline shows up
 	local bx, by, bw, bh = 26, 152, panelwidth()-10, 43
+	if fr.compact then
+		bh = 31
+	end
 	love.graphics.setColor(127, 127, 127)
 	love.graphics.rectangle("fill", bx*scale, by*scale, bw*scale, bh*scale)
 	love.graphics.setColor(92, 148, 252)
@@ -1410,7 +1461,7 @@ local function fr_draw()
 		properprintF(size, (bx + bw - 3 - utf8.len(size)*8)*scale, (by + bh - 10)*scale)
 	else
 		love.graphics.setColor(40, 70, 140)
-		centredprint("the render shows up here", bx + bw/2, by + bh/2 - 4)
+		centredprint(T("the render shows up here"), bx + bw/2, by + bh/2 - 4)
 	end
 
 	ta_draw()
@@ -1612,23 +1663,23 @@ local function mp_validate()
 	end
 	if name:find('[/\\:%*%?"<>|]') then
 		valid = false
-		table.insert(requirements, "name can't have / \\ : * ? \" < > or | in it!")
+		table.insert(requirements, T("name can't have / \\ : * ? \" < > or | in it!"))
 	end
 	if utf8.len(v.display_name) > 17 then
 		valid = false
-		table.insert(requirements, "value for display name is above 17 characters!")
+		table.insert(requirements, T("value for display name is above 17 characters!"))
 	end
 	if utf8.len(v.author) > 13 then
 		valid = false
-		table.insert(requirements, "value for author is above 13 characters!")
+		table.insert(requirements, T("value for author is above 13 characters!"))
 	end
 	if utf8.len(v.description) > 51 then
 		valid = false
-		table.insert(requirements, "value for description is above 51 characters!")
+		table.insert(requirements, T("value for description is above 51 characters!"))
 	end
 	if v.display_name == "" and utf8.len(name) > 17 then
 		valid = false
-		table.insert(requirements, "display name is empty, so it uses the name, which is above 17 characters!")
+		table.insert(requirements, T("display name is empty, so it uses the name, which is above 17 characters!"))
 	end
 
 	local filecount = mp_filecount(v)
@@ -1648,11 +1699,11 @@ local function mp_validate()
 		valid = false
 		local state = mp_deletestate(name)
 		if state == "session" or state == "marker" then
-			table.insert(notices, "you can safely delete '" .. name .. "'.")
+			table.insert(notices, TF("you can safely delete '%s'.", name))
 		else
-			table.insert(requirements, "value for name already exists in the mappack folder!")
+			table.insert(requirements, T("value for name already exists in the mappack folder!"))
 			if state == "locked" then
-				table.insert(requirements, "'" .. name .. "' was made with prevent deletion on, so the creator can't delete it.")
+				table.insert(requirements, TF("'%s' was made with prevent deletion on, so the creator can't delete it.", name))
 			end
 		end
 	end
@@ -1759,10 +1810,10 @@ local function mp_createjob(v)
 	local name = v.name
 	local path = mappackfolder .. "/" .. name
 	mpcreating = true
-	mpstatus, mpstatuscolor = "creating files...", {255, 255, 255}
+	mpstatus, mpstatuscolor = T("creating files..."), {255, 255, 255}
 
 	if not love.filesystem.createDirectory(path) then
-		error("couldn't make the mappack folder", 0)
+		error(T("couldn't make the mappack folder"), 0)
 	end
 	love.filesystem.write(path .. "/settings.txt", mp_settingstxt(v))
 	love.filesystem.write(path .. "/text.txt", mp_texttxt(v))
@@ -1789,7 +1840,7 @@ local function mp_createjob(v)
 
 	local function writefile(filename)
 		if not love.filesystem.write(path .. "/" .. filename, data) then
-			error("couldn't write " .. filename, 0)
+			error(TF("couldn't write %s", filename), 0)
 		end
 		mpprogress.done = mpprogress.done + 1
 		if mpprogress.done % 100 == 0 then
@@ -1807,9 +1858,9 @@ local function mp_createjob(v)
 	end
 
 	mpcreating = false
-	mpstatus, mpstatuscolor = "finished!", {100, 255, 100}
+	mpstatus, mpstatuscolor = T("finished!"), {100, 255, 100}
 	mp_refreshexisting()
-	notice.new("mappack created successfully!", nil, 4)
+	notice.new(T("mappack created successfully!"), nil, 4)
 end
 
 local function mp_create()
@@ -1821,7 +1872,7 @@ local function mp_create()
 	local v = mpcheck.values
 	startjob(function() mp_createjob(v) end, function(err)
 		mpcreating = false
-		mpstatus, mpstatuscolor = "generation failed...", {255, 80, 80}
+		mpstatus, mpstatuscolor = T("generation failed..."), {255, 80, 80}
 		notice.new(err, notice.red, 5)
 		local path = mappackfolder .. "/" .. v.name
 		if insavedirectory(path) then
@@ -1837,15 +1888,15 @@ local function mp_delete()
 		return
 	end
 	local path = mappackfolder .. "/" .. mpexisting[name:lower()]
-	mpstatus, mpstatuscolor = "deleting...", {255, 255, 255}
+	mpstatus, mpstatuscolor = T("deleting..."), {255, 255, 255}
 	startjob(function()
 		removerecursive(path)
 		mpsession[name:lower()] = nil
 		mp_refreshexisting()
 		mpprogress = nil
-		mpstatus, mpstatuscolor = "deleted " .. name, {255, 255, 255}
+		mpstatus, mpstatuscolor = TF("deleted %s", name), {255, 255, 255}
 	end, function(err)
-		mpstatus, mpstatuscolor = "couldn't delete it", {255, 80, 80}
+		mpstatus, mpstatuscolor = T("couldn't delete it"), {255, 80, 80}
 		mp_refreshexisting()
 	end)
 end
@@ -2041,7 +2092,7 @@ local function mp_parsejson(data)
 	local ok, project = pcall(function() return JSON:decode(data) end)
 	JSONcrashgame = oldcrash
 	if not ok or type(project) ~= "table" then
-		error("that .json project has an error in it", 0)
+		error(T("that .json project has an error in it"), 0)
 	end
 	local g = project.general or {}
 	local t = project.text or {}
@@ -2224,7 +2275,7 @@ local function mp_loadproject(data, ext)
 		elseif ext == "mpckproj" then
 			return mp_parsempck(data)
 		end
-		error("this project format is not supported.", 0)
+		error(T("this project format is not supported."), 0)
 	end)
 	if not ok then
 		notice.new(tostring(result), notice.red, 4)
@@ -2232,7 +2283,7 @@ local function mp_loadproject(data, ext)
 	end
 	mp_apply(result)
 	mp_build()
-	notice.new("mappack project loaded successfully!", nil, 3)
+	notice.new(T("mappack project loaded successfully!"), nil, 3)
 end
 
 local function mp_saveproject()
@@ -2254,9 +2305,9 @@ local function mp_saveproject()
 	love.filesystem.createDirectory(PROJECTFOLDER)
 	local path = PROJECTFOLDER .. "/" .. filename .. "." .. ext
 	if love.filesystem.write(path, data) then
-		notice.new("saved project to " .. path, nil, 4)
+		notice.new(TF("saved project to %s", path), nil, 4)
 	else
-		notice.new("couldn't save the project", notice.red, 4)
+		notice.new(T("couldn't save the project"), notice.red, 4)
 	end
 	mp_refreshprojects()
 	mp_build()
@@ -2266,7 +2317,7 @@ local function mp_reset()
 	mp_apply({})
 	mp_seticon(nil)
 	mp_build()
-	notice.new("everything is back to default.", nil, 3)
+	notice.new(T("everything is back to default."), nil, 3)
 end
 
 ------------------------------------------------------------
@@ -2299,17 +2350,41 @@ local function mpcheckbox(key, x, y, text, tab)
 	el = guielement:new("checkbox", x, y, function(v)
 		el.var = v
 		mp[key] = v
-	end, mp[key], text)
+	end, mp[key], ui.line(text))
 	return add("mp_" .. key, el, tab)
 end
 
-local function mpdropdown(key, x, y, w, options, tab, coloured)
+--w is the smallest width; it grows to fit the longest (translated) option, but never past the panel
+--translate: show the options in the current language (the values stay english, project files need them)
+local function mpdropdown(key, x, y, w, options, tab, coloured, translate)
+	local display = lowered(options)
+	if translate then
+		for i, v in ipairs(display) do
+			display[i] = T(v)
+		end
+	end
+	for _, v in ipairs(display) do
+		w = math.max(w, utf8.len(v))
+	end
+	w = math.min(w, math.floor((panelright() - 5 - x - 13)/8))
+
 	local el
 	el = guielement:new("dropdown", x, y, w, function(i)
 		el.var = i
 		mp[key] = i
 	end, mp[key], unpack(lowered(options)))
-	el.coloredtext = coloured
+	el.displayentries = display
+	if coloured then
+		--coloured by number, since gui.lua would look the translated name up in textcolors
+		el.entrycolors = {}
+		for i = 1, #options do
+			if options[i] == "Black" then
+				el.entrycolors[i] = {80, 80, 80}
+			else
+				el.entrycolors[i] = textcolors[options[i]:lower()] or {255, 255, 255}
+			end
+		end
+	end
 	return add("mp_" .. key, el, tab)
 end
 
@@ -2323,56 +2398,77 @@ mp_build = function()
 	mp_refreshexisting()
 	mp_refreshprojects()
 
+	--every tab puts its fields after its longest label, so translations don't run into them
+	local col
+	local hint = {150, 150, 150}
+
 	--general
 	local t = "general"
-	label(26, 37, "name:", t)
-	mpinput("name", 132, 35, 17, 64, t)
-	label(26, 51, "display name:", t)
-	mpinput("display_name", 132, 49, 17, 17, t)
-	label(26, 65, "author:", t)
-	mpinput("author", 132, 63, 13, 13, t)
-	label(26, 79, "description:", t)
-	mpinput("description", 132, 77, 17, 51, t, nil, 3)
-	label(26, 117, "lives:", t)
-	mpstepper("lives", 132, 116, 4, 0, 9999, 1, t)
-	label(26, 133, "physics:", t)
-	mpdropdown("physics", 132, 131, 29, PHYSICS, t)
-	label(26, 147, "camera:", t)
-	mpdropdown("camera", 132, 145, 13, CAMERA, t)
-	label(300, 37, "icon", t)
-	add("mp_iconclear", newbutton(334, 34, "clear", function() mp_seticon(nil) end), t)
-	label(26, 172, "drop a .png onto the window to use it as", t, {150, 150, 150})
-	label(26, 182, "the icon, or a project file to load it", t, {150, 150, 150})
+	col = ui.columnx(132, T("name:"), T("display name:"), T("author:"), T("description:"), T("lives:"), T("physics:"), T("camera:"))
+	local frame = ui.iconframe
+	frame.x = clamp(col + 5 + 17*8 + 8, 300, panelright() - 5 - frame.size)
+	local inputw = math.min(17, math.floor((frame.x - 8 - col - 5)/8))
+	label(26, 37, T("name:"), t)
+	mpinput("name", col, 35, inputw, 64, t)
+	label(26, 51, T("display name:"), t)
+	mpinput("display_name", col, 49, inputw, 17, t)
+	label(26, 65, T("author:"), t)
+	mpinput("author", col, 63, math.min(13, inputw), 13, t)
+	label(26, 79, T("description:"), t)
+	mpinput("description", col, 77, inputw, 51, t, nil, 3)
+	label(26, 117, T("lives:"), t)
+	mpstepper("lives", col, 116, 4, 0, 9999, 1, t)
+	ui.mp.livesx = col + 68
+	label(26, 133, T("physics:"), t)
+	mpdropdown("physics", col, 131, 12, PHYSICS, t)
+	label(26, 147, T("camera:"), t)
+	mpdropdown("camera", col, 145, 13, CAMERA, t, false, true)
+	--"icon" sits left of the clear button; if the translation doesn't fit there it goes inside the empty frame
+	local cleartext = T("clear")
+	local clearx = panelright() - 2 - (3 + ui.textw(cleartext))
+	ui.mp.iconlabel = frame.x + ui.textw(T("icon")) + 2 <= clearx
+	if ui.mp.iconlabel then
+		label(frame.x, 37, T("icon"), t)
+	end
+	add("mp_iconclear", newbutton(clearx, 34, cleartext, function() mp_seticon(nil) end), t)
+	for i, line in ipairs(wraptext(T("drop a .png onto the window to use it as the icon, or a project file to load it"), 43)) do
+		label(26, 172 + (i-1)*10, line, t, hint)
+	end
 
 	--worlds
 	t = "worlds"
 	mpcheckbox("drop_shadow", 26, 36, "drop shadow", t)
+	ui.mp.performancex = math.max(150, 26 + 9 + ui.textw(ui.line("drop shadow")) + 12)
 	mpcheckbox("real_time", 26, 50, "real time", t)
 	mpcheckbox("continue_music", 26, 64, "continue subzone music", t)
 	mpcheckbox("no_hurry", 26, 78, "no hurry music", t)
 	mpcheckbox("no_coinlimit", 26, 92, "no coin limit", t)
-	label(26, 113, "world count:", t)
-	mpslider("world_count", 190, 112, 180, 1, 999, 1, t)
-	label(26, 127, "courses per world:", t)
-	mpslider("courses_per_world", 190, 126, 180, 1, 99, 1, t)
-	label(26, 141, "subzones per course:", t)
-	mpslider("subzones_per_course", 190, 140, 180, 1, 13, 1, t)
+	col = ui.columnx(190, T("world count:"), T("courses per world:"), T("subzones per course:"))
+	ui.mp.worldsx = col
+	label(26, 113, T("world count:"), t)
+	mpslider("world_count", col, 112, panelright() - 9 - col, 1, 999, 1, t)
+	label(26, 127, T("courses per world:"), t)
+	mpslider("courses_per_world", col, 126, panelright() - 9 - col, 1, 99, 1, t)
+	label(26, 141, T("subzones per course:"), t)
+	mpslider("subzones_per_course", col, 140, panelright() - 9 - col, 1, 13, 1, t)
 	mpcheckbox("no_subzones", 26, 155, "do not create subzones", t)
-	label(26, 186, "right click a slider to type a value.", t, {150, 150, 150})
+	label(26, 186, T("right click a slider to type a value."), t, hint)
 
 	--hud
 	t = "hud"
-	label(26, 37, "player name:", t)
-	mpinput("player_name", 124, 35, 12, 12, t)
+	col = ui.columnx(124, T("player name:"), T("hud colour:"))
+	ui.mp.hudx = col
+	label(26, 37, T("player name:"), t)
+	mpinput("player_name", col, 35, 12, 12, t)
 	mpcheckbox("use_character_name", 26, 51, "use character name for player name", t)
-	label(26, 67, "hud colour:", t)
-	mpdropdown("hud_colour", 124, 65, 6, COLOURS, t, true)
+	label(26, 67, T("hud colour:"), t)
+	mpdropdown("hud_colour", col, 65, 6, COLOURS, t, true, true)
 	mpcheckbox("letters_world", 26, 81, "use letters for worlds above 9", t)
 	mpcheckbox("visible_hud", 26, 95, "visible hud", t)
 	mpcheckbox("outlined_hud", 26, 109, "outlined hud", t)
 	mpcheckbox("simple_hud", 26, 123, "simple hud", t)
 	mpcheckbox("allow_cheats", 26, 137, "allow cheats", t)
-	label(26, 157, "hide hud collectables:", t)
+	label(26, 157, T("hide hud collectables:"), t)
 	for i = 1, 10 do
 		local el
 		el = guielement:new("checkbox", 26 + (i-1)*34, 169, function(v)
@@ -2384,55 +2480,65 @@ mp_build = function()
 
 	--text
 	t = "text"
-	label(26, 36, "ending 1:", t)
-	mpinput("ending1", 98, 34, 32, 32, t)
-	label(26, 49, "ending 2:", t)
-	mpinput("ending2", 98, 47, 32, 32, t)
-	label(26, 63, "colour:", t)
-	mpdropdown("ending_colour", 98, 61, 6, COLOURS, t, true)
+	col = ui.columnx(98, T("ending 1:"), T("ending 2:"), T("colour:"), TF("toad %s:", 3), TF("peach %s:", 5))
+	inputw = math.min(32, math.floor((panelright() - 5 - col - 5)/8))
+	label(26, 36, T("ending 1:"), t)
+	mpinput("ending1", col, 34, inputw, 32, t)
+	label(26, 49, T("ending 2:"), t)
+	mpinput("ending2", col, 47, inputw, 32, t)
+	label(26, 63, T("colour:"), t)
+	mpdropdown("ending_colour", col, 61, 6, COLOURS, t, true, true)
 	for i = 1, 3 do
-		label(26, 80 + (i-1)*13, "toad " .. i .. ":", t)
-		mpinput("toad" .. i, 98, 78 + (i-1)*13, 32, 32, t)
+		label(26, 80 + (i-1)*13, TF("toad %s:", i), t)
+		mpinput("toad" .. i, col, 78 + (i-1)*13, inputw, 32, t)
 	end
 	for i = 1, 5 do
-		label(26, 122 + (i-1)*13, "peach " .. i .. ":", t)
-		mpinput("peach" .. i, 98, 120 + (i-1)*13, 32, 32, t)
+		label(26, 122 + (i-1)*13, TF("peach %s:", i), t)
+		mpinput("peach" .. i, col, 120 + (i-1)*13, inputw, 32, t)
 	end
 
 	--course
 	t = "course"
-	label(26, 37, "time limit:", t)
-	mpstepper("time_limit", 190, 36, 4, 0, 9999, 10, t)
-	label(26, 53, "portal gun:", t)
-	mpdropdown("portalgun", 190, 51, 6, PORTALGUN, t)
-	label(26, 69, "background scroll x:", t)
-	mpslider("bgx", 190, 68, 180, 0, 9, 0.1, t)
-	label(26, 83, "background scroll y:", t)
-	mpslider("bgy", 190, 82, 180, 0, 9, 0.1, t)
-	label(26, 97, "foreground scroll x:", t)
-	mpslider("fgx", 190, 96, 180, 0, 9, 0.1, t)
-	label(26, 111, "foreground scroll y:", t)
-	mpslider("fgy", 190, 110, 180, 0, 9, 0.1, t)
-	label(26, 131, "these are used by every new course.", t, {150, 150, 150})
-	label(26, 141, "right click a slider to type a value.", t, {150, 150, 150})
+	col = ui.columnx(190, T("time limit:"), T("portal gun:"), T("background scroll x:"), T("background scroll y:"), T("foreground scroll x:"), T("foreground scroll y:"))
+	ui.mp.timex = col + 64
+	label(26, 37, T("time limit:"), t)
+	mpstepper("time_limit", col, 36, 4, 0, 9999, 10, t)
+	label(26, 53, T("portal gun:"), t)
+	mpdropdown("portalgun", col, 51, 6, PORTALGUN, t, false, true)
+	label(26, 69, T("background scroll x:"), t)
+	mpslider("bgx", col, 68, panelright() - 9 - col, 0, 9, 0.1, t)
+	label(26, 83, T("background scroll y:"), t)
+	mpslider("bgy", col, 82, panelright() - 9 - col, 0, 9, 0.1, t)
+	label(26, 97, T("foreground scroll x:"), t)
+	mpslider("fgx", col, 96, panelright() - 9 - col, 0, 9, 0.1, t)
+	label(26, 111, T("foreground scroll y:"), t)
+	mpslider("fgy", col, 110, panelright() - 9 - col, 0, 9, 0.1, t)
+	label(26, 131, T("these are used by every new course."), t, hint)
+	label(26, 141, T("right click a slider to type a value."), t, hint)
 
 	--create
 	t = "create"
 	mpcheckbox("prevent_delete", 26, 35, "prevent deletion from the mappack creator", t)
-	add("mp_create", newbutton(26, 128, "create mappack", mp_create, 14*8), t)
-	local delete = confirmbutton("mp_delete", 160, 128, "delete mappack", mp_delete, 17*8)
+	local createtext = T("create mappack")
+	add("mp_create", newbutton(26, 128, createtext, mp_create), t)
+	local delete = confirmbutton("mp_delete", math.max(160, 26 + 3 + ui.textw(createtext) + 19), 128, T("delete mappack"), mp_delete)
 	elements[#elements].tab = t
 	delete.textcolor = {255, 80, 80}
 
-	add("mp_save", newbutton(26, 145, "save project", mp_saveproject, 12*8), t)
+	--the save/load buttons share a width, and the dropdowns line up after the wider one
+	local savetext, loadtext = T("save project"), T("load project")
+	local projectw = math.max(ui.textw(savetext), ui.textw(loadtext))
+	col = math.max(130, 26 + 3 + projectw + 5)
+	ui.mp.projectsx = col
+	add("mp_save", newbutton(26, 145, savetext, mp_saveproject, projectw), t)
 	local format
-	format = add("mp_format", guielement:new("dropdown", 130, 145, 9, function(i)
+	format = add("mp_format", guielement:new("dropdown", col, 145, 9, function(i)
 		format.var = i
 		mp.projectformat = i
 	end, mp.projectformat, unpack(PROJECTFORMATS)), t)
 	format.displayentries = {".mpckproj", ".json", ".cfg"}
 
-	add("mp_load", newbutton(26, 162, "load project", function()
+	add("mp_load", newbutton(26, 162, loadtext, function()
 		local file = mpprojects[mp.projectsel]
 		if not file then
 			return
@@ -2441,21 +2547,22 @@ mp_build = function()
 		if data then
 			mp_loadproject(data, (file:match("%.([^%.]+)$") or ""):lower())
 		end
-	end, 12*8), t)
+	end, projectw), t)
 	if #mpprojects > 0 then
 		mp.projectsel = clamp(mp.projectsel, 1, #mpprojects)
 		local projects
-		projects = add("mp_projects", guielement:new("dropdown", 130, 162, 22, function(i)
+		projects = add("mp_projects", guielement:new("dropdown", col, 162, math.min(22, math.floor((panelright() - 5 - col - 13)/8)), function(i)
 			projects.var = i
 			mp.projectsel = i
 		end, mp.projectsel, unpack(mpprojects)), t)
 		projects.displayentries = lowered(mpprojects)
 	end
 
-	confirmbutton("mp_reset", 26, 179, "reset properties", mp_reset, 17*8)
+	local reset = confirmbutton("mp_reset", 26, 179, T("reset properties"), mp_reset)
 	elements[#elements].tab = t
+	ui.mp.statusx = math.max(168, 26 + 3 + reset.width + 3)
 
-	add("back", newbutton(panelright()-40, 199, "back", function() utils_back() end))
+	ui.addback()
 end
 
 local function mp_update()
@@ -2554,7 +2661,7 @@ local function mp_draw()
 		if name == "create" and not mpcheck.valid and mptab ~= name then
 			love.graphics.setColor(170, 60, 60)
 		end
-		properprint(name, r.x*scale, 22*scale)
+		properprintF(T(name), r.x*scale, 22*scale)
 	end
 	love.graphics.setColor(60, 60, 60)
 	love.graphics.rectangle("fill", (PX+5)*scale, 32*scale, (panelwidth()-10)*scale, scale)
@@ -2563,41 +2670,49 @@ local function mp_draw()
 
 	if mptab == "general" then
 		--icon preview
-		drawswatch(300, 47, 66, 66, {0, 0, 0})
+		local f = ui.iconframe
+		local cx, cy = f.x + f.size/2, f.y + f.size/2
+		drawswatch(f.x, f.y, f.size, f.size, {0, 0, 0})
 		if mpiconimage then
 			local iw, ih = mpiconimage:getDimensions()
-			local s = math.min(62/iw, 62/ih)
+			local s = math.min((f.size-4)/iw, (f.size-4)/ih)
 			love.graphics.setColor(255, 255, 255)
-			love.graphics.draw(mpiconimage, (333 - iw*s/2)*scale, (80 - ih*s/2)*scale, 0, s*scale, s*scale)
-		else
+			love.graphics.draw(mpiconimage, (cx - iw*s/2)*scale, (cy - ih*s/2)*scale, 0, s*scale, s*scale)
+		elseif ui.mp.iconlabel then
 			love.graphics.setColor(110, 110, 110)
-			centredprint("blank", 333, 76)
+			centredprint(T("blank"), cx, cy - 4)
+		else
+			--"icon" didn't fit above the frame, so the empty frame says it
+			love.graphics.setColor(150, 150, 150)
+			centredprint(T("icon"), cx, cy - 9)
+			love.graphics.setColor(110, 110, 110)
+			centredprint(T("blank"), cx, cy + 1)
 		end
 		if v.lives == 0 then
 			love.graphics.setColor(100, 255, 100)
-			properprintF("infinite lives!", 200*scale, 117*scale)
+			properprintF(T("infinite lives!"), ui.mp.livesx*scale, 117*scale)
 		end
 	elseif mptab == "worlds" then
 		if mp.drop_shadow then
 			love.graphics.setColor(255, 80, 80)
-			properprintF("will reduce performance!", 150*scale, 37*scale)
+			properprintF(T("will reduce performance!"), ui.mp.performancex*scale, 37*scale)
 		end
 		if mp.no_subzones then
 			love.graphics.setColor(150, 150, 150)
-			properprintF("none", 190*scale, 141*scale)
+			properprintF(T("none"), ui.mp.worldsx*scale, 141*scale)
 		end
 		--fades from grey through orange and reds as the count passes each warning
 		love.graphics.setColor(filecountcolour(mpcheck.filecount))
-		properprintF("files to create: " .. mpcheck.filecount, 26*scale, 172*scale)
+		properprintF(TF("files to create: %s", mpcheck.filecount), 26*scale, 172*scale)
 	elseif mptab == "hud" then
 		if mp.use_character_name then
 			love.graphics.setColor(150, 150, 150)
-			properprintF("the character's name", 124*scale, 37*scale)
+			properprintF(T("the character's name"), ui.mp.hudx*scale, 37*scale)
 		end
 	elseif mptab == "course" then
 		if v.time_limit == 0 then
 			love.graphics.setColor(100, 255, 100)
-			properprintF("infinite time!", 254*scale, 37*scale)
+			properprintF(T("infinite time!"), ui.mp.timex*scale, 37*scale)
 		end
 	elseif mptab == "create" then
 		local y = 50
@@ -2624,13 +2739,13 @@ local function mp_draw()
 		end
 		if #mpcheck.requirements == 0 and #mpcheck.notices == 0 then
 			love.graphics.setColor(150, 150, 150)
-			properprintF("ready to create '" .. v.name .. "'", 26*scale, 50*scale)
-			properprintF("in " .. mappackfolder, 26*scale, 60*scale)
+			properprintF(TF("ready to create '%s'", v.name), 26*scale, 50*scale)
+			properprintF(TF("in %s", mappackfolder), 26*scale, 60*scale)
 		end
 
 		if #mpprojects == 0 then
 			love.graphics.setColor(150, 150, 150)
-			properprintF("no projects saved yet", 130*scale, 164*scale)
+			properprintF(T("no projects saved yet"), ui.mp.projectsx*scale, 164*scale)
 		end
 
 		if mpprogress then
@@ -2651,7 +2766,7 @@ local function mp_draw()
 			properprintF(count, 232*scale, 201*scale)
 		end
 		love.graphics.setColor(mpstatuscolor)
-		properprintF(mpstatus:sub(1, 26), 168*scale, 181*scale)
+		properprintF(ui.cut(mpstatus, math.floor((panelright() - ui.mp.statusx)/8)), ui.mp.statusx*scale, 181*scale)
 	end
 
 	drawlabels()
@@ -2667,9 +2782,9 @@ local function mp_filedropped(file)
 		end)
 		if ok then
 			mp_seticon(imagedata)
-			notice.new("icon set!", nil, 2)
+			notice.new(T("icon set!"), nil, 2)
 		else
-			notice.new("couldn't read that image", notice.red, 3)
+			notice.new(T("couldn't read that image"), notice.red, 3)
 		end
 	elseif ext == "mpckproj" or ext == "json" or ext == "cfg" then
 		local ok, data = pcall(function()
@@ -2678,7 +2793,7 @@ local function mp_filedropped(file)
 		if ok then
 			mp_loadproject(data, ext)
 		else
-			notice.new("couldn't read that file", notice.red, 3)
+			notice.new(T("couldn't read that file"), notice.red, 3)
 		end
 	end
 end
@@ -2725,7 +2840,7 @@ end
 
 utils_back = function()
 	if job then
-		notice.new("wait until it's finished!", notice.red, 2)
+		notice.new(T("wait until it's finished!"), notice.red, 2)
 		return
 	end
 	if page == "fontrender" then
@@ -2740,9 +2855,9 @@ local function inner_utilsmenu_update(dt)
 
 	local result = love.thread.getChannel(CLIPBOARD_CHANNEL):pop()
 	if result == true then
-		notice.new("copied the image to the clipboard!", nil, 3)
+		notice.new(T("copied the image to the clipboard!"), nil, 3)
 	elseif result == false then
-		notice.new("couldn't copy the image,\nit's saved in " .. RENDERFOLDER .. " instead", notice.red, 4)
+		notice.new(TF("couldn't copy the image,\nit's saved in %s instead", RENDERFOLDER), notice.red, 4)
 	end
 
 	if page == "charformat" then
@@ -2914,7 +3029,7 @@ end
 
 local function drawerror()
 	drawpanel()
-	drawtitle("utils hit an error")
+	drawtitle(T("utils hit an error"))
 	love.graphics.setColor(255, 80, 80)
 	local y = 36
 	local message = utilserror:gsub("\t", " ")
@@ -2926,8 +3041,8 @@ local function drawerror()
 		y = y + 10
 	end
 	love.graphics.setColor(255, 255, 255)
-	properprintF("press escape to go back", 26*scale, 196*scale)
-	properprintF("saved in alesans_entities/crashes", 26*scale, 206*scale)
+	properprintF(T("press escape to go back"), 26*scale, 196*scale)
+	properprintF(TF("saved in %s", "alesans_entities/crashes"), 26*scale, 206*scale)
 end
 
 utilsmenu_openpage = guarded(inner_utilsmenu_openpage)
