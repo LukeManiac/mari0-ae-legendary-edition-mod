@@ -305,6 +305,13 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	guielements["scrollfactoryscrollbar"].buttonround = true
 	guielements["scrollfactor2xscrollbar"].buttonround = true
 	guielements["scrollfactor2yscrollbar"].buttonround = true
+	--right click typing (gui.lua) works in the units these sliders stand for
+	guielements["autoscrollingscrollbar"].valuefunction = function(self, v) return round(v*autoscrollingmaxspeed, 2) end
+	for _, name in ipairs({"scrollfactorxscrollbar", "scrollfactoryscrollbar", "scrollfactor2xscrollbar", "scrollfactor2yscrollbar"}) do
+		guielements[name].valuefunction = function(self, v) return round((v*3)^2, 2) end
+		guielements[name].releasefunc = function(self, v) levelmodified = true end
+	end
+	guielements["autoscrollingscrollbar"].releasefunc = function(self, v) levelmodified = true end
 
 	guielements["backgrounddropdown"] = guielement:new("dropdown", 298, 133, 10, changecustombackground, 1, unpack(custombackgrounds))
 	guielements["foregrounddropdown"] = guielement:new("dropdown", 298, 165, 10, changecustomforeground, 1, unpack(custombackgrounds))

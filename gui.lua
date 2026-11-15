@@ -774,8 +774,7 @@ function guielement:draw(a, offx, offy)
 			local high = self:inhighlight(love.mouse.getPosition())
 			
 			local tw, th = self.width*scale, (self.yrange+self.height)*scale
-			local tr = 0
-			if self.buttonround then tr = math.min(tw, th) * 0.15 end
+			local tr = self:sliderradius() --the track is rounded like its handle
 			love.graphics.setColor(self.backgroundcolor)
 			love.graphics.rectangle("fill", self.x*scale, self.y*scale, tw, th, tr)
 		
@@ -820,8 +819,7 @@ function guielement:draw(a, offx, offy)
 			local high = self:inhighlight(love.mouse.getPosition())
 			
 			local tw, th = (self.xrange+self.width)*scale, self.height*scale
-			local tr = 0
-			if self.buttonround then tr = math.min(tw, th) * 0.15 end -- same ratio as buttons
+			local tr = self:sliderradius() --the track is rounded like its handle
 			love.graphics.setColor(self.backgroundcolor)
 			love.graphics.rectangle("fill", self.x*scale, self.y*scale, tw, th, tr)
 		
@@ -859,11 +857,13 @@ function guielement:draw(a, offx, offy)
 			love.graphics.setColor(self.fillcolor)
 			love.graphics.rectangle("fill", (self.x+1+self.xrange*self.value)*scale, (self.y+1)*scale, (self.width-2)*scale, (self.height-2)*scale, sr * 0.7)
 
-			if self.displayfunction then
+			if self.displayfunction or self.inputting then
 				love.graphics.setColor(self.bordercolorhigh)
-				local s = self:displayfunction(self.value)
+				local s
 				if self.inputting then
 					s = self.textvalue
+				else
+					s = self:displayfunction(self.value)
 				end
 				properprint(s, (self.x+self.xrange*self.value)*scale, (self.y+math.ceil((self.height-8)/2))*scale)
 
@@ -1060,14 +1060,19 @@ function guielement:click(x, y, button)
 						end
 					end
 				else
-					if self:inhighlight(x, y) then
-						if button == "r" and (self.rightclickvalue or (self.displayfunction and self.min and self.max)) and not android then
-							self.inputting = true
-							typingintextinput = true
-							self.textvalue = self:displayfunction(self.value)
-							self.cursorblink = true
-							self.timer = 0
-						elseif not self.inputting then
+					if button == "r" then
+						--right click anywhere on a slider to type its value (enter sets it, escape cancels)
+						if self:insidertrack(x, y) and self.typeable ~= false and not android then
+							self:starttyping()
+							return true
+						elseif self.inputting then
+							self:stoptyping()
+						end
+					else
+						if self.inputting then
+							self:stoptyping()
+						end
+						if self:inhighlight(x, y) then
 							self.dragging = true
 							self.draggingx = x-(self.x+self.xrange*self.value)*scale
 							if self.buttonround then
@@ -1075,9 +1080,6 @@ function guielement:click(x, y, button)
 								self.presszoomanim = gui_anim_start(self.presszoom or 1, 0.85)
 							end
 						end
-					else
-						self.inputting = false
-						typingintextinput = false
 					end
 				end
 			end
@@ -1170,28 +1172,24 @@ function guielement:keypress(key,textinput)
 			--Type in number into scrollbar
 			if self.inputting and not self.highlighting then
 				if key == "escape" then
-					self.inputting = false
-					typingintextinput = false
-					love.keyboard.setKeyRepeat(false)
+					self:stoptyping()
 				elseif (key == "return" or key == "enter" or key == "kpenter") then
 					local newvalue = tonumber(self.textvalue)
 					if newvalue then
-						if self.rcrange or (self.min and self.max) then
-							local min, max = self.min or self.rcrange[1], self.max or self.rcrange[2]
-							newvalue = math.min(max, math.max(min, newvalue))
-							self.value = (newvalue-min)/(max-min)
-						end
+						self.value = self:valuefornumber(newvalue)
 						if self.updatefunc then
 							self:updatefunc(self.value)
 						end
+						if self.releasefunc then
+							self:releasefunc(self.value)
+						end
 					end
-					self.inputting = false
-					typingintextinput = false
-					love.keyboard.setKeyRepeat(false)
+					self:stoptyping()
 				elseif key == "backspace" then
 					self.textvalue = string.sub(self.textvalue, 1, -2)
+					self.timer = 0
 				else
-					if string.len(self.textvalue) < math.floor(self.width/8) then
+					if string.len(self.textvalue) < math.max(6, math.floor(self.width/8)) then
 						if tonumber(key) or key == "-" or key == "." then
 							self.textvalue = self.textvalue .. key
 							self.cursorblink = true
@@ -1199,6 +1197,7 @@ function guielement:keypress(key,textinput)
 						end
 					end
 				end
+				return true --the keys belong to the slider while typing
 			end
 		elseif self.type == "input" then
 			if self.inputting then
@@ -1827,6 +1826,100 @@ function guielement:inhighlight(x, y, allow_dropdown_hover)
 	end
 	
 	return false
+end
+
+------------------------------------------------------------
+-- sliders (horizontal scrollbars)
+------------------------------------------------------------
+
+--corner radius of a scrollbar's handle; the track uses the same one
+function guielement:sliderradius()
+	local roundness = 0.25
+	if self.buttonround then
+		roundness = 0.15 --buttons use 0.15
+	end
+	return math.min(self.width, self.height)*scale*roundness
+end
+
+--like inhighlight, but anywhere on a horizontal slider's track instead of only on its handle
+function guielement:insidertrack(x, y)
+	local dropdown_open = opened_dropdown and opened_dropdown.active and opened_dropdown.extended
+	if editormode and not self.alwaysinteractable and
+		(not editor_gui_interaction_enabled(self) or (dropdown_open and opened_dropdown ~= self)) then
+		return false
+	end
+	if (self.controlbindpage or (self.controlspopup and gamestate == "game")) and optionscontrols_transformmouse then
+		x, y = optionscontrols_transformmouse(x, y)
+	end
+	if self.nohover then
+		return false
+	end
+	return x >= self.x*scale and x < (self.x+self.xrange+self.width)*scale and y >= self.y*scale and y < (self.y+self.height)*scale
+end
+
+function guielement:starttyping()
+	self.dragging = false
+	self.inputting = true
+	self.textvalue = "" --typing replaces the value
+	self.cursorblink = true
+	self.timer = 0
+	typingintextinput = true
+	love.keyboard.setKeyRepeat(true)
+end
+
+function guielement:stoptyping()
+	self.inputting = false
+	typingintextinput = false
+	love.keyboard.setKeyRepeat(false)
+end
+
+--the number a slider stands for at a position (0-1), or nil if it can't tell
+function guielement:numberat(v)
+	if self.valuefunction then
+		return tonumber(self:valuefunction(v))
+	elseif self.displayfunction then
+		local s = tostring(self:displayfunction(v) or "")
+		return tonumber(s) or tonumber(s:match("%-?%d+%.?%d*"))
+	end
+	return nil
+end
+
+--turns a typed number into a slider position (0-1)
+--	typefunc(self, number):     the slider says how itself
+--	min/max or rcrange:         a straight range
+--	valuefunction/displayfunction: the closest position showing that number (works for curved scales too)
+--	nothing:                    a percentage
+function guielement:valuefornumber(n)
+	if self.typefunc then
+		return math.min(math.max(self:typefunc(n), 0), 1)
+	end
+	local min, max = self.min, self.max
+	if not (min and max) and self.rcrange then
+		min, max = self.rcrange[1], self.rcrange[2]
+	end
+	if min and max and max ~= min then
+		n = math.min(math.max(n, math.min(min, max)), math.max(min, max))
+		return (n-min)/(max-min)
+	end
+	if self:numberat(0) ~= nil then
+		--find the positions that show the closest number, and take the middle of them
+		local first, last, bestdistance = self.value, self.value, math.huge
+		local steps = 2000
+		for i = 0, steps do
+			local v = i/steps
+			local shown = self:numberat(v)
+			if shown then
+				local distance = math.abs(shown - n)
+				if distance < bestdistance - 1e-9 then
+					first, last, bestdistance = v, v, distance
+				elseif math.abs(distance - bestdistance) <= 1e-9 and last == (i-1)/steps then
+					last = v
+				end
+			end
+		end
+		return (first + last)/2
+	end
+	return math.min(math.max(n/100, 0), 1)
 end
 
 function guielement:updatePos()

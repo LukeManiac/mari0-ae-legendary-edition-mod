@@ -183,7 +183,9 @@ end
 -- gui elements owned by the utils pages
 ------------------------------------------------------------
 
+local steppers
 local function clearelements()
+	steppers = {}
 	elements = {}
 	named = {}
 	labels = {}
@@ -304,6 +306,127 @@ local function opendropdown()
 	return nil
 end
 
+------------------------------------------------------------
+-- sliders: drag the handle, click the track to jump, right click to type a value
+------------------------------------------------------------
+
+local function sliderround(s, n)
+	n = s.min + math.floor((n - s.min)/s.utilsstep + 0.5)*s.utilsstep
+	n = clamp(n, s.min, s.max)
+	if s.utilsstep >= 1 then
+		return math.floor(n + 0.5)
+	end
+	return math.floor(n*10 + 0.5)/10
+end
+
+--the slider's value in its own units (snapped to its step)
+local function slidervalue(s)
+	return sliderround(s, s.min + s.value*(s.max - s.min))
+end
+
+local function setslidervalue(s, n)
+	s.value = clamp((n - s.min)/(s.max - s.min), 0, 1)
+end
+
+local function newslider(x, y, trackwidth, minimum, maximum, step, value)
+	local s = guielement:new("scrollbar", x, y, trackwidth, 33, 9, 0, "hor")
+	s.buttonround = true
+	s.scrollstepdisabled = true --the wheel would change it while scrolling past
+	s.min, s.max = minimum, maximum
+	s.utilsstep = step
+	s.utilsslider = true
+	s.displayfunction = function(self)
+		return numbertostring(slidervalue(self))
+	end
+	setslidervalue(s, tonumber(value) or minimum)
+	return s
+end
+
+local function slidertrackhit(s, x, y)
+	x, y = x/scale, y/scale
+	return x >= s.x and x < s.x + s.xrange + s.width and y >= s.y and y < s.y + s.height
+end
+
+--right click typing comes from gui.lua; clicking the track (not the handle) jumps the handle there
+local function sliderclick(s, x, y, button)
+	if button == "l" and slidertrackhit(s, x, y) and not s:inhighlight(x, y) then
+		s.value = clamp((x/scale - s.x - s.width/2)/s.xrange, 0, 1)
+	end
+	s:click(x, y, button)
+end
+
+------------------------------------------------------------
+-- steppers, like the editor's time limit: [<][value][>]
+-- hold an arrow to keep counting, click the number to type one
+------------------------------------------------------------
+
+steppers = {}
+
+local function stepperget(st)
+	local n = tonumber(st.get())
+	if not n then
+		return st.minimum
+	end
+	return clamp(math.floor(n), st.minimum, st.maximum)
+end
+
+local function newstepper(name, x, y, digits, minimum, maximum, step, get, set, tab)
+	local st = {x = x, digits = digits, minimum = minimum, maximum = maximum, get = get, set = set}
+
+	local function nudge(direction)
+		st.set(clamp(stepperget(st) + direction*step, minimum, maximum))
+	end
+	local function arrow(text, direction)
+		local b = guielement:new("button", x, y, text, function() nudge(direction) end, 0)
+		b.autorepeat = true
+		b.repeatwait = 0.3
+		b.repeatdelay = 0.08
+		return b
+	end
+
+	st.dec = add(name .. "_dec", arrow("{", -1), tab)
+	st.input = add(name .. "_input", guielement:new("input", x + 12, y, 1, function(self)
+		local n = tonumber(self.value)
+		if n then
+			st.set(clamp(math.floor(n), minimum, maximum))
+		else
+			notice.new("that has to be a number!", notice.red, 3)
+		end
+		closeinput(self)
+	end, tostring(stepperget(st)), digits, nil, nil, 0), tab)
+	st.input.justdisplay = true
+	st.input.utilsnumeric = "int"
+	st.inc = add(name .. "_inc", arrow("}", 1), tab)
+	table.insert(steppers, st)
+	return st
+end
+
+--keeps the number and the right arrow where the editor would put them
+local function updatesteppers()
+	for _, st in ipairs(steppers) do
+		local width
+		if st.input.inputting then
+			if not st.wasinputting then
+				--select the whole number, so typing replaces it
+				st.input.highlighting = false
+				st.input.highlight = 1
+				st.input.cursorpos = string.len(tostring(st.input.value)) + 1
+			end
+			width = st.digits
+		else
+			local value = tostring(stepperget(st))
+			st.input.value = value
+			st.input.textoffset = 0
+			width = string.len(value)
+		end
+		st.input.width = width
+		st.inc.x = st.x + 16 + width*8
+		st.dec.utilsdisabled = st.input.inputting
+		st.inc.utilsdisabled = st.input.inputting
+		st.wasinputting = st.input.inputting
+	end
+end
+
 local function clickelements(x, y, button)
 	--an open dropdown gets the click and nothing behind it does
 	local dropdown = opendropdown()
@@ -316,7 +439,11 @@ local function clickelements(x, y, button)
 	for _, v in ipairs(elements) do
 		local el = v.el
 		if el.active and (el.type == "input" or el.type == "scrollbar") then
-			el:click(x, y, button)
+			if el.utilsslider then
+				sliderclick(el, x, y, button)
+			else
+				el:click(x, y, button)
+			end
 		end
 	end
 	for _, v in ipairs(elements) do
@@ -1113,15 +1240,9 @@ local function fr_copy()
 end
 
 local function fr_slider(c, y)
-	local slider = guielement:new("scrollbar", 36, y, 280, 33, 9, fr.color[c]/255, "hor")
+	local slider = newslider(36, y, 280, 0, 255, 1, fr.color[c])
 	local backgrounds = {{90, 0, 0}, {0, 90, 0}, {0, 0, 90}}
 	slider.backgroundcolor = backgrounds[c]
-	slider.buttonround = true
-	slider.scrollstepdisabled = true --the wheel would change it while scrolling over it
-	slider.min, slider.max = 0, 255 --right click to type a value
-	slider.displayfunction = function(self, v)
-		return tostring(round(v*255))
-	end
 	return slider
 end
 
@@ -1165,7 +1286,7 @@ local function fr_build()
 		fr.outline = hudoutline or false
 		named["fr_outline"].var = fr.outline
 		for c = 1, 3 do
-			named["fr_slider" .. c].value = fr.color[c]/255
+			setslidervalue(named["fr_slider" .. c], fr.color[c])
 		end
 	end))
 	add("back", newbutton(panelright()-40, 199, "back", function() utils_back() end))
@@ -1177,7 +1298,7 @@ local function fr_update()
 	for c = 1, 3 do
 		local slider = named["fr_slider" .. c]
 		if slider then
-			fr.color[c] = round(slider.value*255)
+			fr.color[c] = slidervalue(slider)
 		end
 	end
 
@@ -1311,6 +1432,7 @@ local mp --current values (input fields keep their text, dropdowns their index)
 local mpicon --ImageData or nil
 local mpiconimage
 local mpbinds = {}
+local mpsliders = {}
 local mpexisting = {} --lowercase name -> folder name
 local mpexistingtime = 0
 local mpsession = {} --lowercase names created since the game started
@@ -2091,6 +2213,20 @@ end
 -- mappack creator: gui
 ------------------------------------------------------------
 
+local function mpslider(key, x, y, trackwidth, minimum, maximum, step, tab)
+	local slider = newslider(x, y, trackwidth, minimum, maximum, step, mp[key])
+	slider.backgroundcolor = {40, 40, 40}
+	slider.utilskey = key
+	table.insert(mpsliders, slider)
+	return add("mp_" .. key, slider, tab)
+end
+
+local function mpstepper(key, x, y, digits, minimum, maximum, step, tab)
+	return newstepper("mp_" .. key, x, y, digits, minimum, maximum, step,
+		function() return mp[key] end,
+		function(n) mp[key] = tostring(n) end, tab)
+end
+
 local function mpinput(key, x, y, w, maxlength, tab, numeric, h)
 	local el = newinput(x, y, w, mp[key], maxlength, h)
 	el.utilsnumeric = numeric
@@ -2123,6 +2259,7 @@ mp_build = function()
 	end
 	clearelements()
 	mpbinds = {}
+	mpsliders = {}
 	mp_refreshexisting()
 	mp_refreshprojects()
 
@@ -2137,7 +2274,7 @@ mp_build = function()
 	label(26, 79, "description:", t)
 	mpinput("description", 132, 77, 17, 51, t, nil, 3)
 	label(26, 117, "lives:", t)
-	mpinput("lives", 132, 115, 5, 4, t, "int").numdrag = {0, 9999}
+	mpstepper("lives", 132, 116, 4, 0, 9999, 1, t)
 	label(26, 133, "physics:", t)
 	mpdropdown("physics", 132, 131, 29, PHYSICS, t)
 	label(26, 147, "camera:", t)
@@ -2155,12 +2292,13 @@ mp_build = function()
 	mpcheckbox("no_hurry", 26, 78, "no hurry music", t)
 	mpcheckbox("no_coinlimit", 26, 92, "no coin limit", t)
 	label(26, 113, "world count:", t)
-	mpinput("world_count", 190, 111, 4, 3, t, "int").numdrag = {1, 999}
+	mpslider("world_count", 190, 112, 180, 1, 999, 1, t)
 	label(26, 127, "courses per world:", t)
-	mpinput("courses_per_world", 190, 125, 4, 2, t, "int").numdrag = {1, 99}
+	mpslider("courses_per_world", 190, 126, 180, 1, 99, 1, t)
 	label(26, 141, "subzones per course:", t)
-	mpinput("subzones_per_course", 190, 139, 4, 2, t, "int").numdrag = {1, 13}
+	mpslider("subzones_per_course", 190, 140, 180, 1, 13, 1, t)
 	mpcheckbox("no_subzones", 26, 155, "do not create subzones", t)
+	label(26, 186, "right click a slider to type a value.", t, {150, 150, 150})
 
 	--hud
 	t = "hud"
@@ -2204,19 +2342,19 @@ mp_build = function()
 	--course
 	t = "course"
 	label(26, 37, "time limit:", t)
-	mpinput("time_limit", 190, 35, 5, 4, t, "int").numdrag = {0, 9999}
+	mpstepper("time_limit", 190, 36, 4, 0, 9999, 10, t)
 	label(26, 53, "portal gun:", t)
 	mpdropdown("portalgun", 190, 51, 6, PORTALGUN, t)
 	label(26, 69, "background scroll x:", t)
-	mpinput("bgx", 190, 67, 4, 4, t, "float")
+	mpslider("bgx", 190, 68, 180, 0, 9, 0.1, t)
 	label(26, 83, "background scroll y:", t)
-	mpinput("bgy", 190, 81, 4, 4, t, "float")
+	mpslider("bgy", 190, 82, 180, 0, 9, 0.1, t)
 	label(26, 97, "foreground scroll x:", t)
-	mpinput("fgx", 190, 95, 4, 4, t, "float")
+	mpslider("fgx", 190, 96, 180, 0, 9, 0.1, t)
 	label(26, 111, "foreground scroll y:", t)
-	mpinput("fgy", 190, 109, 4, 4, t, "float")
-	label(26, 131, "scroll factors go from 0 to 9.", t, {150, 150, 150})
-	label(26, 141, "these are used by every new course.", t, {150, 150, 150})
+	mpslider("fgy", 190, 110, 180, 0, 9, 0.1, t)
+	label(26, 131, "these are used by every new course.", t, {150, 150, 150})
+	label(26, 141, "right click a slider to type a value.", t, {150, 150, 150})
 
 	--create
 	t = "create"
@@ -2261,10 +2399,14 @@ mp_build = function()
 end
 
 local function mp_update()
-	--text fields -> values
+	--text fields and sliders -> values
 	for _, bind in ipairs(mpbinds) do
 		mp[bind.key] = tostring(bind.el.value)
 	end
+	for _, slider in ipairs(mpsliders) do
+		mp[slider.utilskey] = numbertostring(slidervalue(slider))
+	end
+	updatesteppers()
 
 	--simple hud always uses the character's name
 	local usename = named["mp_use_character_name"]
@@ -2338,7 +2480,7 @@ local function mp_draw()
 		end
 		if v.lives == 0 then
 			love.graphics.setColor(100, 255, 100)
-			properprintF("infinite lives!", 180*scale, 117*scale)
+			properprintF("infinite lives!", 200*scale, 117*scale)
 		end
 	elseif mptab == "worlds" then
 		if mp.drop_shadow then
@@ -2347,10 +2489,10 @@ local function mp_draw()
 		end
 		if mp.no_subzones then
 			love.graphics.setColor(150, 150, 150)
-			properprintF("none", 192*scale, 141*scale)
+			properprintF("none", 190*scale, 141*scale)
 		end
 		love.graphics.setColor(150, 150, 150)
-		properprintF("files to create: " .. mpcheck.filecount, 26*scale, 175*scale)
+		properprintF("files to create: " .. mpcheck.filecount, 26*scale, 172*scale)
 	elseif mptab == "hud" then
 		if mp.use_character_name then
 			love.graphics.setColor(150, 150, 150)
@@ -2359,7 +2501,7 @@ local function mp_draw()
 	elseif mptab == "course" then
 		if v.time_limit == 0 then
 			love.graphics.setColor(100, 255, 100)
-			properprintF("infinite time!", 240*scale, 37*scale)
+			properprintF("infinite time!", 254*scale, 37*scale)
 		end
 	elseif mptab == "create" then
 		local y = 50
