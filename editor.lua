@@ -8950,28 +8950,6 @@ function reverseautoscrollingscrollbar(s)
 	return autoscrollingspeed/autoscrollingmaxspeed
 end
 
-function drawscrollfactorvalue(bar, value)
-	--the number follows the slider handle's top left corner and its press zoom
-	local pz = bar.presszoom or 1
-	local hx = bar.x + bar.xrange*bar.value
-	if pz ~= 1 then
-		local hcx = (hx+bar.width/2)*scale
-		local hcy = (bar.y+bar.height/2)*scale
-		love.graphics.push()
-		love.graphics.translate(hcx, hcy)
-		love.graphics.scale(pz, pz)
-		love.graphics.translate(-hcx, -hcy)
-	end
-	local properprintfunc = properprintF
-	if hudoutline then
-		properprintfunc = properprintFbackground
-	end
-	properprintfunc(formatscrollnumber(value), (hx+1)*scale, (bar.y+1)*scale)
-	if pz ~= 1 then
-		love.graphics.pop()
-	end
-end
-
 function formatscrollnumber(i)
 	if string.len(i) == 1 then
 		return i .. ".00"
