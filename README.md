@@ -380,6 +380,127 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.2.0
+
+### 🧩 New Features
+
+#### 🧰 Utils
+
+A new **Utils** option on the title screen, under **Options**. It opens a hub with three tools: the **Character Formatter**, the **Font Renderer** and the **Mappack Creator**, plus **Back**.
+
+* The title screen items are now 12 pixels apart instead of 16, so **Utils** ends where **Options** used to and nothing moves off the screen. **1 Player Game** stays where it was.
+* Move through the hub with Up and Down (or W and S) and pick a tool with Enter or Space, or use the mouse. The bottom of the hub explains the selected tool.
+* Escape goes back a page, and from the hub it goes back to the title screen, with **Utils** still selected. Escape closes an open dropdown first.
+* Every tool page has a **Back** button in the bottom right corner. While a tool is still working, Back and Escape wait, and a notice says "wait until it's finished!".
+* The tools do their work in the background, a little every frame, so the game never freezes while they run. Progress bars show how far along they are.
+* While Utils is open, it gets every click and key press first, so nothing else in the game can take them. F keys and Alt+Enter (fullscreen) still go to the game.
+* If something in Utils breaks, the game doesn't crash. The panel shows the error instead, and it's saved to `alesans_entities/crashes/utils_error.txt`. Escape or Enter goes back to the title screen.
+* Every bit of text in Utils is translated into every language the game has.
+
+#### 🎨 Character Formatter
+
+Splits a character's animation sheets into the colour layers the game uses for colourable characters.
+
+* Pick a character from the dropdown. It lists every folder in `alesans_entities/characters` that has a `config.json`.
+* The page shows the character's colours from the `colors` list in `config.json` as swatches, and every sheet it will split. A sheet is any `.png` whose name ends in `animations`, like `animations.png` or `biganimations.png`.
+* **Format** copies the character to a new folder, `<name>_formatted`, and splits every sheet there:
+  * Every fully opaque pixel that matches colour N of the list goes into layer N (`animations1.png`, `animations2.png` and so on), drawn in white.
+  * Every other pixel goes into layer 0 (`animations0.png`) with its own colour.
+* Layers the character already has, made by hand, are kept as they are and aren't written over.
+* When it's done, the page says how many layers it wrote. Restart the game to play as the formatted character.
+* **Open Folder** opens `alesans_entities/characters`.
+* **Format** can't be pressed while the character has no colours or no sheets. A `config.json` without a `colors` list, or with a colour that isn't three numbers, shows what's wrong in red.
+
+#### 🔤 Font Renderer
+
+Renders text with the current mappack's font to a `.png`, for thumbnails, title cards and the like. The font in use is shown in the top right corner.
+
+* Type in the text box. It shows 6 lines, holds up to 2,000 characters and scrolls both ways. Enter makes a new line.
+* The text box works like a normal one: the arrow keys, Home and End move the cursor, Backspace and Delete remove characters, the mouse wheel scrolls, and clicking moves the cursor there.
+* **Ctrl+V** pastes, **Ctrl+C** copies all the text, and **Ctrl+X** cuts all of it.
+* Characters the font doesn't have show up as a red `?` in the text box, so you know they won't be in the render.
+* **All caps** draws the text the same way the game does with its capitals font. It's on by default.
+* **Outline** adds the font's black outline.
+* **Align** lines up lines of different lengths to the left, centre or right.
+* Three red, green and blue sliders set the text colour, with a swatch next to them. They start on the mappack's HUD colour and outline. **HUD Colour** goes back to them.
+* The render updates as you type and shows up under the sliders on the game's sky colour, so the outline can be seen, with its size in pixels.
+* **Save PNG** saves the render to `renders/text <date> <time>.png` in the save folder.
+* **Copy Image** puts the render on the clipboard, with its transparency where the system allows it. It uses PowerShell on Windows, `osascript` on macOS and `xclip` on Linux. If that doesn't work, the image is saved to `renders/clipboard.png` instead and a notice says so.
+
+#### 🗺️ Mappack Creator
+
+Makes a new mappack filled with blank courses and subzones. Its options and project files match the Python Mappack Creator, so projects work in both.
+
+The creator has six tabs: **General**, **Worlds**, **HUD**, **Text**, **Course** and **Create**. Click a tab, or use Left and Right (or A and D) when you aren't typing.
+
+**General**
+
+* **Name** (the folder name), **Display name** (up to 17 characters), **Author** (up to 13) and **Description** (up to 51, over three lines).
+* **Lives**, from 0 to 9999. 0 shows "infinite lives!".
+* **Physics:** Mari0, SMB, Mari0-SMB2J, SMB2J, Mari0-Maker, Mario Maker or Portal.
+* **Camera:** Default, Centered or Forward Only.
+* **Icon:** Drop an image onto the window to use it as the icon. It's kept as it is. Right-click the icon frame or press **Clear** to remove it.
+* Lives and the course time limit use steppers like the editor's time limit: hold an arrow to keep counting, or click the number to type one.
+
+**Worlds**
+
+* **Drop shadow** (with a warning that it reduces performance), **Real time**, **Continue subzone music**, **No hurry music** and **No coin limit**.
+* **World count** (1 to 999), **Courses per world** (1 to 99) and **Subzones per course** (1 to 13) are sliders. **Do not create subzones** hides the last one.
+* The number of files to create is shown at the bottom. Its colour fades from grey through orange to dark red as it gets bigger.
+
+**HUD**
+
+* **Player name**, or **Use character name for player name**.
+* **HUD colour**, from 14 colours, each one shown in its own colour.
+* **Use letters for worlds above 9**, **Visible HUD**, **Outlined HUD**, **Simple HUD** and **Allow cheats**. Simple HUD always uses the character's name.
+* **Hide HUD collectables**, with a checkbox for each of the 10 collectables.
+
+**Text**
+
+* The two ending lines and their colour, Toad's three lines and Peach's five lines.
+
+**Course**
+
+* The defaults for every new course: **Time limit** (0 to 9999, in steps of 10; 0 shows "infinite time!"), **Portal gun** (Normal, None, 1 Only, 2 Only or Gel), and the background and foreground scroll factors (0 to 9, in steps of 0.1).
+
+**Create**
+
+* Before anything is made, the creator checks the values and lists anything wrong in red. The **Create** tab's name turns red while something is wrong. A mappack can't be made if:
+  * The name is empty, has `/ \ : * ? " < > |` in it, or is already a folder in the mappack folder.
+  * The display name, author or description is too long, or the display name is empty and the name is longer than 17 characters.
+* Large mappacks only get a warning. From 1,000, 10,000, 100,000 and 1,000,000 files, it says the mappack will take some time, a lot of time, a very long time or a ridiculously long time to make. These limits are `MAPPACKCREATOR_FILEWARNING` and the others at the top of `utilsmenu.lua`.
+* **Create Mappack** writes the mappack to the mappack folder with a progress bar:
+  * `settings.txt`, `text.txt` and `icon.png`.
+  * The `animated`, `animations`, `backgrounds`, `custom`, `enemies`, `music` and `sounds` folders.
+  * A blank 25x15 course for every course and subzone (`1-1.txt`, `1-1_1.txt` and so on), with sky and two rows of ground.
+* If making the mappack fails, the half-made folder is removed.
+* **Delete Mappack** deletes the mappack with the current name. Click it twice within 3 seconds to confirm. It only deletes mappacks the creator made, and only in the save folder.
+* **Prevent deletion from the mappack creator** (on by default) stops **Delete Mappack** from deleting the mappack later. Mappacks made since the game started can always be deleted.
+* **Save Project** saves every setting, including the icon, to `alesans_entities/mappackprojects` as `.mpckproj`, `.json` or `.cfg`.
+* **Load Project** loads a project picked from the dropdown. Dropping a project file onto the window loads it too.
+* **Reset Properties** puts everything back to default. Click it twice within 3 seconds to confirm.
+* Text is lowercased when a project is loaded, since the game's text boxes don't show capitals properly.
+
+### ✨ Improvements
+
+#### 🎚️ Sliders
+
+* Right-click anywhere on a slider, not just its handle, to type a number. Enter sets it, and Escape or clicking somewhere else cancels.
+* Typing works on every slider now, not only the ones with a fixed range. The box starts with the slider's current value, and a typed number goes to the closest place on the slider that shows it, even when the slider's scale isn't straight.
+* A typed value counts the same as letting go of the slider, so anything that happens on release happens then too.
+* The typing cursor fades in and out with a random motion curve and glides between characters, the same as in text boxes.
+* Slider tracks are now rounded to match their handles.
+* While you're typing a value, the keys you press go to the slider and nothing else.
+
+#### 🛠️ Course Maker
+
+* Typing a value into the autoscroll speed slider uses the real speed, and typing into the scroll factor sliders uses the scroll factor shown on them, instead of the slider's position.
+* Changing the autoscroll speed or a scroll factor now counts as an unsaved change to the course.
+
+#### 🌐 Languages
+
+* Spanish, Esperanto, Portuguese, Russian and Turkish now have translations for the Course Maker's **Cont. music**, **No low time** and **No coin cap** settings.
+
 ## v1.1.1
 
 ### 🧩 New Features
