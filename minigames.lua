@@ -5763,6 +5763,31 @@ local function rrr_generatelayout(theme)
 			set(x, row, "=")
 		end
 	end
+	--every ? block needs 3 clear tiles over it (see the check at the end), so a platform from x1 to x2 in this row
+	--can't go there if a block is 1 to 3 tiles under it...
+	local function overblock(x1, x2, row)
+		for x = x1, x2 do
+			for d = 1, 3 do
+				if RRR_BLOCKS[get(x, row+d)] then
+					return true
+				end
+			end
+		end
+		return false
+	end
+	--...and a block can't go where anything but a spawn is 1 to 3 tiles over it
+	local function blockfits(x, row)
+		for d = 1, 3 do
+			local c = get(x, row-d)
+			if c ~= " " and not c:match("%d") then
+				return false
+			end
+		end
+		return true
+	end
+	--the highest row the last middle platform can be in: the rare block goes 3 tiles over it,
+	--with its own 3 clear tiles over it, under the ceiling if there is one
+	local toprow = ((style == "cave" or style == "lab") and 2 or 1) + 6
 
 	--ground and walls (and a ceiling underground and in the test chamber)
 	for x = 1, W/2 do
@@ -5841,13 +5866,19 @@ local function rrr_generatelayout(theme)
 	if hwmin > hwmax then
 		return nil
 	end
+	--if it can, it leaves the spot right of the low platform open for the ? block hit from the ground
+	--(a block there right under the middle platform wouldn't have the 3 clear tiles over it)
+	local hwopen = W/2 - math.max(x2 + 2, s1 + 2)
+	if hwopen >= hwmin then
+		hwmax = math.min(hwmax, hwopen)
+	end
 	local hw = math.random(hwmin, hwmax)
 	middleplatform(row, hw)
 
 	--a ledge on the wall now and then
 	if math.random() < 0.5 then
 		local lx2 = 1 + math.random(2, 4)
-		if lx2 < pc - 1 and x1 - lx2 - 1 <= 3 and free(2, row-2, lx2, row) then
+		if lx2 < pc - 1 and x1 - lx2 - 1 <= 3 and free(2, row-2, lx2, row) and not overblock(2, lx2, row) then
 			for x = 2, lx2 do
 				set(x, row, "=")
 			end
@@ -5857,26 +5888,35 @@ local function rrr_generatelayout(theme)
 	--more platforms going up: one on each side, then the middle again (3 or 4 tiles up each time, 1 to 3 tiles
 	--across), as long as there's room for both and the rare block over the last one
 	local topside --the highest side platforms, the top spawns (p1 and p2) go there
-	while row - 8 - 3 >= 3 do
-		--the side platforms, out from the middle one's end
-		local siderow = row - math.random(3, 4)
-		local sx2 = W/2 - hw - math.random(1, 3)
-		local sx1 = math.max(2, sx2 - math.random(3, 6) + 1)
-		if sx2 < sx1 + 1 then
-			break
+	while row - 6 >= toprow do --(room for a side platform and a middle one, 3 tiles up each)
+		--a few goes at a side platform and the middle one over it that don't end up over a ? block
+		--(and the middle one no higher than toprow), instead of throwing the whole arena away
+		local pick
+		for try = 1, 12 do
+			--the side platforms, out from the middle one's end
+			local siderow = row - math.random(3, 4)
+			local nextrow = siderow - math.random(3, 4)
+			if nextrow < toprow then
+				siderow, nextrow = row - 3, row - 6
+			end
+			local sx2 = W/2 - hw - math.random(1, 3)
+			local sx1 = math.max(2, sx2 - math.random(3, 6) + 1)
+			--the next middle platform, out to within 1 to 3 tiles of the side ones
+			local nexthw = math.min(W/2 - sx2 - math.random(1, 3), 7)
+			if sx2 >= sx1 + 1 and nexthw >= 2 and not overblock(sx1, sx2, siderow)
+				and not overblock(W/2 + 1 - nexthw, W/2, nextrow) then
+				pick = {sx1 = sx1, sx2 = sx2, siderow = siderow, nextrow = nextrow, nexthw = nexthw}
+				break
+			end
 		end
-		for x = sx1, sx2 do
-			set(x, siderow, "=")
-		end
-		topside = {x1 = sx1, x2 = sx2, row = siderow}
-		--the next middle platform, out to within 1 to 3 tiles of the side ones
-		local nextrow = siderow - math.random(3, 4)
-		local nexthw = W/2 - sx2 - math.random(1, 3)
-		if nexthw < 2 then
+		if not pick then
 			return nil
 		end
-		nexthw = math.min(nexthw, 7)
-		row, hw = nextrow, nexthw
+		for x = pick.sx1, pick.sx2 do
+			set(x, pick.siderow, "=")
+		end
+		topside = {x1 = pick.sx1, x2 = pick.sx2, row = pick.siderow}
+		row, hw = pick.nextrow, pick.nexthw
 		middleplatform(row, hw)
 	end
 	grid[row-3][W/2] = "R"
@@ -5886,7 +5926,7 @@ local function rrr_generatelayout(theme)
 		return nil
 	end
 	local sc = math.floor((topside.x1 + topside.x2)/2)
-	if not free(sc, topside.row-4, sc, topside.row-1) then
+	if not free(sc, topside.row-4, sc, topside.row-1) or not blockfits(sc, topside.row-4) then
 		return nil
 	end
 	setpair(sc, topside.row-1, "1", "2")
@@ -5895,7 +5935,7 @@ local function rrr_generatelayout(theme)
 	--a ? block on each side, hit from the ground
 	local spots = {}
 	for x = math.max(x2 + 2, s1 + 2), W/2 - 1 do
-		if not nearpit(x) and free(x, lowrow-1, x, G) and free(x-1, lowrow, x+1, lowrow) then
+		if not nearpit(x) and free(x, lowrow-1, x, G) and free(x-1, lowrow, x+1, lowrow) and blockfits(x, lowrow) then
 			table.insert(spots, x)
 		end
 	end
