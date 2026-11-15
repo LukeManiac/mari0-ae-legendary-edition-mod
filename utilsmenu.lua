@@ -1438,8 +1438,6 @@ end
 local mp --current values (input fields keep their text, dropdowns their index)
 local mpicon --ImageData or nil
 local mpiconimage
---icon picking: the png file itself is kept as it is (never rescaled or re-encoded)
-local iconui = {bytes = nil, dialogopen = false, channel = "utilsmenu_icondialog", framex = 300, framey = 47, framesize = 66}
 local mpbinds = {}
 local mpsliders = {}
 local mpexisting = {} --lowercase name -> folder name
@@ -1462,135 +1460,13 @@ local function mpnumber(key, default, minimum, maximum, float)
 	return clamp(n, minimum, maximum)
 end
 
---bytes: the original png file; without it the image is encoded to png once
-local function mp_seticon(imagedata, bytes)
+local function mp_seticon(imagedata)
 	mpicon = imagedata
 	mpiconimage = nil
-	iconui.bytes = nil
 	if imagedata then
 		mpiconimage = love.graphics.newImage(imagedata)
 		mpiconimage:setFilter("nearest", "nearest")
-		iconui.bytes = bytes or imagedata:encode("png"):getString()
 	end
-end
-
-iconui.pngsignature = "\137PNG\r\n\26\n"
-
---png bytes -> icon; returns true when it worked
-function iconui.seticonfrompng(bytes)
-	if type(bytes) ~= "string" or bytes:sub(1, 8) ~= iconui.pngsignature then
-		notice.new("that isn't a png file", notice.red, 3)
-		return false
-	end
-	local ok, imagedata = pcall(function()
-		return love.image.newImageData(love.filesystem.newFileData(bytes, "icon.png"))
-	end)
-	if not ok then
-		notice.new("couldn't read that png", notice.red, 3)
-		return false
-	end
-	mp_seticon(imagedata, bytes)
-	return true
-end
-
-------------------------------------------------------------
--- mappack creator: icon file dialog (the system's own, run on a thread so the game keeps going)
-------------------------------------------------------------
-
-iconui.thread = [[
-require("love.thread")
-local command, channel, readfile = ...
-local output = ""
-local pipe = io.popen(command)
-if pipe then
-	output = pipe:read("*a") or ""
-	pipe:close()
-end
-output = output:gsub("[\r\n]+$", "")
-local result = {status = "cancel"}
-if output ~= "" then
-	if readfile then
-		local file = io.open(output, "rb")
-		if file then
-			result = {status = "ok", data = file:read("*a")}
-			file:close()
-		else
-			result = {status = "error"}
-		end
-	else
-		result = {status = "ok", base64 = output}
-	end
-end
-love.thread.getChannel(channel):push(result)
-]]
-
---the command that shows a png picker; readfile: the command prints a path to read (otherwise it prints the file as base64)
-function iconui.icondialogcommand()
-	local system = love.system.getOS()
-	if system == "Windows" then
-		local script = table.concat({
-			"Add-Type -AssemblyName System.Windows.Forms",
-			"$owner = New-Object System.Windows.Forms.Form",
-			"$owner.TopMost = $true",
-			"$dialog = New-Object System.Windows.Forms.OpenFileDialog",
-			"$dialog.Title = 'Choose a mappack icon'",
-			"$dialog.Filter = 'PNG image (*.png)|*.png'",
-			"if ($dialog.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) {",
-			"	[Console]::Out.Write([Convert]::ToBase64String([IO.File]::ReadAllBytes($dialog.FileName)))",
-			"}",
-			"$owner.Dispose()",
-		}, "\n")
-		local encoded = love.data.encode("string", "base64", utf16le(script))
-		return "powershell -NoProfile -NonInteractive -STA -WindowStyle Hidden -EncodedCommand " .. encoded, false
-	elseif system == "OS X" then
-		return "osascript -e 'POSIX path of (choose file of type {\"public.png\"} with prompt \"Choose a mappack icon\")' 2>/dev/null", true
-	elseif system == "Linux" then
-		return "zenity --file-selection --title='Choose a mappack icon' --file-filter='PNG image | *.png' 2>/dev/null || kdialog --getopenfilename ~ '*.png' 2>/dev/null", true
-	end
-	return nil
-end
-
-function iconui.openicondialog()
-	if iconui.dialogopen then
-		return
-	end
-	local command, readfile = iconui.icondialogcommand()
-	if not command then
-		notice.new("no file dialog on this system,\ndrop a .png onto the window instead", notice.red, 4)
-		return
-	end
-	iconui.dialogopen = true
-	love.thread.newThread(iconui.thread):start(command, iconui.channel, readfile)
-end
-
-function iconui.pollicondialog()
-	local result = love.thread.getChannel(iconui.channel):pop()
-	if not result then
-		return
-	end
-	iconui.dialogopen = false
-	if result.status == "ok" then
-		local bytes = result.data
-		if result.base64 then
-			local ok, decoded = pcall(love.data.decode, "string", "base64", result.base64)
-			if ok then
-				bytes = decoded
-			end
-		end
-		if iconui.seticonfrompng(bytes) then
-			local w, h = mpicon:getDimensions()
-			notice.new("icon set! (" .. w .. "*" .. h .. ")", nil, 2)
-		end
-	elseif result.status == "error" then
-		notice.new("couldn't open that file", notice.red, 3)
-	end
-end
-
---the icon frame on the general tab
-
-function iconui.insideiconframe(x, y)
-	x, y = x/scale, y/scale
-	return x >= iconui.framex and x < iconui.framex + iconui.framesize and y >= iconui.framey and y < iconui.framey + iconui.framesize
 end
 
 --every value in its final form, used by creating and saving
@@ -1841,8 +1717,8 @@ local function mp_createjob(v)
 	end
 	love.filesystem.write(path .. "/settings.txt", mp_settingstxt(v))
 	love.filesystem.write(path .. "/text.txt", mp_texttxt(v))
-	if iconui.bytes then
-		love.filesystem.write(path .. "/icon.png", iconui.bytes) --the original file, not rescaled
+	if mpicon then
+		mpicon:encode("png", path .. "/icon.png")
 	end
 	for _, folder in ipairs(SUBFOLDERS) do
 		love.filesystem.createDirectory(path .. "/" .. folder)
@@ -1930,10 +1806,10 @@ end
 ------------------------------------------------------------
 
 local function mp_icondata()
-	if not iconui.bytes then
+	if not mpicon then
 		return nil
 	end
-	return love.data.encode("string", "base64", iconui.bytes)
+	return love.data.encode("string", "base64", mpicon:encode("png"):getString())
 end
 
 local function mp_loadicondata(data)
@@ -1941,15 +1817,12 @@ local function mp_loadicondata(data)
 		mp_seticon(nil)
 		return
 	end
-	local ok, bytes = pcall(love.data.decode, "string", "base64", data)
-	local imageok, imagedata = false, nil
+	local ok, imagedata = pcall(function()
+		local bytes = love.data.decode("string", "base64", data)
+		return love.image.newImageData(love.filesystem.newFileData(bytes, "icon.png"))
+	end)
 	if ok then
-		imageok, imagedata = pcall(function()
-			return love.image.newImageData(love.filesystem.newFileData(bytes, "icon.png"))
-		end)
-	end
-	if imageok then
-		mp_seticon(imagedata, bytes)
+		mp_seticon(imagedata)
 	else
 		mp_seticon(nil)
 	end
@@ -2419,8 +2292,8 @@ mp_build = function()
 	mpdropdown("camera", 132, 145, 13, CAMERA, t)
 	label(300, 37, "icon", t)
 	add("mp_iconclear", newbutton(334, 34, "clear", function() mp_seticon(nil) end), t)
-	label(26, 172, "click the icon frame or drop a .png onto", t, {150, 150, 150})
-	label(26, 182, "the window to set the icon (kept as it is)", t, {150, 150, 150})
+	label(26, 172, "drop a .png onto the window to use it as", t, {150, 150, 150})
+	label(26, 182, "the icon, or a project file to load it", t, {150, 150, 150})
 
 	--worlds
 	t = "worlds"
@@ -2638,40 +2511,16 @@ local function mp_draw()
 	local v = mpcheck.values or mp_values()
 
 	if mptab == "general" then
-		--icon frame: click it to pick a png; the icon is shown at its real size (no scaling)
-		local fx, fy, fs = iconui.framex, iconui.framey, iconui.framesize
-		local hover = iconui.insideiconframe(love.mouse.getPosition()) and not opendropdown()
-		local border = 127
-		if hover or iconui.dialogopen then
-			border = 255
-		end
-		love.graphics.setColor(border, border, border)
-		love.graphics.rectangle("fill", fx*scale, fy*scale, fs*scale, fs*scale, 2*scale)
-		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", (fx+1)*scale, (fy+1)*scale, (fs-2)*scale, (fs-2)*scale, 1.4*scale)
-		local cx, cy = fx + fs/2, fy + fs/2
-		if iconui.dialogopen then
-			love.graphics.setColor(170, 170, 170)
-			centredprint("choosing", cx, cy - 4)
-		elseif mpiconimage then
+		--icon preview
+		drawswatch(300, 47, 66, 66, {0, 0, 0})
+		if mpiconimage then
 			local iw, ih = mpiconimage:getDimensions()
-			love.graphics.setScissor((fx+1)*scale, (fy+1)*scale, (fs-2)*scale, (fs-2)*scale)
+			local s = math.min(62/iw, 62/ih)
 			love.graphics.setColor(255, 255, 255)
-			love.graphics.draw(mpiconimage, math.floor(cx - iw/2)*scale, math.floor(cy - ih/2)*scale, 0, scale, scale)
-			love.graphics.setScissor()
-			if hover then
-				local size = iw .. "*" .. ih
-				love.graphics.setColor(0, 0, 0, 180)
-				love.graphics.rectangle("fill", (fx+1)*scale, (fy+fs-11)*scale, (fs-2)*scale, 10*scale)
-				love.graphics.setColor(255, 255, 255)
-				centredprint(size, cx, fy + fs - 10)
-			end
+			love.graphics.draw(mpiconimage, (333 - iw*s/2)*scale, (80 - ih*s/2)*scale, 0, s*scale, s*scale)
 		else
 			love.graphics.setColor(110, 110, 110)
-			if hover then
-				love.graphics.setColor(200, 200, 200)
-			end
-			centredprint("click to\nchoose\na .png", cx, cy - 14)
+			centredprint("blank", 333, 76)
 		end
 		if v.lives == 0 then
 			love.graphics.setColor(100, 255, 100)
@@ -2761,15 +2610,15 @@ end
 local function mp_filedropped(file)
 	local filename = file:getFilename()
 	local ext = (filename:match("%.([^%.\\/]+)$") or ""):lower()
-	if ext == "png" then
-		local ok, bytes = pcall(function()
-			return love.filesystem.newFileData(file):getString()
+	if ext == "png" or ext == "jpg" or ext == "jpeg" or ext == "bmp" or ext == "tga" then
+		local ok, imagedata = pcall(function()
+			return love.image.newImageData(love.filesystem.newFileData(file))
 		end)
-		if ok and iconui.seticonfrompng(bytes) then
-			local w, h = mpicon:getDimensions()
-			notice.new("icon set! (" .. w .. "*" .. h .. ")", nil, 2)
-		elseif not ok then
-			notice.new("couldn't read that file", notice.red, 3)
+		if ok then
+			mp_seticon(imagedata)
+			notice.new("icon set!", nil, 2)
+		else
+			notice.new("couldn't read that image", notice.red, 3)
 		end
 	elseif ext == "mpckproj" or ext == "json" or ext == "cfg" then
 		local ok, data = pcall(function()
@@ -2837,7 +2686,6 @@ end
 
 local function inner_utilsmenu_update(dt)
 	runjob()
-	iconui.pollicondialog()
 
 	local result = love.thread.getChannel(CLIPBOARD_CHANNEL):pop()
 	if result == true then
@@ -2928,11 +2776,6 @@ local function inner_utilsmenu_mousepressed(x, y, button)
 	end
 
 	if clickelements(x, y, button) then
-		return
-	end
-
-	if page == "mappack" and button == "l" and mptab == "general" and iconui.insideiconframe(x, y) then
-		iconui.openicondialog()
 		return
 	end
 

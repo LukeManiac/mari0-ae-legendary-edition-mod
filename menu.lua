@@ -1880,17 +1880,17 @@ function menu_draw()
 		love.graphics.setColor(255, 255, 255, 255)
 		
 		if selection == 0 then
-			love.graphics.draw(menuselectimg, (129-(math.ceil((utf8.len(TEXT["continue game"]))/2)*8))*scale, (137+(selection-1)*16)*scale, 0, scale, scale)
+			love.graphics.draw(menuselectimg, (129-(math.ceil((utf8.len(TEXT["continue game"]))/2)*8))*scale, (titlemenuy(selection)-1)*scale, 0, scale, scale)
 		elseif selection == 1 then
-			love.graphics.draw(menuselectimg, (134-(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8)-5)*scale, (137+(selection-1)*16)*scale, 0, scale, scale)
+			love.graphics.draw(menuselectimg, (134-(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8)-5)*scale, (titlemenuy(selection)-1)*scale, 0, scale, scale)
 		elseif selection == 2 then
-			love.graphics.draw(menuselectimg, (129-(math.ceil((utf8.len(TEXT["level editor"]))/2)*8))*scale, (137+(selection-1)*16)*scale, 0, scale, scale)
+			love.graphics.draw(menuselectimg, (129-(math.ceil((utf8.len(TEXT["level editor"]))/2)*8))*scale, (titlemenuy(selection)-1)*scale, 0, scale, scale)
 		elseif selection == 3 then
-			love.graphics.draw(menuselectimg, (129-(math.ceil((utf8.len(TEXT["select mappack"]))/2)*8))*scale, (137+(selection-1)*16)*scale, 0, scale, scale)
+			love.graphics.draw(menuselectimg, (129-(math.ceil((utf8.len(TEXT["select mappack"]))/2)*8))*scale, (titlemenuy(selection)-1)*scale, 0, scale, scale)
 		elseif selection == 4 then
-			love.graphics.draw(menuselectimg, (129-(math.ceil((utf8.len(TEXT["options"]))/2)*8))*scale, (137+(selection-1)*16)*scale, 0, scale, scale)
+			love.graphics.draw(menuselectimg, (129-(math.ceil((utf8.len(TEXT["options"]))/2)*8))*scale, (titlemenuy(selection)-1)*scale, 0, scale, scale)
 		elseif selection == 5 then
-			love.graphics.draw(menuselectimg, (129-(math.ceil((utf8.len(TEXT["utils"]))/2)*8))*scale, (137+(selection-1)*16)*scale, 0, scale, scale)
+			love.graphics.draw(menuselectimg, (129-(math.ceil((utf8.len(TEXT["utils"]))/2)*8))*scale, (titlemenuy(selection)-1)*scale, 0, scale, scale)
 		end
 		
 		local start = 9
@@ -1924,24 +1924,24 @@ function menu_draw()
 			
 			if continueavailable then
 				if i == 9 then if mouseonselecthold and mouseonselect == 0 then love.graphics.setColor(188, 188, 188) else love.graphics.setColor(255, 255, 255) end end
-				properprintfunc(TEXT["continue game"], (143-(math.ceil(utf8.len(TEXT["continue game"])/2)*8))*scale, 122*scale)
+				properprintfunc(TEXT["continue game"], (143-(math.ceil(utf8.len(TEXT["continue game"])/2)*8))*scale, titlemenuy(0)*scale)
 			end
 			
 			if i == 9 then if mouseonselecthold and mouseonselect == 1 then love.graphics.setColor(188, 188, 188) else love.graphics.setColor(255, 255, 255) end end
-			properprintfunc(TEXT["player game"], (143-(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8)+16)*scale, 138*scale)
+			properprintfunc(TEXT["player game"], (143-(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8)+16)*scale, titlemenuy(1)*scale)
 			
-			properprintfunc(players, (143-(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8))*scale, 138*scale)
+			properprintfunc(players, (143-(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8))*scale, titlemenuy(1)*scale)
 			if i == 9 then if (mouseonselecthold and mouseonselect == 2) then love.graphics.setColor(188, 188, 188) else love.graphics.setColor(255, 255, 255) end end
-			properprintfunc(TEXT["level editor"], (143-(math.ceil(utf8.len(TEXT["level editor"])/2)*8))*scale, 154*scale)
+			properprintfunc(TEXT["level editor"], (143-(math.ceil(utf8.len(TEXT["level editor"])/2)*8))*scale, titlemenuy(2)*scale)
 			
 			if i == 9 then if mouseonselecthold and mouseonselect == 3 then love.graphics.setColor(188, 188, 188) else love.graphics.setColor(255, 255, 255) end end
-			properprintfunc(TEXT["select mappack"], (143-(math.ceil(utf8.len(TEXT["select mappack"])/2)*8))*scale, 170*scale)
+			properprintfunc(TEXT["select mappack"], (143-(math.ceil(utf8.len(TEXT["select mappack"])/2)*8))*scale, titlemenuy(3)*scale)
 			
 			if i == 9 then if mouseonselecthold and mouseonselect == 4 then love.graphics.setColor(188, 188, 188) else love.graphics.setColor(255, 255, 255) end end
-			properprintfunc(TEXT["options"], (143-(math.ceil(utf8.len(TEXT["options"])/2)*8))*scale, 186*scale)
+			properprintfunc(TEXT["options"], (143-(math.ceil(utf8.len(TEXT["options"])/2)*8))*scale, titlemenuy(4)*scale)
 			
 			if i == 9 then if mouseonselecthold and mouseonselect == 5 then love.graphics.setColor(188, 188, 188) else love.graphics.setColor(255, 255, 255) end end
-			properprintfunc(TEXT["utils"], (143-(math.ceil(utf8.len(TEXT["utils"])/2)*8))*scale, 202*scale)
+			properprintfunc(TEXT["utils"], (143-(math.ceil(utf8.len(TEXT["utils"])/2)*8))*scale, titlemenuy(5)*scale)
 			
 			if i == 9 then love.graphics.setColor(255, 255, 255) end
 			
@@ -1959,11 +1959,11 @@ function menu_draw()
 		end
 		
 		if players >= 1 then
-			love.graphics.draw(playerselectarrowimg, (138-(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8))*scale, 138*scale, 0, scale, scale)
+			love.graphics.draw(playerselectarrowimg, (138-(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8))*scale, titlemenuy(1)*scale, 0, scale, scale)
 		end
 		
 		if players < 4 then
-			love.graphics.draw(playerselectarrowimg, (158-(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8))*scale, 138*scale, 0, -scale, scale)
+			love.graphics.draw(playerselectarrowimg, (158-(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8))*scale, titlemenuy(1)*scale, 0, -scale, scale)
 		end
 		
         local now = love.timer.getTime()
@@ -4752,33 +4752,33 @@ function menu_updatemouseselection(x,y)
 		local x, y = x/scale, y/scale
 		--continue game
 		if continueavailable then
-			if x > (143-(math.ceil(utf8.len(TEXT["continue game"])/2)*8)) and y > 122 and x < (143+(math.ceil(utf8.len(TEXT["continue game"])/2)*8)) and y < 122+8 then
+			if x > (143-(math.ceil(utf8.len(TEXT["continue game"])/2)*8)) and y > titlemenuy(0) and x < (143+(math.ceil(utf8.len(TEXT["continue game"])/2)*8)) and y < titlemenuy(0)+8 then
 				selection = 0
 				mouseonselect = 0
 			end
 		end
 		--player game
-		if x > (143-(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8)) and y > 138 and x < (143+(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8)) and y < 138+8 then
+		if x > (143-(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8)) and y > titlemenuy(1) and x < (143+(math.ceil((utf8.len(TEXT["player game"])+2)/2)*8)) and y < titlemenuy(1)+8 then
 			selection = 1
 			mouseonselect = 1
 		end
 		--level editor
-		if x > (143-(math.ceil(utf8.len(TEXT["level editor"])/2)*8)) and y > 154 and x < (143+(math.ceil(utf8.len(TEXT["level editor"])/2)*8)) and y < 154+8 then
+		if x > (143-(math.ceil(utf8.len(TEXT["level editor"])/2)*8)) and y > titlemenuy(2) and x < (143+(math.ceil(utf8.len(TEXT["level editor"])/2)*8)) and y < titlemenuy(2)+8 then
 			selection = 2
 			mouseonselect = 2
 		end
 		--select mappack
-		if x > (143-(math.ceil(utf8.len(TEXT["select mappack"])/2)*8)) and y > 170 and x < (143+(math.ceil(utf8.len(TEXT["select mappack"])/2)*8)) and y < 170+8 then
+		if x > (143-(math.ceil(utf8.len(TEXT["select mappack"])/2)*8)) and y > titlemenuy(3) and x < (143+(math.ceil(utf8.len(TEXT["select mappack"])/2)*8)) and y < titlemenuy(3)+8 then
 			selection = 3
 			mouseonselect = 3
 		end
 		--options
-		if x > (143-(math.ceil(utf8.len(TEXT["options"])/2)*8)) and y > 186 and x < (143+(math.ceil(utf8.len(TEXT["options"])/2)*8)) and y < 186+8 then
+		if x > (143-(math.ceil(utf8.len(TEXT["options"])/2)*8)) and y > titlemenuy(4) and x < (143+(math.ceil(utf8.len(TEXT["options"])/2)*8)) and y < titlemenuy(4)+8 then
 			selection = 4
 			mouseonselect = 4
 		end
 		--utils
-		if x > (143-(math.ceil(utf8.len(TEXT["utils"])/2)*8)) and y > 202 and x < (143+(math.ceil(utf8.len(TEXT["utils"])/2)*8)) and y < 202+8 then
+		if x > (143-(math.ceil(utf8.len(TEXT["utils"])/2)*8)) and y > titlemenuy(5) and x < (143+(math.ceil(utf8.len(TEXT["utils"])/2)*8)) and y < titlemenuy(5)+8 then
 			selection = 5
 			mouseonselect = 5
 		end
@@ -4830,6 +4830,14 @@ function searchmappacks()
 end
 
 require("utilsmenu")
+
+--title screen menu layout: "1 player game" stays at TITLEMENU_TOP and every item is TITLEMENU_SPACING below the last,
+--so the last item (utils) ends where options used to (0 = continue game, 1 = player game ... 5 = utils)
+TITLEMENU_TOP = 138
+TITLEMENU_SPACING = 12
+function titlemenuy(i)
+	return TITLEMENU_TOP + (i-1)*TITLEMENU_SPACING
+end
 
 function brprint(text, y)
 	properprintFbackground(text, (width*16-#(text)*8-8)*scale, y*scale)
