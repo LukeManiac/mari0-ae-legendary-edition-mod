@@ -1471,6 +1471,9 @@ function menu_update(dt)
 	optionsmisc_update()
 	optionscheats_update()
 	optionscontrols_update()
+	if gamestate == "utils" then
+		utilsmenu_update(dt)
+	end
 	
 	if mappackscroll then
 		--smooth the scroll
@@ -1883,6 +1886,8 @@ function menu_draw()
 			love.graphics.draw(menuselectimg, (129-(math.ceil((utf8.len(TEXT["select mappack"]))/2)*8))*scale, (137+(selection-1)*16)*scale, 0, scale, scale)
 		elseif selection == 4 then
 			love.graphics.draw(menuselectimg, (129-(math.ceil((utf8.len(TEXT["options"]))/2)*8))*scale, (137+(selection-1)*16)*scale, 0, scale, scale)
+		elseif selection == 5 then
+			love.graphics.draw(menuselectimg, (129-(math.ceil((utf8.len(TEXT["utils"]))/2)*8))*scale, (137+(selection-1)*16)*scale, 0, scale, scale)
 		end
 		
 		local start = 9
@@ -1931,6 +1936,9 @@ function menu_draw()
 			
 			if i == 9 then if mouseonselecthold and mouseonselect == 4 then love.graphics.setColor(188, 188, 188) else love.graphics.setColor(255, 255, 255) end end
 			properprintfunc(TEXT["options"], (143-(math.ceil(utf8.len(TEXT["options"])/2)*8))*scale, 186*scale)
+			
+			if i == 9 then if mouseonselecthold and mouseonselect == 5 then love.graphics.setColor(188, 188, 188) else love.graphics.setColor(255, 255, 255) end end
+			properprintfunc(TEXT["utils"], (143-(math.ceil(utf8.len(TEXT["utils"])/2)*8))*scale, 202*scale)
 			
 			if i == 9 then love.graphics.setColor(255, 255, 255) end
 			
@@ -2098,6 +2106,8 @@ function menu_draw()
 			properprintF(utf8.sub(currentmenutip, 1, math.floor((menutipoffset+(width*16))/8)+1), -menutipoffset*scale, 210*scale)
 		end
 		
+	elseif gamestate == "utils" then
+		utilsmenu_draw()
 	elseif gamestate == "mappackmenu" then
 		--background
 		love.graphics.setColor(0, 0, 0, 100)
@@ -3444,6 +3454,10 @@ function menu_keypressed(key, unicode)
 		resetwarning_keypressed(key)
 		return
 	end
+	if gamestate == "utils" then
+		utilsmenu_keypressed(key)
+		return
+	end
 	if gamestate == "menu" then
 		if newgamewarning then
 			if (key == "left" or key == "a") then
@@ -3498,7 +3512,7 @@ function menu_keypressed(key, unicode)
 				end
 			end
 		elseif (key == "down" or key == "s") then
-			if selection < 4 then
+			if selection < 5 then
 				selection = selection + 1
 			end
 		elseif (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
@@ -3540,6 +3554,8 @@ function menu_keypressed(key, unicode)
 					return false
 				end
 				gamestate = "options"
+			elseif selection == 5 then
+				utilsmenu_open()
 			end
 		elseif key == "escape" then
 			love.event.quit()
@@ -4154,6 +4170,10 @@ function menu_mousepressed(x, y, button)
 		resetwarning_mousepressed(x, y, button)
 		return
 	end
+	if gamestate == "utils" then
+		utilsmenu_mousepressed(x, y, button)
+		return
+	end
 	if gamestate == "menu" then
 		menu_updatemouseselection(x,y)
 		if mouseonselect then
@@ -4280,6 +4300,10 @@ function menu_mousereleased(x, y, button)
 	if languagemenuopen then
 		return
 	end
+	if gamestate == "utils" then
+		utilsmenu_mousereleased(x, y, button)
+		return
+	end
 	if gamestate == "menu" then
 		if mouseonselect and mouseonselecthold then
 			if mouseonselect == 0 then
@@ -4311,6 +4335,8 @@ function menu_mousereleased(x, y, button)
 				mappacks()
 			elseif mouseonselect == 4 then
 				gamestate = "options"
+			elseif mouseonselect == 5 then
+				utilsmenu_open()
 			end
 		end
 		mouseonselecthold = false
@@ -4329,6 +4355,10 @@ function menu_mousemoved(x, y, dx, dy)
 	end
 	if languagemenuopen then
 		languagemenu_mousemoved(x, y, dx, dy)
+		return
+	end
+	if gamestate == "utils" then
+		utilsmenu_mousemoved(x, y)
 		return
 	end
 	if gamestate == "mappackmenu" then
@@ -4653,6 +4683,10 @@ local function lastIndexOf(haystack, needle)
 end
 
 function menu_filedropped(file)
+	if gamestate == "utils" then
+		utilsmenu_filedropped(file)
+		return
+	end
 	if gamestate == "mappackmenu" then
 		--drag and drop zip file
 		local filename = string.sub(file:getFilename(), (lastIndexOf(file:getFilename(), "\\") or -5)+1, -1)
@@ -4741,6 +4775,11 @@ function menu_updatemouseselection(x,y)
 		if x > (143-(math.ceil(utf8.len(TEXT["options"])/2)*8)) and y > 186 and x < (143+(math.ceil(utf8.len(TEXT["options"])/2)*8)) and y < 186+8 then
 			selection = 4
 			mouseonselect = 4
+		end
+		--utils
+		if x > (143-(math.ceil(utf8.len(TEXT["utils"])/2)*8)) and y > 202 and x < (143+(math.ceil(utf8.len(TEXT["utils"])/2)*8)) and y < 202+8 then
+			selection = 5
+			mouseonselect = 5
 		end
 	end
 end

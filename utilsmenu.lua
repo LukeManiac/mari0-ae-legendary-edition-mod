@@ -1,0 +1,2399 @@
+--[[
+	UTILS (title screen > utils)
+
+	character formatter: splits a character's animation sheets into colour layers,
+	                     written to alesans_entities/characters/<name>_formatted
+	font renderer:       renders text with the current mappack's font (and its outline) to a png
+	mappack creator:     makes a new mappack filled with blank courses and subzones
+
+	Everything here lives in its own gamestate ("utils") and keeps its gui elements to itself,
+	so nothing leaks into the global guielements table.
+]]
+
+local CHARFOLDER = "alesans_entities/characters"
+local PROJECTFOLDER = "alesans_entities/mappackprojects"
+local RENDERFOLDER = "renders"
+
+local PX, PY, PH = 21, 16, 200 --panel position and height (width follows the screen)
+
+local function panelright()
+	return width*16 - PX
+end
+
+local function panelwidth()
+	return panelright() - PX
+end
+
+local page = "hub" --"hub", "charformat", "fontrender" or "mappack"
+local hubselection = 1
+local HUBITEMS = {
+	{text = "character formatter", page = "charformat", info = "split a character's\nsheets into colour layers"},
+	{text = "font renderer", page = "fontrender", info = "render text to a png\nwith this mappack's font"},
+	{text = "mappack creator", page = "mappack", info = "make a new mappack full\nof blank courses"},
+	{text = "back", info = "back to the title screen"},
+}
+
+local elements = {} --{el = guielement, tab = mappack tab or nil}
+local named = {}
+local labels = {} --{x, y, text, tab}
+local job --background work (coroutine), see startjob
+local confirmuntil = {} --two-click buttons: name -> time the "click again" state runs out
+
+local mptab = "general"
+local MPTABS = {"general", "worlds", "hud", "text", "course", "create"}
+
+local utils_back --forward declarations
+local mp_build
+
+------------------------------------------------------------
+-- helpers
+------------------------------------------------------------
+
+local function clamp(v, minimum, maximum)
+	return math.max(minimum, math.min(maximum, v))
+end
+
+local function wraptext(s, maxchars)
+	local lines = {}
+	for paragraph in (s .. "\n"):gmatch("(.-)\n") do
+		local line = ""
+		for word in paragraph:gmatch("%S+") do
+			if line == "" then
+				line = word
+			elseif utf8.len(line) + 1 + utf8.len(word) <= maxchars then
+				line = line .. " " .. word
+			else
+				table.insert(lines, line)
+				line = word
+			end
+		end
+		table.insert(lines, line)
+	end
+	return lines
+end
+
+local function centredprint(s, cx, y)
+	for i, line in ipairs(wraptext(s, 999)) do
+		properprintF(line, (cx - utf8.len(line)*4)*scale, (y + (i-1)*10)*scale)
+	end
+end
+
+local function numbertostring(n)
+	if n == math.floor(n) then
+		return string.format("%d", n)
+	end
+	return tostring(n)
+end
+
+local function tobool(value, default)
+	if value == nil then
+		return default
+	end
+	if type(value) == "boolean" then
+		return value
+	end
+	local s = tostring(value):lower()
+	return s == "true" or s == "t" or s == "yes" or s == "1"
+end
+
+local function readjson(path)
+	local s = love.filesystem.read(path)
+	if not s then
+		return nil, "can't read " .. path
+	end
+	local oldcrash = JSONcrashgame
+	JSONcrashgame = false
+	local ok, result = pcall(function() return JSON:decode(s) end)
+	JSONcrashgame = oldcrash
+	if not ok or type(result) ~= "table" then
+		return nil, "that json file has an error in it"
+	end
+	return result
+end
+
+local function copyfolder(src, dst)
+	love.filesystem.createDirectory(dst)
+	for _, file in ipairs(love.filesystem.getDirectoryItems(src)) do
+		local from, to = src .. "/" .. file, dst .. "/" .. file
+		local info = love.filesystem.getInfo(from)
+		if info and info.type == "directory" then
+			copyfolder(from, to)
+		elseif info then
+			local data = love.filesystem.read(from)
+			if data then
+				love.filesystem.write(to, data)
+			end
+		end
+	end
+end
+
+--deletes a folder from the save directory, yields now and then so it can run as a job
+local removedcount = 0
+local function removerecursive(path)
+	local info = love.filesystem.getInfo(path)
+	if info and info.type == "directory" then
+		for _, file in ipairs(love.filesystem.getDirectoryItems(path)) do
+			removerecursive(path .. "/" .. file)
+		end
+	end
+	love.filesystem.remove(path)
+	removedcount = removedcount + 1
+	if removedcount % 200 == 0 and coroutine.running() then
+		coroutine.yield()
+	end
+end
+
+local function insavedirectory(path)
+	local ok, real = pcall(love.filesystem.getRealDirectory, path)
+	return ok and real ~= nil and real == love.filesystem.getSaveDirectory()
+end
+
+local function drawpanel()
+	love.graphics.setColor(0, 0, 0, 200)
+	love.graphics.rectangle("fill", PX*scale, PY*scale, panelwidth()*scale, PH*scale)
+end
+
+local function drawtitle(s)
+	love.graphics.setColor(255, 255, 255)
+	properprintF(s, (PX+5)*scale, (PY+6)*scale)
+	love.graphics.setColor(60, 60, 60)
+	love.graphics.rectangle("fill", (PX+5)*scale, (PY+15)*scale, (panelwidth()-10)*scale, scale)
+end
+
+local function drawprogress(x, y, w, p, color)
+	love.graphics.setColor(127, 127, 127)
+	love.graphics.rectangle("fill", x*scale, y*scale, w*scale, 8*scale)
+	love.graphics.setColor(0, 0, 0)
+	love.graphics.rectangle("fill", (x+1)*scale, (y+1)*scale, (w-2)*scale, 6*scale)
+	love.graphics.setColor(color)
+	love.graphics.rectangle("fill", (x+1)*scale, (y+1)*scale, math.floor((w-2)*clamp(p, 0, 1))*scale, 6*scale)
+end
+
+local function drawswatch(x, y, w, h, color)
+	love.graphics.setColor(255, 255, 255)
+	love.graphics.rectangle("fill", x*scale, y*scale, w*scale, h*scale)
+	love.graphics.setColor(0, 0, 0)
+	love.graphics.rectangle("fill", (x+1)*scale, (y+1)*scale, (w-2)*scale, (h-2)*scale)
+	love.graphics.setColor(color)
+	love.graphics.rectangle("fill", (x+2)*scale, (y+2)*scale, (w-4)*scale, (h-4)*scale)
+end
+
+------------------------------------------------------------
+-- gui elements owned by the utils pages
+------------------------------------------------------------
+
+local function clearelements()
+	elements = {}
+	named = {}
+	labels = {}
+	confirmuntil = {}
+	typingintextinput = false
+	love.keyboard.setKeyRepeat(false)
+end
+
+local function add(name, el, tab)
+	table.insert(elements, {el = el, tab = tab})
+	named[name] = el
+	return el
+end
+
+local function label(x, y, text, tab, color)
+	table.insert(labels, {x = x, y = y, text = text, tab = tab, color = color})
+end
+
+local function onpage(entry)
+	return entry.tab == nil or entry.tab == mptab
+end
+
+local function closeinput(self)
+	self.inputting = false
+	self.highlight = false
+	typingintextinput = false
+	love.keyboard.setKeyRepeat(false)
+end
+
+local function newinput(x, y, w, value, maxlength, h)
+	local el = guielement:new("input", x, y, w, closeinput, tostring(value or ""), maxlength, h or 1)
+	el.bypassspecialcharacters = true --keep "," and "-" as they are
+	return el
+end
+
+local function newbutton(x, y, text, func, w)
+	return guielement:new("button", x, y, text, func, 0, nil, 1, w)
+end
+
+--a button that has to be clicked twice within 3 seconds
+local function confirmbutton(name, x, y, text, func, w)
+	local el
+	el = newbutton(x, y, text, function()
+		if confirmuntil[name] and love.timer.getTime() < confirmuntil[name] then
+			confirmuntil[name] = nil
+			el.text = text
+			func()
+		else
+			confirmuntil[name] = love.timer.getTime() + 3
+			el.text = "sure? click again"
+		end
+	end, w)
+	el.textcolor = {255, 80, 80}
+	el.utilsconfirmtext = text
+	return add(name, el)
+end
+
+local function updateelements(dt)
+	local now = love.timer.getTime()
+	for name, untiltime in pairs(confirmuntil) do
+		if now >= untiltime then
+			confirmuntil[name] = nil
+			if named[name] then
+				named[name].text = named[name].utilsconfirmtext
+			end
+		end
+	end
+
+	for _, v in ipairs(elements) do
+		local el = v.el
+		local visible = onpage(v) and not el.utilshidden
+		el.active = visible and not el.utilsdisabled
+		el.nohover = el.utilsdisabled
+		if not visible and el.type == "input" and el.inputting then
+			closeinput(el)
+		end
+		if el.active then
+			el:update(dt)
+		end
+	end
+end
+
+local function drawelements()
+	local ontop = {}
+	for _, v in ipairs(elements) do
+		local el = v.el
+		if onpage(v) and not el.utilshidden then
+			if el.type == "dropdown" and (el.extended or (el.listvalue and el.listvalue > 0)) then
+				table.insert(ontop, el)
+			elseif el.type == "button" and el.utilsdisabled then
+				el:draw(90)
+			else
+				el:draw()
+			end
+		end
+	end
+	for _, el in ipairs(ontop) do
+		el:draw()
+	end
+end
+
+local function drawlabels()
+	for _, v in ipairs(labels) do
+		if v.tab == nil or v.tab == mptab then
+			love.graphics.setColor(v.color or {255, 255, 255})
+			properprintF(v.text, v.x*scale, v.y*scale)
+		end
+	end
+end
+
+local function opendropdown()
+	for _, v in ipairs(elements) do
+		local el = v.el
+		if el.active and el.type == "dropdown" and el.extended then
+			return el
+		end
+	end
+	return nil
+end
+
+local function clickelements(x, y, button)
+	--an open dropdown gets the click and nothing behind it does
+	local dropdown = opendropdown()
+	if dropdown then
+		dropdown:click(x, y, button)
+		return true
+	end
+
+	--inputs and sliders first: they never stop the click, and every input has to see it to lose focus
+	for _, v in ipairs(elements) do
+		local el = v.el
+		if el.active and (el.type == "input" or el.type == "scrollbar") then
+			el:click(x, y, button)
+		end
+	end
+	for _, v in ipairs(elements) do
+		local el = v.el
+		if el.active and el.type ~= "input" and el.type ~= "scrollbar" then
+			if el:click(x, y, button) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function keyelements(key)
+	local shift = love.keyboard.isDown("lshift") or love.keyboard.isDown("rshift")
+	for _, v in ipairs(elements) do
+		local el = v.el
+		if el.active then
+			local k = key
+			if el.type == "input" and el.inputting and string.len(key) == 1 and not el.ctrl then
+				if el.utilsnumeric then
+					local allowed = key:match("%d") ~= nil or (el.utilsnumeric == "float" and key == ".")
+					if shift or not allowed then
+						return true
+					end
+				elseif el.utilscaps and shift and key:match("%l") then
+					k = key:upper()
+				end
+			end
+			if el:keypress(k) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function anyinputting()
+	for _, v in ipairs(elements) do
+		local el = v.el
+		if el.active and el.inputting then
+			return true
+		end
+	end
+	return false
+end
+
+------------------------------------------------------------
+-- background jobs
+------------------------------------------------------------
+
+--fn runs as a coroutine and yields whenever it wants to give the frame back
+local function startjob(fn, onerror)
+	job = {co = coroutine.create(fn), onerror = onerror}
+end
+
+local function runjob()
+	local stop = love.timer.getTime() + 0.012
+	while job and love.timer.getTime() < stop do
+		local current = job
+		local ok, err = coroutine.resume(current.co)
+		if not ok then
+			job = nil
+			print("utils job failed: " .. tostring(err))
+			if current.onerror then
+				current.onerror(tostring(err))
+			end
+		elseif coroutine.status(current.co) == "dead" then
+			job = nil
+		end
+	end
+end
+
+------------------------------------------------------------
+-- hub
+------------------------------------------------------------
+
+local function hub_itemrect(i)
+	local item = HUBITEMS[i]
+	local y = 56 + (i-1)*22
+	if i == #HUBITEMS then
+		y = y + 10
+	end
+	local x = 130 - utf8.len(item.text)*4
+	return x, y, utf8.len(item.text)*8
+end
+
+local function hub_draw()
+	love.graphics.setColor(0, 0, 0, 200)
+	love.graphics.rectangle("fill", 21*scale, 16*scale, 218*scale, 200*scale)
+
+	love.graphics.setColor(255, 255, 255)
+	centredprint("utils", 130, 26)
+	love.graphics.setColor(60, 60, 60)
+	love.graphics.rectangle("fill", 30*scale, 37*scale, 200*scale, scale)
+
+	for i, item in ipairs(HUBITEMS) do
+		local x, y = hub_itemrect(i)
+		if hubselection == i then
+			love.graphics.setColor(255, 255, 255)
+			love.graphics.draw(menuselectimg, (x-14)*scale, (y-1)*scale, 0, scale, scale)
+		else
+			love.graphics.setColor(100, 100, 100)
+		end
+		properprintF(item.text, x*scale, y*scale)
+	end
+
+	love.graphics.setColor(60, 60, 60)
+	love.graphics.rectangle("fill", 30*scale, 162*scale, 200*scale, scale)
+	love.graphics.setColor(170, 170, 170)
+	centredprint(HUBITEMS[hubselection].info, 130, 172)
+end
+
+local function hub_activate()
+	local item = HUBITEMS[hubselection]
+	if item.page then
+		utilsmenu_openpage(item.page)
+	else
+		utilsmenu_close()
+	end
+end
+
+local function hub_mouseitem(x, y)
+	x, y = x/scale, y/scale
+	for i = 1, #HUBITEMS do
+		local ix, iy, iw = hub_itemrect(i)
+		if x >= ix - 16 and x < ix + iw + 2 and y >= iy - 3 and y < iy + 11 then
+			return i
+		end
+	end
+	return nil
+end
+
+------------------------------------------------------------
+-- character formatter
+------------------------------------------------------------
+
+local cf = {list = {}, sel = 1, colors = nil, sheets = {}, status = "", statuscolor = {255, 255, 255}}
+
+local function cf_scan()
+	local previous = cf.list[cf.sel]
+	cf.list = {}
+	for _, v in ipairs(love.filesystem.getDirectoryItems(CHARFOLDER)) do
+		if love.filesystem.getInfo(CHARFOLDER .. "/" .. v .. "/config.json") then
+			table.insert(cf.list, v)
+		end
+	end
+	table.sort(cf.list, function(a, b) return a:lower() < b:lower() end)
+	cf.sel = 1
+	for i, v in ipairs(cf.list) do
+		if v == previous then
+			cf.sel = i
+		end
+	end
+end
+
+--the sheets the formatter splits: "<something>animations.png", not already a numbered layer
+local function cf_findsheets(folder)
+	local sheets = {}
+	for _, file in ipairs(love.filesystem.getDirectoryItems(folder)) do
+		local lower = file:lower()
+		if lower:sub(-4) == ".png" and love.filesystem.getInfo(folder .. "/" .. file, "file") then
+			local base = lower:sub(1, -5)
+			if base:match("animations$") then
+				table.insert(sheets, file)
+			end
+		end
+	end
+	table.sort(sheets, function(a, b) return a:lower() < b:lower() end)
+	return sheets
+end
+
+local function cf_readcolors(folder)
+	local config, err = readjson(folder .. "/config.json")
+	if not config then
+		return nil, err
+	end
+	local colors = config.colors
+	if type(colors) ~= "table" or #colors == 0 then
+		return nil, "config.json has no colors list"
+	end
+	local list = {}
+	for i, c in ipairs(colors) do
+		if type(c) ~= "table" or not (tonumber(c[1]) and tonumber(c[2]) and tonumber(c[3])) then
+			return nil, "colour " .. i .. " in config.json isn't r, g, b"
+		end
+		list[i] = {tonumber(c[1]), tonumber(c[2]), tonumber(c[3])}
+	end
+	return list
+end
+
+local function cf_load()
+	cf.colors, cf.error, cf.sheets = nil, nil, {}
+	local name = cf.list[cf.sel]
+	if not name then
+		return
+	end
+	local folder = CHARFOLDER .. "/" .. name
+	cf.colors, cf.error = cf_readcolors(folder)
+	cf.sheets = cf_findsheets(folder)
+end
+
+local function colourkey(r, g, b)
+	return math.floor(r + 0.5)*65536 + math.floor(g + 0.5)*256 + math.floor(b + 0.5)
+end
+
+local function cf_job(name)
+	local src = CHARFOLDER .. "/" .. name
+	local dst = CHARFOLDER .. "/" .. name .. "_formatted"
+
+	local colors, err = cf_readcolors(src)
+	if not colors then
+		error(err, 0)
+	end
+	local lookup = {}
+	for i, c in ipairs(colors) do
+		local key = colourkey(c[1], c[2], c[3])
+		if not lookup[key] then
+			lookup[key] = i
+		end
+	end
+
+	cf.status, cf.statuscolor = "copying files...", {255, 255, 255}
+	copyfolder(src, dst)
+	coroutine.yield()
+
+	local sheets = cf_findsheets(src)
+	cf.progress = {done = 0, total = #sheets, row = 0}
+	local written = 0
+
+	for _, file in ipairs(sheets) do
+		cf.status = "splitting " .. file:lower()
+		local img = love.image.newImageData(src .. "/" .. file)
+		local w, h = img:getDimensions()
+		local layers = {}
+		for i = 1, #colors do
+			layers[i] = love.image.newImageData(w, h)
+		end
+		local excluded = love.image.newImageData(w, h)
+
+		--main.lua wraps ImageData so pixels are 0-255 here, like the rest of the game
+		for y = 0, h-1 do
+			for x = 0, w-1 do
+				local r, g, b, a = img:getPixel(x, y)
+				if a > 0 then
+					local index = nil
+					if a >= 255 then
+						index = lookup[colourkey(r, g, b)]
+					end
+					if index then
+						layers[index]:setPixel(x, y, 255, 255, 255, 255)
+					else
+						excluded:setPixel(x, y, r, g, b, a)
+					end
+				end
+			end
+			if y % 16 == 15 then
+				cf.progress.row = (y+1)/h
+				coroutine.yield()
+			end
+		end
+
+		--layers the character already had (made by hand) are kept as they are
+		local base = file:sub(1, -5)
+		local function writelayer(imagedata, suffix)
+			local outname = base .. suffix .. ".png"
+			if not love.filesystem.getInfo(src .. "/" .. outname) then
+				imagedata:encode("png", dst .. "/" .. outname)
+				written = written + 1
+			end
+		end
+		writelayer(excluded, "0")
+		for i = 1, #layers do
+			writelayer(layers[i], tostring(i))
+		end
+
+		cf.progress.done = cf.progress.done + 1
+		cf.progress.row = 0
+		coroutine.yield()
+	end
+
+	cf.progress = nil
+	cf.status = "done! wrote " .. written .. " layers to " .. name:lower() .. "_formatted"
+	cf.statuscolor = {100, 255, 100}
+	notice.new("formatted " .. name .. " (restart to play as it)", nil, 4)
+	cf_scan()
+	cf_load()
+	if named["cf_char"] then
+		named["cf_char"].var = cf.sel
+	end
+end
+
+local function cf_start()
+	local name = cf.list[cf.sel]
+	if not name or job then
+		return
+	end
+	startjob(function() cf_job(name) end, function(err)
+		cf.progress = nil
+		cf.status = "failed: " .. err
+		cf.statuscolor = {255, 80, 80}
+	end)
+end
+
+local function cf_build()
+	clearelements()
+	cf_scan()
+
+	if #cf.list > 0 then
+		local w = 8
+		local display = {}
+		for i, v in ipairs(cf.list) do
+			w = math.max(w, math.min(20, utf8.len(v)))
+			display[i] = v:lower()
+		end
+		local drop
+		drop = add("cf_char", guielement:new("dropdown", 114, 35, w, function(i)
+			drop.var = i
+			cf.sel = i
+			cf.status = ""
+			cf_load()
+		end, cf.sel, unpack(cf.list)))
+		drop.displayentries = display
+	end
+
+	add("cf_format", newbutton(26, 199, "format", cf_start))
+	add("cf_open", newbutton(80, 199, "open folder", function() openSaveFolder(CHARFOLDER) end))
+	add("back", newbutton(panelright()-40, 199, "back", function() utils_back() end))
+
+	cf_load()
+end
+
+local function cf_update()
+	if named["cf_format"] then
+		named["cf_format"].utilsdisabled = (job ~= nil) or cf.colors == nil or #cf.sheets == 0
+	end
+	if named["cf_char"] then
+		named["cf_char"].utilsdisabled = (job ~= nil)
+	end
+end
+
+local function cf_draw()
+	drawpanel()
+	drawtitle("character formatter")
+
+	love.graphics.setColor(255, 255, 255)
+	properprintF("character:", 26*scale, 37*scale)
+
+	if #cf.list == 0 then
+		love.graphics.setColor(255, 80, 80)
+		properprintF("no characters found in\n" .. CHARFOLDER, 114*scale, 37*scale)
+	else
+		love.graphics.setColor(255, 255, 255)
+		properprintF("colours:", 26*scale, 55*scale)
+		if cf.colors then
+			for i, c in ipairs(cf.colors) do
+				drawswatch(114 + (i-1)*13, 53, 11, 11, c)
+			end
+		elseif cf.error then
+			love.graphics.setColor(255, 80, 80)
+			properprintF(cf.error, 114*scale, 55*scale)
+		end
+
+		love.graphics.setColor(255, 255, 255)
+		properprintF("sheets to split: " .. #cf.sheets, 26*scale, 72*scale)
+		love.graphics.setColor(150, 150, 150)
+		for i, file in ipairs(cf.sheets) do
+			if i > 14 then
+				properprintF("+" .. (#cf.sheets - 14) .. " more", 200*scale, (84 + 6*10)*scale)
+				break
+			end
+			local col = math.floor((i-1)/7)
+			local row = (i-1) % 7
+			properprintF(file:lower():sub(1, 21), (26 + col*174)*scale, (84 + row*10)*scale)
+		end
+
+		love.graphics.setColor(255, 255, 255)
+		properprintF("output:", 26*scale, 158*scale)
+		love.graphics.setColor(150, 150, 150)
+		properprintF((cf.list[cf.sel] or ""):lower() .. "_formatted", 90*scale, 158*scale)
+	end
+
+	if cf.progress then
+		local p = 0
+		if cf.progress.total > 0 then
+			p = (cf.progress.done + cf.progress.row)/cf.progress.total
+		end
+		drawprogress(26, 172, panelwidth()-10, p, {60, 100, 255})
+	end
+	love.graphics.setColor(cf.statuscolor)
+	properprintF(cf.status:sub(1, 44), 26*scale, 184*scale)
+
+	drawelements()
+end
+
+------------------------------------------------------------
+-- font renderer
+------------------------------------------------------------
+
+local FR_LINES = 4
+local FR_ALIGN = {"left", "center", "right"}
+local fr = {lines = {}, caps = true, outline = false, align = 2, color = {255, 255, 255}}
+for i = 1, FR_LINES do
+	fr.lines[i] = ""
+end
+local CLIPBOARD_CHANNEL = "utilsmenu_clipboard"
+
+--the glyph the game would draw for a character (all caps uses the same table as properprintF)
+local function fr_glyph(c)
+	if fr.caps then
+		c = fontindexCAP[c] or c
+	end
+	if fontquads[c] then
+		return c
+	end
+	return nil
+end
+
+local function fr_gettext()
+	local lines = {}
+	for i = 1, FR_LINES do
+		local el = named["fr_line" .. i]
+		if el then
+			fr.lines[i] = tostring(el.value)
+		end
+		lines[i] = fr.lines[i]
+	end
+	while #lines > 0 and lines[#lines] == "" do
+		table.remove(lines)
+	end
+	return lines
+end
+
+--renders the text with the mappack's font (fontimage) and outline (fontbackimage) like properprintFbackground does
+local function fr_render()
+	local lines = fr_gettext()
+	local longest = 0
+	for _, line in ipairs(lines) do
+		longest = math.max(longest, utf8.len(line))
+	end
+	if longest == 0 then
+		return nil
+	end
+
+	local pad = 0
+	if fr.outline then
+		pad = 1
+	end
+	local w, h = longest*8 + pad*2, #lines*10
+	local canvas = love.graphics.newCanvas(w, h)
+	canvas:setFilter("nearest", "nearest")
+
+	--each line's left edge in pixels
+	local offsets = {}
+	for i, line in ipairs(lines) do
+		local free = (longest - utf8.len(line))*8
+		if fr.align == 1 then
+			offsets[i] = pad
+		elseif fr.align == 2 then
+			offsets[i] = pad + math.floor(free/2)
+		else
+			offsets[i] = pad + free
+		end
+	end
+
+	love.graphics.push("all")
+	love.graphics.setCanvas(canvas)
+	love.graphics.origin()
+	love.graphics.setScissor()
+	love.graphics.clear(0, 0, 0, 0)
+	love.graphics.setBlendMode("alpha")
+
+	--outline first, so it never covers the letters next to it
+	if fr.outline then
+		love.graphics.setColor(255, 255, 255)
+		for li, line in ipairs(lines) do
+			for i, c in utf8.chars(line) do
+				local g = fr_glyph(c)
+				if g and fontquadsback[g] then
+					love.graphics.draw(fontbackimage, fontquadsback[g], offsets[li] + (i-1)*8 - 1, (li-1)*10)
+				end
+			end
+		end
+	end
+
+	love.graphics.setColor(fr.color[1], fr.color[2], fr.color[3])
+	for li, line in ipairs(lines) do
+		for i, c in utf8.chars(line) do
+			local g = fr_glyph(c)
+			if g then
+				love.graphics.draw(fontimage, fontquads[g], offsets[li] + (i-1)*8, (li-1)*10 + 1)
+			end
+		end
+	end
+	love.graphics.pop()
+
+	return canvas
+end
+
+local function fr_renderkey()
+	local lines = fr_gettext()
+	return table.concat(lines, "\n") .. "|" .. tostring(fr.caps) .. tostring(fr.outline) .. fr.align
+		.. "|" .. fr.color[1] .. "," .. fr.color[2] .. "," .. fr.color[3] .. "|" .. tostring(fontimage) .. tostring(fontbackimage)
+end
+
+local function fr_save(path)
+	if not fr.canvas then
+		notice.new("there's no text to render!", notice.red, 3)
+		return false
+	end
+	love.filesystem.createDirectory(RENDERFOLDER)
+	local data = fr.canvas:newImageData()
+	data:encode("png", path)
+	return true
+end
+
+local function utf16le(s)
+	local out = {}
+	for _, cp in utf8.codes(s) do
+		if cp >= 0x10000 then
+			cp = cp - 0x10000
+			local hi, lo = 0xD800 + math.floor(cp/0x400), 0xDC00 + cp % 0x400
+			out[#out+1] = string.char(hi % 256, math.floor(hi/256), lo % 256, math.floor(lo/256))
+		else
+			out[#out+1] = string.char(cp % 256, math.floor(cp/256))
+		end
+	end
+	return table.concat(out)
+end
+
+--a shell command that puts the png on the clipboard (keeps transparency where the os allows it)
+local function fr_clipboardcommand(realpath)
+	local system = love.system.getOS()
+	if system == "Windows" then
+		realpath = realpath:gsub("/", "\\")
+		local script = table.concat({
+			"Add-Type -AssemblyName System.Windows.Forms",
+			"Add-Type -AssemblyName System.Drawing",
+			"$bytes = [System.IO.File]::ReadAllBytes('" .. realpath:gsub("'", "''") .. "')",
+			"$data = New-Object System.Windows.Forms.DataObject",
+			"$data.SetData('PNG', (New-Object System.IO.MemoryStream(,$bytes)))",
+			"$data.SetImage([System.Drawing.Image]::FromStream((New-Object System.IO.MemoryStream(,$bytes))))",
+			"[System.Windows.Forms.Clipboard]::SetDataObject($data, $true)",
+		}, "\n")
+		local encoded = love.data.encode("string", "base64", utf16le(script))
+		return "powershell -NoProfile -NonInteractive -STA -WindowStyle Hidden -EncodedCommand " .. encoded
+	elseif system == "OS X" then
+		return "osascript -e 'set the clipboard to (read (POSIX file \"" .. realpath .. "\") as «class PNGf»)'"
+	elseif system == "Linux" then
+		return "xclip -selection clipboard -t image/png -i \"" .. realpath .. "\""
+	end
+	return nil
+end
+
+local CLIPBOARD_THREAD = [[
+require("love.thread")
+local command, channel = ...
+local result = os.execute(command)
+love.thread.getChannel(channel):push(result == 0 or result == true)
+]]
+
+local function fr_copy()
+	local path = RENDERFOLDER .. "/clipboard.png"
+	if not fr_save(path) then
+		return
+	end
+	local command = fr_clipboardcommand(love.filesystem.getSaveDirectory() .. "/" .. path)
+	if not command then
+		notice.new("can't copy images on this system,\nsaved to " .. path .. " instead", notice.red, 4)
+		return
+	end
+	love.thread.newThread(CLIPBOARD_THREAD):start(command, CLIPBOARD_CHANNEL)
+	notice.new("copying...", nil, 1)
+end
+
+local function fr_slider(c, y)
+	local slider = guielement:new("scrollbar", 36, y, 280, 33, 9, fr.color[c]/255, "hor")
+	local backgrounds = {{90, 0, 0}, {0, 90, 0}, {0, 0, 90}}
+	slider.backgroundcolor = backgrounds[c]
+	slider.buttonround = true
+	slider.scrollstepdisabled = true --the wheel would change it while scrolling over it
+	slider.min, slider.max = 0, 255 --right click to type a value
+	slider.displayfunction = function(self, v)
+		return tostring(round(v*255))
+	end
+	return slider
+end
+
+local function fr_build()
+	clearelements()
+	if fr.colorfrommappack == nil then
+		--start with the mappack's own hud settings
+		fr.outline = hudoutline or false
+		fr.color = {hudtextcolor[1], hudtextcolor[2], hudtextcolor[3]}
+		fr.colorfrommappack = mappack
+	end
+
+	for i = 1, FR_LINES do
+		local el = newinput(26, 33 + (i-1)*13, 42, fr.lines[i], 64)
+		el.allowanycharacters = true --show capitals as capitals while typing
+		el.utilscaps = true --shift + letter types a capital
+		add("fr_line" .. i, el)
+	end
+
+	local caps, outline, align
+	caps = add("fr_caps", guielement:new("checkbox", 26, 89, function(v)
+		caps.var = v
+		fr.caps = v
+	end, fr.caps, "all caps"))
+	outline = add("fr_outline", guielement:new("checkbox", 110, 89, function(v)
+		outline.var = v
+		fr.outline = v
+	end, fr.outline, "outline"))
+	label(202, 90, "align:")
+	align = add("fr_align", guielement:new("dropdown", 252, 88, 6, function(i)
+		align.var = i
+		fr.align = i
+	end, fr.align, unpack(FR_ALIGN)))
+
+	for c = 1, 3 do
+		add("fr_slider" .. c, fr_slider(c, 104 + (c-1)*12))
+	end
+
+	add("fr_save", newbutton(26, 199, "save png", function()
+		local path = RENDERFOLDER .. "/text " .. os.date("%Y-%m-%d %H-%M-%S") .. ".png"
+		if fr_save(path) then
+			notice.new("saved to " .. path, nil, 4)
+		end
+	end))
+	add("fr_copy", newbutton(103, 199, "copy image", fr_copy))
+	add("fr_mappackcolour", newbutton(196, 199, "hud colour", function()
+		fr.color = {hudtextcolor[1], hudtextcolor[2], hudtextcolor[3]}
+		fr.outline = hudoutline or false
+		named["fr_outline"].var = fr.outline
+		for c = 1, 3 do
+			named["fr_slider" .. c].value = fr.color[c]/255
+		end
+	end))
+	add("back", newbutton(panelright()-40, 199, "back", function() utils_back() end))
+
+	fr.renderkey = nil
+end
+
+local function fr_update()
+	for c = 1, 3 do
+		local slider = named["fr_slider" .. c]
+		if slider then
+			fr.color[c] = round(slider.value*255)
+		end
+	end
+
+	local key = fr_renderkey()
+	if key ~= fr.renderkey then
+		fr.renderkey = key
+		fr.canvas = fr_render()
+	end
+end
+
+local function fr_draw()
+	drawpanel()
+	drawtitle("font renderer")
+	local fontname = "font: " .. tostring(mappack)
+	love.graphics.setColor(150, 150, 150)
+	properprintF(fontname:sub(1, 26), (panelright() - 5 - math.min(26, utf8.len(fontname))*8)*scale, (PY+6)*scale)
+
+	--rgb letters next to the sliders, drawn like the skin options do
+	local letters = {"r", "g", "b"}
+	local dark = {{100, 0, 0}, {0, 100, 0}, {0, 0, 100}}
+	local bright = {{255, 0, 0}, {0, 255, 0}, {0, 0, 255}}
+	for c = 1, 3 do
+		local y = 105 + (c-1)*12
+		love.graphics.setColor(dark[c])
+		properprint(letters[c], 27*scale, (y+1)*scale)
+		love.graphics.setColor(bright[c])
+		properprint(letters[c], 26*scale, y*scale)
+	end
+
+	--colour preview, right of the sliders
+	drawswatch(324, 103, 34, 34, fr.color)
+
+	--rendered preview, on the game's sky so the black outline shows up
+	local bx, by, bw, bh = 26, 146, panelwidth()-10, 48
+	love.graphics.setColor(127, 127, 127)
+	love.graphics.rectangle("fill", bx*scale, by*scale, bw*scale, bh*scale)
+	love.graphics.setColor(92, 148, 252)
+	love.graphics.rectangle("fill", (bx+1)*scale, (by+1)*scale, (bw-2)*scale, (bh-2)*scale)
+	if fr.canvas then
+		local cw, ch = fr.canvas:getDimensions()
+		local s = math.min(2, (bw-6)/cw, (bh-6)/ch)
+		if s >= 1 then
+			s = math.floor(s)
+		end
+		local x = bx + (bw - cw*s)/2
+		local y = by + (bh - ch*s)/2
+		love.graphics.setColor(255, 255, 255)
+		love.graphics.setBlendMode("alpha", "premultiplied")
+		love.graphics.draw(fr.canvas, math.floor(x*scale), math.floor(y*scale), 0, s*scale, s*scale)
+		love.graphics.setBlendMode("alpha")
+		love.graphics.setColor(40, 70, 140)
+		local size = cw .. "*" .. ch
+		properprintF(size, (bx + bw - 3 - utf8.len(size)*8)*scale, (by + bh - 10)*scale)
+	else
+		love.graphics.setColor(40, 70, 140)
+		centredprint("type some text above", bx + bw/2, by + bh/2 - 4)
+	end
+
+	drawlabels()
+	drawelements()
+end
+
+------------------------------------------------------------
+-- mappack creator
+------------------------------------------------------------
+
+--option names match the python mappack creator, so project files work in both
+local PHYSICS = {"Mari0", "Super Mario Bros.", "Mari0 x Lost Levels", "Super Mario Bros. Lost Levels", "Mari0 x Super Mario Maker", "Super Mario Maker", "Portal"}
+local CAMERA = {"Default", "Centered", "No Backscroll"}
+local PORTALGUN = {"Normal", "None", "1 Only", "2 Only", "Gel"}
+local COLOURS = {"Black", "Blue", "Brown", "Gray", "Green", "Lime", "Maroon", "Orange", "Pink", "Purple", "Red", "Sky", "White", "Yellow"}
+local WHITE = 13
+local PROJECTFORMATS = {"mpckproj", "json", "cfg"}
+local SUBFOLDERS = {"animated", "animations", "backgrounds", "custom", "enemies", "music", "sounds"}
+
+local function lowered(list)
+	local out = {}
+	for i, v in ipairs(list) do
+		out[i] = v:lower()
+	end
+	return out
+end
+
+local function optionindex(list, value, default)
+	if type(value) == "number" then
+		if list[value] then
+			return value
+		end
+		return default
+	end
+	if value == nil then
+		return default
+	end
+	value = tostring(value):lower()
+	for i, v in ipairs(list) do
+		if v:lower() == value then
+			return i
+		end
+	end
+	return default
+end
+
+local function colourvalue(i)
+	return textcolors[COLOURS[i]:lower()] or {255, 255, 255}
+end
+
+local function mp_defaults()
+	local d = {
+		name = "new mappack", display_name = "", author = "you", description = "the newest best  mappack",
+		lives = "3", physics = 1, camera = 1,
+		drop_shadow = false, real_time = false, continue_music = false, no_hurry = false, no_coinlimit = false,
+		world_count = "8", courses_per_world = "4", subzones_per_course = "5", no_subzones = false,
+		player_name = "", use_character_name = true, hud_colour = WHITE,
+		letters_world = false, visible_hud = true, outlined_hud = false, simple_hud = false,
+		ending1 = "congratulations!", ending2 = "you have finished this mappack!", ending_colour = WHITE,
+		toad1 = "thank you mario!", toad2 = "but our princess is in", toad3 = "another castle!",
+		peach1 = "thank you mario!", peach2 = "your quest is over.", peach3 = "we present you a new quest.",
+		peach4 = "push button b", peach5 = "to play as steve",
+		allow_cheats = true, hidden = {},
+		time_limit = "400", portalgun = 1, bgx = "0", bgy = "0", fgx = "0", fgy = "0",
+		prevent_delete = true, projectformat = 1, projectsel = 1,
+	}
+	for i = 1, 10 do
+		d.hidden[i] = false
+	end
+	return d
+end
+
+local mp --current values (input fields keep their text, dropdowns their index)
+local mpicon --ImageData or nil
+local mpiconimage
+local mpbinds = {}
+local mpexisting = {} --lowercase name -> folder name
+local mpexistingtime = 0
+local mpsession = {} --lowercase names created since the game started
+local mpprojects = {}
+local mpcreating = false
+local mpprogress --{done, total}
+local mpstatus, mpstatuscolor = "", {255, 255, 255}
+local mpcheck = {valid = true, requirements = {}, notices = {}}
+
+local function mpnumber(key, default, minimum, maximum, float)
+	local n = tonumber(mp[key])
+	if not n then
+		return default
+	end
+	if not float then
+		n = math.floor(n)
+	end
+	return clamp(n, minimum, maximum)
+end
+
+local function mp_seticon(imagedata)
+	mpicon = imagedata
+	mpiconimage = nil
+	if imagedata then
+		mpiconimage = love.graphics.newImage(imagedata)
+		mpiconimage:setFilter("nearest", "nearest")
+	end
+end
+
+--every value in its final form, used by creating and saving
+local function mp_values()
+	local v = {}
+	for _, key in ipairs({"name", "display_name", "author", "description", "player_name", "ending1", "ending2", "toad1", "toad2", "toad3", "peach1", "peach2", "peach3", "peach4", "peach5"}) do
+		v[key] = tostring(mp[key])
+	end
+	for _, key in ipairs({"drop_shadow", "real_time", "continue_music", "no_hurry", "no_coinlimit", "no_subzones", "use_character_name", "letters_world", "visible_hud", "outlined_hud", "simple_hud", "allow_cheats", "prevent_delete"}) do
+		v[key] = mp[key]
+	end
+	if v.simple_hud then
+		v.use_character_name = true
+	end
+	v.lives = mpnumber("lives", 3, 0, 9999)
+	v.world_count = mpnumber("world_count", 8, 1, 999)
+	v.courses_per_world = mpnumber("courses_per_world", 4, 1, 99)
+	v.subzones_per_course = mpnumber("subzones_per_course", 5, 1, 13)
+	v.time_limit = mpnumber("time_limit", 400, 0, 9999)
+	v.bgx = mpnumber("bgx", 0, 0, 9, true)
+	v.bgy = mpnumber("bgy", 0, 0, 9, true)
+	v.fgx = mpnumber("fgx", 0, 0, 9, true)
+	v.fgy = mpnumber("fgy", 0, 0, 9, true)
+	v.physics, v.camera, v.portalgun = mp.physics, mp.camera, mp.portalgun
+	v.hud_colour, v.ending_colour = mp.hud_colour, mp.ending_colour
+	v.hidden = {}
+	for i = 1, 10 do
+		v.hidden[i] = mp.hidden[i] == true
+	end
+	return v
+end
+
+local function mp_filecount(v)
+	local subzones = v.subzones_per_course
+	if v.no_subzones then
+		subzones = 0
+	end
+	return v.world_count * v.courses_per_world * (subzones + 1)
+end
+
+local function mp_refreshexisting()
+	mpexisting = {}
+	for _, v in ipairs(love.filesystem.getDirectoryItems(mappackfolder)) do
+		if love.filesystem.getInfo(mappackfolder .. "/" .. v, "directory") then
+			mpexisting[v:lower()] = v
+		end
+	end
+	mpexistingtime = love.timer.getTime()
+end
+
+local function mp_refreshprojects()
+	mpprojects = {}
+	for _, file in ipairs(love.filesystem.getDirectoryItems(PROJECTFOLDER)) do
+		local ext = (file:match("%.([^%.]+)$") or ""):lower()
+		if ext == "mpckproj" or ext == "json" or ext == "cfg" then
+			table.insert(mpprojects, file)
+		end
+	end
+	table.sort(mpprojects, function(a, b) return a:lower() < b:lower() end)
+end
+
+--nil: not made by the creator (or not in the save folder), "session"/"marker": can be deleted, "locked": prevent deletion was on
+local function mp_deletestate(name)
+	local folder = mpexisting[name:lower()]
+	if not folder then
+		return nil
+	end
+	local path = mappackfolder .. "/" .. folder
+	if not insavedirectory(path) then
+		return nil
+	end
+	if mpsession[name:lower()] then
+		return "session"
+	end
+	local marker = love.filesystem.read(path .. "/made_by_mappack_creator")
+	if marker == nil then
+		return nil
+	end
+	if marker:find("cannot delete") then
+		return "locked"
+	end
+	return "marker"
+end
+
+local function mp_validate()
+	local v = mp_values()
+	local valid = true
+	local requirements, notices = {}, {}
+	local name = v.name
+
+	if name:match("^%s*$") then
+		valid = false
+		table.insert(requirements, "value for name is empty!")
+	end
+	if name:find('[/\\:%*%?"<>|]') then
+		valid = false
+		table.insert(requirements, "name can't have / \\ : * ? \" < > or | in it!")
+	end
+	if utf8.len(v.display_name) > 17 then
+		valid = false
+		table.insert(requirements, "value for display name is above 17 characters!")
+	end
+	if utf8.len(v.author) > 13 then
+		valid = false
+		table.insert(requirements, "value for author is above 13 characters!")
+	end
+	if utf8.len(v.description) > 51 then
+		valid = false
+		table.insert(requirements, "value for description is above 51 characters!")
+	end
+	if v.display_name == "" and utf8.len(name) > 17 then
+		valid = false
+		table.insert(requirements, "display name is empty, so it uses the name, which is above 17 characters!")
+	end
+
+	local filecount = mp_filecount(v)
+	if filecount >= 1000 then
+		local amount = "some"
+		if filecount >= 10000 then
+			amount = "a lot of"
+		end
+		table.insert(requirements, "this will create " .. filecount .. " files. this will take " .. amount .. " time.")
+	end
+
+	if mpexisting[name:lower()] and not mpcreating then
+		valid = false
+		local state = mp_deletestate(name)
+		if state == "session" or state == "marker" then
+			table.insert(notices, "you can safely delete '" .. name .. "'.")
+		else
+			table.insert(requirements, "value for name already exists in the mappack folder!")
+			if state == "locked" then
+				table.insert(requirements, "'" .. name .. "' was made with prevent deletion on, so the creator can't delete it.")
+			end
+		end
+	end
+
+	mpcheck = {valid = valid, requirements = requirements, notices = notices, filecount = filecount, values = v}
+end
+
+------------------------------------------------------------
+-- mappack creator: writing the mappack
+------------------------------------------------------------
+
+local function colourstring(i)
+	local c = colourvalue(i)
+	return c[1] .. ", " .. c[2] .. ", " .. c[3]
+end
+
+local function mp_settingstxt(v)
+	local display = v.display_name
+	if display == "" then
+		display = v.name
+	end
+	local lines = {
+		"name=" .. display:lower(),
+		"author=" .. v.author:lower(),
+		"description=" .. v.description:lower(),
+		"lives=" .. v.lives,
+	}
+	if v.physics ~= 1 then
+		table.insert(lines, "physics=" .. v.physics)
+	end
+	if v.camera ~= 1 then
+		table.insert(lines, "camera=" .. v.camera)
+	end
+	if v.drop_shadow then
+		table.insert(lines, "dropshadow=t")
+	end
+	if v.real_time then
+		table.insert(lines, "realtime=t")
+	end
+	if v.continue_music then
+		table.insert(lines, "continuesublevelmusic=t")
+	end
+	if v.no_hurry then
+		table.insert(lines, "nolowtime=t")
+	end
+	if v.no_coinlimit then
+		table.insert(lines, "nocoinlimit=t")
+	end
+	return table.concat(lines, "\n")
+end
+
+local function mp_texttxt(v)
+	local hidden = {}
+	for i = 1, 10 do
+		hidden[i] = tostring(v.hidden[i])
+	end
+	local lines = {
+		"endingtextcolor=" .. colourstring(v.ending_colour),
+		"endingcolorname=" .. COLOURS[v.ending_colour]:lower(),
+		"endingtext=" .. v.ending1:lower() .. "," .. v.ending2:lower(),
+	}
+	if not v.use_character_name then
+		table.insert(lines, "playername=" .. v.player_name)
+	end
+	table.insert(lines, "hudtextcolor=" .. colourstring(v.hud_colour))
+	table.insert(lines, "hudcolorname=" .. COLOURS[v.hud_colour]:lower())
+	table.insert(lines, "hudvisible=" .. tostring(v.visible_hud))
+	table.insert(lines, "hudworldletter=" .. tostring(v.letters_world))
+	table.insert(lines, "hudoutline=" .. tostring(v.outlined_hud))
+	table.insert(lines, "hudsimple=" .. tostring(v.simple_hud))
+	table.insert(lines, "toadtext=" .. v.toad1:lower() .. "," .. v.toad2:lower() .. "," .. v.toad3:lower())
+	table.insert(lines, "peachtext=" .. table.concat({v.peach1:lower(), v.peach2:lower(), v.peach3:lower(), v.peach4:lower(), v.peach5:lower()}, ","))
+	table.insert(lines, "steve=" .. tostring(v.allow_cheats))
+	table.insert(lines, "hudhidecollectables=" .. table.concat(hidden, ","))
+	return table.concat(lines, "\n")
+end
+
+--a blank 25x15 course: sky with two rows of ground
+local function mp_coursedata(v)
+	local tiles = {}
+	for i = 1, 325 do
+		tiles[i] = "1"
+	end
+	for i = 326, 375 do
+		tiles[i] = "2"
+	end
+	local portalgun = "portalguni=" .. v.portalgun
+	if v.portalgun == 2 then --"none"
+		portalgun = "noportalgun"
+	end
+	return table.concat({
+		table.concat(tiles, ","),
+		"height=15", "background=1", "spriteset=1", "music=1",
+		portalgun,
+		"timelimit=" .. v.time_limit,
+		"scrollfactor=" .. numbertostring(v.bgx),
+		"scrollfactory=" .. numbertostring(v.bgy),
+		"scrollfactor2=" .. numbertostring(v.fgx),
+		"scrollfactor2y=" .. numbertostring(v.fgy),
+	}, ";")
+end
+
+local function mp_createjob(v)
+	local name = v.name
+	local path = mappackfolder .. "/" .. name
+	mpcreating = true
+	mpstatus, mpstatuscolor = "creating files...", {255, 255, 255}
+
+	if not love.filesystem.createDirectory(path) then
+		error("couldn't make the mappack folder", 0)
+	end
+	love.filesystem.write(path .. "/settings.txt", mp_settingstxt(v))
+	love.filesystem.write(path .. "/text.txt", mp_texttxt(v))
+	if mpicon then
+		mpicon:encode("png", path .. "/icon.png")
+	end
+	for _, folder in ipairs(SUBFOLDERS) do
+		love.filesystem.createDirectory(path .. "/" .. folder)
+	end
+
+	local marker = ""
+	if v.prevent_delete then
+		marker = "cannot delete"
+	end
+	love.filesystem.write(path .. "/made_by_mappack_creator", marker)
+	mpsession[name:lower()] = true
+
+	local data = mp_coursedata(v)
+	local subzones = v.subzones_per_course
+	if v.no_subzones then
+		subzones = 0
+	end
+	mpprogress = {done = 0, total = mp_filecount(v)}
+
+	local function writefile(filename)
+		if not love.filesystem.write(path .. "/" .. filename, data) then
+			error("couldn't write " .. filename, 0)
+		end
+		mpprogress.done = mpprogress.done + 1
+		if mpprogress.done % 100 == 0 then
+			coroutine.yield()
+		end
+	end
+
+	for world = 1, v.world_count do
+		for course = 1, v.courses_per_world do
+			writefile(world .. "-" .. course .. ".txt")
+			for subzone = 1, subzones do
+				writefile(world .. "-" .. course .. "_" .. subzone .. ".txt")
+			end
+		end
+	end
+
+	mpcreating = false
+	mpstatus, mpstatuscolor = "finished!", {100, 255, 100}
+	mp_refreshexisting()
+	notice.new("mappack created successfully!", nil, 4)
+end
+
+local function mp_create()
+	mp_refreshexisting()
+	mp_validate()
+	if job or not mpcheck.valid then
+		return
+	end
+	local v = mpcheck.values
+	startjob(function() mp_createjob(v) end, function(err)
+		mpcreating = false
+		mpstatus, mpstatuscolor = "generation failed...", {255, 80, 80}
+		notice.new(err, notice.red, 5)
+		local path = mappackfolder .. "/" .. v.name
+		if insavedirectory(path) then
+			startjob(function() removerecursive(path) mp_refreshexisting() end)
+		end
+	end)
+end
+
+local function mp_delete()
+	local name = tostring(mp.name)
+	local state = mp_deletestate(name)
+	if job or not (state == "session" or state == "marker") then
+		return
+	end
+	local path = mappackfolder .. "/" .. mpexisting[name:lower()]
+	mpstatus, mpstatuscolor = "deleting...", {255, 255, 255}
+	startjob(function()
+		removerecursive(path)
+		mpsession[name:lower()] = nil
+		mp_refreshexisting()
+		mpprogress = nil
+		mpstatus, mpstatuscolor = "deleted " .. name, {255, 255, 255}
+	end, function(err)
+		mpstatus, mpstatuscolor = "couldn't delete it", {255, 80, 80}
+		mp_refreshexisting()
+	end)
+end
+
+------------------------------------------------------------
+-- mappack creator: project files (.mpckproj, .json, .cfg)
+------------------------------------------------------------
+
+local function mp_icondata()
+	if not mpicon then
+		return nil
+	end
+	return love.data.encode("string", "base64", mpicon:encode("png"):getString())
+end
+
+local function mp_loadicondata(data)
+	if type(data) ~= "string" or data == "" or data == "None" or data == "nil" or data == "null" then
+		mp_seticon(nil)
+		return
+	end
+	local ok, imagedata = pcall(function()
+		local bytes = love.data.decode("string", "base64", data)
+		return love.image.newImageData(love.filesystem.newFileData(bytes, "icon.png"))
+	end)
+	if ok then
+		mp_seticon(imagedata)
+	else
+		mp_seticon(nil)
+	end
+end
+
+local function mp_projectjson(v, icon)
+	return JSON:encode_pretty({
+		general = {
+			name = v.name, display_name = v.display_name, author = v.author, description = v.description,
+			icon = icon, lives = v.lives, physics = PHYSICS[v.physics], camera = CAMERA[v.camera],
+			drop_shadow = v.drop_shadow, real_time = v.real_time, continue_music = v.continue_music,
+			no_hurry = v.no_hurry, no_coinlimit = v.no_coinlimit,
+			world_count = v.world_count, courses_per_world = v.courses_per_world,
+			subzones_per_course = v.subzones_per_course, no_subzones = v.no_subzones,
+		},
+		text = {
+			player_name = v.player_name, use_character_name = v.use_character_name,
+			hud_colour = COLOURS[v.hud_colour], letters_world = v.letters_world, visible_hud = v.visible_hud,
+			outlined_hud = v.outlined_hud, simple_hud = v.simple_hud,
+			ending1 = v.ending1, ending2 = v.ending2, ending_colour = COLOURS[v.ending_colour],
+			toad = {v.toad1, v.toad2, v.toad3},
+			peach = {v.peach1, v.peach2, v.peach3, v.peach4, v.peach5},
+			allow_cheats = v.allow_cheats, hidden_collectables = v.hidden,
+		},
+		course_defaults = {
+			time_limit = v.time_limit, portalgun = PORTALGUN[v.portalgun],
+			background_scroll = {x = v.bgx, y = v.bgy},
+			foreground_scroll = {x = v.fgx, y = v.fgy},
+		},
+	})
+end
+
+local function mp_projectcfg(v, icon)
+	local hidden = {}
+	for i = 1, 10 do
+		hidden[i] = tostring(v.hidden[i])
+	end
+	local lines = {
+		"# Mari0 Mappack Creator Project",
+		"[General]",
+		"name=" .. v.name, "display_name=" .. v.display_name, "author=" .. v.author,
+		"description=" .. v.description, "icon=" .. (icon or ""), "lives=" .. v.lives,
+		"physics=" .. v.physics, "camera=" .. v.camera,
+		"",
+		"[Flags]",
+		"drop_shadow=" .. tostring(v.drop_shadow), "real_time=" .. tostring(v.real_time),
+		"continue_music=" .. tostring(v.continue_music), "no_hurry=" .. tostring(v.no_hurry),
+		"no_coinlimit=" .. tostring(v.no_coinlimit),
+		"",
+		"[Worlds]",
+		"world_count=" .. v.world_count, "courses_per_world=" .. v.courses_per_world,
+		"subzones_per_course=" .. v.subzones_per_course, "no_subzones=" .. tostring(v.no_subzones),
+		"",
+		"[Text]",
+		"player_name=" .. v.player_name, "use_character_name=" .. tostring(v.use_character_name),
+		"hud_colour=" .. COLOURS[v.hud_colour], "letters_world=" .. tostring(v.letters_world),
+		"visible_hud=" .. tostring(v.visible_hud), "outlined_hud=" .. tostring(v.outlined_hud),
+		"simple_hud=" .. tostring(v.simple_hud),
+		"ending1=" .. v.ending1, "ending2=" .. v.ending2, "ending_colour=" .. COLOURS[v.ending_colour],
+		"toad1=" .. v.toad1, "toad2=" .. v.toad2, "toad3=" .. v.toad3,
+		"peach1=" .. v.peach1, "peach2=" .. v.peach2, "peach3=" .. v.peach3, "peach4=" .. v.peach4, "peach5=" .. v.peach5,
+		"allow_cheats=" .. tostring(v.allow_cheats), "hidden_collectables=" .. table.concat(hidden, ","),
+		"",
+		"[Course]",
+		"time_limit=" .. v.time_limit, "portalgun=" .. PORTALGUN[v.portalgun],
+		"background_x=" .. numbertostring(v.bgx), "background_y=" .. numbertostring(v.bgy),
+		"foreground_x=" .. numbertostring(v.fgx), "foreground_y=" .. numbertostring(v.fgy),
+		"",
+	}
+	return table.concat(lines, "\n")
+end
+
+local function mp_projectmpck(v, icon)
+	local hidden = {}
+	for i = 1, 10 do
+		hidden[i] = tostring(v.hidden[i])
+	end
+	local function q(s)
+		return '"' .. s .. '"'
+	end
+	local lines = {
+		"MARIO_MAPPACK_PROJECT",
+		"GENERAL {",
+		"    NAME " .. q(v.name),
+		"    DISPLAY_NAME " .. q(v.display_name),
+		"    AUTHOR " .. q(v.author),
+		"    DESCRIPTION " .. q(v.description),
+		"    ICON " .. q(icon or "None"),
+		"    LIVES " .. v.lives,
+		"    PHYSICS " .. q(PHYSICS[v.physics]),
+		"    CAMERA " .. q(CAMERA[v.camera]),
+		"}",
+		"",
+		"OPTIONS {",
+		"    DROP_SHADOW " .. tostring(v.drop_shadow),
+		"    REAL_TIME " .. tostring(v.real_time),
+		"    CONTINUE_MUSIC " .. tostring(v.continue_music),
+		"    NO_HURRY " .. tostring(v.no_hurry),
+		"    NO_COINLIMIT " .. tostring(v.no_coinlimit),
+		"}",
+		"",
+		"LAYOUT {",
+		"    WORLDS " .. v.world_count,
+		"    COURSES_PER_WORLD " .. v.courses_per_world,
+		"    SUBZONES_PER_COURSE " .. v.subzones_per_course,
+		"    NO_SUBZONES " .. tostring(v.no_subzones),
+		"}",
+		"",
+		"TEXT {",
+		"    PLAYER_NAME " .. q(v.player_name),
+		"    USE_CHARACTER_NAME " .. tostring(v.use_character_name),
+		"",
+		"    HUD_COLOUR " .. q(COLOURS[v.hud_colour]),
+		"    ENDING_COLOUR " .. q(COLOURS[v.ending_colour]),
+		"    LETTERS_WORLD " .. tostring(v.letters_world),
+		"    VISIBLE_HUD " .. tostring(v.visible_hud),
+		"    OUTLINED_HUD " .. tostring(v.outlined_hud),
+		"    SIMPLE_HUD " .. tostring(v.simple_hud),
+		"",
+		"    ENDING_TEXT {",
+		"        " .. q(v.ending1),
+		"        " .. q(v.ending2),
+		"    }",
+		"",
+		"    TOAD_TEXT {",
+		"        " .. q(v.toad1),
+		"        " .. q(v.toad2),
+		"        " .. q(v.toad3),
+		"    }",
+		"",
+		"    PEACH_TEXT {",
+		"        " .. q(v.peach1),
+		"        " .. q(v.peach2),
+		"        " .. q(v.peach3),
+		"        " .. q(v.peach4),
+		"        " .. q(v.peach5),
+		"    }",
+		"",
+		"    ALLOW_CHEATS " .. tostring(v.allow_cheats),
+		"",
+		"    HIDDEN_COLLECTABLES {" .. table.concat(hidden, ", ") .. "}",
+		"}",
+		"",
+		"COURSE_DEFAULTS {",
+		"    TIME_LIMIT " .. v.time_limit,
+		"    PORTALGUN " .. q(PORTALGUN[v.portalgun]),
+		"",
+		"    BACKGROUND_SCROLL {",
+		"        X " .. numbertostring(v.bgx),
+		"        Y " .. numbertostring(v.bgy),
+		"    }",
+		"",
+		"    FOREGROUND_SCROLL {",
+		"        X " .. numbertostring(v.fgx),
+		"        Y " .. numbertostring(v.fgy),
+		"    }",
+		"}",
+		"",
+	}
+	return table.concat(lines, "\n")
+end
+
+--project data -> a table with the creator's keys (missing values stay nil)
+local function mp_parsejson(data)
+	local oldcrash = JSONcrashgame
+	JSONcrashgame = false
+	local ok, project = pcall(function() return JSON:decode(data) end)
+	JSONcrashgame = oldcrash
+	if not ok or type(project) ~= "table" then
+		error("that .json project has an error in it", 0)
+	end
+	local g = project.general or {}
+	local t = project.text or {}
+	local c = project.course_defaults or {}
+	local p = {
+		name = g.name, display_name = g.display_name, author = g.author, description = g.description,
+		icon = g.icon, lives = g.lives,
+		physics = optionindex(PHYSICS, g.physics), camera = optionindex(CAMERA, g.camera),
+		drop_shadow = g.drop_shadow, real_time = g.real_time, continue_music = g.continue_music,
+		no_hurry = g.no_hurry, no_coinlimit = g.no_coinlimit,
+		world_count = g.world_count, courses_per_world = g.courses_per_world,
+		subzones_per_course = g.subzones_per_course, no_subzones = g.no_subzones,
+		player_name = t.player_name, use_character_name = t.use_character_name,
+		hud_colour = optionindex(COLOURS, t.hud_colour), letters_world = t.letters_world,
+		visible_hud = t.visible_hud, outlined_hud = t.outlined_hud, simple_hud = t.simple_hud,
+		ending1 = t.ending1, ending2 = t.ending2, ending_colour = optionindex(COLOURS, t.ending_colour),
+		allow_cheats = t.allow_cheats,
+		time_limit = c.time_limit, portalgun = optionindex(PORTALGUN, c.portalgun),
+	}
+	if type(t.toad) == "table" and #t.toad >= 3 then
+		p.toad1, p.toad2, p.toad3 = t.toad[1], t.toad[2], t.toad[3]
+	end
+	if type(t.peach) == "table" and #t.peach >= 5 then
+		p.peach1, p.peach2, p.peach3, p.peach4, p.peach5 = t.peach[1], t.peach[2], t.peach[3], t.peach[4], t.peach[5]
+	end
+	if type(t.hidden_collectables) == "table" then
+		p.hidden = t.hidden_collectables
+	end
+	if type(c.background_scroll) == "table" then
+		p.bgx, p.bgy = c.background_scroll.x, c.background_scroll.y
+	end
+	if type(c.foreground_scroll) == "table" then
+		p.fgx, p.fgy = c.foreground_scroll.x, c.foreground_scroll.y
+	end
+	return p
+end
+
+local function mp_parsecfg(data)
+	local sections, current = {}, nil
+	for line in (data .. "\n"):gmatch("(.-)\r?\n") do
+		line = line:match("^%s*(.-)%s*$")
+		if line ~= "" and line:sub(1, 1) ~= "#" then
+			local section = line:match("^%[(.*)%]$")
+			if section then
+				current = section
+				sections[current] = {}
+			elseif current and line:find("=") then
+				local key, value = line:match("^([^=]*)=(.*)$")
+				sections[current][key] = value
+			end
+		end
+	end
+	local g, f, w, t, c = sections.General or {}, sections.Flags or {}, sections.Worlds or {}, sections.Text or {}, sections.Course or {}
+	local p = {
+		name = g.name, display_name = g.display_name, author = g.author, description = g.description,
+		icon = g.icon, lives = g.lives,
+		physics = optionindex(PHYSICS, tonumber(g.physics)), camera = optionindex(CAMERA, tonumber(g.camera)),
+		drop_shadow = tobool(f.drop_shadow), real_time = tobool(f.real_time), continue_music = tobool(f.continue_music),
+		no_hurry = tobool(f.no_hurry), no_coinlimit = tobool(f.no_coinlimit),
+		world_count = w.world_count, courses_per_world = w.courses_per_world,
+		subzones_per_course = w.subzones_per_course, no_subzones = tobool(w.no_subzones),
+		player_name = t.player_name, use_character_name = tobool(t.use_character_name),
+		hud_colour = optionindex(COLOURS, t.hud_colour), letters_world = tobool(t.letters_world),
+		visible_hud = tobool(t.visible_hud), outlined_hud = tobool(t.outlined_hud), simple_hud = tobool(t.simple_hud),
+		ending1 = t.ending1, ending2 = t.ending2, ending_colour = optionindex(COLOURS, t.ending_colour),
+		toad1 = t.toad1, toad2 = t.toad2, toad3 = t.toad3,
+		peach1 = t.peach1, peach2 = t.peach2, peach3 = t.peach3, peach4 = t.peach4, peach5 = t.peach5,
+		allow_cheats = tobool(t.allow_cheats),
+		time_limit = c.time_limit, portalgun = optionindex(PORTALGUN, c.portalgun),
+		bgx = c.background_x, bgy = c.background_y, fgx = c.foreground_x, fgy = c.foreground_y,
+	}
+	if t.hidden_collectables then
+		p.hidden = {}
+		for value in (t.hidden_collectables .. ","):gmatch("(.-),") do
+			table.insert(p.hidden, tobool(value:match("^%s*(.-)%s*$")))
+		end
+	end
+	return p
+end
+
+local function mp_parsempck(data)
+	local function value(pattern)
+		return data:match(pattern)
+	end
+	local function quoted(key)
+		return value("%f[%w_]" .. key .. ' "(.-)"')
+	end
+	local function word(key)
+		return value("%f[%w_]" .. key .. " ([%w%.]+)")
+	end
+	local function block(key)
+		local inner = value(key .. "%s*{(.-)}")
+		local lines = {}
+		if inner then
+			for line in inner:gmatch("[^\r\n]+") do
+				line = line:match("^%s*(.-)%s*$")
+				if line ~= "" then
+					table.insert(lines, (line:gsub('^"', ""):gsub('"$', "")))
+				end
+			end
+		end
+		return lines
+	end
+
+	local p = {
+		name = quoted("NAME"), display_name = quoted("DISPLAY_NAME"), author = quoted("AUTHOR"),
+		description = quoted("DESCRIPTION"), icon = quoted("ICON"), lives = word("LIVES"),
+		physics = optionindex(PHYSICS, quoted("PHYSICS")), camera = optionindex(CAMERA, quoted("CAMERA")),
+		drop_shadow = tobool(word("DROP_SHADOW")), real_time = tobool(word("REAL_TIME")),
+		continue_music = tobool(word("CONTINUE_MUSIC")), no_hurry = tobool(word("NO_HURRY")),
+		no_coinlimit = tobool(word("NO_COINLIMIT") or word("NO_COIN_LIMIT")),
+		world_count = word("WORLDS"), courses_per_world = word("COURSES_PER_WORLD"),
+		subzones_per_course = word("SUBZONES_PER_COURSE"), no_subzones = tobool(word("NO_SUBZONES")),
+		player_name = quoted("PLAYER_NAME"), use_character_name = tobool(word("USE_CHARACTER_NAME")),
+		hud_colour = optionindex(COLOURS, quoted("HUD_COLOUR")), ending_colour = optionindex(COLOURS, quoted("ENDING_COLOUR")),
+		letters_world = tobool(word("LETTERS_WORLD")), visible_hud = tobool(word("VISIBLE_HUD")),
+		outlined_hud = tobool(word("OUTLINED_HUD")), simple_hud = tobool(word("SIMPLE_HUD")),
+		allow_cheats = tobool(word("ALLOW_CHEATS")),
+		time_limit = word("TIME_LIMIT"), portalgun = optionindex(PORTALGUN, quoted("PORTALGUN")),
+	}
+	local ending = block("ENDING_TEXT")
+	if #ending >= 2 then
+		p.ending1, p.ending2 = ending[1], ending[2]
+	end
+	local toad = block("TOAD_TEXT")
+	if #toad >= 3 then
+		p.toad1, p.toad2, p.toad3 = toad[1], toad[2], toad[3]
+	end
+	local peach = block("PEACH_TEXT")
+	if #peach >= 5 then
+		p.peach1, p.peach2, p.peach3, p.peach4, p.peach5 = peach[1], peach[2], peach[3], peach[4], peach[5]
+	end
+	local hidden = value("HIDDEN_COLLECTABLES%s*{(.-)}")
+	if hidden then
+		p.hidden = {}
+		for v in (hidden .. ","):gmatch("(.-),") do
+			table.insert(p.hidden, tobool(v:match("^%s*(.-)%s*$")))
+		end
+	end
+	p.bgx, p.bgy = value("BACKGROUND_SCROLL%s*{%s*X ([%d%.]+)%s*Y ([%d%.]+)")
+	p.fgx, p.fgy = value("FOREGROUND_SCROLL%s*{%s*X ([%d%.]+)%s*Y ([%d%.]+)")
+	return p
+end
+
+local NUMBERKEYS = {lives = true, world_count = true, courses_per_world = true, subzones_per_course = true, time_limit = true, bgx = true, bgy = true, fgx = true, fgy = true}
+
+local function mp_apply(p)
+	local keep = {prevent_delete = mp.prevent_delete, projectformat = mp.projectformat, projectsel = mp.projectsel}
+	mp = mp_defaults()
+	for key, value in pairs(keep) do
+		mp[key] = value
+	end
+	for key, value in pairs(p) do
+		if key == "icon" then
+			--handled below
+		elseif key == "hidden" then
+			for i = 1, 10 do
+				mp.hidden[i] = tobool(value[i], false)
+			end
+		elseif NUMBERKEYS[key] then
+			local n = tonumber(value)
+			if n then
+				mp[key] = numbertostring(n)
+			end
+		elseif type(mp[key]) == "string" and value ~= nil then
+			mp[key] = tostring(value):lower() --capitals don't show up right in the game's text boxes
+		elseif mp[key] ~= nil and value ~= nil then
+			mp[key] = value
+		end
+	end
+	mp_loadicondata(p.icon)
+end
+
+local function mp_loadproject(data, ext)
+	local ok, result = pcall(function()
+		if ext == "json" then
+			return mp_parsejson(data)
+		elseif ext == "cfg" then
+			return mp_parsecfg(data)
+		elseif ext == "mpckproj" then
+			return mp_parsempck(data)
+		end
+		error("this project format is not supported.", 0)
+	end)
+	if not ok then
+		notice.new(tostring(result), notice.red, 4)
+		return
+	end
+	mp_apply(result)
+	mp_build()
+	notice.new("mappack project loaded successfully!", nil, 3)
+end
+
+local function mp_saveproject()
+	local v = mp_values()
+	local ext = PROJECTFORMATS[mp.projectformat]
+	local filename = v.name:gsub('[/\\:%*%?"<>|]', "_")
+	if filename:match("^%s*$") then
+		filename = "new mappack"
+	end
+	local icon = mp_icondata()
+	local data
+	if ext == "json" then
+		data = mp_projectjson(v, icon)
+	elseif ext == "cfg" then
+		data = mp_projectcfg(v, icon)
+	else
+		data = mp_projectmpck(v, icon)
+	end
+	love.filesystem.createDirectory(PROJECTFOLDER)
+	local path = PROJECTFOLDER .. "/" .. filename .. "." .. ext
+	if love.filesystem.write(path, data) then
+		notice.new("saved project to " .. path, nil, 4)
+	else
+		notice.new("couldn't save the project", notice.red, 4)
+	end
+	mp_refreshprojects()
+	mp_build()
+end
+
+local function mp_reset()
+	mp_apply({})
+	mp_seticon(nil)
+	mp_build()
+	notice.new("everything is back to default.", nil, 3)
+end
+
+------------------------------------------------------------
+-- mappack creator: gui
+------------------------------------------------------------
+
+local function mpinput(key, x, y, w, maxlength, tab, numeric, h)
+	local el = newinput(x, y, w, mp[key], maxlength, h)
+	el.utilsnumeric = numeric
+	table.insert(mpbinds, {el = el, key = key})
+	return add("mp_" .. key, el, tab)
+end
+
+local function mpcheckbox(key, x, y, text, tab)
+	local el
+	el = guielement:new("checkbox", x, y, function(v)
+		el.var = v
+		mp[key] = v
+	end, mp[key], text)
+	return add("mp_" .. key, el, tab)
+end
+
+local function mpdropdown(key, x, y, w, options, tab, coloured)
+	local el
+	el = guielement:new("dropdown", x, y, w, function(i)
+		el.var = i
+		mp[key] = i
+	end, mp[key], unpack(lowered(options)))
+	el.coloredtext = coloured
+	return add("mp_" .. key, el, tab)
+end
+
+mp_build = function()
+	if not mp then
+		mp = mp_defaults()
+	end
+	clearelements()
+	mpbinds = {}
+	mp_refreshexisting()
+	mp_refreshprojects()
+
+	--general
+	local t = "general"
+	label(26, 37, "name:", t)
+	mpinput("name", 132, 35, 17, 64, t)
+	label(26, 51, "display name:", t)
+	mpinput("display_name", 132, 49, 17, 17, t)
+	label(26, 65, "author:", t)
+	mpinput("author", 132, 63, 13, 13, t)
+	label(26, 79, "description:", t)
+	mpinput("description", 132, 77, 17, 51, t, nil, 3)
+	label(26, 117, "lives:", t)
+	mpinput("lives", 132, 115, 5, 4, t, "int").numdrag = {0, 9999}
+	label(26, 133, "physics:", t)
+	mpdropdown("physics", 132, 131, 29, PHYSICS, t)
+	label(26, 147, "camera:", t)
+	mpdropdown("camera", 132, 145, 13, CAMERA, t)
+	label(300, 37, "icon", t)
+	add("mp_iconclear", newbutton(334, 34, "clear", function() mp_seticon(nil) end), t)
+	label(26, 172, "drop a .png onto the window to use it as", t, {150, 150, 150})
+	label(26, 182, "the icon, or a project file to load it", t, {150, 150, 150})
+
+	--worlds
+	t = "worlds"
+	mpcheckbox("drop_shadow", 26, 36, "drop shadow", t)
+	mpcheckbox("real_time", 26, 50, "real time", t)
+	mpcheckbox("continue_music", 26, 64, "continue subzone music", t)
+	mpcheckbox("no_hurry", 26, 78, "no hurry music", t)
+	mpcheckbox("no_coinlimit", 26, 92, "no coin limit", t)
+	label(26, 113, "world count:", t)
+	mpinput("world_count", 190, 111, 4, 3, t, "int").numdrag = {1, 999}
+	label(26, 127, "courses per world:", t)
+	mpinput("courses_per_world", 190, 125, 4, 2, t, "int").numdrag = {1, 99}
+	label(26, 141, "subzones per course:", t)
+	mpinput("subzones_per_course", 190, 139, 4, 2, t, "int").numdrag = {1, 13}
+	mpcheckbox("no_subzones", 26, 155, "do not create subzones", t)
+
+	--hud
+	t = "hud"
+	label(26, 37, "player name:", t)
+	mpinput("player_name", 124, 35, 12, 12, t)
+	mpcheckbox("use_character_name", 26, 51, "use character name for player name", t)
+	label(26, 67, "hud colour:", t)
+	mpdropdown("hud_colour", 124, 65, 6, COLOURS, t, true)
+	mpcheckbox("letters_world", 26, 81, "use letters for worlds above 9", t)
+	mpcheckbox("visible_hud", 26, 95, "visible hud", t)
+	mpcheckbox("outlined_hud", 26, 109, "outlined hud", t)
+	mpcheckbox("simple_hud", 26, 123, "simple hud", t)
+	mpcheckbox("allow_cheats", 26, 137, "allow cheats", t)
+	label(26, 157, "hide hud collectables:", t)
+	for i = 1, 10 do
+		local el
+		el = guielement:new("checkbox", 26 + (i-1)*34, 169, function(v)
+			el.var = v
+			mp.hidden[i] = v
+		end, mp.hidden[i], tostring(i))
+		add("mp_hidden" .. i, el, t)
+	end
+
+	--text
+	t = "text"
+	label(26, 36, "ending 1:", t)
+	mpinput("ending1", 98, 34, 32, 32, t)
+	label(26, 49, "ending 2:", t)
+	mpinput("ending2", 98, 47, 32, 32, t)
+	label(26, 63, "colour:", t)
+	mpdropdown("ending_colour", 98, 61, 6, COLOURS, t, true)
+	for i = 1, 3 do
+		label(26, 80 + (i-1)*13, "toad " .. i .. ":", t)
+		mpinput("toad" .. i, 98, 78 + (i-1)*13, 32, 32, t)
+	end
+	for i = 1, 5 do
+		label(26, 122 + (i-1)*13, "peach " .. i .. ":", t)
+		mpinput("peach" .. i, 98, 120 + (i-1)*13, 32, 32, t)
+	end
+
+	--course
+	t = "course"
+	label(26, 37, "time limit:", t)
+	mpinput("time_limit", 190, 35, 5, 4, t, "int").numdrag = {0, 9999}
+	label(26, 53, "portal gun:", t)
+	mpdropdown("portalgun", 190, 51, 6, PORTALGUN, t)
+	label(26, 69, "background scroll x:", t)
+	mpinput("bgx", 190, 67, 4, 4, t, "float")
+	label(26, 83, "background scroll y:", t)
+	mpinput("bgy", 190, 81, 4, 4, t, "float")
+	label(26, 97, "foreground scroll x:", t)
+	mpinput("fgx", 190, 95, 4, 4, t, "float")
+	label(26, 111, "foreground scroll y:", t)
+	mpinput("fgy", 190, 109, 4, 4, t, "float")
+	label(26, 131, "scroll factors go from 0 to 9.", t, {150, 150, 150})
+	label(26, 141, "these are used by every new course.", t, {150, 150, 150})
+
+	--create
+	t = "create"
+	mpcheckbox("prevent_delete", 26, 35, "prevent deletion from the mappack creator", t)
+	add("mp_create", newbutton(26, 128, "create mappack", mp_create, 14*8), t)
+	local delete = confirmbutton("mp_delete", 160, 128, "delete mappack", mp_delete, 17*8)
+	elements[#elements].tab = t
+	delete.textcolor = {255, 80, 80}
+
+	add("mp_save", newbutton(26, 145, "save project", mp_saveproject, 12*8), t)
+	local format
+	format = add("mp_format", guielement:new("dropdown", 130, 145, 9, function(i)
+		format.var = i
+		mp.projectformat = i
+	end, mp.projectformat, unpack(PROJECTFORMATS)), t)
+	format.displayentries = {".mpckproj", ".json", ".cfg"}
+
+	add("mp_load", newbutton(26, 162, "load project", function()
+		local file = mpprojects[mp.projectsel]
+		if not file then
+			return
+		end
+		local data = love.filesystem.read(PROJECTFOLDER .. "/" .. file)
+		if data then
+			mp_loadproject(data, (file:match("%.([^%.]+)$") or ""):lower())
+		end
+	end, 12*8), t)
+	if #mpprojects > 0 then
+		mp.projectsel = clamp(mp.projectsel, 1, #mpprojects)
+		local projects
+		projects = add("mp_projects", guielement:new("dropdown", 130, 162, 22, function(i)
+			projects.var = i
+			mp.projectsel = i
+		end, mp.projectsel, unpack(mpprojects)), t)
+		projects.displayentries = lowered(mpprojects)
+	end
+
+	confirmbutton("mp_reset", 26, 179, "reset properties", mp_reset, 17*8)
+	elements[#elements].tab = t
+
+	add("back", newbutton(panelright()-40, 199, "back", function() utils_back() end))
+end
+
+local function mp_update()
+	--text fields -> values
+	for _, bind in ipairs(mpbinds) do
+		mp[bind.key] = tostring(bind.el.value)
+	end
+
+	--simple hud always uses the character's name
+	local usename = named["mp_use_character_name"]
+	if mp.simple_hud then
+		mp.use_character_name = true
+		usename.var = true
+	end
+	usename.utilsdisabled = mp.simple_hud
+	named["mp_player_name"].utilshidden = mp.use_character_name
+	named["mp_subzones_per_course"].utilshidden = mp.no_subzones
+	named["mp_iconclear"].utilsdisabled = (mpicon == nil)
+
+	if love.timer.getTime() - mpexistingtime > 2 then
+		mp_refreshexisting()
+	end
+	mp_validate()
+
+	named["mp_create"].utilsdisabled = (job ~= nil) or not mpcheck.valid
+	local state = mp_deletestate(tostring(mp.name))
+	named["mp_delete"].utilsdisabled = (job ~= nil) or mpcreating or not (state == "session" or state == "marker")
+	named["mp_save"].utilsdisabled = (job ~= nil)
+	named["mp_load"].utilsdisabled = (job ~= nil) or #mpprojects == 0
+	named["mp_reset"].utilsdisabled = (job ~= nil)
+end
+
+local function mp_tabrects()
+	local rects = {}
+	local x = 26
+	for i, name in ipairs(MPTABS) do
+		rects[i] = {x = x, w = utf8.len(name)*8}
+		x = x + utf8.len(name)*8 + 6
+	end
+	return rects
+end
+
+local function mp_draw()
+	drawpanel()
+
+	--tab heads, like the options menu
+	local rects = mp_tabrects()
+	for i, name in ipairs(MPTABS) do
+		local r = rects[i]
+		if mptab == name then
+			love.graphics.setColor(100, 100, 100, 100)
+			love.graphics.rectangle("fill", (r.x-1)*scale, 20*scale, (r.w+3)*scale, 11*scale)
+			love.graphics.setColor(255, 255, 255)
+		else
+			love.graphics.setColor(100, 100, 100)
+		end
+		if name == "create" and not mpcheck.valid and mptab ~= name then
+			love.graphics.setColor(170, 60, 60)
+		end
+		properprint(name, r.x*scale, 22*scale)
+	end
+	love.graphics.setColor(60, 60, 60)
+	love.graphics.rectangle("fill", (PX+5)*scale, 32*scale, (panelwidth()-10)*scale, scale)
+
+	local v = mpcheck.values or mp_values()
+
+	if mptab == "general" then
+		--icon preview
+		drawswatch(300, 47, 66, 66, {0, 0, 0})
+		if mpiconimage then
+			local iw, ih = mpiconimage:getDimensions()
+			local s = math.min(62/iw, 62/ih)
+			love.graphics.setColor(255, 255, 255)
+			love.graphics.draw(mpiconimage, (333 - iw*s/2)*scale, (80 - ih*s/2)*scale, 0, s*scale, s*scale)
+		else
+			love.graphics.setColor(110, 110, 110)
+			centredprint("blank", 333, 76)
+		end
+		if v.lives == 0 then
+			love.graphics.setColor(100, 255, 100)
+			properprintF("infinite lives!", 180*scale, 117*scale)
+		end
+	elseif mptab == "worlds" then
+		if mp.drop_shadow then
+			love.graphics.setColor(255, 80, 80)
+			properprintF("will reduce performance!", 150*scale, 37*scale)
+		end
+		if mp.no_subzones then
+			love.graphics.setColor(150, 150, 150)
+			properprintF("none", 192*scale, 141*scale)
+		end
+		love.graphics.setColor(150, 150, 150)
+		properprintF("files to create: " .. mpcheck.filecount, 26*scale, 175*scale)
+	elseif mptab == "hud" then
+		if mp.use_character_name then
+			love.graphics.setColor(150, 150, 150)
+			properprintF("the character's name", 124*scale, 37*scale)
+		end
+	elseif mptab == "course" then
+		if v.time_limit == 0 then
+			love.graphics.setColor(100, 255, 100)
+			properprintF("infinite time!", 240*scale, 37*scale)
+		end
+	elseif mptab == "create" then
+		local y = 50
+		local maxlines = 7
+		for _, message in ipairs(mpcheck.requirements) do
+			for _, line in ipairs(wraptext(message, 43)) do
+				if maxlines > 0 then
+					love.graphics.setColor(255, 80, 80)
+					properprintF(line, 26*scale, y*scale)
+					y = y + 10
+					maxlines = maxlines - 1
+				end
+			end
+		end
+		for _, message in ipairs(mpcheck.notices) do
+			for _, line in ipairs(wraptext(message, 43)) do
+				if maxlines > 0 then
+					love.graphics.setColor(100, 255, 100)
+					properprintF(line, 26*scale, y*scale)
+					y = y + 10
+					maxlines = maxlines - 1
+				end
+			end
+		end
+		if #mpcheck.requirements == 0 and #mpcheck.notices == 0 then
+			love.graphics.setColor(150, 150, 150)
+			properprintF("ready to create '" .. v.name .. "'", 26*scale, 50*scale)
+			properprintF("in " .. mappackfolder, 26*scale, 60*scale)
+		end
+
+		if #mpprojects == 0 then
+			love.graphics.setColor(150, 150, 150)
+			properprintF("no projects saved yet", 130*scale, 164*scale)
+		end
+
+		if mpprogress then
+			local p = 0
+			if mpprogress.total > 0 then
+				p = mpprogress.done/mpprogress.total
+			end
+			local color = {60, 100, 255}
+			if not mpcreating then
+				color = {60, 200, 60}
+			end
+			if mpstatuscolor[1] == 255 and mpstatuscolor[2] == 80 then
+				color = {255, 60, 60}
+			end
+			drawprogress(26, 201, 200, p, color)
+			love.graphics.setColor(150, 150, 150)
+			local count = mpprogress.done .. "/" .. mpprogress.total
+			properprintF(count, 232*scale, 201*scale)
+		end
+		love.graphics.setColor(mpstatuscolor)
+		properprintF(mpstatus:sub(1, 26), 168*scale, 181*scale)
+	end
+
+	drawlabels()
+	drawelements()
+end
+
+local function mp_filedropped(file)
+	local filename = file:getFilename()
+	local ext = (filename:match("%.([^%.\\/]+)$") or ""):lower()
+	if ext == "png" or ext == "jpg" or ext == "jpeg" or ext == "bmp" or ext == "tga" then
+		local ok, imagedata = pcall(function()
+			return love.image.newImageData(love.filesystem.newFileData(file))
+		end)
+		if ok then
+			mp_seticon(imagedata)
+			notice.new("icon set!", nil, 2)
+		else
+			notice.new("couldn't read that image", notice.red, 3)
+		end
+	elseif ext == "mpckproj" or ext == "json" or ext == "cfg" then
+		local ok, data = pcall(function()
+			return love.filesystem.newFileData(file):getString()
+		end)
+		if ok then
+			mp_loadproject(data, ext)
+		else
+			notice.new("couldn't read that file", notice.red, 3)
+		end
+	end
+end
+
+local function mp_switchtab(delta)
+	for i, name in ipairs(MPTABS) do
+		if name == mptab then
+			mptab = MPTABS[(i - 1 + delta) % #MPTABS + 1]
+			return
+		end
+	end
+end
+
+------------------------------------------------------------
+-- public functions (called from menu.lua)
+------------------------------------------------------------
+
+function utilsmenu_open()
+	gamestate = "utils"
+	page = "hub"
+	clearelements()
+end
+
+function utilsmenu_close()
+	clearelements()
+	page = "hub"
+	gamestate = "menu"
+	selection = 5
+end
+
+function utilsmenu_openpage(name)
+	page = name
+	if name == "charformat" then
+		cf_build()
+	elseif name == "fontrender" then
+		fr_build()
+	elseif name == "mappack" then
+		mp_build()
+	end
+end
+
+utils_back = function()
+	if job then
+		notice.new("wait until it's finished!", notice.red, 2)
+		return
+	end
+	if page == "fontrender" then
+		fr_gettext() --keep the text for next time
+	end
+	clearelements()
+	page = "hub"
+end
+
+function utilsmenu_update(dt)
+	runjob()
+
+	local result = love.thread.getChannel(CLIPBOARD_CHANNEL):pop()
+	if result == true then
+		notice.new("copied the image to the clipboard!", nil, 3)
+	elseif result == false then
+		notice.new("couldn't copy the image,\nit's saved in " .. RENDERFOLDER .. " instead", notice.red, 4)
+	end
+
+	if page == "charformat" then
+		cf_update()
+	elseif page == "fontrender" then
+		fr_update()
+	elseif page == "mappack" then
+		mp_update()
+	end
+	updateelements(dt)
+end
+
+function utilsmenu_draw()
+	if page == "hub" then
+		hub_draw()
+	elseif page == "charformat" then
+		cf_draw()
+	elseif page == "fontrender" then
+		fr_draw()
+	elseif page == "mappack" then
+		mp_draw()
+	end
+	love.graphics.setColor(255, 255, 255)
+end
+
+function utilsmenu_keypressed(key)
+	if page == "hub" then
+		if key == "up" or key == "w" then
+			hubselection = math.max(1, hubselection - 1)
+		elseif key == "down" or key == "s" then
+			hubselection = math.min(#HUBITEMS, hubselection + 1)
+		elseif key == "return" or key == "enter" or key == "kpenter" or key == " " then
+			hub_activate()
+		elseif key == "escape" then
+			utilsmenu_close()
+		end
+		return
+	end
+
+	if keyelements(key) then
+		return
+	end
+
+	local dropdown = opendropdown()
+	if dropdown then
+		if key == "escape" then
+			dropdown:close()
+		end
+		return
+	end
+
+	if key == "escape" then
+		utils_back()
+	elseif page == "mappack" and not anyinputting() then
+		if key == "left" or key == "a" then
+			mp_switchtab(-1)
+		elseif key == "right" or key == "d" then
+			mp_switchtab(1)
+		end
+	end
+end
+
+function utilsmenu_mousepressed(x, y, button)
+	if page == "hub" then
+		if button == "l" then
+			local i = hub_mouseitem(x, y)
+			if i then
+				hubselection = i
+				hub_activate()
+			end
+		end
+		return
+	end
+
+	if clickelements(x, y, button) then
+		return
+	end
+
+	if page == "mappack" and button == "l" then
+		local gx, gy = x/scale, y/scale
+		if gy >= 20 and gy < 31 then
+			for i, r in ipairs(mp_tabrects()) do
+				if gx >= r.x - 1 and gx < r.x + r.w + 2 then
+					mptab = MPTABS[i]
+				end
+			end
+		end
+	end
+end
+
+function utilsmenu_mousereleased(x, y, button)
+	for _, v in ipairs(elements) do
+		v.el:unclick(x, y, button)
+	end
+end
+
+function utilsmenu_mousemoved(x, y)
+	if page == "hub" then
+		local i = hub_mouseitem(x, y)
+		if i then
+			hubselection = i
+		end
+	end
+end
+
+function utilsmenu_filedropped(file)
+	if page == "mappack" then
+		mp_filedropped(file)
+	end
+end

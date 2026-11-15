@@ -447,7 +447,7 @@ function love.load()
 	require "notice"
 	require "languages"
 	
-	local luas = {"intro", "menu", "levelscreen", "game", "splitscreen", "editor", "physics", "online", "quad", "animatedquad", "entity", "dailychallenge", "portalwall", "tile", "mario", "mushroom", "hatconfigs", "flower", "star", "coinblockanimation", "scrollingscore", "platform", "platformspawner", "portalparticle", "portalprojectile", "box", "emancipationgrill", "door", "button", "groundlight", "wallindicator", "walltimer", "lightbridge", "faithplate", "laser", "laserdetector", "gel", "geldispenser", "cubedispenser", "pushbutton", "screenboundary", "fireball", "gui", "blockdebris", "firework", "vine", "spring", "seesaw", "seesawplatform", "bubble", "rainboom", "miniblock", "notgate", "musicloader", "smbsitem", "donut", "levelball", "leaf", "mariotail", "windleaf", "energylauncher", "energycatcher", "blocktogglebutton", "squarewave", "delayer", "coin", "funnel", "longfire", "pedestal", "portalent", "text", "regiontrigger", "tiletool",   "enemytool", "randomizer", "yoshi", "musicchanger", "mariohammer", "regiondrag", "flipblock", "characters", "checkpoint", "onlinemenu", "lobby", "magic", "doorsprite", "enemies", "enemy", "itemanimation", "cappy", "emancipationfizzle", "emancipateanimation", "ceilblocker", "belt", "hatloader", "poof", "animationguiline", "animation", "animationsystem", "animationtrigger", "dialogbox", "portal", "orgate", "andgate", "animatedtiletrigger", "rsflipflop", "animatedtimer", "collectable", "powblock", "smallspring", "risingwater", "redseesaw", "snakeblock", "frozencoin", "entitytooltip", "spawnanimation", "camerastop", "clearpipe", "track", "tilemoving", "laserfield", "checkpointflag", "ice", "pipe", "errorwindow", "filebrowser", "minigames"}
+	local luas = {"intro", "menu", "levelscreen", "game", "splitscreen", "editor", "physics", "online", "quad", "animatedquad", "entity", "dailychallenge", "portalwall", "tile", "mario", "mushroom", "hatconfigs", "flower", "star", "coinblockanimation", "scrollingscore", "platform", "platformspawner", "portalparticle", "portalprojectile", "box", "emancipationgrill", "door", "button", "groundlight", "wallindicator", "walltimer", "lightbridge", "faithplate", "laser", "laserdetector", "gel", "geldispenser", "cubedispenser", "pushbutton", "screenboundary", "fireball", "gui", "blockdebris", "firework", "vine", "spring", "seesaw", "seesawplatform", "bubble", "rainboom", "miniblock", "notgate", "musicloader", "smbsitem", "donut", "levelball", "leaf", "mariotail", "windleaf", "energylauncher", "energycatcher", "blocktogglebutton", "squarewave", "delayer", "coin", "funnel", "longfire", "pedestal", "portalent", "text", "regiontrigger", "tiletool",   "enemytool", "randomizer", "yoshi", "musicchanger", "mariohammer", "regiondrag", "flipblock", "characters", "checkpoint", "onlinemenu", "lobby", "magic", "doorsprite", "enemies", "enemy", "itemanimation", "cappy", "emancipationfizzle", "emancipateanimation", "ceilblocker", "belt", "hatloader", "poof", "animationguiline", "animation", "animationsystem", "animationtrigger", "dialogbox", "portal", "orgate", "andgate", "animatedtiletrigger", "rsflipflop", "animatedtimer", "collectable", "powblock", "smallspring", "risingwater", "redseesaw", "snakeblock", "frozencoin", "entitytooltip", "spawnanimation", "camerastop", "clearpipe", "track", "tilemoving", "laserfield", "checkpointflag", "ice", "pipe", "errorwindow", "filebrowser", "minigames", "utilsmenu"}
 	for i = 1, #luas do
 		require(luas[i])
 	end
@@ -1247,7 +1247,7 @@ function love.update(dt)
 	end
 	keyprompt_update()
 	
-	if gamestate == "menu" or gamestate == "mappackmenu" or gamestate == "onlinemenu" or gamestate == "lobby" or gamestate == "options" then
+	if gamestate == "menu" or gamestate == "mappackmenu" or gamestate == "onlinemenu" or gamestate == "lobby" or gamestate == "options" or gamestate == "utils" then
 		menu_update(dt)
 	elseif gamestate == "levelscreen" or gamestate == "gameover" or gamestate == "sublevelscreen" or gamestate == "mappackfinished" or gamestate == "dclevelscreen" or gamestate == "minigamelevelscreen" then
 		levelscreen_update(dt)
@@ -2499,7 +2499,7 @@ function love.mousereleased(x, y, button, istouch)
 		return
 	end
 
-	if gamestate == "menu" or gamestate == "options" or gamestate == "mappackmenu" then
+	if gamestate == "menu" or gamestate == "options" or gamestate == "mappackmenu" or gamestate == "utils" then
 		menu_mousereleased(x, y, button)
 	elseif gamestate == "game" then
 		game_mousereleased(x, y, button)
@@ -2565,7 +2565,7 @@ function love.wheelmoved(x, y)
 end
 
 function love.filedropped(file)
-	if gamestate == "menu" or gamestate == "mappackmenu" then
+	if gamestate == "menu" or gamestate == "mappackmenu" or gamestate == "utils" then
 		menu_filedropped(file)
 	elseif gamestate == "game" and editormode then
 		editor_filedropped(file)

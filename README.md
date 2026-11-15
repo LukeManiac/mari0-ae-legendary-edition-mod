@@ -417,6 +417,7 @@ A four-player battle minigame inspired by the battle mode of Super Mario 4 Jugad
 
 * When a ? block is ready, a roulette of its items is drawn on the block, changing every 0.2 seconds. It's drawn behind everything else.
 * When a block is on cooldown, it shows the seconds left. It can still be bumped, but nothing comes out.
+* When the cooldown ends, the roulette starts over from the block's first item, on the block's own clock, so blocks that become ready at different times don't cycle in step. With `removecooldowns`, it starts over straight after every hit.
 * **Spawn blocks:** One sits 3 tiles above each spawn. 10-second cooldown. Fire Flower, Hammer Suit or Boomerang Flower.
 * **? blocks:** 15-second cooldown. Super Leaf, Tanooki Suit or Superball Flower.
 * **Rare block:** 30-second cooldown. Blue Shell, Super Star or Cape Feather.
@@ -434,7 +435,7 @@ A four-player battle minigame inspired by the battle mode of Super Mario 4 Jugad
 
 **Lives, knockouts and winning**
 
-* A player who loses their last life is out. Once their death animation is over, their viewport is removed, and the other viewports slide and resize into the new layout with the same random motion curves as the pause menu. The last viewport is never removed: if its player is out, it follows someone who's still in the battle and shows "watching pN".
+* A player who loses their last life is out. Once their death animation is over, their viewport is removed, and the other viewports slide and resize into the new layout with the same random motion curves as the pause menu. The last viewport is never removed: if its player is out, it stays on that player and fades out, without switching to spectate anyone else.
 * A knockout counts for the player who hit you, if you die within 4 seconds of their hit (falling into a pit, for example). The HUD shows every player's lives and knockouts, and marks the bots with "CPU".
 * A human player who is out can type the Konami code with their own controls to come back with 3 lives (1 in sudden death), once per battle: **Up, Up, Down, Down, Left, Right, Left, Right, Run, Jump**. Their viewport comes back with them.
 * When only one player is left, everything freezes for 3 seconds, except the players who are still dying. Sounds that are already playing carry on, but nothing new plays and nothing is stopped. Then the game fades to the results screen, which says "pN wins!" and plays the battle clear theme: `bowserend.ogg`, or the music pack's own one (see **Custom Music** below), with its `-intro` first if it has one. The results screen stays up until the theme ends, and for at least 4 seconds. A battle clear theme longer than 15 seconds gets cut off.
