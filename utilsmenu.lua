@@ -716,12 +716,8 @@ end
 -- font renderer
 ------------------------------------------------------------
 
-local FR_LINES = 4
 local FR_ALIGN = {"left", "center", "right"}
-local fr = {lines = {}, caps = true, outline = false, align = 2, color = {255, 255, 255}}
-for i = 1, FR_LINES do
-	fr.lines[i] = ""
-end
+local fr = {caps = true, outline = false, align = 2, color = {255, 255, 255}}
 local CLIPBOARD_CHANNEL = "utilsmenu_clipboard"
 
 --the glyph the game would draw for a character (all caps uses the same table as properprintF)
@@ -735,14 +731,232 @@ local function fr_glyph(c)
 	return nil
 end
 
+------------------------------------------------------------
+-- font renderer: multi-line text area (typing comes from love.textinput, so capitals and symbols just work)
+------------------------------------------------------------
+
+local TA_X, TA_Y, TA_ROWS = 26, 33, 6
+local TA_MAXCHARS = 2000
+local ta = {chars = {}, cursor = 0, focus = false, scroll = 0, hscroll = 0, blinkstart = 0}
+
+local function ta_width()
+	return panelwidth() - 10
+end
+
+local function ta_height()
+	return TA_ROWS*10 + 4
+end
+
+local function ta_visiblecolumns()
+	return math.floor((ta_width() - 6)/8)
+end
+
+local function ta_text()
+	return table.concat(ta.chars)
+end
+
+--every line as {start = index of its first character, len = characters in it}
+local function ta_lines()
+	local lines = {{start = 1, len = 0}}
+	for i, c in ipairs(ta.chars) do
+		if c == "\n" then
+			lines[#lines+1] = {start = i + 1, len = 0}
+		else
+			lines[#lines].len = lines[#lines].len + 1
+		end
+	end
+	return lines
+end
+
+--line number and column (0 = before the first character) of the cursor
+local function ta_cursorpos()
+	local lines = ta_lines()
+	for li, line in ipairs(lines) do
+		if ta.cursor >= line.start - 1 and ta.cursor <= line.start - 1 + line.len then
+			return li, ta.cursor - (line.start - 1), lines
+		end
+	end
+	return #lines, lines[#lines].len, lines
+end
+
+--scroll so the cursor can be seen
+local function ta_follow()
+	local li, col = ta_cursorpos()
+	if li - 1 < ta.scroll then
+		ta.scroll = li - 1
+	elseif li > ta.scroll + TA_ROWS then
+		ta.scroll = li - TA_ROWS
+	end
+	local columns = ta_visiblecolumns()
+	if col < ta.hscroll then
+		ta.hscroll = col
+	elseif col > ta.hscroll + columns - 1 then
+		ta.hscroll = col - columns + 1
+	end
+	ta.blinkstart = love.timer.getTime()
+end
+
+local function ta_insert(s)
+	for _, c in utf8.chars(s) do
+		if c == "\t" then
+			c = " "
+		end
+		if c ~= "\r" and #ta.chars < TA_MAXCHARS then
+			table.insert(ta.chars, ta.cursor + 1, c)
+			ta.cursor = ta.cursor + 1
+		end
+	end
+	ta_follow()
+end
+
+local function ta_setfocus(focus)
+	ta.focus = focus
+	love.keyboard.setKeyRepeat(focus)
+	typingintextinput = focus
+	if focus then
+		ta.blinkstart = love.timer.getTime()
+	end
+end
+
+local function ta_keypressed(key)
+	local ctrl = love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl") or love.keyboard.isDown("lgui") or love.keyboard.isDown("rgui")
+	local li, col, lines = ta_cursorpos()
+	if key == "escape" then
+		ta_setfocus(false)
+	elseif key == "backspace" then
+		if ta.cursor > 0 then
+			table.remove(ta.chars, ta.cursor)
+			ta.cursor = ta.cursor - 1
+		end
+	elseif key == "delete" then
+		if ta.cursor < #ta.chars then
+			table.remove(ta.chars, ta.cursor + 1)
+		end
+	elseif key == "left" then
+		ta.cursor = math.max(0, ta.cursor - 1)
+	elseif key == "right" then
+		ta.cursor = math.min(#ta.chars, ta.cursor + 1)
+	elseif key == "up" or key == "down" then
+		local target = li - 1
+		if key == "down" then
+			target = li + 1
+		end
+		if lines[target] then
+			ta.cursor = lines[target].start - 1 + math.min(col, lines[target].len)
+		end
+	elseif key == "home" then
+		ta.cursor = lines[li].start - 1
+	elseif key == "end" then
+		ta.cursor = lines[li].start - 1 + lines[li].len
+	elseif key == "return" or key == "enter" or key == "kpenter" then
+		ta_insert("\n")
+	elseif key == "v" and ctrl then
+		local paste = love.system.getClipboardText()
+		if paste then
+			ta_insert(paste)
+		end
+	elseif key == "c" and ctrl then
+		love.system.setClipboardText(ta_text())
+		notice.new("copied the text", nil, 2)
+	elseif key == "x" and ctrl then
+		love.system.setClipboardText(ta_text())
+		ta.chars, ta.cursor = {}, 0
+	end
+	ta_follow()
+end
+
+local function ta_inside(x, y)
+	x, y = x/scale, y/scale
+	return x >= TA_X and x < TA_X + ta_width() and y >= TA_Y and y < TA_Y + ta_height()
+end
+
+--returns true when the click belonged to the text area
+local function ta_mousepressed(x, y, button)
+	if not ta_inside(x, y) then
+		if button == "l" and ta.focus then
+			ta_setfocus(false)
+		end
+		return false
+	end
+	local lines = ta_lines()
+	if button == "wu" then
+		ta.scroll = math.max(0, ta.scroll - 1)
+	elseif button == "wd" then
+		ta.scroll = math.max(0, math.min(#lines - TA_ROWS, ta.scroll + 1))
+	elseif button == "l" then
+		ta_setfocus(true)
+		local gx, gy = x/scale, y/scale
+		local li = clamp(ta.scroll + math.floor((gy - TA_Y - 2)/10) + 1, 1, #lines)
+		local col = clamp(ta.hscroll + math.floor((gx - TA_X - 3)/8 + 0.5), 0, lines[li].len)
+		ta.cursor = lines[li].start - 1 + col
+		ta_follow()
+	end
+	return true
+end
+
+local function ta_draw()
+	local x, y, w, h = TA_X, TA_Y, ta_width(), ta_height()
+	local hover = ta_inside(love.mouse.getPosition())
+	local border = 127
+	if ta.focus or hover then
+		border = 255
+	end
+	local r = math.min(w, h)*scale*0.08
+	love.graphics.setColor(border, border, border)
+	love.graphics.rectangle("fill", x*scale, y*scale, w*scale, h*scale, r)
+	love.graphics.setColor(0, 0, 0)
+	love.graphics.rectangle("fill", (x+1)*scale, (y+1)*scale, (w-2)*scale, (h-2)*scale, r*0.7)
+
+	if #ta.chars == 0 and not ta.focus then
+		love.graphics.setColor(110, 110, 110)
+		properprintF("click here and type. enter makes a new line.", (x+3)*scale, (y+3)*scale)
+		return
+	end
+
+	love.graphics.setScissor((x+1)*scale, (y+1)*scale, (w-2)*scale, (h-2)*scale)
+	local lines = ta_lines()
+	local columns = ta_visiblecolumns()
+	for row = 1, TA_ROWS do
+		local line = lines[ta.scroll + row]
+		if line then
+			for k = 1, math.min(columns + 1, line.len - ta.hscroll) do
+				local c = ta.chars[line.start - 1 + ta.hscroll + k]
+				local cx, cy = (x + 3 + (k-1)*8)*scale, (y + 3 + (row-1)*10)*scale
+				if fontquads[c] then
+					love.graphics.setColor(255, 255, 255)
+					love.graphics.draw(fontimage, fontquads[c], cx, cy, 0, scale, scale)
+				elseif c ~= " " then
+					--the font has no glyph for this, so it won't show up in the render either
+					love.graphics.setColor(255, 80, 80)
+					love.graphics.draw(fontimage, fontquads["?"], cx, cy, 0, scale, scale)
+				end
+			end
+		end
+	end
+
+	if ta.focus and (love.timer.getTime() - ta.blinkstart) % 1 < 0.5 then
+		local li, col = ta_cursorpos()
+		local row = li - ta.scroll
+		if row >= 1 and row <= TA_ROWS then
+			love.graphics.setColor(255, 255, 255)
+			love.graphics.rectangle("fill", (x + 2 + (col - ta.hscroll)*8)*scale, (y + 2 + (row-1)*10)*scale, scale, 9*scale)
+		end
+	end
+	love.graphics.setScissor()
+
+	--line count, so you know there's more when it's scrolled
+	if #lines > TA_ROWS then
+		love.graphics.setColor(110, 110, 110)
+		local s = (ta.scroll + 1) .. "-" .. math.min(#lines, ta.scroll + TA_ROWS) .. "/" .. #lines
+		properprintF(s, (x + w - 3 - utf8.len(s)*8)*scale, (y + h - 10)*scale)
+	end
+end
+
+--the lines that get rendered (empty lines at the end are dropped)
 local function fr_gettext()
 	local lines = {}
-	for i = 1, FR_LINES do
-		local el = named["fr_line" .. i]
-		if el then
-			fr.lines[i] = tostring(el.value)
-		end
-		lines[i] = fr.lines[i]
+	for line in (ta_text() .. "\n"):gmatch("(.-)\n") do
+		table.insert(lines, line)
 	end
 	while #lines > 0 and lines[#lines] == "" do
 		table.remove(lines)
@@ -920,30 +1134,23 @@ local function fr_build()
 		fr.colorfrommappack = mappack
 	end
 
-	for i = 1, FR_LINES do
-		local el = newinput(26, 33 + (i-1)*13, 42, fr.lines[i], 64)
-		el.allowanycharacters = true --show capitals as capitals while typing
-		el.utilscaps = true --shift + letter types a capital
-		add("fr_line" .. i, el)
-	end
-
 	local caps, outline, align
-	caps = add("fr_caps", guielement:new("checkbox", 26, 89, function(v)
+	caps = add("fr_caps", guielement:new("checkbox", 26, 101, function(v)
 		caps.var = v
 		fr.caps = v
 	end, fr.caps, "all caps"))
-	outline = add("fr_outline", guielement:new("checkbox", 110, 89, function(v)
+	outline = add("fr_outline", guielement:new("checkbox", 110, 101, function(v)
 		outline.var = v
 		fr.outline = v
 	end, fr.outline, "outline"))
-	label(202, 90, "align:")
-	align = add("fr_align", guielement:new("dropdown", 252, 88, 6, function(i)
+	label(202, 102, "align:")
+	align = add("fr_align", guielement:new("dropdown", 252, 100, 6, function(i)
 		align.var = i
 		fr.align = i
 	end, fr.align, unpack(FR_ALIGN)))
 
 	for c = 1, 3 do
-		add("fr_slider" .. c, fr_slider(c, 104 + (c-1)*12))
+		add("fr_slider" .. c, fr_slider(c, 115 + (c-1)*12))
 	end
 
 	add("fr_save", newbutton(26, 199, "save png", function()
@@ -993,7 +1200,7 @@ local function fr_draw()
 	local dark = {{100, 0, 0}, {0, 100, 0}, {0, 0, 100}}
 	local bright = {{255, 0, 0}, {0, 255, 0}, {0, 0, 255}}
 	for c = 1, 3 do
-		local y = 105 + (c-1)*12
+		local y = 116 + (c-1)*12
 		love.graphics.setColor(dark[c])
 		properprint(letters[c], 27*scale, (y+1)*scale)
 		love.graphics.setColor(bright[c])
@@ -1001,10 +1208,10 @@ local function fr_draw()
 	end
 
 	--colour preview, right of the sliders
-	drawswatch(324, 103, 34, 34, fr.color)
+	drawswatch(324, 114, 34, 34, fr.color)
 
 	--rendered preview, on the game's sky so the black outline shows up
-	local bx, by, bw, bh = 26, 146, panelwidth()-10, 48
+	local bx, by, bw, bh = 26, 152, panelwidth()-10, 43
 	love.graphics.setColor(127, 127, 127)
 	love.graphics.rectangle("fill", bx*scale, by*scale, bw*scale, bh*scale)
 	love.graphics.setColor(92, 148, 252)
@@ -1026,9 +1233,10 @@ local function fr_draw()
 		properprintF(size, (bx + bw - 3 - utf8.len(size)*8)*scale, (by + bh - 10)*scale)
 	else
 		love.graphics.setColor(40, 70, 140)
-		centredprint("type some text above", bx + bw/2, by + bh/2 - 4)
+		centredprint("the render shows up here", bx + bw/2, by + bh/2 - 4)
 	end
 
+	ta_draw()
 	drawlabels()
 	drawelements()
 end
@@ -2283,7 +2491,7 @@ utils_back = function()
 		return
 	end
 	if page == "fontrender" then
-		fr_gettext() --keep the text for next time
+		ta_setfocus(false)
 	end
 	clearelements()
 	page = "hub"
@@ -2336,6 +2544,11 @@ local function inner_utilsmenu_keypressed(key)
 		return
 	end
 
+	if page == "fontrender" and ta.focus then
+		ta_keypressed(key)
+		return
+	end
+
 	if keyelements(key) then
 		return
 	end
@@ -2371,6 +2584,10 @@ local function inner_utilsmenu_mousepressed(x, y, button)
 		return
 	end
 
+	if page == "fontrender" and not opendropdown() and ta_mousepressed(x, y, button) then
+		return
+	end
+
 	if clickelements(x, y, button) then
 		return
 	end
@@ -2399,6 +2616,12 @@ local function inner_utilsmenu_mousemoved(x, y)
 		if i then
 			hubselection = i
 		end
+	end
+end
+
+local function inner_utilsmenu_textinput(text)
+	if page == "fontrender" and ta.focus then
+		ta_insert(text)
 	end
 end
 
@@ -2461,6 +2684,7 @@ utilsmenu_mousepressed = guarded(inner_utilsmenu_mousepressed)
 utilsmenu_mousereleased = guarded(inner_utilsmenu_mousereleased)
 utilsmenu_mousemoved = guarded(inner_utilsmenu_mousemoved)
 utilsmenu_filedropped = guarded(inner_utilsmenu_filedropped)
+utilsmenu_textinput = guarded(inner_utilsmenu_textinput)
 
 local guardedkeypressed = guarded(inner_utilsmenu_keypressed)
 function utilsmenu_keypressed(key)
@@ -2485,5 +2709,84 @@ function utilsmenu_draw()
 	if not ok then
 		reporterror(err)
 		drawerror()
+	end
+end
+
+------------------------------------------------------------
+-- input: while the utils menu is open it takes love's input callbacks first,
+-- so nothing else in the game can swallow the clicks and keys meant for it
+------------------------------------------------------------
+
+if not utilsmenu_hooked then
+	utilsmenu_hooked = true
+
+	local oldmousepressed = love.mousepressed
+	love.mousepressed = function(x, y, button, ...)
+		if utilsmenuopen and not android then
+			local mx, my = love.mouse.getPosition()
+			utilsmenu_mousepressed(mx, my, nummousebutton(button))
+			return
+		end
+		return oldmousepressed(x, y, button, ...)
+	end
+
+	local oldmousereleased = love.mousereleased
+	love.mousereleased = function(x, y, button, ...)
+		if utilsmenuopen and not android then
+			local mx, my = love.mouse.getPosition()
+			utilsmenu_mousereleased(mx, my, nummousebutton(button))
+			return
+		end
+		return oldmousereleased(x, y, button, ...)
+	end
+
+	local oldmousemoved = love.mousemoved
+	love.mousemoved = function(...)
+		if utilsmenuopen and not android then
+			utilsmenu_mousemoved(love.mouse.getPosition())
+			return
+		end
+		if oldmousemoved then
+			return oldmousemoved(...)
+		end
+	end
+
+	local oldkeypressed = love.keypressed
+	love.keypressed = function(key, ...)
+		if utilsmenuopen and not android then
+			local k = key
+			if k == "space" then
+				k = " "
+			end
+			--function keys and alt+enter (fullscreen) still go to the game
+			local passthrough = k:match("^f%d+$") or ((k == "return") and (love.keyboard.isDown("lalt") or love.keyboard.isDown("ralt")))
+			if not passthrough then
+				utilsmenu_keypressed(k)
+				return
+			end
+		end
+		return oldkeypressed(key, ...)
+	end
+
+	local oldtextinput = love.textinput
+	love.textinput = function(text, ...)
+		if utilsmenuopen and not android then
+			utilsmenu_textinput(text)
+			return
+		end
+		if oldtextinput then
+			return oldtextinput(text, ...)
+		end
+	end
+
+	local oldfiledropped = love.filedropped
+	love.filedropped = function(file, ...)
+		if utilsmenuopen then
+			utilsmenu_filedropped(file)
+			return
+		end
+		if oldfiledropped then
+			return oldfiledropped(file, ...)
+		end
 	end
 end
