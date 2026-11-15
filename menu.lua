@@ -3552,6 +3552,7 @@ function menu_keypressed(key, unicode)
 					languagemenu_open()
 					return false
 				end
+				optionsmenu_resettab()
 				gamestate = "options"
 			elseif selection == 5 then
 				utilsmenu_open()
@@ -4142,6 +4143,7 @@ function menu_keypressed(key, unicode)
 				colorsetedit = 1
 				setcustomplayer(characters.list[characteri], skinningplayer)
 			end
+			optionsmenu_resettab()
 			gamestate = "menu"
 			saveconfig()
 		end
@@ -4333,6 +4335,7 @@ function menu_mousereleased(x, y, button)
 				gamestate = "mappackmenu"
 				mappacks()
 			elseif mouseonselect == 4 then
+				optionsmenu_resettab()
 				gamestate = "options"
 			elseif mouseonselect == 5 then
 				utilsmenu_open()
@@ -4615,6 +4618,12 @@ function newgame()
 	selectworld()
 end
 
+--the options menu always opens and closes on its first tab (the same one menu_load starts on)
+function optionsmenu_resettab()
+	optionstab = 2
+	optionsselection = 1 --a row from another tab could be past the end of this one
+end
+
 function selectworld()
 	if not reachedworlds[mappack] then
 		renderoverlay("loading game...")
@@ -4641,6 +4650,10 @@ function selectworld()
 	previousselectworldtime = nil
 	selectworldcursoranimstart = love.timer.getTime()
 	selectworldcursorcurve = random_motion_curve()
+	--no slide or page scroll left over from the last time it was open, the cursor just drops in
+	previousselectworldx = nil
+	selectworldpreviouspage = nil
+	selectworldscrollstart = nil
 	
 	selectworldexists = {}
 	for i = 1, #mappacklevels do
