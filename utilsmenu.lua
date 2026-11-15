@@ -43,6 +43,7 @@ local mptab = "general"
 local MPTABS = {"general", "worlds", "hud", "text", "course", "create"}
 
 local utils_back --forward declarations
+local inner_utilsmenu_openpage
 local mp_build
 
 ------------------------------------------------------------
@@ -432,7 +433,7 @@ end
 local function hub_activate()
 	local item = HUBITEMS[hubselection]
 	if item.page then
-		utilsmenu_openpage(item.page)
+		inner_utilsmenu_openpage(item.page)
 	else
 		utilsmenu_close()
 	end
@@ -782,6 +783,7 @@ local function fr_render()
 	end
 
 	love.graphics.push("all")
+	local ok, err = pcall(function()
 	love.graphics.setCanvas(canvas)
 	love.graphics.origin()
 	love.graphics.setScissor()
@@ -810,7 +812,12 @@ local function fr_render()
 			end
 		end
 	end
+	end)
+	love.graphics.setCanvas()
 	love.graphics.pop()
+	if not ok then
+		error(err, 0)
+	end
 
 	return canvas
 end
@@ -2243,20 +2250,20 @@ end
 -- public functions (called from menu.lua)
 ------------------------------------------------------------
 
-function utilsmenu_open()
+local function inner_utilsmenu_open()
 	gamestate = "utils"
 	page = "hub"
 	clearelements()
 end
 
-function utilsmenu_close()
+local function inner_utilsmenu_close()
 	clearelements()
 	page = "hub"
 	gamestate = "menu"
 	selection = 5
 end
 
-function utilsmenu_openpage(name)
+inner_utilsmenu_openpage = function(name)
 	page = name
 	if name == "charformat" then
 		cf_build()
@@ -2279,7 +2286,7 @@ utils_back = function()
 	page = "hub"
 end
 
-function utilsmenu_update(dt)
+local function inner_utilsmenu_update(dt)
 	runjob()
 
 	local result = love.thread.getChannel(CLIPBOARD_CHANNEL):pop()
@@ -2299,7 +2306,7 @@ function utilsmenu_update(dt)
 	updateelements(dt)
 end
 
-function utilsmenu_draw()
+local function inner_utilsmenu_draw()
 	if page == "hub" then
 		hub_draw()
 	elseif page == "charformat" then
@@ -2312,7 +2319,7 @@ function utilsmenu_draw()
 	love.graphics.setColor(255, 255, 255)
 end
 
-function utilsmenu_keypressed(key)
+local function inner_utilsmenu_keypressed(key)
 	if page == "hub" then
 		if key == "up" or key == "w" then
 			hubselection = math.max(1, hubselection - 1)
@@ -2349,7 +2356,7 @@ function utilsmenu_keypressed(key)
 	end
 end
 
-function utilsmenu_mousepressed(x, y, button)
+local function inner_utilsmenu_mousepressed(x, y, button)
 	if page == "hub" then
 		if button == "l" then
 			local i = hub_mouseitem(x, y)
@@ -2377,13 +2384,13 @@ function utilsmenu_mousepressed(x, y, button)
 	end
 end
 
-function utilsmenu_mousereleased(x, y, button)
+local function inner_utilsmenu_mousereleased(x, y, button)
 	for _, v in ipairs(elements) do
 		v.el:unclick(x, y, button)
 	end
 end
 
-function utilsmenu_mousemoved(x, y)
+local function inner_utilsmenu_mousemoved(x, y)
 	if page == "hub" then
 		local i = hub_mouseitem(x, y)
 		if i then
@@ -2392,8 +2399,88 @@ function utilsmenu_mousemoved(x, y)
 	end
 end
 
-function utilsmenu_filedropped(file)
+local function inner_utilsmenu_filedropped(file)
 	if page == "mappack" then
 		mp_filedropped(file)
+	end
+end
+
+------------------------------------------------------------
+-- error guard: if anything in here breaks, show it instead of leaving a broken screen
+------------------------------------------------------------
+
+local utilserror
+
+local function reporterror(err)
+	utilserror = tostring(err)
+	print("UTILS ERROR: " .. utilserror)
+	pcall(function()
+		love.filesystem.createDirectory("alesans_entities/crashes")
+		love.filesystem.write("alesans_entities/crashes/utils_error.txt", utilserror)
+	end)
+	job = nil
+	clearelements()
+end
+
+local function guarded(fn)
+	return function(...)
+		if utilserror then
+			return
+		end
+		local ok, err = xpcall(fn, debug.traceback, ...)
+		if not ok then
+			reporterror(err)
+		end
+	end
+end
+
+local function drawerror()
+	drawpanel()
+	drawtitle("utils hit an error")
+	love.graphics.setColor(255, 80, 80)
+	local y = 36
+	local message = utilserror:gsub("\t", " ")
+	for _, line in ipairs(wraptext(message:lower(), 44)) do
+		if y > 180 then
+			break
+		end
+		properprint(line, 26*scale, y*scale)
+		y = y + 10
+	end
+	love.graphics.setColor(255, 255, 255)
+	properprintF("press escape to go back", 26*scale, 196*scale)
+	properprintF("saved in alesans_entities/crashes", 26*scale, 206*scale)
+end
+
+utilsmenu_openpage = guarded(inner_utilsmenu_openpage)
+utilsmenu_update = guarded(inner_utilsmenu_update)
+utilsmenu_mousepressed = guarded(inner_utilsmenu_mousepressed)
+utilsmenu_mousereleased = guarded(inner_utilsmenu_mousereleased)
+utilsmenu_mousemoved = guarded(inner_utilsmenu_mousemoved)
+utilsmenu_filedropped = guarded(inner_utilsmenu_filedropped)
+
+local guardedkeypressed = guarded(inner_utilsmenu_keypressed)
+function utilsmenu_keypressed(key)
+	if utilserror then
+		if key == "escape" or key == "return" then
+			utilserror = nil
+			utilsmenu_close()
+		end
+		return
+	end
+	guardedkeypressed(key)
+end
+
+function utilsmenu_draw()
+	if utilserror then
+		drawerror()
+		return
+	end
+	love.graphics.push("all")
+	local ok, err = xpcall(inner_utilsmenu_draw, debug.traceback)
+	love.graphics.pop()
+	if not ok then
+		reporterror(err)
+		drawerror()
 	end
 end
