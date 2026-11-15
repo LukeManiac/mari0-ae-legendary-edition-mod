@@ -594,9 +594,16 @@ function splitscreen_finishdraw(views)
 		love.graphics.pop()
 	end
 
-	--livecounter on top of the viewports
-	for i = 1, #views do
-		splitscreen_drawlives(i, views[i])
+	--livecounter is drawn once across the screen, the same as regular multiplayer
+	if players > 1 then
+		love.graphics.push()
+		drawmultiHUD()
+		love.graphics.pop()
+	end
+	if splitscreenviewhud then
+		for i = 1, #views do
+			splitscreenviewhud(i, views[i], splitscreen_viewplayer(i))
+		end
 	end
 
 	--the rest of the game expects the normal camera
