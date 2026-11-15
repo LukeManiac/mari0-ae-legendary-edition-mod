@@ -610,6 +610,7 @@ function game_update(dt)
 		end
 		
 		if (notime == false or breakoutmode) and mariotime ~= 0 then
+			local previousmariotime = mariotime
 			if not infinitetime then
 				if realtime then --mario maker time
 					mariotime = mariotime - dt --mario maker purists rejoice
@@ -618,7 +619,7 @@ function game_update(dt)
 				end
 			end
 			
-			if mariotime > 0 and (mariotime < 99 and mariotime + 2.5*dt >= 99 and GOTTAGOFAST and (mariotime + 2.5*dt > 99 or not GOTTAGOFASTINSTANT)) and (not dcplaying) and (not levelfinished) and not nolowtime then
+			if mariotime > 0 and (mariotime < 99 and previousmariotime >= 99 and (previousmariotime > 99 or not (GOTTAGOFAST and GOTTAGOFASTINSTANT))) and (not dcplaying) and (not levelfinished) and not nolowtime then
 				startlowtime()
 			end
 			
