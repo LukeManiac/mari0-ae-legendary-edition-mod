@@ -4463,7 +4463,8 @@ function drawmultiHUD()
 		properprintfunc = properprintFbackground
 	end
 	
-	local livesdisplay = (mariolivecount ~= false)
+	local rrractive = (rrr_hudkos ~= nil) and (rrr_hudkos(1) ~= nil)
+	local livesdisplay = (mariolivecount ~= false) or rrractive
 	if (not livesdisplay) and objects and objects["player"] then
 		--should the lives counter be displayed?
 		for i = 1, players do
@@ -4518,6 +4519,13 @@ function drawmultiHUD()
 					properprintfunc(s, (cx+9)*scale, cy*scale)
 					cy = cy + 10
 				end
+			end
+
+			--knockouts (rival rumble royale)
+			if rrractive then
+				love.graphics.setColor(255, 255, 255)
+				properprintfunc("KOs: " .. rrr_hudkos(i), cx*scale, cy*scale)
+				cy = cy + 10
 			end
 		end
 	end

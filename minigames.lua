@@ -4879,6 +4879,15 @@ local function rrr_state()
 	return nil
 end
 
+--player i's knockouts while RRR is running (nil otherwise), for drawmultiHUD in game.lua
+function rrr_hudkos(i)
+	local S = rrr_state()
+	if S and S.kos then
+		return S.kos[i] or 0
+	end
+	return nil
+end
+
 local function rrr_center(p)
 	return p.x + p.width/2
 end
