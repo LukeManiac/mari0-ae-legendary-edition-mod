@@ -2250,20 +2250,20 @@ end
 -- public functions (called from menu.lua)
 ------------------------------------------------------------
 
-local function inner_utilsmenu_open()
+function utilsmenu_open()
 	gamestate = "utils"
 	page = "hub"
 	clearelements()
 end
 
-local function inner_utilsmenu_close()
+function utilsmenu_close()
 	clearelements()
 	page = "hub"
 	gamestate = "menu"
 	selection = 5
 end
 
-inner_utilsmenu_openpage = function(name)
+local function inner_utilsmenu_openpage(name)
 	page = name
 	if name == "charformat" then
 		cf_build()
