@@ -61,6 +61,39 @@ local function clamp(v, minimum, maximum)
 	return math.max(minimum, math.min(maximum, v))
 end
 
+local ui = {mp = {}} --layout helpers (one table, the file is near lua's 200 locals limit)
+
+--text in the current language: languages/<language>.json, falling back to english.json, then to the key itself
+--(the keys are the english text, like the rest of the game)
+local function T(key)
+	if TEXT and TEXT[key] then
+		return TEXT[key]
+	end
+	return key
+end
+
+--T with string.format, for text with %s in it
+local function TF(key, ...)
+	return string.format(T(key), ...)
+end
+
+--where a column of fields starts: after the longest label, but never left of minimum
+function ui.columnx(minimum, ...)
+	local longest = 0
+	for _, s in ipairs({...}) do
+		for line in (s .. "\n"):gmatch("(.-)\n") do
+			longest = math.max(longest, utf8.len(line))
+		end
+	end
+	return math.max(minimum, 26 + longest*8 + 6)
+end
+
+--how many extra lines a piece of text has (some translations wrap with \n)
+function ui.extralines(s)
+	local _, count = s:gsub("\n", "")
+	return count
+end
+
 local function wraptext(s, maxchars)
 	local lines = {}
 	for paragraph in (s .. "\n"):gmatch("(.-)\n") do
@@ -233,7 +266,8 @@ local function newbutton(x, y, text, func, w)
 end
 
 --a button that has to be clicked twice within 3 seconds
-local function confirmbutton(name, x, y, text, func, w)
+local function confirmbutton(name, x, y, text, func)
+	local w = math.max(utf8.len(text), utf8.len(T("sure? click again")))*8
 	local el
 	el = newbutton(x, y, text, function()
 		if confirmuntil[name] and love.timer.getTime() < confirmuntil[name] then
@@ -248,6 +282,21 @@ local function confirmbutton(name, x, y, text, func, w)
 	el.textcolor = {255, 80, 80}
 	el.utilsconfirmtext = text
 	return add(name, el)
+end
+
+--buttons one after another from x (each {name, text, func}); returns where the row ends
+function ui.buttonrow(x, y, ...)
+	for _, b in ipairs({...}) do
+		local el = add(b[1], newbutton(x, y, b[2], b[3]))
+		x = x + 3 + el.width + 6
+	end
+	return x
+end
+
+--the back button in the bottom right corner of every page
+function ui.addback()
+	local text = T("back")
+	add("back", newbutton(panelright() - 5 - (3 + utf8.len(text)*8), 199, text, function() utils_back() end))
 end
 
 local function updateelements(dt)
@@ -1559,7 +1608,7 @@ local function mp_validate()
 
 	if name:match("^%s*$") then
 		valid = false
-		table.insert(requirements, "value for name is empty!")
+		table.insert(requirements, T("value for name is empty!"))
 	end
 	if name:find('[/\\:%*%?"<>|]') then
 		valid = false
@@ -1584,15 +1633,15 @@ local function mp_validate()
 
 	local filecount = mp_filecount(v)
 	if filecount >= MAPPACKCREATOR_FILEWARNING then
-		local amount = "some"
+		local sentence = "this will create %s files. this will take some time."
 		if filecount >= MAPPACKCREATOR_FILEWARNING_GOODGOD then
-			amount = "a ridiculously long"
-        elseif filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
-			amount = "a very long"
-        elseif filecount >= MAPPACKCREATOR_FILEWARNING_BIG then
-			amount = "a lot of"
+			sentence = "this will create %s files. this will take a ridiculously long time."
+		elseif filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
+			sentence = "this will create %s files. this will take a very long time."
+		elseif filecount >= MAPPACKCREATOR_FILEWARNING_BIG then
+			sentence = "this will create %s files. this will take a lot of time."
 		end
-		table.insert(requirements, "this will create " .. filecount .. " files. this will take " .. amount .. " time.")
+		table.insert(requirements, TF(sentence, filecount))
 	end
 
 	if mpexisting[name:lower()] and not mpcreating then
@@ -2447,8 +2496,9 @@ local function mp_tabrects()
 	local rects = {}
 	local x = 26
 	for i, name in ipairs(MPTABS) do
-		rects[i] = {x = x, w = utf8.len(name)*8}
-		x = x + utf8.len(name)*8 + 6
+		local w = utf8.len(T(name))*8
+		rects[i] = {x = x, w = w}
+		x = x + w + 6
 	end
 	return rects
 end
@@ -2760,6 +2810,15 @@ local function inner_utilsmenu_keypressed(key)
 	end
 end
 
+--the icon frame on the general tab (mp_build can move it right to make room for long labels)
+ui.iconframe = {x = 300, y = 47, size = 66}
+
+function ui.insideiconframe(x, y)
+	local f = ui.iconframe
+	x, y = x/scale, y/scale
+	return x >= f.x and x < f.x + f.size and y >= f.y and y < f.y + f.size
+end
+
 local function inner_utilsmenu_mousepressed(x, y, button)
 	if page == "hub" then
 		if button == "l" then
@@ -2777,6 +2836,11 @@ local function inner_utilsmenu_mousepressed(x, y, button)
 	end
 
 	if clickelements(x, y, button) then
+		return
+	end
+
+	if page == "mappack" and button == "r" and mptab == "general" and not opendropdown() and ui.insideiconframe(x, y) then
+		mp_seticon(nil) --right click clears the icon
 		return
 	end
 
