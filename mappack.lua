@@ -259,7 +259,7 @@ function savecustomtext()
 	notice.new("Saved custom text!", nil, 2)
 end
 
-function loadcustombackground(filename)
+function loadcustombackground(filename, defaultonly)
 	local i = 1
 	custombackgroundimg = {}
 	custombackgroundwidth = {}
@@ -323,6 +323,12 @@ function loadcustombackground(filename)
 			custombackgroundimg[i]:setWrap("repeat","repeat")
 			custombackgroundquad[i] = love.graphics.newQuad(0,0,width*16,height*16,custombackgroundimg[i]:getWidth(),custombackgroundimg[i]:getHeight())
 		end
+	end
+
+	-- just the default background (graphics/SMB/portalbackground), skipping the level and mappack ones
+	if defaultonly then
+		loadbg(1, "graphics/SMB/portalbackground")
+		return
 	end
 
 	-- loads BG from level

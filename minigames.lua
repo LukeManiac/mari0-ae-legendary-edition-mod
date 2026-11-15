@@ -4838,11 +4838,16 @@ local RRR_SD_LAYOUTS = {
 local RRR_GREENPIPE = {16, 17, 38, 39}
 local RRR_GRAYPIPE = {14, 15, 36, 37}
 local RRR_THEMES = {
-	{name = "Overworld", layout = "field", spriteset = 1, background = 1, ground = 2, block = 78, brick = 7, used = 113, platform = {70, 71, 72}, trunk = 93, pipe = RRR_GREENPIPE, decor = "hills"},
-	{name = "Underground", layout = "cave", spriteset = 2, background = 2, ground = 50, block = 111, brick = 49, used = 114, platform = {49, 49, 49}, pipe = RRR_GREENPIPE},
-	{name = "Castle", layout = "castle", spriteset = 3, background = 2, ground = 29, block = 29, brick = 122, used = 117, platform = {122, 122, 122}, pipe = RRR_GRAYPIPE, lava = {107, 120}},
-	{name = "Portal", layout = "lab", spriteset = 1, background = 1, portalbackground = true, ground = 140, block = 154, brick = 141, used = 113, platform = {141, 141, 141}, pipe = RRR_GRAYPIPE, decor = "lab"},
-	{name = "Night Overworld", layout = "field", spriteset = 3, background = 2, ground = 92, block = 29, brick = 122, used = 117, platform = {89, 90, 91}, pipe = RRR_GRAYPIPE, decor = "clouds"},
+	{name = "Overworld", layout = "field", spriteset = 1, background = 1, ground = 2, block = 78, brick = 7, used = 113,
+		platform = {70, 71, 72}, trunk = 93, pipe = RRR_GREENPIPE, decor = "hills"},
+	{name = "Underground", layout = "cave", spriteset = 2, background = 2, ground = 50, block = 111, brick = 49, used = 114,
+		platform = {49, 49, 49}, pipe = RRR_GREENPIPE},
+	{name = "Castle", layout = "castle", spriteset = 3, background = 2, ground = 29, block = 29, brick = 122, used = 117,
+		platform = {122, 122, 122}, pipe = RRR_GRAYPIPE, lava = {107, 120}},
+	{name = "Portal", layout = "lab", spriteset = 1, background = 1, portalbackground = true, ground = 140, block = 154, brick = 141, used = 113,
+		platform = {141, 141, 141}, pipe = RRR_GRAYPIPE, decor = "lab"},
+	{name = "Night Overworld", layout = "field", spriteset = 3, background = 2, ground = 92, block = 29, brick = 122, used = 117,
+		platform = {89, 90, 91}, pipe = RRR_GRAYPIPE, decor = "clouds"},
 }
 
 --a music pack is a folder in sounds/minigames, its pack.json gives its name, its place in the list and the songs' names:
@@ -7702,6 +7707,23 @@ addminigame({
 		else
 			background = theme.background
 			backgroundrgbon = false
+		end
+		if theme.portalbackground then
+			--the default custom background (graphics/SMB/portalbackground.png), loaded directly
+			--(not through loadcustombackground, which looks for the mappack's own backgrounds first)
+			local img = love.graphics.newImage("graphics/SMB/portalbackground.png")
+			custombackground = true
+			custombackgroundimg = {img}
+			custombackgroundwidth = {img:getWidth()/16}
+			custombackgroundheight = {img:getHeight()/16}
+			custombackgroundanim = {}
+			custombackgroundquad = {}
+			if not SlowBackgrounds then
+				img:setWrap("repeat", "repeat")
+				custombackgroundquad[1] = love.graphics.newQuad(0, 0, width*16, height*16, img:getWidth(), img:getHeight())
+			end
+		else
+			custombackground = false
 		end
 		portalgun = false
 
