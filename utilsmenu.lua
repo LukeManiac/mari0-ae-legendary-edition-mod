@@ -18,6 +18,7 @@ local PROJECTFOLDER = "alesans_entities/mappackprojects"
 MAPPACKCREATOR_FILEWARNING = 1000 --"this will take some time"
 MAPPACKCREATOR_FILEWARNING_BIG = 10000 --"this will take a lot of time"
 MAPPACKCREATOR_FILEWARNING_HUGE = 100000 --"this will take tons of time"
+MAPPACKCREATOR_FILEWARNING_GOODGOD = 1000000 --"this will take MILLION TONS of time"
 local RENDERFOLDER = "renders"
 
 local PX, PY, PH = 21, 16, 200 --panel position and height (width follows the screen)
@@ -1584,8 +1585,10 @@ local function mp_validate()
 	local filecount = mp_filecount(v)
 	if filecount >= MAPPACKCREATOR_FILEWARNING then
 		local amount = "some"
+		if filecount >= MAPPACKCREATOR_FILEWARNING_GOODGOD then
+			amount = "a ridiculously long"
 		if filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
-			amount = "a ridiculously long amount of"
+			amount = "a very long"
         elseif filecount >= MAPPACKCREATOR_FILEWARNING_BIG then
 			amount = "a lot of"
 		end
@@ -2501,7 +2504,9 @@ local function mp_draw()
 		end
 		--grey, orange past the warning, red past the big warning
 		love.graphics.setColor(150, 150, 150)
-		if mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
+		if mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_GOODGOD then
+			love.graphics.setColor(127, 0, 0)
+		elif mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_HUGE then
 			love.graphics.setColor(255, 0, 0)
 		elseif mpcheck.filecount >= MAPPACKCREATOR_FILEWARNING_BIG then
 			love.graphics.setColor(252, 80, 80)
