@@ -84,6 +84,9 @@ function icicle:init(x, y, t, respawn, r)
 	
 	self.falling = false
 	self.falltimer = false
+	self.shaking = false --shaking because a player is near
+	self.shaketimer = 0
+	self.fallwait = nil --seconds left before it falls
 	self.dead = false
 	self.shot = false
 
@@ -153,17 +156,39 @@ function icicle:update(dt)
 				end
 			end
 		end
+	elseif self.fallwait then
+		--stopped shaking, falls once the wait is over
+		self.fallwait = self.fallwait - dt
+		if self.fallwait <= 0 then
+			self.fallwait = nil
+			self:fall()
+		end
 	elseif self.falls then
+		--shakes while a player below is within icicleshakedist, then stops for goombadeathtime and falls once one
+		--is within iciclefalldist
+		local shake, fall = false, false
 		for i = 1, players do
 			local v = objects["player"][i]
-			local fallrange = 3
-			if self.t == "big" then
-				fallrange = 2
-			end
-			if inrange(v.x+v.width/2, self.x+self.width/2-fallrange, self.x+self.width/2+fallrange) and v.y > self.y and math.abs(v.y-(self.y+self.height)) < height then --player near
-				self:fall()
+			if self:playerbelow(v, iciclefalldist) then
+				fall = true
 				break
+			elseif self:playerbelow(v, icicleshakedist) then
+				shake = true
 			end
+		end
+		if fall then
+			self:startfallwait()
+		elseif shake then
+			if not self.shaking then
+				self.shaking = true
+				self.shaketimer = 0
+			end
+			self.shaketimer = (self.shaketimer + donutoffsetspeed*dt)%1
+			self.rotation = math.sin(self.shaketimer*math.pi*2)*math.rad(icicleshakeangle)
+		elseif self.shaking then
+			self.shaking = false
+			self.shaketimer = 0
+			self.rotation = 0
 		end
 	end
 	
@@ -180,11 +205,27 @@ function icicle:update(dt)
 	end
 end
 
+--whether player v is below the icicle, within dist tiles of it sideways (and no more than a screen further down)
+function icicle:playerbelow(v, dist)
+	return inrange(v.x+v.width/2, self.x+self.width/2-dist, self.x+self.width/2+dist) and v.y > self.y and math.abs(v.y-(self.y+self.height)) < height
+end
+
 function icicle:shotted(dir) --fireball, star, turtle
 	if self.respawn then
 		return
 	end
 	self:explode()
+end
+
+--stops shaking and falls after goombadeathtime seconds
+function icicle:startfallwait()
+	if self.falling or self.fallwait or not self.falls then
+		return false
+	end
+	self.shaking = false
+	self.shaketimer = 0
+	self.rotation = 0
+	self.fallwait = goombadeathtime
 end
 
 function icicle:fall()
@@ -193,11 +234,18 @@ function icicle:fall()
 	end
 	self.gravity = self.fallingravity
 	self.falling = true
-	if self.t == "big" then
-		self.falltimer = 0.8
-	else
-		self.static = false
+	self.fallwait = nil
+	if self.shaking then
+		self.shaking = false
+		self.rotation = 0
 	end
+	if self.t == "big" then
+		--it already waited (see startfallwait), so it drops straight away
+		playsound(iciclefallsound)
+		self.speedy = 1
+		self.trackable = false
+	end
+	self.static = false
 end
 
 function icicle:appear()
@@ -232,7 +280,7 @@ function icicle:ceilcollide(a, b)
 	end
 
 	if self.t == "big" and a == "player" then
-		self:fall()
+		self:startfallwait()
 	end
 end
 

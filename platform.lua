@@ -156,7 +156,8 @@ function platform:update(dt)
 						if inrange(w.x, self.x-w.width, self.x+self.width) then --vertical carry
 							if ((w.y == self.y - w.height) or 
 								(w.y+w.height >= self.y-0.4 and w.y+w.height < self.y+0.4))
-								and (not w.jumping) and not (self.speedy > 0 and w.speedy < 0) then --and w.speedy >= self.speedy
+								and (not w.jumping) and not (self.speedy > 0 and w.speedy < 0)
+								and not (dt > 0 and passingupthrough(w, ydiff/dt)) then --and w.speedy >= self.speedy
 								if #checkrect(w.x+xdiff, self.y-w.height, w.width, w.height, {"exclude", w}, true, condition) == 0 then
 									w.oldxplatform = w.x
 									w.x = w.x + xdiff
@@ -209,7 +210,7 @@ function platform:update(dt)
 						end
 					end
 					if self.speedy ~= 0 then
-						if not w.jumping and inrange(w.x, self.x-w.width, self.x+self.width) and w.speedy and w.height then
+						if not w.jumping and inrange(w.x, self.x-w.width, self.x+self.width) and w.speedy and w.height and not passingupthrough(w, self.speedy) then
 							local clip_past_platform = (w.y+w.height-w.speedy*dt < self.y and w.y+w.height > self.y)
 							if inrange(w.y, self.y - w.height - 0.1, self.y - w.height + 0.1) or clip_past_platform then
 								local x1, y1 = math.ceil(w.x+0.01), math.ceil(self.y+self.height)

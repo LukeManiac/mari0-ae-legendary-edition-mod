@@ -56,6 +56,20 @@ local rotatepoint, getslopey
 --* stays carried: inertiaspeedx and inertiaspeedy follow the object's speed
 --* stops being carried (jumps or falls off): the object's speedx is added to speedx, and its speedy too if it was
 --  going up. inertiaspeedx and inertiaspeedy keep these values until the player is carried by something again
+--Whether player w is moving up through a top-only object from below. Letting go of jump ends "jumping" while the
+--player is still going up, so a moving object's vertical carry would stick them onto its top as soon as their feet
+--reached it. carrierspeedy: how fast the object itself is moving up or down. A player riding the object always has
+--gravity added on top of the object's speedy, so they're never moving up faster than it
+function passingupthrough(w, carrierspeedy)
+	if not w.playernumber then
+		return false
+	end
+	if w.gravitydir and w.gravitydir ~= "down" then
+		return false
+	end
+	return w.speedy < 0 and w.speedy < (carrierspeedy or 0) - 0.0001
+end
+
 function inertiacarry(w, carrier, speedx, speedy)
 	if not InertiaPhysics then
 		return

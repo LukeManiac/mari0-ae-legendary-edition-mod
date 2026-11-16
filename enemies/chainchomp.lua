@@ -70,22 +70,47 @@ function chainchomp:init(x, y)
 	self.nospawnanimation = true
 end
 
+--the rotation that points the chain chomp's mouth at angle (the sprite faces left, and is flipped when facing right)
+function chainchomp:aimrotation(angle)
+	if self.animationdirection ~= "left" then
+		angle = angle - math.pi
+	end
+	return (angle + math.pi)%(math.pi*2) - math.pi
+end
+
 function chainchomp:update(dt)
 	if self.frozen then
 		return
 	end
 	
-	--rotate back to 0 (portals)
-	self.rotation = math.fmod(self.rotation, math.pi*2)
-	if self.rotation > 0 then
-		self.rotation = self.rotation - portalrotationalignmentspeed*dt
-		if self.rotation < 0 then
-			self.rotation = 0
+	--waiting to attack or charging: turn smoothly to face the player (or where it's charging)
+	local aimangle
+	if not self.shot and not self.free then
+		if self.attack and not self.returnn then
+			aimangle = self.targetangle
+		elseif (not self.attack) and self.targetplayer and self.attacktimer > chainchompattackwait+self.randomattackadd then
+			local p = self.targetplayer
+			aimangle = math.atan2((p.y+p.height/2)-(self.y+self.height/2), (p.x+p.width/2)-(self.x+self.width/2))
 		end
-	elseif self.rotation < 0 then
-		self.rotation = self.rotation + portalrotationalignmentspeed*dt
+	end
+	
+	if aimangle then
+		local target = self:aimrotation(aimangle)
+		local diff = (target - self.rotation + math.pi)%(math.pi*2) - math.pi
+		self.rotation = self.rotation + diff*math.min(1, chainchomprotatespeed*dt)
+	else
+		--rotate back to 0 (portals)
+		self.rotation = math.fmod(self.rotation, math.pi*2)
 		if self.rotation > 0 then
-			self.rotation = 0
+			self.rotation = self.rotation - portalrotationalignmentspeed*dt
+			if self.rotation < 0 then
+				self.rotation = 0
+			end
+		elseif self.rotation < 0 then
+			self.rotation = self.rotation + portalrotationalignmentspeed*dt
+			if self.rotation > 0 then
+				self.rotation = 0
+			end
 		end
 	end
 	
@@ -98,8 +123,16 @@ function chainchomp:update(dt)
 		return false
 	else
 		if self.attack then
-			--charge at player
-			self.quad = chainchompquad[spriteset][2]
+			--charge at player, chomping twice as fast
+			self.animationtimer = self.animationtimer + dt
+			while self.animationtimer > goombaanimationspeed/2 do
+				if self.quad == chainchompquad[spriteset][1] then
+					self.quad = chainchompquad[spriteset][2]
+				else
+					self.quad = chainchompquad[spriteset][1]
+				end
+				self.animationtimer = self.animationtimer - goombaanimationspeed/2
+			end
 			
 			self.mask[2] = true
 			self.speedx = self.chargespeedx
@@ -227,19 +260,15 @@ function chainchomp:update(dt)
 				end
 			end
 			
-			--animation
-			if self.attacktimer > chainchompattackwait+self.randomattackadd then
-				self.quad = chainchompquad[spriteset][1]
-			else
-				self.animationtimer = self.animationtimer + dt
-				while self.animationtimer > goombaanimationspeed do
-					if self.quad == chainchompquad[spriteset][1] then
-						self.quad = chainchompquad[spriteset][2]
-					else
-						self.quad = chainchompquad[spriteset][1]
-					end
-					self.animationtimer = self.animationtimer - goombaanimationspeed
+			--animation (keeps going while it waits to attack)
+			self.animationtimer = self.animationtimer + dt
+			while self.animationtimer > goombaanimationspeed do
+				if self.quad == chainchompquad[spriteset][1] then
+					self.quad = chainchompquad[spriteset][2]
+				else
+					self.quad = chainchompquad[spriteset][1]
 				end
+				self.animationtimer = self.animationtimer - goombaanimationspeed
 			end
 			
 			--stay within range

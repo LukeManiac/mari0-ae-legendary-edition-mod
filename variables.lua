@@ -261,6 +261,14 @@ wigglerspeedangry = 4
 thwompattackspeed = 15
 thwompwait = 1
 thwompreturnspeed = 3
+thwomprestwait = 0.5 --after getting back to its spawn (or a ceiling or wall), it waits this long before it can attack again
+
+donutfalltime = 1 --how long a donut shakes before it falls
+donutoffsetspeed = 8 --shakes per second (donuts and small icicles)
+
+icicleshakedist = 5 --small icicles shake when a player below is this many tiles away
+iciclefalldist = 2 --small icicles stop shaking, wait goombadeathtime, then fall when a player below is this close
+icicleshakeangle = 18 --how far small icicles tilt each way while shaking, in degrees
 
 muncheracceleration = 8
 muncheranimationspeed = 0.1
@@ -595,7 +603,8 @@ castlefireanimationdelay = 0.07
 chainchompspeed = 2
 chainchompattackstart = 2.6--attack interval?
 chainchompattackrange = 8
-chainchompattackwait = chainchompattackstart-.4 --actually when it STARTS waiting
+chainchompattackwait = chainchompattackstart-1 --actually when it STARTS waiting (it waits 1 second before attacking)
+chainchomprotatespeed = 12 --how fast it turns to face the player while waiting to attack (higher is faster)
 chainchompattackspeed = 22 --speed it charges at the player
 chainchompattacktime = 1 --how long it stays "attacking"
 chainchompfreedist = 6 --how far it has to be to break free

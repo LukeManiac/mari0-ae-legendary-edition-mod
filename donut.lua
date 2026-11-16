@@ -93,13 +93,13 @@ function donut:update(dt)
 	end
 
 	if self.falling then
-		if self.fallingtimer > goombadeathtime then
+		if self.fallingtimer > donutfalltime then
 			self.speedy = 8
 			local x, y, y2 = self.cox, math.floor(self.y+17/16), math.floor(self.y+16/16)
 			if (not inmap(x, y)) or (not tilequads[map[x][y][1]].collision and inmap(x, y2) and not tilequads[map[x][y2][1]].collision) then --stop players from falling through ground
 				for i, v in pairs(self.checktable) do --Make mario stay on donut when donut is falling (makes mario fall through ground)
 					for j, w in pairs(objects[v]) do
-						if ((not w.gravity) or w.gravity ~= 0) and (not w.jumping) and inrange(w.x, self.x-w.width, self.x+self.width) then
+						if ((not w.gravity) or w.gravity ~= 0) and (not w.jumping) and inrange(w.x, self.x-w.width, self.x+self.width) and not (w.speedy and passingupthrough(w, self.speedy)) then
 							if inrange(w.y, self.y - w.height - 0.1, self.y - w.height + 0.1) then
 								local x1, y1 = math.ceil(w.x+0.001), math.ceil(self.y+self.height-.5)
 								local x2, y2 = math.ceil(w.x+w.width-0.001), math.ceil(self.y+self.height-.5)
@@ -132,8 +132,8 @@ function donut:update(dt)
 			if on then
 				self.fallingtimer = self.fallingtimer + dt
 				self.quad = starquad[spriteset][self.quadi+2]
-				self.shaketimer = (self.shaketimer + 8*dt)%1
-				self.offsetX = 7+round(math.abs(self.shaketimer-.5)*4)
+				self.shaketimer = (self.shaketimer + donutoffsetspeed*dt)%1
+				self.offsetX = 8+math.sin(self.shaketimer*math.pi*2)
 			else
 				self.falling = false
 				self.fallingtimer = 0
@@ -144,8 +144,8 @@ function donut:update(dt)
 		else
 			self.fallingtimer = self.fallingtimer + dt
 			self.quad = starquad[spriteset][self.quadi+2]
-			self.shaketimer = (self.shaketimer + 8*dt)%1
-			self.offsetX = 7+round(math.abs(self.shaketimer-.5)*4)
+			self.shaketimer = (self.shaketimer + donutoffsetspeed*dt)%1
+			self.offsetX = 8+math.sin(self.shaketimer*math.pi*2)
 		end
 	
 		return false

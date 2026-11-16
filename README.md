@@ -370,6 +370,7 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `classicspeedupfastmusic`: In Rival Rumble Royale, a song without a fast version is just played faster, which also makes it higher.
 - `modernsizechangeanimation`: Powering up and down uses a Super Mario Maker 2 style animation instead of the classic one.
 - `noairspeedcap`: Holding run in the air speeds you up to full running speed, even if you jumped from below walking speed.
+- `inertiaphysics`: Jumping or falling off a moving platform keeps its speed, so you fly off in the direction it was going.
 - `dontfreezeonsizechange`: Powering up and down only freezes the player it happens to, like in SMBX2. Everything else keeps moving, and that player can't be touched until the animation is done.
 - `camerasmoothing`: The camera eases after where it's going instead of moving rigidly, so it trails slightly behind.
 - `backwardsmoothing`: The camera leads ahead by as much as `camerasmoothing` would make it trail. Requires `camerasmoothing`.
@@ -379,6 +380,60 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 # Changelog
 
 All notable releases and updates to **Legendary Edition** are documented here.
+
+## v1.2.1
+
+### 🧩 New Features
+
+#### 🛹 Inertia Physics
+
+A new nitpick, `inertiaphysics`. When you jump or fall off something that's moving, you keep its speed, the same way you would in real life. **Generate Nitpicks File** adds it to an existing file.
+
+* It works on everything that carries the player: moving platforms, objects on tracks, custom enemies with `platform`, Big Moles, Shy Guys, seesaws and snake blocks.
+* Seesaws and snake blocks only carry you up and down, so they only pass on their vertical speed.
+* **Getting on:** If you land on a moving object while you still have speed from another one, your speed becomes relative to the new object, so you don't slide off it. Landing on it from the ground or a tile keeps your speed like normal.
+* **Riding:** The game keeps track of the object's speed every frame while you're on it.
+* **Getting off:** The object's horizontal speed is added to yours. If it was going up, its upward speed is added too: jumping adds it to your jump, and falling off gives you whichever of the two is faster upwards, so objects that already push you up don't push you twice.
+* Landing on solid ground (or anything that isn't moving) makes it count as your new starting point, so your speed goes back to normal.
+* Pipes, cutscenes, dying and sideways gravity drop the object without flinging you anywhere.
+* Only players are affected. Enemies and items ride objects the same as before.
+
+### 🐛 Bug Fixes
+
+* Fixed a crash whenever a custom background was drawn. The check for a background that doesn't scroll sideways compared the scroll factor against `scrollfactormax`, which doesn't exist.
+* Custom backgrounds now stop scrolling sideways at the highest scroll factor, the same way they already did up and down.
+* Players can't die while the screen fades out for the next course, or for an animation's `loadlevel` or `loadlevelinstant` action. Before, falling into a pit or touching an enemy during the fade could kill you after you'd already finished.
+* Moving up through a top-only object from below no longer sticks you onto its top when you aren't holding jump. Letting go of jump ends the jump while you're still going up, and moving objects only skipped players who were still jumping, so your feet got pulled onto the top as soon as they reached it. Now you carry on up and only land on it when you come back down. This covers moving platforms, objects on tracks, custom enemies with `platform`, seesaws and donut blocks.
+* Standing on a rising custom enemy with `platform` no longer shows the running frames when you should be skidding. The game used to think you were falling, since the enemy was moving up from under you.
+
+### ✨ Improvements
+
+#### 🍩 Donut Blocks
+
+* A donut block now falls after `donutfalltime` seconds (1 by default, in `variables.lua`) instead of half a second.
+* The shake is now a smooth sine wave instead of a zigzag. Each shake lasts 1/`donutoffsetspeed` seconds (`donutoffsetspeed` is 8 by default, in `variables.lua`).
+
+#### 🧊 Icicles
+
+* When a player below is within `icicleshakedist` tiles of an icicle sideways (5 by default), it shakes by tilting back and forth. The tilt follows a sine wave that's 1/`donutoffsetspeed` seconds long and goes up to `icicleshakeangle` degrees each way (18 by default). It doesn't move sideways.
+* It stops shaking if every player moves out of range.
+* When a player below gets within `iciclefalldist` tiles (2 by default), it stops shaking and holds still for half a second (`goombadeathtime`), then falls. Before, small icicles fell straight away once a player was within 3 tiles, and big ones shook sideways for 0.8 seconds once a player was within 2.
+* This works for small and big icicles. Big icicles that are set not to fall don't shake either.
+* Hitting a big icicle from below starts the same half-second wait.
+
+#### 🗿 Thwomps
+
+* A Thwomp that hits a ceiling on the way back up can fall again straight away. So can a sideways Thwomp that hits a wall on its way back. Before, it had to wait half a second first. A Thwomp that stops because it got back to where it started still waits.
+
+#### 🎬 Animations
+
+Mappack animations now stop completely while the game is paused or frozen for a size change.
+
+* Nothing in an animation runs, waits or counts time while the pause menu is open or the game is frozen.
+* Pressing a button while paused or frozen doesn't trigger anything, and neither does letting go of it afterwards.
+* A button release only triggers if its press did. Holding a button from before the course started and letting go no longer sets off a release on its own.
+* Letting go of a button while paused or frozen triggers once the game carries on, as long as the button is still up by then.
+* Landing and getting hurt don't trigger animations while the game is frozen.
 
 ## v1.2.0
 

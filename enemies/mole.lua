@@ -46,6 +46,7 @@ function mole:init(x, y, r)
 	self.movedirection = "left"
 	
 	self.falling = false
+	self.jumpingout = false --jumped out of the ground and hasn't landed yet: keeps the jump sprite and doesn't chase
 	self.jumptimer = 0
 	self.freezetimer = 0
 	
@@ -107,6 +108,7 @@ function mole:update(dt)
 				self.active = true
 				self.speedy = -ninjijumpforce
 				self.quad = molequad[spriteset][2]
+				self.jumpingout = true
 				self.gravity = yacceleration
 				self.mask = {	true, 
 							false, false, false, false, true,
@@ -122,7 +124,7 @@ function mole:update(dt)
 		self.trackable = false
 	end
 	
-	if self.shot == false and self.inground == false and not self.frozen and self.quad ~= molequad[spriteset][2] then
+	if self.shot == false and self.inground == false and not self.frozen and not self.jumpingout and self.quad ~= molequad[spriteset][2] then
 		local p = objects["player"][closestplayer]
 		if self.x+self.width/2 > p.x+p.width/2 + molechaserange then
 			self.animationdirection = "right"
@@ -191,7 +193,7 @@ function mole:update(dt)
 		return false
 		
 	else
-		if self.inground == false and not self.frozen then
+		if self.inground == false and not self.frozen and not self.jumpingout then
 			self.animationtimer = self.animationtimer + dt
 			while self.animationtimer > moleanimationspeed do
 				self.animationtimer = self.animationtimer - moleanimationspeed
@@ -288,6 +290,12 @@ function mole:floorcollide(a, b)
 		return false
 	end
 	self.speedy = 0
+	if self.jumpingout then
+		--landed after jumping out of the ground: starts walking and chasing from here
+		self.jumpingout = false
+		self.animationtimer = 0
+		self.quad = molequad[spriteset][3]
+	end
 end
 
 function mole:passivecollide(a, b)

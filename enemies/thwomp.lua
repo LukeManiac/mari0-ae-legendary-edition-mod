@@ -144,10 +144,12 @@ function thwomp:update(dt)
 			end
 		end
 		if not self.attack then
-			self.waittimer = self.waittimer - dt
-
-			--reset sprite to calm
-			self.quad = thwompquad[spriteset][2]
+			--waiting after getting back: keeps its sprite and doesn't look for players
+			if self.waittimer > 0 then
+				self.waittimer = math.max(0, self.waittimer - dt)
+			else
+				--reset sprite to calm
+				self.quad = thwompquad[spriteset][2]
 
 			local attackrange = 3
 			if self.t == "left" or self.t == "right" then
@@ -157,7 +159,7 @@ function thwomp:update(dt)
 			for i = 1, players do
 				local v = objects["player"][i]
 				if ((self.t == "down" and inrange(v.x+v.width/2, self.x+self.width/2-attackrange-closerange, self.x+self.width/2+attackrange+closerange) and v.y > self.y)
-				or (self.t == "left" and self.x-xscroll < width and (inrange(v.y, self.y+self.height/2-attackrange-closerange, self.y+self.height/2+attackrange+closerange) or inrange(v.y+v.height, self.y+self.height/2-attackrange-closerange, self.y+self.height/2+attackrange+closerange)) and v.x < self.x)
+				or (self.t == "left" and self.x-xscroll < width and (inrange(v.y, self.y+self.height/2-attackrange-closerange, self.y+self.height/2+attackrange+closerange) or inrange(v.y+v.height, self.y+self.height/2-attackrange-closerange, self.y+self.height/2+attackrange+closerange)) and v.x-v.width < self.x-self.width)
 				or (self.t == "right" and self.x+self.width-xscroll > 0 and (inrange(v.y, self.y+self.height/2-attackrange-closerange, self.y+self.height/2+attackrange+closerange) or inrange(v.y+v.height, self.y+self.height/2-attackrange-closerange, self.y+self.height/2+attackrange+closerange)) and v.x > self.x)) then
 					local dist = math.abs((v.x+v.width/2)-(self.x+self.width/2))
 					if self.t == "left" or self.t == "right" then
@@ -177,7 +179,6 @@ function thwomp:update(dt)
 						else
 							self.quad = thwompquad[spriteset][1]
 						end
-						self.waittimer = 0.5
 						self.trackable = false
 						return
 					else --look
@@ -356,6 +357,8 @@ function thwomp:globalcollide(a, b)
 end
 
 function thwomp:rest() --returning
+	--back at its spawn (or stopped by a ceiling or wall on the way back): it can attack again after thwomprestwait
+	self.waittimer = thwomprestwait
 	if self.t == "left" or self.t == "right" then
 		self.speedx = 0
 	else
