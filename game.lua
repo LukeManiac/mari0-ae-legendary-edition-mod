@@ -10493,15 +10493,9 @@ function rendercustombackground(xscroll, yscroll, scrollfactor, scrollfactory)
 	local scrollfactor, scrollfactory = scrollfactor or 0, scrollfactory or 0
 	if custombackground then
 		for i = #custombackgroundimg, 1, -1  do
-			local xdiv, ydiv = i * scrollfactor + 1, i * scrollfactory + 1
-			local xscroll, yscroll = 0, 0
-			if xdiv ~= 0 then
-				xscroll = oxscroll / xdiv
-			end
-			if ydiv ~= 0 then
-				yscroll = oyscroll / ydiv
-			end
-			if scrollfactor >= scrollfactormax then
+			local xscroll = xscroll / (i * scrollfactor + 1)
+			local yscroll = yscroll / (i * scrollfactory + 1)
+			if reversescrollfactor(scrollfactor) == 1 then
 				xscroll = 0
 			end
 			if reversescrollfactor(scrollfactory) == 1 then
