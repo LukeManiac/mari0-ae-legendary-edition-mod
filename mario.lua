@@ -2982,6 +2982,7 @@ function mario:platformcarry(speedy)
 	end
 	self.platformcarryspeedy = speedy
 	self.platformcarryframes = 2
+	self.shoehopping = false --landed on it
 end
 
 function mario:movement(dt)

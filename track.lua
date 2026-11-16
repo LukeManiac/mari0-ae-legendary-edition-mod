@@ -515,7 +515,7 @@ function trackcontroller:update(dt)
 					if (not b.noplatformcarrying) and inrange(w.x, b.x-w.width, b.x+b.width) then --vertical carry
 						if ( (w.y == b.y - w.height) or 
 							( (w.y+w.height >= b.y-0.1-math.max(0,math.abs(ydiff)) and w.y+w.height-math.max(0,w.speedy*dt) <= b.y+0.2-math.min(0,ydiff)) ) )
-							and (not w.jumping) and (not w.vine) and (not w.shoehopping) then
+							and (not w.jumping) and (not w.vine) and not (w.shoehopping and w.speedy < ydiff/dt) then
 							if #checkrect(w.x+xdiff, b.y-w.height, w.width, w.height, {"exclude", w}, true, condition) == 0 then
 								if v == "player" and w.platformcarry then
 									w:platformcarry(ydiff/dt)

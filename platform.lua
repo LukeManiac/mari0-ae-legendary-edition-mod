@@ -156,7 +156,7 @@ function platform:update(dt)
 						if inrange(w.x, self.x-w.width, self.x+self.width) then --vertical carry
 							if ((w.y == self.y - w.height) or 
 								(w.y+w.height >= self.y-0.4 and w.y+w.height < self.y+0.4))
-								and (not w.jumping) and (not w.shoehopping) and not (self.speedy > 0 and w.speedy < 0) then --and w.speedy >= self.speedy
+								and (not w.jumping) and not (w.shoehopping and w.speedy < ydiff/dt) and not (self.speedy > 0 and w.speedy < 0) then --and w.speedy >= self.speedy
 								if #checkrect(w.x+xdiff, self.y-w.height, w.width, w.height, {"exclude", w}, true, condition) == 0 then
 									if v == "player" and w.platformcarry then
 										w:platformcarry(ydiff/dt)
@@ -186,7 +186,7 @@ function platform:update(dt)
 			for j, w in pairs(objects[v]) do
 				if (not w.ignoreplatform) and w.active then
 					if self.speedx ~= 0 then
-						if inrange(w.x, self.x-w.width, self.x+self.width) and (not w.shoehopping) then
+						if inrange(w.x, self.x-w.width, self.x+self.width) and not (w.shoehopping and w.speedy < self.speedy) then
 							if w.y == self.y - w.height then
 								if v == "player" and w.platformcarry then
 									w:platformcarry(self.speedy)
@@ -211,7 +211,7 @@ function platform:update(dt)
 						end
 					end
 					if self.speedy ~= 0 then
-						if not w.jumping and (not w.shoehopping) and inrange(w.x, self.x-w.width, self.x+self.width) and w.speedy and w.height then
+						if not w.jumping and not (w.shoehopping and w.speedy < self.speedy) and inrange(w.x, self.x-w.width, self.x+self.width) and w.speedy and w.height then
 							local clip_past_platform = (w.y+w.height-w.speedy*dt < self.y and w.y+w.height > self.y)
 							if inrange(w.y, self.y - w.height - 0.1, self.y - w.height + 0.1) or clip_past_platform then
 								if v == "player" and w.platformcarry then
@@ -248,7 +248,7 @@ function platform:update(dt)
 		for i, v in pairs(self.checktable) do
 			for j, w in pairs(objects[v]) do
 				if (not w.ignoreplatform) and w.active then
-					if not w.jumping and (not w.shoehopping) and inrange(w.x, self.x-w.width, self.x+self.width) then
+					if not w.jumping and not (w.shoehopping and w.speedy < self.speedy) and inrange(w.x, self.x-w.width, self.x+self.width) then
 						if inrange(w.y, self.y - w.height - 0.1, self.y - w.height + 0.1) then
 							if v == "player" and w.platformcarry then
 								w:platformcarry(self.speedy)
