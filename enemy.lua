@@ -2028,11 +2028,8 @@ function enemy:update(dt)
 					if (not self.noplatformcarrying) and inrange(w.x, self.x-w.width, self.x+self.width) then --vertical carry
 						if ((w.y == self.y - w.height) or 
 							((self.movement == "circle" or self.movement == "flyvertical" or self.movement == "path" or self.speedy ~= 0) and w.y+w.height >= self.y-0.1 and w.y+w.height < self.y+0.1))
-							and (not w.jumping) and not (w.shoehopping and w.speedy < ydiff/dt) and not (self.speedy > 0 and w.speedy < 0) then --and w.speedy >= self.speedy
+							and (not w.jumping) and not (self.speedy > 0 and w.speedy < 0) then --and w.speedy >= self.speedy
 							if #checkrect(w.x+xdiff, self.y-w.height, w.width, w.height, {"exclude", w}, true, condition) == 0 then
-								if v == "player" and w.platformcarry then
-									w:platformcarry(ydiff/dt)
-								end
 								w.oldxplatform = w.x
 								w.x = w.x + xdiff
 								w.y = self.y-w.height

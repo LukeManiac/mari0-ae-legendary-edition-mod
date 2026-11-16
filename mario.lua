@@ -2702,13 +2702,6 @@ function mario:update(dt)
 		if self.redseesaw then
 			self.redseesaw = self.redseesaw - dt
 		end
-		if self.platformcarryframes then
-			self.platformcarryframes = self.platformcarryframes - 1
-			if self.platformcarryframes <= 0 then
-				self.platformcarryframes = nil
-				self.platformcarryspeedy = nil
-			end
-		end
 		
 		--self.water = underwater
 		if not underwater then
@@ -2947,42 +2940,6 @@ function mario:updateangle()
 			end
 		end
 	end
-end
-
-function mario:canshoehop(speedy)
-	--goomba shoe, stiletto and dry bones shell hop while walking on the ground or on a moving platform
-	if (not self.shoe) or self.shoe == "yoshi" or self.shoehopping then
-		return false
-	end
-	if self[speedy] == 0 then
-		return true
-	end
-	return speedy == "speedy" and self.platformcarryspeedy ~= nil
-end
-
-function mario:shoehop(speedy)
-	--hop relative to a platform that's moving up, so the shoe actually leaves it
-	local base = 0
-	if speedy == "speedy" and self.platformcarryspeedy then
-		base = math.min(0, self.platformcarryspeedy)
-	end
-	self[speedy] = base - goombashoehop
-	self.shoehopping = true
-	self.shoehopbase = base
-	if self.shoe == "heel" then
-		playsound(heelsound)
-		heelsound:setPitch(1+(math.random(1,10)/20-.25))
-	end
-end
-
-function mario:platformcarry(speedy)
-	--called by platforms, tracks and platform enemies while they carry this player
-	if speedy ~= speedy or speedy == math.huge or speedy == -math.huge then --dt was 0
-		speedy = 0
-	end
-	self.platformcarryspeedy = speedy
-	self.platformcarryframes = 2
-	self.shoehopping = false --landed on it
 end
 
 function mario:movement(dt)
@@ -3227,8 +3184,8 @@ function mario:movement(dt)
 				if self.size == 14 and self[speedx] == maxrunspeed and (not self.shoe) and (not self.pickup) and (not self.helmet) then --get into blueshell
 					self:duck(true)
 				end
-				if self:canshoehop(speedy) then --goomba shoe
-					self:shoehop(speedy)
+				if self.shoe and self.shoe ~= "yoshi" and self[speedy] == 0 then --goomba shoe
+					self[speedy] = -goombashoehop; if self.shoe == "heel" then playsound(heelsound); heelsound:setPitch(1+(math.random(1,10)/20-.25)) end
 				end
 			end
 			
@@ -4022,11 +3979,7 @@ function mario:jump(force)
 					self.falling = false
 				end
 				
-				local shoespeedy = self.speedy
-				if self.shoehopping and self.shoehopbase then
-					shoespeedy = shoespeedy - self.shoehopbase --hopping off a platform that's moving up
-				end
-				if self.shoe and (((not lowgravity) and (shoespeedy > 8 or shoespeedy < -goombashoehop)) or (lowgravity and (shoespeedy > 4.5 or shoespeedy < -goombashoehop))) then
+				if self.shoe and (((not lowgravity) and (self.speedy > 8 or self.speedy < -goombashoehop)) or (lowgravity and (self.speedy > 4.5 or self.speedy < -goombashoehop))) then
 					return
 				elseif self.shoe == "drybonesshell" and self.ducking then
 					return
@@ -5216,11 +5169,6 @@ end
 
 function mario:floorcollide(a, b)
 	self.rainboomallowed = true
-	self.shoehopping = false
-	if self.gravitydir == "down" and b and type(b.speedy) == "number" and b.speedy ~= 0 and (a == "platform" or b.platform or b.trackplatform) then
-		--landed on a moving platform: the next shoe hop goes off its speed, not 0
-		self:platformcarry(b.speedy)
-	end
 	if self.jumping and (a == "platform" or a == "seesawplatform" or a == "donut") and self.speedy < -self.characterdata.jumpforce + 0.1 then
 		return false
 	end
