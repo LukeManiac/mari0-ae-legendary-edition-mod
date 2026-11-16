@@ -1911,8 +1911,8 @@ function defaultconfig()
 	volume = 1
 	mappack = "smb"
 	vsync = false
-	mappackfolder = "mappacks"
-	savesfolder = "saves"
+	mappackfolder = "alesans_entities/mappacks"
+	savesfolder = "alesans_entities/saves"
 	localnick = false
 	modmappacks = true
 	
