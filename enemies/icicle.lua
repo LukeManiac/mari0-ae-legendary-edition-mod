@@ -42,9 +42,9 @@ function icicle:init(x, y, t, respawn, r)
 			self.quad = iciclebigquad[1]
 		end
 		self.offsetX = 7
-		self.offsetY = -8
+		self.offsetY = 8
 		self.quadcenterX = 8
-		self.quadcenterY = 16
+		self.quadcenterY = 0
 
 		self.mask = {	true, 
 			false, false, false, false, true,
@@ -183,7 +183,7 @@ function icicle:update(dt)
 				self.shaking = true
 				self.shaketimer = 0
 			end
-			self.shaketimer = (self.shaketimer + donutoffsetspeed*dt)%1
+			self.shaketimer = (self.shaketimer + icicleoffsetspeed*dt)%1
 			self.rotation = math.sin(self.shaketimer*math.pi*2)*math.rad(icicleshakeangle)
 		elseif self.shaking then
 			self.shaking = false

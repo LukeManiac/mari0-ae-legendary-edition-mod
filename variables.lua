@@ -267,8 +267,9 @@ donutfalltime = 1 --how long a donut shakes before it falls
 donutoffsetspeed = 8 --shakes per second (donuts and small icicles)
 
 icicleshakedist = 5 --small icicles shake when a player below is this many tiles away
-iciclefalldist = 2 --small icicles stop shaking, wait goombadeathtime, then fall when a player below is this close
-icicleshakeangle = 18 --how far small icicles tilt each way while shaking, in degrees
+iciclefalldist = 3 --small icicles stop shaking, wait goombadeathtime, then fall when a player below is this close
+icicleshakeangle = 4.5 --how far small icicles tilt each way while shaking, in degrees
+icicleoffsetspeed = donutoffsetspeed/2
 
 muncheracceleration = 8
 muncheranimationspeed = 0.1
@@ -313,8 +314,8 @@ drybonesanimationspeed = 0.2
 drybonesjumpforce = 10
 drybonesflyinggravity = 30
 
-moleanimationspeed = 0.15
-molespeed = 3.5
+moleanimationspeed = 0.1
+molespeed = 4
 molechaserange = 2
 molebounceforce = molespeed*2
 moleacceleration = 14
