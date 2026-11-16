@@ -150,6 +150,7 @@ function thwomp:update(dt)
 			else
 				--reset sprite to calm
 				self.quad = thwompquad[spriteset][2]
+			end
 
 			local attackrange = 3
 			if self.t == "left" or self.t == "right" then
