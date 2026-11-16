@@ -423,7 +423,22 @@ A new nitpick, `inertiaphysics`. When you jump or fall off something that's movi
 
 #### 🗿 Thwomps
 
-* A Thwomp that hits a ceiling on the way back up can fall again straight away. So can a sideways Thwomp that hits a wall on its way back. Before, it had to wait half a second first. A Thwomp that stops because it got back to where it started still waits.
+* After a Thwomp pounds and goes back, it waits `thwomprestwait` seconds (0.25 by default, in `variables.lua`) before it can attack again. Before, it was half a second. The wait starts once it's stopped: when it gets back to its spawn, or when it hits a ceiling (or a wall for sideways Thwomps) with **return to spawn** off.
+* It keeps the same sprite while it waits, and doesn't look at players until the wait is over.
+* A left-facing Thwomp only notices a player whose x minus their width is less than its own x minus its width. Downward and right-facing Thwomps still only notice players below them or to their right.
+
+#### 🐹 Monty Moles
+
+* A mole that jumps out of the ground now keeps its jump sprite until it lands. It only starts its walking animation and chasing the player once it's back on the ground. Before, it switched to walking and started chasing while still in the air.
+
+#### ⛓️ Chain Chomps
+
+Chain Chomps now attack like in Super Mario Maker 2.
+
+* Once it spots a player, it stops and waits 1 second before lunging, instead of under half a second. The wait is set by `chainchompattackwait` in `variables.lua`.
+* While it waits, it keeps chomping like normal instead of freezing on one frame, and turns smoothly to face the player as soon as the wait starts. It keeps following the player until it lunges. How fast it turns is `chainchomprotatespeed` (12 by default, higher is faster).
+* It stays pointed the way it lunged until it starts heading back, then turns back upright.
+* While it's attacking, it chomps twice as fast.
 
 #### 🎬 Animations
 

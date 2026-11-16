@@ -63,7 +63,9 @@ function chainchomp:init(x, y)
 	self.randomattackadd = math.random(0, 200)/100
 	
 	self.free = false
-	self.freecount = 0
+	self.freecount = 0 --times the chain has stopped it lunging
+	self.blocked = false --the chain stopped this lunge (counted once per lunge)
+	self.freelinks = false --links of the broken chain that trail behind it once it's free
 	self.freebounce = 5
 
 	self.trackable = false
@@ -178,6 +180,15 @@ function chainchomp:update(dt)
 				self.x = self.targetx
 				self.y = self.targety
 				self.static = true
+				if not self.blocked then
+					--the chain stopped it: one more try at breaking free
+					self.blocked = true
+					self.freecount = self.freecount + 1
+					if self.freecount >= chainchompfreecount then
+						self:breakfree()
+						return false
+					end
+				end
 			end
 			
 			self.attack = self.attack - dt
@@ -224,14 +235,15 @@ function chainchomp:update(dt)
 				self.speedx = -chainchompfreespeed
 			end
 			self.animationtimer = self.animationtimer + dt
-			while self.animationtimer > goombaanimationspeed/2.5 do
+			while self.animationtimer > goombaanimationspeed/1.5 do
 				if self.quad == chainchompquad[spriteset][1] then
 					self.quad = chainchompquad[spriteset][2]
 				else
 					self.quad = chainchompquad[spriteset][1]
 				end
-				self.animationtimer = self.animationtimer - goombaanimationspeed/2.5
+				self.animationtimer = self.animationtimer - goombaanimationspeed/1.5
 			end
+			self:updatefreelinks(dt)
 		else
 			--slow down
 			if self.speedx > 0 then
@@ -276,12 +288,8 @@ function chainchomp:update(dt)
 			local dist = math.sqrt((x2 - x1)^2 + (y2 - y1)^2)
 			local angle = math.atan2(y2 - y1, x2 - x1)
 			if (dist > chainchompfreedist or self.freecount >= chainchompfreecount) and not (self.attacktimer > chainchompattackwait+self.randomattackadd) then
-				self.free = true
-				if self.speedx > 0 then
-					self.speedx = chainchompfreespeed
-				else
-					self.speedx = -chainchompfreespeed
-				end
+				self:breakfree()
+				return false
 			end
 			
 			if dist > self.range and self.x > self.cox-.5 and self.speedx > 0 then
@@ -316,7 +324,7 @@ function chainchomp:update(dt)
 				local rx, ry = (self.targetx + -self.x), (self.targety + -self.y)
 				local d = math.sqrt(rx*rx+ry*ry)
 				self.chargespeedx, self.chargespeedy = (rx)/d*(chainchompattackspeed), (ry)/d*(chainchompattackspeed)
-				self.freecount = self.freecount + 1
+				self.blocked = false
 			elseif self.attacktimer > chainchompattackwait+self.randomattackadd then
 				if self.targetplayer then
 					if self.targetplayer.x+self.targetplayer.width/2 < self.x+self.width/2 then
@@ -362,6 +370,19 @@ function chainchomp:update(dt)
 end
 
 function chainchomp:draw()
+	if self.free and not self.shot then
+		--the broken chain trailing behind it
+		if self.freelinks then
+			love.graphics.setColor(255, 255, 255)
+			local s = self.supersized or 1
+			for i = #self.freelinks, 1, -1 do
+				local l = self.freelinks[i]
+				love.graphics.draw(chainchompimg, chainchompquad[spriteset][3],
+					math.floor((l.x-s*.25-xscroll)*16*scale), math.floor((l.y-s*.25-yscroll-.5)*16*scale),
+					0, s*scale, s*scale)
+			end
+		end
+	end
 	if not self.shot and not self.free then
 		--draw the chain
 		love.graphics.setColor(255, 255, 255)
@@ -494,4 +515,82 @@ end
 
 function chainchomp:dospawnanimation(a)
 	self.free = true
+end
+
+--the stake gives way: runs off with its chain trailing behind it, like in Super Mario Maker 2
+function chainchomp:breakfree()
+	--keeps going the way it lunged
+	local dir = self.speedx
+	if self.attack and self.chargespeedx then
+		dir = self.chargespeedx
+	end
+	self.free = true
+	self.attack = false
+	self.returnn = false
+	self.static = false
+	self.gravity = nil
+	self.mask[2] = false
+	self.attacktimer = 0
+	self.targetplayer = false
+	self.targetangle = false
+	self.targetx = false
+	self.targety = false
+	self.chargespeedx = false
+	self.chargespeedy = false
+	self.speedy = 0
+	if dir and dir > 0 then
+		self.speedx = chainchompfreespeed
+		self.animationdirection = "left"
+	else
+		self.speedx = -chainchompfreespeed
+		self.animationdirection = "right"
+	end
+
+	--the links start where the chain was drawn, from the chomp back to the stake
+	local s = self.supersized or 1
+	local cx, cy = self.x+self.width/2, self.y+self.height/2
+	local sx, sy = self.cox-s*12/16+s*.25, self.coy-s*12/16+s*.25
+	self.freelinks = {}
+	for i = 1, 4 do
+		local t = 1-(i-.5)/4
+		table.insert(self.freelinks, {x = sx+(cx-sx)*t, y = sy+(cy-sy)*t, speedy = 0})
+	end
+end
+
+--each link falls, rests on solid tiles, and is dragged along by the one in front of it (the first one by the chomp)
+function chainchomp:updatefreelinks(dt)
+	local cx, cy = self.x+self.width/2, self.y+self.height/2
+	if not self.freelinks then
+		self.freelinks = {}
+		for i = 1, 4 do
+			table.insert(self.freelinks, {x = cx, y = cy, speedy = 0})
+		end
+	end
+	local linkdist = chainchompfreelinkdist*(self.supersized or 1)
+	local px, py = cx, cy
+	for i, l in ipairs(self.freelinks) do
+		l.speedy = math.min(maxyspeed, l.speedy + yacceleration*dt)
+		l.y = l.y + l.speedy*dt
+
+		--drag along behind the link in front
+		local dx, dy = l.x-px, l.y-py
+		local d = math.sqrt(dx*dx+dy*dy)
+		if d > linkdist then
+			l.x = px + dx/d*linkdist
+			l.y = py + dy/d*linkdist
+			if l.y < py and l.speedy > 0 then
+				l.speedy = 0
+			end
+		end
+
+		--rest on solid tiles (only while the chomp hasn't fallen through the ground)
+		if self.mask[1] ~= false then
+			local tx, ty = math.floor(l.x)+1, math.floor(l.y+.25)+1
+			if inmap(tx, ty) and tilequads[map[tx][ty][1]]:getproperty("collision", tx, ty) then
+				l.y = ty-1-.25
+				l.speedy = 0
+			end
+		end
+		px, py = l.x, l.y
+	end
 end
