@@ -65,6 +65,7 @@ function chainchomp:init(x, y)
 	self.free = false
 	self.freecount = 0 --times the chain has stopped it lunging
 	self.blocked = false --the chain stopped this lunge (counted once per lunge)
+	self.wallstop = false --a wall or ceiling stopped this lunge before the chain did
 	self.freetrail = false --once it's free: the path it took (newest first), which the broken chain's links follow
 	self.freelinks = false --positions of the broken chain's links
 	self.freebounce = 5
@@ -81,27 +82,33 @@ function chainchomp:aimrotation(angle)
 	return (angle + math.pi)%(math.pi*2) - math.pi
 end
 
+--chain chomps never lunge downward: anything below level is aimed straight sideways instead
+function chainchomp:levelangle(angle)
+	if math.sin(angle) <= 0 then
+		return angle
+	end
+	if math.cos(angle) >= 0 then
+		return 0
+	end
+	return math.pi
+end
+
 function chainchomp:update(dt)
 	if self.frozen then
 		return
 	end
 	
-	--waiting to attack or charging: turn smoothly to face the player (or where it's charging)
-	local aimangle
-	if not self.shot and not self.free then
-		if self.attack and not self.returnn then
-			aimangle = self.targetangle
-		elseif (not self.attack) and self.targetplayer and self.attacktimer > chainchompattackwait+self.randomattackadd then
-			local p = self.targetplayer
-			aimangle = math.atan2((p.y+p.height/2)-(self.y+self.height/2), (p.x+p.width/2)-(self.x+self.width/2))
+	--waiting to attack or charging: holds the rotation it locked on with when the wait started
+	local aiming = false
+	if not self.shot and not self.free and self.targetangle then
+		if self.attack then
+			aiming = not self.returnn
+		else
+			aiming = self.attacktimer > chainchompattackwait+self.randomattackadd
 		end
 	end
 	
-	if aimangle then
-		local target = self:aimrotation(aimangle)
-		local diff = (target - self.rotation + math.pi)%(math.pi*2) - math.pi
-		self.rotation = self.rotation + diff*math.min(1, chainchomprotatespeed*dt)
-	else
+	if not aiming then
 		--rotate back to 0 (portals)
 		self.rotation = math.fmod(self.rotation, math.pi*2)
 		if self.rotation > 0 then
@@ -177,11 +184,17 @@ function chainchomp:update(dt)
 					end
 				end
 			end
+			if self.wallstop and not self.returnn then
+				--stopped against a wall or ceiling: stays there instead of reaching the end of the chain
+				freeze = true
+			end
 			if freeze and not self.returnn then
-				self.x = self.targetx
-				self.y = self.targety
+				if not self.wallstop then
+					self.x = self.targetx
+					self.y = self.targety
+				end
 				self.static = true
-				if not self.blocked then
+				if not self.blocked and not self.wallstop then
 					--the chain stopped it: one more try at breaking free
 					self.blocked = true
 					self.freecount = self.freecount + 1
@@ -209,6 +222,7 @@ function chainchomp:update(dt)
 				self.y = self.targety
 				self.attack = false
 				self.returnn = false
+				self.wallstop = false
 				self.gravity = nil
 				self.attacktimer = 0
 				self.targetplayer = false
@@ -230,10 +244,13 @@ function chainchomp:update(dt)
 				end
 			end
 		elseif self.free then --break free
+			--faces the way it's going (the sprite faces left, and is flipped when facing right)
 			if self.speedx > 0 then
 				self.speedx = chainchompfreespeed
+				self.animationdirection = "left"
 			else
 				self.speedx = -chainchompfreespeed
+				self.animationdirection = "right"
 			end
 			self.animationtimer = self.animationtimer + dt
 			while self.animationtimer > goombaanimationspeed/1.5 do
@@ -318,21 +335,27 @@ function chainchomp:update(dt)
 			if self.attacktimer > chainchompattackstart+self.randomattackadd then
 				self.gravity = 0
 				self.attack = chainchompattacktime
-				local x2, y2 = self.targetplayer.x+self.targetplayer.width/2, self.targetplayer.y+self.targetplayer.height/2
-				self.targetangle = math.atan2(y2 - y1, x2 - x1)
+				if not self.targetangle then
+					local x2, y2 = self.targetplayer.x+self.targetplayer.width/2, self.targetplayer.y+self.targetplayer.height/2
+					self.targetangle = self:levelangle(math.atan2(y2 - y1, x2 - x1))
+				end
 				self.targetx = self.cox-.5+(math.cos(self.targetangle)*self.range)-self.width/2
 				self.targety = self.coy-.5+(math.sin(self.targetangle)*self.range)-self.height/2
+				if self.targety > self.y then
+					--never lunges even a bit downward
+					self.targety = self.y
+				end
 				local rx, ry = (self.targetx + -self.x), (self.targety + -self.y)
 				local d = math.sqrt(rx*rx+ry*ry)
+				if d == 0 then
+					rx, d = 1, 1
+				end
 				self.chargespeedx, self.chargespeedy = (rx)/d*(chainchompattackspeed), (ry)/d*(chainchompattackspeed)
 				self.blocked = false
+				self.wallstop = false
 			elseif self.attacktimer > chainchompattackwait+self.randomattackadd then
 				if self.targetplayer then
-					if self.targetplayer.x+self.targetplayer.width/2 < self.x+self.width/2 then
-						self.animationdirection = "right"
-					else
-						self.animationdirection = "left"
-					end
+					--locked on: keeps facing and pointing where it was when the wait started
 					self.speedx = 0
 				else
 					local closestplayer = false
@@ -354,6 +377,10 @@ function chainchomp:update(dt)
 							self.animationdirection = "left"
 						end
 						self.speedx = 0
+						--lock on: point straight at the player now, and lunge this way when the wait is over
+						local x2, y2 = self.targetplayer.x+self.targetplayer.width/2, self.targetplayer.y+self.targetplayer.height/2
+						self.targetangle = self:levelangle(math.atan2(y2 - y1, x2 - x1))
+						self.rotation = self:aimrotation(self.targetangle)
 					else
 						self.attacktimer = 0
 					end
@@ -419,9 +446,36 @@ function chainchomp:freeze()
 	self.frozen = true
 end
 
+--hit a solid tile on the side or above: dir is the way it should go to move away from it (1 right, -1 left, 0 for ceilings)
+function chainchomp:hitwall(a, dir)
+	if a ~= "tile" then
+		return false
+	end
+	if self.attack then
+		if self.returnn then
+			--heading home along the way it came: don't get stuck
+			return false
+		end
+		self.wallstop = true
+		return true
+	end
+	if dir ~= 0 then
+		if self.free then
+			self.speedx = chainchompfreespeed*dir
+		else
+			self.speedx = chainchompspeed*dir
+		end
+	end
+	return true
+end
+
 function chainchomp:leftcollide(a, b)
 	if self:globalcollide(a, b) then
 		return false
+	end
+	
+	if self:hitwall(a, 1) then
+		return true
 	end
 	
 	if self.free then
@@ -440,6 +494,10 @@ function chainchomp:rightcollide(a, b)
 		return false
 	end
 	
+	if self:hitwall(a, -1) then
+		return true
+	end
+	
 	if self.free then
 		return false
 	end
@@ -454,6 +512,10 @@ end
 function chainchomp:ceilcollide(a, b)
 	if self:globalcollide(a, b) then
 		return false
+	end
+	
+	if self:hitwall(a, 0) then
+		return true
 	end
 	
 	if self.free then
@@ -524,6 +586,7 @@ function chainchomp:breakfree()
 	self.free = true
 	self.attack = false
 	self.returnn = false
+	self.wallstop = false
 	self.static = false
 	self.gravity = nil
 	self.mask[2] = false

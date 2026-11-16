@@ -436,9 +436,15 @@ A new nitpick, `inertiaphysics`. When you jump or fall off something that's movi
 Chain Chomps now attack like in Super Mario Maker 2.
 
 * Once it spots a player, it stops and waits 1 second before lunging, instead of under half a second. The wait is set by `chainchompattackwait` in `variables.lua`.
-* While it waits, it keeps chomping like normal instead of freezing on one frame, and turns smoothly to face the player as soon as the wait starts. It keeps following the player until it lunges. How fast it turns is `chainchomprotatespeed` (12 by default, higher is faster).
-* It stays pointed the way it lunged until it starts heading back, then turns back upright.
+* While it waits, it keeps chomping like normal instead of freezing on one frame.
+* As soon as the wait starts, it points straight at the player and locks on. It doesn't turn while it waits, and it lunges the way it locked on, even if the player has moved.
+* It stays pointed that way until it starts heading back, then turns back upright.
+* It never lunges downward. If the player is even a little below it, it lunges straight sideways instead.
+* Chain Chomps no longer pass through walls or ceilings. A lunge that hits one stops there (this doesn't count as a try at breaking free). Walking or bouncing into a wall turns them around, and a free Chain Chomp bumps its head on ceilings instead of going through.
 * While it's attacking, it chomps twice as fast.
+* A try at breaking free now counts when the chain actually stops a lunge, not when the lunge starts. As soon as that count reaches `chainchompfreecount`, the stake gives way: the Chain Chomp keeps going the way it lunged, with its broken chain trailing behind it.
+* The links follow it like a Wiggler's body: each one traces the exact path the Chain Chomp took, a set distance behind the one in front. The spacing is `chainchompfreelinkdist` (6/16 of a tile by default). A Chain Chomp that comes out free (from a pipe, for example) trails a chain too.
+* A free Chain Chomp keeps bouncing along the ground instead of dropping through it after a few bounces, and always faces the way it's going.
 
 #### 🎬 Animations
 
