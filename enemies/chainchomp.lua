@@ -539,22 +539,13 @@ function chainchomp:floorcollide(a, b)
 	end
 	
 	if not self.attack and self.attacktimer < chainchompattackwait+self.randomattackadd then
-		if self.free then
-			--keeps bouncing along the ground
-			if lowgravity then
-				self.speedy = -10
-			else
-				self.speedy = -20
-			end
+		if lowgravity then
+			self.speedy = -5
 		else
-			if lowgravity then
-				self.speedy = -5
-			else
-				self.speedy = -10
-			end
-			if a == "tile" then
-				self.cfloor = b.coy
-			end
+			self.speedy = -10
+		end
+		if a == "tile" and not self.free then
+			self.cfloor = b.coy
 		end
 	end
 end
