@@ -111,7 +111,7 @@ function physicsupdate(dt, only)
 		for _, p in pairs(lobjects["player"]) do
 			inertiaupdate(p)
 		end
-	endm
+	end
 	
 	for j, w in kpairs(lobjects, objectskeys) do
 		if j ~= "tile" and j ~= "buttonblock" and j ~= "tracksegment" then
