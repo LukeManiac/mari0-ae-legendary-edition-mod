@@ -156,8 +156,11 @@ function platform:update(dt)
 						if inrange(w.x, self.x-w.width, self.x+self.width) then --vertical carry
 							if ((w.y == self.y - w.height) or 
 								(w.y+w.height >= self.y-0.4 and w.y+w.height < self.y+0.4))
-								and (not w.jumping) and not (self.speedy > 0 and w.speedy < 0) then --and w.speedy >= self.speedy
+								and (not w.jumping) and (not w.shoehopping) and not (self.speedy > 0 and w.speedy < 0) then --and w.speedy >= self.speedy
 								if #checkrect(w.x+xdiff, self.y-w.height, w.width, w.height, {"exclude", w}, true, condition) == 0 then
+									if v == "player" and w.platformcarry then
+										w:platformcarry(ydiff/dt)
+									end
 									w.oldxplatform = w.x
 									w.x = w.x + xdiff
 									w.y = self.y-w.height
@@ -183,8 +186,11 @@ function platform:update(dt)
 			for j, w in pairs(objects[v]) do
 				if (not w.ignoreplatform) and w.active then
 					if self.speedx ~= 0 then
-						if inrange(w.x, self.x-w.width, self.x+self.width) then
+						if inrange(w.x, self.x-w.width, self.x+self.width) and (not w.shoehopping) then
 							if w.y == self.y - w.height then
+								if v == "player" and w.platformcarry then
+									w:platformcarry(self.speedy)
+								end
 								if ((not w.playernumber) and not checkintile(w.x+self.speedx*dt, w.y, w.width, w.height, {}, w, "ignoreplatforms")) or
 									(w.playernumber and #checkrect(w.x+self.speedx*dt, w.y, w.width, w.height, {"exclude", w}, true) == 0) then
 									w.oldxplatform = w.x
@@ -205,9 +211,12 @@ function platform:update(dt)
 						end
 					end
 					if self.speedy ~= 0 then
-						if not w.jumping and inrange(w.x, self.x-w.width, self.x+self.width) and w.speedy and w.height then
+						if not w.jumping and (not w.shoehopping) and inrange(w.x, self.x-w.width, self.x+self.width) and w.speedy and w.height then
 							local clip_past_platform = (w.y+w.height-w.speedy*dt < self.y and w.y+w.height > self.y)
 							if inrange(w.y, self.y - w.height - 0.1, self.y - w.height + 0.1) or clip_past_platform then
+								if v == "player" and w.platformcarry then
+									w:platformcarry(self.speedy)
+								end
 								local x1, y1 = math.ceil(w.x+0.01), math.ceil(self.y+self.height)
 								local x2, y2 = math.ceil(w.x+w.width), math.ceil(self.y+self.height)
 								local maxy, col = math.huge, false
@@ -239,8 +248,11 @@ function platform:update(dt)
 		for i, v in pairs(self.checktable) do
 			for j, w in pairs(objects[v]) do
 				if (not w.ignoreplatform) and w.active then
-					if not w.jumping and inrange(w.x, self.x-w.width, self.x+self.width) then
+					if not w.jumping and (not w.shoehopping) and inrange(w.x, self.x-w.width, self.x+self.width) then
 						if inrange(w.y, self.y - w.height - 0.1, self.y - w.height + 0.1) then
+							if v == "player" and w.platformcarry then
+								w:platformcarry(self.speedy)
+							end
 							numberofobjects = numberofobjects + 1
 							if #checkrect(w.x, w.y, w.width, w.height, {"exclude", w}) == 0 then
 								local x1, y1 = math.ceil(w.x+0.01), math.ceil(self.y+self.height)

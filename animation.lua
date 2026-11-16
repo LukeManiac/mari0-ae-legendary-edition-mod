@@ -670,7 +670,7 @@ function animation:update(dt)
 					if v[1] == "loadlevelinstant" then
 						levelscreentimer = blacktime
 					end
-				end)
+				end, nil, nil, true)
 			elseif v[1] == "nextlevel" then
 				nextlevel()
 			elseif v[1] == "disableplayeraim" then

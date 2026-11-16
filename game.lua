@@ -1435,8 +1435,7 @@ function game_update(dt)
 	end
 
 	--camerasmoothing: what's shown (and used until the next frame) is the smoothed camera
-	camerasmoothing_apply("shared", splitxscroll, splityscroll, 1, dt,
-		math.max(0, mapwidth-width*screenzoom2), math.max(0, mapheight-height*screenzoom2-1))
+	camerasmoothing_apply("shared", splitxscroll, splityscroll, 1, dt, math.max(0, mapwidth-width*screenzoom2), math.max(0, mapheight-height*screenzoom2-1))
 	xscroll, yscroll = splitxscroll[1], splityscroll[1]
 
 	updateenemycamerarelativepositions()
@@ -6791,10 +6790,11 @@ function maptransitionsdisabled()
 	return NoTransitions or (disabletransition and gamestate == "game" and not editormode)
 end
 
-function startwarpfade(func, iswarp, fadein)
+function startwarpfade(func, iswarp, fadein, blockdeath)
 	--fades the screen to black, then calls func (which loads the next map)
 	--iswarp: loaded via pipe, door, vine or warp, so the next map doesn't fade in from black
 	--fadein: fade back in from black after func has run
+	--blockdeath: players can't die while the screen is fading out
 	if warpfade then
 		return false
 	end
@@ -6809,7 +6809,7 @@ function startwarpfade(func, iswarp, fadein)
 		end
 		return true
 	end
-	warpfade = {t = 0, func = func, iswarp = iswarp, fadein = fadein}
+	warpfade = {t = 0, func = func, iswarp = iswarp, fadein = fadein, blockdeath = blockdeath}
 	warpfadein = nil
 	return true
 end
@@ -6950,7 +6950,7 @@ function nextlevel()
 		end
 		
 		levelscreen_load("next")
-	end)
+	end, nil, nil, true)
 end
 
 function warpzone(i, l)
