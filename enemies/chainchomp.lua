@@ -125,13 +125,13 @@ function chainchomp:update(dt)
 		if self.attack then
 			--charge at player, chomping twice as fast
 			self.animationtimer = self.animationtimer + dt
-			while self.animationtimer > goombaanimationspeed/2 do
+			while self.animationtimer > goombaanimationspeed/2.5 do
 				if self.quad == chainchompquad[spriteset][1] then
 					self.quad = chainchompquad[spriteset][2]
 				else
 					self.quad = chainchompquad[spriteset][1]
 				end
-				self.animationtimer = self.animationtimer - goombaanimationspeed/2
+				self.animationtimer = self.animationtimer - goombaanimationspeed/2.5
 			end
 			
 			self.mask[2] = true
@@ -224,13 +224,13 @@ function chainchomp:update(dt)
 				self.speedx = -chainchompfreespeed
 			end
 			self.animationtimer = self.animationtimer + dt
-			while self.animationtimer > goombaanimationspeed/1.5 do
+			while self.animationtimer > goombaanimationspeed/2.5 do
 				if self.quad == chainchompquad[spriteset][1] then
 					self.quad = chainchompquad[spriteset][2]
 				else
 					self.quad = chainchompquad[spriteset][1]
 				end
-				self.animationtimer = self.animationtimer - goombaanimationspeed/1.5
+				self.animationtimer = self.animationtimer - goombaanimationspeed/2.5
 			end
 		else
 			--slow down
