@@ -610,7 +610,7 @@ chainchompattackspeed = 22 --speed it charges at the player
 chainchompattacktime = 1 --how long it stays "attacking"
 chainchompfreedist = 6 --how far it has to be to break free
 chainchompfreecount = 2 --how many times it has to attack to break free
-chainchompfreespeed = 4--how fast it goes when free
+chainchompfreespeed = 8--how fast it goes when free
 chainchompfreelinkdist = 6/16 --how far apart the links of a broken chain trail behind a free chain chomp
 
 rockywrenchintime = 2.5 --how long it is inside

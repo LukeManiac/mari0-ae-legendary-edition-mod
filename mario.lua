@@ -4727,10 +4727,10 @@ function mario:endsizechange()
 	if not c then
 		return
 	end
-	if c.blinking and not self.animation then
-		self.animation = "invincible"
+	if (c.blinking and not self.animation) or not sizechangefreezes() then
 		self.invincible = true
-		self.animationtimer = c.blinking
+		self.animation = "invincible"
+		self.animationtimer = sizechangefreezes() and c.blinking or (invincibletime - invincibletime2)
 	end
 	local size = self.size
 	--in the air too: a duck jump stays a duck jump (ducking only ends on landing, see mario:update)

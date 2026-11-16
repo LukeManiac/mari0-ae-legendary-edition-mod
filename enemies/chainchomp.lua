@@ -65,7 +65,8 @@ function chainchomp:init(x, y)
 	self.free = false
 	self.freecount = 0 --times the chain has stopped it lunging
 	self.blocked = false --the chain stopped this lunge (counted once per lunge)
-	self.freelinks = false --links of the broken chain that trail behind it once it's free
+	self.freetrail = false --once it's free: the path it took (newest first), which the broken chain's links follow
+	self.freelinks = false --positions of the broken chain's links
 	self.freebounce = 5
 
 	self.trackable = false
@@ -243,7 +244,7 @@ function chainchomp:update(dt)
 				end
 				self.animationtimer = self.animationtimer - goombaanimationspeed/1.5
 			end
-			self:updatefreelinks(dt)
+			self:updatefreelinks()
 		else
 			--slow down
 			if self.speedx > 0 then
@@ -477,16 +478,12 @@ function chainchomp:floorcollide(a, b)
 	
 	if not self.attack and self.attacktimer < chainchompattackwait+self.randomattackadd then
 		if self.free then
-			if self.freebounce <= 0 then
-				self.mask = {false}
-				return false
-			end
+			--keeps bouncing along the ground
 			if lowgravity then
 				self.speedy = -10
 			else
 				self.speedy = -20
 			end
-			self.freebounce = self.freebounce - 1
 		else
 			if lowgravity then
 				self.speedy = -5
@@ -546,51 +543,67 @@ function chainchomp:breakfree()
 		self.animationdirection = "right"
 	end
 
-	--the links start where the chain was drawn, from the chomp back to the stake
+	--the trail starts as the chain itself, from the chomp back to the stake
 	local s = self.supersized or 1
-	local cx, cy = self.x+self.width/2, self.y+self.height/2
-	local sx, sy = self.cox-s*12/16+s*.25, self.coy-s*12/16+s*.25
-	self.freelinks = {}
-	for i = 1, 4 do
-		local t = 1-(i-.5)/4
-		table.insert(self.freelinks, {x = sx+(cx-sx)*t, y = sy+(cy-sy)*t, speedy = 0})
-	end
+	self.freetrail = {
+		{x = self.x+self.width/2, y = self.y+self.height/2},
+		{x = self.cox-s*12/16+s*.25, y = self.coy-s*12/16+s*.25},
+	}
+	self:updatefreelinks()
 end
 
---each link falls, rests on solid tiles, and is dragged along by the one in front of it (the first one by the chomp)
-function chainchomp:updatefreelinks(dt)
+--like a Wiggler's body: the links follow the exact path the chomp took, each a set distance behind the one in front
+function chainchomp:updatefreelinks()
+	local s = self.supersized or 1
+	local linkdist = chainchompfreelinkdist*s
+	local links = 4
 	local cx, cy = self.x+self.width/2, self.y+self.height/2
-	if not self.freelinks then
-		self.freelinks = {}
-		for i = 1, 4 do
-			table.insert(self.freelinks, {x = cx, y = cy, speedy = 0})
+	
+	if not self.freetrail then
+		self.freetrail = {{x = cx, y = cy}}
+	end
+	local trail = self.freetrail
+	
+	--add where it is now to the front of the trail
+	local dx, dy = cx-trail[1].x, cy-trail[1].y
+	local moved = math.sqrt(dx*dx+dy*dy)
+	if moved > 2*s then
+		--teleported (portals): start the chain over from here
+		self.freetrail = {{x = cx, y = cy}}
+		trail = self.freetrail
+	elseif moved >= 1/16 then
+		table.insert(trail, 1, {x = cx, y = cy})
+	end
+	
+	--walk back along the trail, dropping a link every linkdist
+	self.freelinks = {}
+	local px, py = cx, cy
+	local walked = 0
+	local nextlink = linkdist
+	local last = 1
+	for i = 1, #trail do
+		local t = trail[i]
+		local sx, sy = t.x-px, t.y-py
+		local seg = math.sqrt(sx*sx+sy*sy)
+		while seg > 0 and walked+seg >= nextlink and #self.freelinks < links do
+			local f = (nextlink-walked)/seg
+			table.insert(self.freelinks, {x = px+sx*f, y = py+sy*f})
+			nextlink = nextlink + linkdist
+		end
+		walked = walked + seg
+		px, py = t.x, t.y
+		last = i
+		if #self.freelinks >= links then
+			break
 		end
 	end
-	local linkdist = chainchompfreelinkdist*(self.supersized or 1)
-	local px, py = cx, cy
-	for i, l in ipairs(self.freelinks) do
-		l.speedy = math.min(maxyspeed, l.speedy + yacceleration*dt)
-		l.y = l.y + l.speedy*dt
-
-		--drag along behind the link in front
-		local dx, dy = l.x-px, l.y-py
-		local d = math.sqrt(dx*dx+dy*dy)
-		if d > linkdist then
-			l.x = px + dx/d*linkdist
-			l.y = py + dy/d*linkdist
-			if l.y < py and l.speedy > 0 then
-				l.speedy = 0
-			end
-		end
-
-		--rest on solid tiles (only while the chomp hasn't fallen through the ground)
-		if self.mask[1] ~= false then
-			local tx, ty = math.floor(l.x)+1, math.floor(l.y+.25)+1
-			if inmap(tx, ty) and tilequads[map[tx][ty][1]]:getproperty("collision", tx, ty) then
-				l.y = ty-1-.25
-				l.speedy = 0
-			end
-		end
-		px, py = l.x, l.y
+	--trail not long enough yet: the rest bunch up at its end
+	while #self.freelinks < links do
+		table.insert(self.freelinks, {x = px, y = py})
+	end
+	
+	--forget the part of the trail the last link has passed
+	for i = #trail, last+2, -1 do
+		table.remove(trail, i)
 	end
 end
