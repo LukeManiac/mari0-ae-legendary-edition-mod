@@ -2035,6 +2035,10 @@ function enemy:update(dt)
 								w.y = self.y-w.height
 								w.falling = false
 								w.speedy = self.speedy
+								if v == "player" and ydiff < 0 then
+									--rising carrier: stop physics from calling startfall (which sets "falling" and shows run frames instead of skidding)
+									w.falloverride = true
+								end
 							end
 						end
 					end
