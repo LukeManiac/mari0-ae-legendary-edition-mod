@@ -48,10 +48,70 @@
 --33: TRACK
 local rotatepoint, getslopey
 
+--INERTIA PHYSICS (the inertiaphysics nitpick)
+--Moving objects that carry a player (platforms, tracked objects, platform enemies, seesaws, snake blocks...) call
+--inertiacarry every frame they carry it, with their own speed. Once every object has updated, physicsupdate
+--works out what changed for each player:
+--* starts being carried (lands or steps on): speedx becomes relative to the object, speedx - objectspeedx
+--* stays carried: inertiaspeedx and inertiaspeedy follow the object's speed
+--* stops being carried (jumps or falls off): the object's speedx is added to speedx, and its speedy too if it was
+--  going up. inertiaspeedx and inertiaspeedy keep these values until the player is carried by something again
+function inertiacarry(w, carrier, speedx, speedy)
+	if not InertiaPhysics then
+		return
+	end
+	if not (w.playernumber and objects["player"][w.playernumber] == w) then
+		return
+	end
+	w.inertiacarried = true
+	w.inertiacarrier = carrier
+	w.inertiacarrierspeedx = speedx or 0
+	w.inertiacarrierspeedy = speedy or 0
+end
+
+local function inertiaupdate(p)
+	local carried = p.inertiacarried
+	p.inertiacarried = nil
+	
+	--pipes, cutscenes, death and sideways gravity: forget the object without flinging the player
+	if p.dead or p.animation or (not p.active) or (p.gravitydir and p.gravitydir ~= "down") then
+		p.inertiariding = false
+		p.inertiacarrier = nil
+		return
+	end
+	
+	if carried then
+		if not p.inertiariding then
+			p.inertiariding = true
+			p.speedx = p.speedx - p.inertiacarrierspeedx
+		end
+		p.inertiaspeedx = p.inertiacarrierspeedx
+		p.inertiaspeedy = p.inertiacarrierspeedy
+	elseif p.inertiariding then
+		p.inertiariding = false
+		p.inertiacarrier = nil
+		p.speedx = p.speedx + p.inertiaspeedx
+		if p.inertiaspeedy < 0 then
+			if p.jumping then
+				p.speedy = p.speedy + p.inertiaspeedy
+			else
+				--falling off: some objects already gave the player their speedy while carrying, don't add it twice
+				p.speedy = math.min(p.speedy, p.inertiaspeedy)
+			end
+		end
+	end
+end
+
 --only: optional, function(type, object) -> whether that object moves this time (everything still collides with it).
 --Used for the enemies with updatewhensizechange while the game is frozen for a size change (see game_update)
 function physicsupdate(dt, only)
 	local lobjects = objects
+	
+	if InertiaPhysics and (not only) then
+		for _, p in pairs(lobjects["player"]) do
+			inertiaupdate(p)
+		end
+	endm
 	
 	for j, w in kpairs(lobjects, objectskeys) do
 		if j ~= "tile" and j ~= "buttonblock" and j ~= "tracksegment" then

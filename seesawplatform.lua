@@ -61,6 +61,7 @@ function seesawplatform:update(dt)
 							maxy = y2-1-w.height
 						end
 						w.y = math.min(maxy, self.y - w.height + self.speedy*dt)
+						inertiacarry(w, self, 0, self.speedy)
 					end
 				end
 			end

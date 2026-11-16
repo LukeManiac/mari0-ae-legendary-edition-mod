@@ -530,6 +530,9 @@ function trackcontroller:update(dt)
 								elseif ydiff < 0 then
 									w.y = math.min(w.y+w.speedy*dt, b.y-w.height)
 								end
+								if dt > 0 then
+									inertiacarry(w, b, xdiff/dt, ydiff/dt)
+								end
 								--w.speedy = b.speedy
 							end
 						elseif (w.y >= b.y+b.height-0.1 and w.y <= b.y+b.height+0.1) and w.speedy < 0 and (not b.PLATFORM) then --bottom

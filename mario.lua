@@ -32,6 +32,11 @@ function mario:init(x, y, i, animation, size, t, properties)
 	--PHYSICS STUFF
 	self.speedx = 0
 	self.speedy = 0
+	--inertiaphysics nitpick (see inertiacarry in physics.lua)
+	self.inertiaspeedx = 0 --speed of the last moving object the player stood on
+	self.inertiaspeedy = 0
+	self.inertiariding = false --being carried by a moving object
+	self.inertiacarrier = nil --the object carrying the player
 	self.x = x
 	self.width = 12/16
 	self.height = 12/16

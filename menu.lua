@@ -1187,6 +1187,7 @@ local nitpickkeys = {
 	"classicspeedupfastmusic",
 	"modernsizechangeanimation",
 	"noairspeedcap",
+	"inertiaphysics",
 	"dontfreezeonsizechange",
 	"camerasmoothing",
 	"backwardsmoothing"

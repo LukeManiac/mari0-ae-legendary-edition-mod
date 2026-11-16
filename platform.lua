@@ -163,6 +163,9 @@ function platform:update(dt)
 									w.y = self.y-w.height
 									w.falling = false
 									w.speedy = self.speedy
+									if dt > 0 then
+										inertiacarry(w, self, xdiff/dt, ydiff/dt)
+									end
 								end
 							end
 						end
@@ -189,6 +192,7 @@ function platform:update(dt)
 									(w.playernumber and #checkrect(w.x+self.speedx*dt, w.y, w.width, w.height, {"exclude", w}, true) == 0) then
 									w.oldxplatform = w.x
 									w.x = w.x + self.speedx*dt
+									inertiacarry(w, self, self.speedx, self.speedy)
 									--make sure red koopas dont fall off
 									if v == "drybones" or (v == "koopa" and w.t == "red" and not w.small) or (v == "goomba" and (w.t == "goombrat" or w.t == "spiketop" or w.t == "wiggler")) or (w.turnaroundoncliff and not w.small) then
 										if not inrange(w.x+w.width/2+w.speedx*dt, self.x, self.x+self.width) then
@@ -220,6 +224,7 @@ function platform:update(dt)
 								if clip_past_platform then
 									w.speedy = 0
 								end
+								inertiacarry(w, self, self.speedx, self.speedy)
 							end
 						end
 					end

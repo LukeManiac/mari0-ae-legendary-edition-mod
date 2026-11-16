@@ -569,6 +569,7 @@ function goomba:update(dt)
 									if #checkrect(w.x+self.speedx*dt, w.y, w.width, w.height, {"exclude", w}, true) == 0 then
 										w.oldxplatform = w.x
 										w.x = w.x + self.speedx*dt
+										inertiacarry(w, self, self.speedx, 0)
 									end
 								end
 							end

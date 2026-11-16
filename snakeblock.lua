@@ -526,6 +526,8 @@ function snakeblock:update(dt)
 									--w.falling = false
 									--w.falloverride = true
 									w.speedy = self.speedy
+									--snake blocks don't carry sideways, only up and down
+									inertiacarry(w, self, 0, self.speedy)
 								end
 								self.active = true
 							end

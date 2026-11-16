@@ -2039,6 +2039,9 @@ function enemy:update(dt)
 									--rising carrier: stop physics from calling startfall (which sets "falling" and shows run frames instead of skidding)
 									w.falloverride = true
 								end
+								if dt > 0 then
+									inertiacarry(w, self, xdiff/dt, ydiff/dt)
+								end
 							end
 						end
 					end

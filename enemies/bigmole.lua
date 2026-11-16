@@ -64,6 +64,9 @@ function bigmole:update(dt)
 								w.falling = false
 								w.falloverridestrict = 2
 								w.speedy = math.min(self.speedy, w.speedy)
+								if dt > 0 then
+									inertiacarry(w, self, (self.x-self.oldx)/dt, self.speedy)
+								end
 							end
 						end
 					end
