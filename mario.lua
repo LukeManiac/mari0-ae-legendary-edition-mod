@@ -5217,6 +5217,10 @@ end
 function mario:floorcollide(a, b)
 	self.rainboomallowed = true
 	self.shoehopping = false
+	if self.gravitydir == "down" and b and type(b.speedy) == "number" and b.speedy ~= 0 and (a == "platform" or b.platform or b.trackplatform) then
+		--landed on a moving platform: the next shoe hop goes off its speed, not 0
+		self:platformcarry(b.speedy)
+	end
 	if self.jumping and (a == "platform" or a == "seesawplatform" or a == "donut") and self.speedy < -self.characterdata.jumpforce + 0.1 then
 		return false
 	end
