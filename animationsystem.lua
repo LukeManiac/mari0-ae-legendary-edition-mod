@@ -7,6 +7,10 @@ function animationsystem_load()
 	animationplayerhurttriggerfuncs = {}
 	animations = {}
 	animationschar = {}
+	--buttons whose press got triggered, so only their release gets triggered ([player][button] = true)
+	animationbuttonsheld = {}
+	--buttons released while paused or frozen, triggered once the game goes on ([player][button] = true)
+	animationbuttonspendingrelease = {}
 	
 	if not dcplaying and not minigameplaying then
 		local fl = love.filesystem.getDirectoryItems(mappackfolder .. "/" .. mappack .. "/animations")
@@ -44,7 +48,43 @@ function animationsystem_load()
 	end
 end
 
+--the game is paused (pause menu) or frozen (size change): key presses and player conditions don't trigger animations
+local function animationsystem_paused()
+	return pausemenuopen or noupdate
+end
+
+--whether player i is holding button right now
+local function animationsystem_buttondown(i, button)
+	if button == "jump" then return jumpkey(i)
+	elseif button == "left" then return leftkey(i)
+	elseif button == "right" then return rightkey(i)
+	elseif button == "up" then return upkey(i)
+	elseif button == "down" then return downkey(i)
+	elseif button == "run" then return runkey(i)
+	elseif button == "use" then return usekey(i)
+	elseif button == "reload" then return reloadkey(i)
+	end
+	return false
+end
+
 function animationsystem_update(dt)
+	--paused or frozen: no animation updates, so nothing runs, waits or counts time
+	if animationsystem_paused() then
+		return
+	end
+
+	--buttons released while the game was paused or frozen
+	if animationbuttonspendingrelease then
+		for i, t in pairs(animationbuttonspendingrelease) do
+			for button in pairs(t) do
+				t[button] = nil
+				if not animationsystem_buttondown(i, button) then
+					animationsystem_buttonreleasetrigger(i, button)
+				end
+			end
+		end
+	end
+
 	if not editormode then
 		for i, v in pairs(animations) do
 			v:update(dt)
@@ -76,6 +116,14 @@ function animationsystem_buttontrigger(i, button)
 		return
 	end
 
+	--paused or frozen: the press doesn't trigger anything (and its release won't either)
+	if animationsystem_paused() then
+		return
+	end
+
+	animationbuttonsheld[i] = animationbuttonsheld[i] or {}
+	animationbuttonsheld[i][button] = true
+
 	if not animationbuttontriggerfuncs[button] then
 		return
 	end
@@ -95,6 +143,19 @@ function animationsystem_buttonreleasetrigger(i, button)
 	if editormode then
 		return
 	end
+
+	local held = animationbuttonsheld[i]
+	if not (held and held[button]) then
+		--its press never got triggered (pressed while paused or frozen, or before the level started)
+		return
+	end
+	if animationsystem_paused() then
+		--trigger it once the game is unpaused or unfrozen, if the button is still released by then
+		animationbuttonspendingrelease[i] = animationbuttonspendingrelease[i] or {}
+		animationbuttonspendingrelease[i][button] = true
+		return
+	end
+	held[button] = nil
 	
 	if not animationbuttonreleasetriggerfuncs[button] then
 		return
@@ -112,7 +173,7 @@ function animationsystem_buttonreleasetrigger(i, button)
 end
 
 function animationsystem_playerlandtrigger(i)
-	if editormode then
+	if editormode or animationsystem_paused() then
 		return
 	end
 	if objects and objects["player"][i] and objects["player"][i].dead then
@@ -131,7 +192,7 @@ function animationsystem_playerlandtrigger(i)
 end
 
 function animationsystem_playerhurttrigger(i)
-	if editormode then
+	if editormode or animationsystem_paused() then
 		return
 	end
 	if objects and objects["player"][i] and objects["player"][i].dead then

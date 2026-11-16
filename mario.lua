@@ -36,6 +36,7 @@ function mario:init(x, y, i, animation, size, t, properties)
 	self.inertiaspeedx = 0 --speed of the last moving object the player stood on
 	self.inertiaspeedy = 0
 	self.inertiariding = false --being carried by a moving object
+	self.inertiaactive = false --left a moving object and hasn't stood on anything since (speedx includes inertiaspeedx)
 	self.inertiacarrier = nil --the object carrying the player
 	self.x = x
 	self.width = 12/16
@@ -5634,6 +5635,9 @@ function mario:floorcollide(a, b)
 		end
 	end
 
+	--inertiaphysics: standing on something, physicsupdate checks next frame if it was a moving object
+	self.inertiagrounded = true
+	
 	--land on ground
 	if self.gravitydir == "down" and (not self.fence) then
 		if fall then

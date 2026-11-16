@@ -71,24 +71,33 @@ end
 
 local function inertiaupdate(p)
 	local carried = p.inertiacarried
+	local grounded = p.inertiagrounded
 	p.inertiacarried = nil
-	
+	p.inertiagrounded = nil
+
 	--pipes, cutscenes, death and sideways gravity: forget the object without flinging the player
 	if p.dead or p.animation or (not p.active) or (p.gravitydir and p.gravitydir ~= "down") then
 		p.inertiariding = false
+		p.inertiaactive = false
 		p.inertiacarrier = nil
 		return
 	end
-	
+
 	if carried then
 		if not p.inertiariding then
 			p.inertiariding = true
-			p.speedx = p.speedx - p.inertiacarrierspeedx
+			--only make speedx relative if it has a moving object's speed in it. Coming from a tile (or anything
+			--stationary), speedx is kept like normal
+			if p.inertiaactive then
+				p.speedx = p.speedx - p.inertiacarrierspeedx
+			end
+			p.inertiaactive = false
 		end
 		p.inertiaspeedx = p.inertiacarrierspeedx
 		p.inertiaspeedy = p.inertiacarrierspeedy
 	elseif p.inertiariding then
 		p.inertiariding = false
+		p.inertiaactive = true
 		p.inertiacarrier = nil
 		p.speedx = p.speedx + p.inertiaspeedx
 		if p.inertiaspeedy < 0 then
@@ -99,6 +108,9 @@ local function inertiaupdate(p)
 				p.speedy = math.min(p.speedy, p.inertiaspeedy)
 			end
 		end
+	elseif grounded then
+		--landed on something stationary: its speed (0) is the new reference
+		p.inertiaactive = false
 	end
 end
 
