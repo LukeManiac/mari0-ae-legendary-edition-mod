@@ -385,6 +385,8 @@ All notable releases and updates to **Legendary Edition** are documented here.
 
 ### 🧩 New Features
 
+* For enemies that have `updatewhensizechange` set to true, the enemies they spawn (via `spawnsenemy` or `spawnchildren`) or transform into will have the parameter passed onto them, unless `donotpassupdatewhensizechange` is set to true.
+
 #### 🛹 Inertia Physics
 
 A new nitpick, `inertiaphysics`. When you jump or fall off something that's moving, you keep its speed, the same way you would in real life. **Generate Nitpicks File** adds it to an existing file.

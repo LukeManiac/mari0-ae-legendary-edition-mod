@@ -503,13 +503,16 @@ function enemy:init(x, y, t, a, properties)
 				if self.childrencanspawnchildren then
 					a = {}
 				end
-				local temp = enemy:new(self.x+self.width/2+.5+offsetx, self.y+self.height+offsety, self.spawnchildren[i], a)
-				if self.updatewhensizechange then
-					temp.updatewhensizechange = true --(it passes on to the children)
+				local properties
+				if self.updatewhensizechange and not self.donotpassupdatewhensizechange then
+					if not properties then properties = {} end
+					properties.updatewhensizechange = true
 				end
 				if self.spawnchildrenparent then
-					temp.parent = self
+					if not properties then properties = {} end
+					properties.parent = self
 				end
+				local temp = enemy:new(self.x+self.width/2+.5+offsetx, self.y+self.height+offsety, self.spawnchildren[i], a, properties)
 				if self.supersizechildren and self.supersized then
 					supersizeentity(temp)
 				end
@@ -3608,12 +3611,14 @@ function enemy:spawnenemy(t)
 			end
 		end
 	end
+
+	if self.updatewhensizechange and not self.donotpassupdatewhensizechange then
+		if not properties then properties = {} end
+		properties.updatewhensizechange = true
+	end
 	
 	local temp = enemy:new(self.x+self.width/2+.5+xoffset, self.y+self.height+yoffset, t, {}, properties)
 	temp.justspawned = true
-	if self.updatewhensizechange then
-		temp.updatewhensizechange = true --(it passes on to the enemies it spawns)
-	end
 
 	if not self.spawnpassedparametersbeforespawn then
 		if self.spawnpassedparameters then --pass parameters
@@ -3687,11 +3692,13 @@ function enemy:transform(t, returntransform, death)
 		end
 	end
 
+	if self.updatewhensizechange and not self.donotpassupdatewhensizechange then
+		if not properties then properties = {} end
+		properties.updatewhensizechange = true
+	end
+
 	local temp = enemy:new(self.x+self.width/2+.5+xoffset, self.y+self.height+yoffset, t, {}, properties)
 	temp.justspawned = true
-	if self.updatewhensizechange then
-		temp.updatewhensizechange = true --(it passes on to what it transforms into)
-	end
 	
 	--set parameters after spawn
 	if not self.transformpassedparametersbeforespawn then
