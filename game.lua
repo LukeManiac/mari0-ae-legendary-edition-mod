@@ -8890,6 +8890,9 @@ function controlplayers()
 end
 
 function isPauseKey(key)
+	if joypausepressed then
+		return true
+	end
 	for i = 1, controlplayers() do
 		if controlbindingmatcheskey(i, "pause", key) then
 			return true
@@ -9093,7 +9096,10 @@ function game_joystickpressed( joystick, button )
 	--pause with controller
 	for i = 1, controlplayers() do
 		if controlbindingmatchesjoy(i, "pause", joystick, button) then
+			--"escape" may not be a pause key any more, so tell isPauseKey this press counts
+			joypausepressed = true
 			game_keypressed("escape")
+			joypausepressed = false
 			break
 		end
 	end

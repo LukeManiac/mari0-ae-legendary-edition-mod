@@ -443,6 +443,10 @@ For anyone building menus with the GUI:
 * Switching to a player whose character has fewer colourables than the one you were editing no longer leaves the colour row pointing at a colourable that doesn't exist.
 * A character whose `colorables` list is empty is no longer treated as having colourables.
 
+### 🚨 Major Bug Fixes
+
+* Pause bound to a controller button now pauses and unpauses the game. Pressing it acted like pressing Escape, but the game only paused if Escape itself was a pause bind. Once pause was bound to a controller button instead, Escape wasn't, so the press did nothing. The controller's pause button is now always treated as a pause press, and it still backs out of the quit prompts like Escape does.
+
 ### ✨ Improvements
 
 * Escape now closes an open dropdown first in every options tab, instead of leaving the options menu with the dropdown still open.
