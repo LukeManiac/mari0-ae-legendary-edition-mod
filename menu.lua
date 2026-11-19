@@ -1327,6 +1327,763 @@ local function optionsmisc_draw()
 	end
 end
 
+------------------------------------------------------------------------
+--Skins options tab (optionstab == 2) widgets
+------------------------------------------------------------------------
+--keyboard rows: 2 player, 3 character, 4 hat, 5 colourable, 6-8 red, green and blue, 9-10 coop portal colours
+--(a character without colourables has its portal colours at 5 and 6)
+local optionsskinsgui = {"skin_player", "skin_character", "skin_hat", "skin_colorable", "skin_red", "skin_green", "skin_blue", "skin_portal1", "skin_portal2"}
+
+--layout, in game pixels
+local SKINS_RIGHT = 235 --right edge of the widgets, like the other tabs
+local SKINS_DROPDOWN_X = 118 --the character, hat and colourable dropdowns
+local SKINS_DROPDOWN_WIDTH = 13 --characters wide, so they end at SKINS_RIGHT
+local SKINS_PREVIEW_X, SKINS_PREVIEW_FEET = 50, 92 --middle and feet of the big character preview (drawn twice the size)
+local SKINS_PORTAL_X, SKINS_PORTAL_Y = 78, 56 --top left of the 32x32 portal preview
+local SKINS_CHARACTER_Y = 56
+local SKINS_CHARACTER_ROW = 32 --a character's skin (20 pixels, with room for a hat) and its name under it
+local SKINS_HAT_Y = 92
+local SKINS_HAT_ROW = 18 --fits the tallest hat (17 pixels)
+local SKINS_HAT_COLUMNS = 6
+local SKINS_COLORABLE_Y = 115
+local SKINS_RGB_Y = 130 --red, green and blue rows are 10 pixels apart
+local SKINS_PORTAL1_Y = 164 --label, with the slider 10 pixels under it
+local SKINS_PORTAL2_Y = 187
+local SKINS_SLIDER_RIGHT = 205
+local SKINS_SWATCH_X = 210 --the full colour previews, right of the sliders
+local SKINS_SWATCH_W = SKINS_RIGHT-SKINS_SWATCH_X
+local SKINS_SLIDER_H = 9
+
+--what the colour and portal sliders were last showing, so a switch to something else can be seen
+local skins_colorcontext, skins_portalcontext
+
+local function skins_character()
+	return characters.data[mariocharacter[skinningplayer]]
+end
+
+function skins_hascolorables()
+	local v = skins_character()
+	return v and type(v.colorables) == "table" and #v.colorables > 0
+end
+
+--the colour (r, g, b, 0-255) the sliders edit
+local function skins_editcolor()
+	local colors = mariocolors[skinningplayer]
+	return colors and colors[colorsetedit]
+end
+
+--what a character looks like for the player being edited: the colours and hats it has now if it is theirs,
+--else the ones picking it would give it (setcustomplayer)
+local function skins_previewlook(name)
+	local pn = skinningplayer
+	local v = characters.data[name]
+	if name == mariocharacter[pn] then
+		return mariocolors[pn] or {}, mariohats[pn] or {}
+	end
+	local colors, hats = mariocolors[pn] or {}, mariohats[pn] or {}
+	local defaults = v.defaultcolors and v.defaultcolors[pn]
+	if defaults and type(v.colorables) == "table" and #defaults >= #v.colorables then
+		colors = defaults
+		if v.defaulthat then
+			hats = {}
+			if v.defaulthat ~= 0 then
+				hats = {v.defaulthat}
+			end
+		end
+	end
+	return colors, hats
+end
+
+--the part of a character's standing frame that has pixels in it: {left, top, right, bottom} in the frame
+--(right and bottom are past the last pixel). Custom characters pad their frames however they like,
+--so this is what lines them up. Worked out once from the image files.
+local function skins_spritebounds(name)
+	local v = characters.data[name]
+	local qx, qy, qw, qh = v.small.idle[3]:getViewport()
+	local bounds = {0, 0, qw, qh}
+	local folder = "alesans_entities/characters/" .. name .. "/"
+	local files = {}
+	if love.filesystem.getInfo(folder .. "animations.png") then
+		files = {"animations.png"}
+	else
+		local colorables = type(v.colorables) == "table" and #v.colorables or 0
+		for j = 0, colorables do
+			if love.filesystem.getInfo(folder .. "animations" .. j .. ".png") then
+				table.insert(files, "animations" .. j .. ".png")
+			end
+		end
+	end
+	local left, top, right, bottom = math.huge, math.huge, -math.huge, -math.huge
+	for _, file in ipairs(files) do
+		local ok, data = pcall(love.image.newImageData, folder .. file)
+		if ok and data then
+			local w, h = data:getDimensions()
+			for y = math.max(0, qy), math.min(h, qy+qh)-1 do
+				for x = math.max(0, qx), math.min(w, qx+qw)-1 do
+					local _, _, _, a = data:getPixel(x, y)
+					if a > 0 then
+						left, right = math.min(left, x-qx), math.max(right, x-qx+1)
+						top, bottom = math.min(top, y-qy), math.max(bottom, y-qy+1)
+					end
+				end
+			end
+		end
+	end
+	if left <= right then
+		bounds = {left, top, right, bottom}
+	end
+	return bounds
+end
+
+--makes sure a character's graphics and bounds are loaded (optionsskins_preload loads them all when the menu loads,
+--this catches characters added after that, like a downloaded one)
+local function skins_characterready(name)
+	local v = characters.data[name]
+	if not v then
+		return false
+	end
+	if not (v.animations and v.quads and v.skinsbounds) then
+		loadcustomplayergraphics(name)
+		v.skinsbounds = skins_spritebounds(name)
+	end
+	return true
+end
+
+--loads every character's skin, so the skins menu never has to stop and load one
+function optionsskins_preload()
+	for _, name in ipairs(characters.list) do
+		skins_characterready(name)
+	end
+end
+
+--the character's middle across its standing frame, where the game centres it: the game draws the frame
+--smalloffsetX right of the player and smallquadcenterX back, and the player is 12 pixels wide
+local function skins_framecenterx(name)
+	local v = characters.data[name]
+	return 6 - v.smalloffsetX + v.smallquadcenterX
+end
+
+--top left of the standing frame (game pixels) that puts the character's middle in the middle of a box x, w wide
+--and the bottom of its sprite on feety (rounded inside the box, so it stays put in a list that scrolls by fractions of a pixel)
+local function skins_placecharacter(name, x, w, feety, s)
+	local b = characters.data[name].skinsbounds
+	return x + math.floor(w/2 - skins_framecenterx(name)*s), feety - b[4]*s
+end
+
+--draws a character standing still with the top left of its frame at x, y (s is its size),
+--the colourable parts get colors, and hats are stacked on its head if withhats
+local function skins_drawcharacter(name, colors, hats, x, y, s, withhats)
+	local v = characters.data[name]
+	if not (v and v.small and v.animations) then
+		return
+	end
+	local quad = v.small.idle[3]
+	local ax, ay = (x+v.smallquadcenterX*s)*scale, (y+v.smallquadcenterY*s)*scale
+	local colorables = type(v.colorables) == "table" and v.colorables or {}
+
+	if v.portalgununderhat then
+		love.graphics.setColor(255, 255, 255, 255)
+		love.graphics.draw(v.animations[0], quad, ax, ay, 0, scale*s, scale*s, v.smallquadcenterX, v.smallquadcenterY)
+	end
+	for i = 1, #colorables do
+		love.graphics.setColor(colors[i] or {255, 255, 255})
+		if v.animations[i] then
+			love.graphics.draw(v.animations[i], quad, ax, ay, 0, scale*s, scale*s, v.smallquadcenterX, v.smallquadcenterY)
+		end
+	end
+
+	if withhats and v.hats then
+		local offsets = customplayerhatoffsets(name, "hatoffsets", "idle") or hatoffsets["idle"]
+		if #hats > 1 or hats[1] ~= 1 then
+			local yadd = 0
+			for i = 1, #hats do
+				local t = hat[hats[i]]
+				if t then
+					love.graphics.setColor(255, 255, 255)
+					love.graphics.draw(t.graphic, t.quad[1], ax, ay, 0, scale*s, scale*s, v.smallquadcenterX - t.x + offsets[1], v.smallquadcenterY - t.y + offsets[2] + yadd)
+					yadd = yadd + t.height
+				end
+			end
+		elseif #hats == 1 then
+			--the standard hat takes the first colourable's colour
+			local t = hat[1]
+			love.graphics.setColor(colors[1] or {255, 255, 255})
+			love.graphics.draw(t.graphic, t.quad[1], ax, ay, 0, scale*s, scale*s, v.smallquadcenterX - t.x + offsets[1], v.smallquadcenterY - t.y + offsets[2])
+		end
+	end
+
+	if not v.portalgununderhat then
+		love.graphics.setColor(255, 255, 255, 255)
+		love.graphics.draw(v.animations[0], quad, ax, ay, 0, scale*s, scale*s, v.smallquadcenterX, v.smallquadcenterY)
+	end
+end
+
+--text colour of a dropdown entry: black on the bright highlight, grey for the header while its list is open
+local function skins_entrytextcolor(self, highlighted, header)
+	if highlighted then
+		love.graphics.setColor(0, 0, 0)
+	elseif header and self.extended then
+		love.graphics.setColor(127, 127, 127)
+	else
+		love.graphics.setColor(255, 255, 255)
+	end
+end
+
+--runs f with drawing cut to a box (game pixels, wherever the current transform puts it)
+local function skins_clip(x, y, w, h, f)
+	local sx1, sy1 = love.graphics.transformPoint(x*scale, y*scale)
+	local sx2, sy2 = love.graphics.transformPoint((x+w)*scale, (y+h)*scale)
+	local ox, oy, ow, oh = love.graphics.getScissor()
+	love.graphics.intersectScissor(math.floor(sx1), math.floor(sy1), math.max(0, math.ceil(sx2-sx1)), math.max(0, math.ceil(sy2-sy1)))
+	f()
+	if ox then
+		love.graphics.setScissor(ox, oy, ow, oh)
+	else
+		love.graphics.setScissor()
+	end
+end
+
+--prints s centred in a box of width w; text too long for it slides to its end and back so all of it can be read
+local SKINS_SCROLL_SPEED = 24 --game pixels a second
+local SKINS_SCROLL_PAUSE = 1 --seconds it waits at each end
+local function skins_printscrolling(s, x, y, w)
+	local textwidth = utf8.len(s)*8
+	if textwidth <= w then
+		properprintF(s, (x+math.floor((w-textwidth)/2))*scale, y*scale)
+		return
+	end
+	local overflow = textwidth-w
+	local slide = overflow/SKINS_SCROLL_SPEED
+	local t = love.timer.getTime() % (2*(slide+SKINS_SCROLL_PAUSE))
+	local offset
+	if t < SKINS_SCROLL_PAUSE then
+		offset = 0
+	elseif t < SKINS_SCROLL_PAUSE+slide then
+		offset = (t-SKINS_SCROLL_PAUSE)*SKINS_SCROLL_SPEED
+	elseif t < 2*SKINS_SCROLL_PAUSE+slide then
+		offset = overflow
+	else
+		offset = overflow-(t-2*SKINS_SCROLL_PAUSE-slide)*SKINS_SCROLL_SPEED
+	end
+	skins_clip(x, y-1, w, 10, function()
+		properprintF(s, math.floor((x-offset)*scale), y*scale)
+	end)
+end
+
+--prints s centred in a box, cut to fit
+local function skins_printcentered(s, x, y, w)
+	local maxchars = math.floor(w/8)
+	if utf8.len(s) > maxchars then
+		s = s:sub(1, (utf8.offset(s, maxchars+1) or #s+1)-1)
+	end
+	properprintF(s, (x+math.floor((w-utf8.len(s)*8)/2))*scale, y*scale)
+end
+
+--character dropdown entry: its skin, with its name under it
+local function skins_drawcharacterentry(self, i, x, y, w, h, highlighted, header)
+	local name = characters.list[i]
+	local v = characters.data[name]
+	if not v then
+		return
+	end
+	--the sprite stands just above the name, in the middle; a tall sprite or hat is cut at the box
+	local feety = y+h-9
+	if skins_characterready(name) then
+		local colors, hats = skins_previewlook(name)
+		local px, py = skins_placecharacter(name, x, w, feety, 1)
+		skins_clip(x, y, w, feety-y, function()
+			skins_drawcharacter(name, colors, hats, px, py, 1, true)
+		end)
+	end
+
+	skins_entrytextcolor(self, highlighted, header)
+	skins_printscrolling(v.name or name, x+1, y+h-8, w-2)
+end
+
+--hat dropdown: the hat ids in list order, 0 being no hat
+local function skins_hatlist()
+	local ids = {}
+	for id in pairs(hat) do
+		if type(id) == "number" then
+			table.insert(ids, id)
+		end
+	end
+	table.sort(ids)
+	table.insert(ids, 1, 0)
+	return ids
+end
+
+--hat dropdown entry: only the hat's graphic
+local function skins_drawhatentry(self, i, x, y, w, h, highlighted, header)
+	local v = skins_character()
+	if header and not (v and v.hats) then
+		love.graphics.setColor(127, 127, 127)
+		skins_printcentered(TEXT["disabled"], x, y+math.floor((h-8)/2), w)
+		return
+	end
+	local id = self.entries[i]
+	local t = hat[id]
+	if not t then
+		--no hat: a crossed out circle
+		skins_entrytextcolor(self, highlighted, header)
+		local cx, cy = (x+w/2)*scale, (y+h/2)*scale
+		love.graphics.setLineWidth(scale)
+		love.graphics.circle("line", cx, cy, 4*scale, 16)
+		love.graphics.line(cx-2.8*scale, cy+2.8*scale, cx+2.8*scale, cy-2.8*scale)
+		love.graphics.setLineWidth(1)
+		return
+	end
+	local _, _, qw, qh = t.quad[1]:getViewport()
+	if id == 1 then
+		--the standard hat takes the first colourable's colour, as it does on the player
+		local colors = mariocolors[skinningplayer]
+		love.graphics.setColor(colors and colors[1] or {255, 255, 255})
+	else
+		love.graphics.setColor(255, 255, 255)
+	end
+	love.graphics.draw(t.graphic, t.quad[1], (x+math.floor((w-qw)/2))*scale, (y+math.floor((h-qh)/2))*scale, 0, scale, scale)
+end
+
+--a small colour square with a frame, so black on black still shows
+local function skins_drawswatch(x, y, w, h, color)
+	local r = math.min(w, h)*scale*0.15
+	love.graphics.setColor(127, 127, 127)
+	love.graphics.rectangle("fill", x*scale, y*scale, w*scale, h*scale, r)
+	love.graphics.setColor(color[1], color[2], color[3])
+	love.graphics.rectangle("fill", (x+1)*scale, (y+1)*scale, (w-2)*scale, (h-2)*scale, r*0.7)
+end
+
+--colourable dropdown entry: its colour and its name
+local function skins_drawcolorableentry(self, i, x, y, w, h, highlighted, header)
+	local colors = mariocolors[skinningplayer]
+	skins_drawswatch(x+1, y+1, 7, 7, colors and colors[i] or {255, 255, 255})
+	skins_entrytextcolor(self, highlighted, header)
+	local s = tostring(self.entries[i])
+	local maxchars = math.floor((w-11)/8)
+	if utf8.len(s) > maxchars then
+		s = s:sub(1, (utf8.offset(s, maxchars+1) or #s+1)-1)
+	end
+	properprintF(s, (x+10)*scale, (y+1)*scale)
+end
+
+--a slider's track painted by stepcolor(t) along it (t from 0 to 1), inside the usual dark frame
+local function skins_drawgradienttrack(x, y, w, h, r, stepcolor)
+	love.graphics.setColor(0, 0, 0)
+	love.graphics.rectangle("fill", x, y, w, h, r)
+	local steps = math.max(1, math.floor(w/scale)-2)
+	for i = 0, steps-1 do
+		love.graphics.setColor(stepcolor(i/math.max(1, steps-1)))
+		love.graphics.rectangle("fill", x+(1+i)*scale, y+scale, scale, h-2*scale)
+	end
+end
+
+local function skins_newslider(x, y, range, handlewidth, value)
+	local slider = guielement:new("scrollbar", x, y, range, handlewidth, SKINS_SLIDER_H, value, "hor")
+	slider.backgroundcolor = {0, 0, 0}
+	slider.buttonround = true
+	slider.scrollstepdisabled = true --the mouse wheel would change the colour without saving it
+	slider.trackclick = true
+	return slider
+end
+
+--slider for one channel (1 red, 2 green, 3 blue) of the colourable being edited
+local function skins_rgbslider(channel, y)
+	local color = skins_editcolor() or {0, 0, 0}
+	local slider = skins_newslider(40, y, SKINS_SLIDER_RIGHT-40, 27, (color[channel] or 0)/255)
+	slider.centerdisplay = true
+	slider.displayfunction = function(self, v)
+		if self.valueanim then
+			v = self.valueanim.to --show where it's going while it glides
+		end
+		return round(v*255)
+	end
+	slider.updatefunc = function(self, v)
+		local color = skins_editcolor()
+		if color then
+			color[channel] = round(v*255)
+		end
+	end
+	slider.releasefunc = function(self, v)
+		saveconfig()
+	end
+	--the track shows what the colour would be along it
+	slider.drawtrack = function(self, x, y, w, h, r)
+		local color = skins_editcolor() or {0, 0, 0}
+		skins_drawgradienttrack(x, y, w, h, r, function(t)
+			local c = {color[1], color[2], color[3]}
+			c[channel] = t*255
+			return c
+		end)
+	end
+	return slider
+end
+
+--slider for the hue of one of the coop portals
+local function skins_portalslider(portal, y)
+	local slider = skins_newslider(30, y, SKINS_SLIDER_RIGHT-30, 9, portalhues[skinningplayer][portal])
+	slider.typeable = false
+	slider.updatefunc = function(self, v)
+		portalhues[skinningplayer][portal] = v
+		portalcolor[skinningplayer][portal] = getrainbowcolor(v)
+	end
+	slider.releasefunc = function(self, v)
+		saveconfig()
+	end
+	slider.drawtrack = function(self, x, y, w, h, r)
+		love.graphics.setColor(0, 0, 0)
+		love.graphics.rectangle("fill", x, y, w, h, r)
+		love.graphics.setColor(255, 255, 255)
+		love.graphics.draw(huebarimg, x+scale, y+scale, 0, (w-2*scale)/huebarimg:getWidth(), (h-2*scale)/huebarimg:getHeight())
+	end
+	return slider
+end
+
+--picking a character in the dropdown, or with left and right
+function optionsskins_setcharacter(i)
+	if not characters.list[i] then
+		return
+	end
+	if characters.list[i] ~= mariocharacter[skinningplayer] then
+		colorsetedit = 1
+		setcustomplayer(characters.list[i], skinningplayer)
+		saveconfig()
+	end
+	characteri = characters.data[mariocharacter[skinningplayer]].i
+end
+
+local function optionsskins_create()
+	--Edit Player dropdown, the same as the controls tab's
+	guielements["skin_player"] = guielement:new("dropdown", SKINS_RIGHT - (13 + 1 * 8), 40, 1, function(i)
+		skinningplayer = i
+		if characters.data[mariocharacter[skinningplayer]] then
+			characteri = characters.data[mariocharacter[skinningplayer]].i
+		end
+		if players > #controls then
+			loadconfig()
+		end
+		guielements["skin_player"].var = i
+		saveconfig()
+	end, skinningplayer, "1", "2", "3", "4")
+
+	--Character: skin and name
+	guielements["skin_character"] = guielement:new("dropdown", SKINS_DROPDOWN_X, SKINS_CHARACTER_Y, SKINS_DROPDOWN_WIDTH, function(i)
+		optionsskins_setcharacter(i)
+	end, characteri, unpack(characters.list))
+	guielements["skin_character"]:setentrydrawing(skins_drawcharacterentry, SKINS_CHARACTER_ROW)
+
+	--Hat: only the graphics, in a grid
+	guielements["skin_hat"] = guielement:new("dropdown", SKINS_DROPDOWN_X, SKINS_HAT_Y, SKINS_DROPDOWN_WIDTH, function(i)
+		local id = guielements["skin_hat"].entries[i]
+		if id == 0 then
+			mariohats[skinningplayer] = {}
+		else
+			mariohats[skinningplayer][1] = id
+		end
+		saveconfig()
+	end, 1, unpack(skins_hatlist()))
+	guielements["skin_hat"]:setentrydrawing(skins_drawhatentry, SKINS_HAT_ROW, SKINS_HAT_COLUMNS)
+	guielements["skin_hat"].hatcount = hatcount
+
+	--Colourable
+	guielements["skin_colorable"] = guielement:new("dropdown", SKINS_DROPDOWN_X, SKINS_COLORABLE_Y, SKINS_DROPDOWN_WIDTH, function(i)
+		colorsetedit = i
+	end, 1, "")
+	guielements["skin_colorable"]:setentrydrawing(skins_drawcolorableentry)
+
+	--Red, green and blue
+	guielements["skin_red"] = skins_rgbslider(1, SKINS_RGB_Y)
+	guielements["skin_green"] = skins_rgbslider(2, SKINS_RGB_Y+10)
+	guielements["skin_blue"] = skins_rgbslider(3, SKINS_RGB_Y+20)
+
+	--Coop portal colours
+	guielements["skin_portal1"] = skins_portalslider(1, SKINS_PORTAL1_Y+10)
+	guielements["skin_portal2"] = skins_portalslider(2, SKINS_PORTAL2_Y+10)
+end
+
+local function optionsskins_remove()
+	skins_colorcontext, skins_portalcontext = nil, nil --nothing to glide from when they're made again
+	for i = 1, #optionsskinsgui do
+		local v = guielements[optionsskinsgui[i]]
+		if v and v.type == "dropdown" then
+			v:close()
+		end
+		guielements[optionsskinsgui[i]] = nil
+	end
+end
+
+--the keyboard row of each widget, which depends on the character having colourables
+local function optionsskins_selections()
+	if skins_hascolorables() then
+		return {[2] = "skin_player", [3] = "skin_character", [4] = "skin_hat", [5] = "skin_colorable",
+			[6] = "skin_red", [7] = "skin_green", [8] = "skin_blue", [9] = "skin_portal1", [10] = "skin_portal2"}
+	end
+	return {[2] = "skin_player", [3] = "skin_character", [4] = "skin_hat", [5] = "skin_portal1", [6] = "skin_portal2"}
+end
+
+--a list changed (characters or hats loaded, another character's colourables): keep the dropdown's entries in line
+local function skins_sameentries(a, b)
+	if #a ~= #b then
+		return false
+	end
+	for i = 1, #a do
+		if a[i] ~= b[i] then
+			return false
+		end
+	end
+	return true
+end
+
+--moves a slider to target: gliding there on a motion curve (0.25 seconds) if glide, else straight away.
+--A glide stops when the value is taken over (dragged, typed, or changed by a held key)
+local SKINS_GLIDE_TIME = 0.25
+local function skins_followvalue(slider, target, glide)
+	if slider.dragging or slider.inputting then
+		slider.valueanim = nil
+		return
+	end
+	if glide and math.abs(slider.value-target) > 1e-9 then
+		slider.valueanim = {from = slider.value, to = target, start = love.timer.getTime(), curve = random_motion_curve()}
+	end
+	local anim = slider.valueanim
+	if anim and anim.to == target then
+		local t = (love.timer.getTime()-anim.start)/SKINS_GLIDE_TIME
+		if t < 1 then
+			slider.value = lerp(anim.from, anim.to, motion_curve(t, anim.curve, true, true, true, true))
+			return
+		end
+	end
+	slider.valueanim = nil
+	slider.value = target
+end
+
+--keeps the widgets in line with the variables when something else changed them (keyboard, another player, ...)
+local function optionsskins_sync()
+	local pn = skinningplayer
+	local v = skins_character()
+	local hascolorables = skins_hascolorables()
+	if hascolorables then
+		colorsetedit = math.max(1, math.min(colorsetedit, #v.colorables))
+	end
+
+	guielements["skin_player"].var = pn
+
+	local character = guielements["skin_character"]
+	if not skins_sameentries(character.entries, characters.list) then
+		character:close()
+		character:setentries({unpack(characters.list)})
+	end
+	character.var = v.i
+
+	local hats = guielements["skin_hat"]
+	if hats.hatcount ~= hatcount then
+		hats:close()
+		hats:setentries(skins_hatlist())
+		hats.hatcount = hatcount
+	end
+	hats.var = 1
+	for i, id in ipairs(hats.entries) do
+		if id == mariohats[pn][1] then
+			hats.var = i
+			break
+		end
+	end
+	--a character without hats can't wear one
+	if not v.hats and hats.extended then
+		hats:close()
+	end
+	hats.active = v.hats and true or false
+	hats.nohover = not hats.active
+
+	local colorable = guielements["skin_colorable"]
+	if hascolorables then
+		if not skins_sameentries(colorable.entries, v.colorables) then
+			colorable:close()
+			colorable:setentries({unpack(v.colorables)})
+		end
+		colorable.var = colorsetedit
+	elseif colorable.extended then
+		colorable:close()
+	end
+	colorable.active = hascolorables
+
+	--sliders follow the colours unless they're being dragged; they glide over when another player, character or colourable
+	--is picked (the colour sliders) or another player (the portal sliders, the only thing their colours belong to)
+	local colorcontext = pn .. ":" .. tostring(mariocharacter[pn]) .. ":" .. colorsetedit
+	local glidecolors = skins_colorcontext ~= nil and colorcontext ~= skins_colorcontext
+	local glideportals = skins_portalcontext ~= nil and pn ~= skins_portalcontext
+	skins_colorcontext, skins_portalcontext = colorcontext, pn
+
+	local color = skins_editcolor()
+	for channel, name in ipairs({"skin_red", "skin_green", "skin_blue"}) do
+		local slider = guielements[name]
+		slider.active = hascolorables and color ~= nil
+		if slider.active then
+			skins_followvalue(slider, math.min(math.max((color[channel] or 0)/255, 0), 1), glidecolors)
+		end
+	end
+	for portal = 1, 2 do
+		local slider = guielements["skin_portal" .. portal]
+		skins_followvalue(slider, portalhues[pn][portal], glideportals)
+		slider.fillcolor = portalcolor[pn][portal] --the handle is the portal's colour
+	end
+
+	--the widget the keyboard has selected looks hovered
+	local selections = optionsskins_selections()
+	for i = 1, #optionsskinsgui do
+		guielements[optionsskinsgui[i]].forcehover = false
+	end
+	for selection, name in pairs(selections) do
+		guielements[name].forcehover = (optionsselection == selection)
+	end
+end
+
+function optionsskins_update()
+	if gamestate == "options" and optionstab == 2 then
+		if not guielements["skin_player"] then
+			optionsskins_create()
+		end
+		optionsskins_sync()
+	elseif guielements["skin_player"] then
+		optionsskins_remove()
+	end
+end
+
+--pressing enter on the row the keyboard has selected opens its dropdown
+function optionsskins_activate(selection)
+	local v = guielements[optionsskins_selections()[selection]]
+	if v and v.active and v.type == "dropdown" and not v.extended then
+		v:open(true)
+	end
+end
+
+--labels, previews and widgets of the skins tab
+local function optionsskins_draw()
+	local pn = skinningplayer
+	local v = skins_character()
+	local hascolorables = skins_hascolorables()
+	local selections = optionsskins_selections()
+	local function rowcolor(name)
+		local selected = false
+		for selection, n in pairs(selections) do
+			if n == name and optionsselection == selection then
+				selected = true
+			end
+		end
+		if selected then
+			love.graphics.setColor(255, 255, 255, 255)
+		else
+			love.graphics.setColor(100, 100, 100, 255)
+		end
+		return selected
+	end
+
+	--edit player
+	rowcolor("skin_player")
+	properprintF(TEXT["edit player:"], 30*scale, 40*scale)
+
+	--PREVIEW MARIO IN BIG. WITH BIG LETTERS
+	if skins_characterready(mariocharacter[pn]) then
+		local px, py = skins_placecharacter(mariocharacter[pn], SKINS_PREVIEW_X-30, 60, SKINS_PREVIEW_FEET, 2)
+		skins_drawcharacter(mariocharacter[pn], mariocolors[pn], mariohats[pn], px, py, 2, true)
+	end
+
+	--PREVIEW PORTALS WITH FALLING MARIO BECAUSE I CAN AND IT LOOKS RAD
+	local dx, dy = SKINS_PORTAL_X-142, SKINS_PORTAL_Y-42 --this preview was made for 142, 42
+	love.graphics.setScissor(SKINS_PORTAL_X*scale, SKINS_PORTAL_Y*scale, 32*scale, 32*scale)
+	local colorables = type(v.colorables) == "table" and v.colorables or {}
+	for j = 1, #colorables do
+		local fx, fy = (152+dx+v.smalloffsetX)*scale, (2+dy+((j-1)*32)+infmarioY-v.smalloffsetY)*scale
+		if v.portalgununderhat then
+			love.graphics.setColor(255, 255, 255, 255)
+			love.graphics.draw(v["animations"][0], v["small"]["jump"][3][1], fx, fy, infmarioR, scale, scale, v.smallquadcenterX, v.smallquadcenterY)
+		end
+		for i = 1, #colorables do
+			love.graphics.setColor(mariocolors[pn][i] or {255, 255, 255})
+			love.graphics.draw(v["animations"][i], v["small"]["jump"][3][1], fx, fy, infmarioR, scale, scale, v.smallquadcenterX, v.smallquadcenterY)
+		end
+		if not v.portalgununderhat then
+			love.graphics.setColor(255, 255, 255, 255)
+			love.graphics.draw(v["animations"][0], v["small"]["jump"][3][1], fx, fy, infmarioR, scale, scale, v.smallquadcenterX, v.smallquadcenterY)
+		end
+	end
+	local portalframe = portalanimation
+	love.graphics.setColor(255, 255, 255, 80 - math.abs(portalframe-3)*10)
+	love.graphics.draw(portalglowimg, (174+dx)*scale, (59+dy)*scale, math.pi, scale, scale)
+	love.graphics.draw(portalglowimg, (142+dx)*scale, (57+dy)*scale, 0, scale, scale)
+	love.graphics.setColor(portalcolor[pn][1])
+	love.graphics.draw(portalimg, portalquad[portalframe], (174+dx)*scale, (46+dy)*scale, math.pi, scale, scale)
+	love.graphics.setColor(portalcolor[pn][2])
+	love.graphics.draw(portalimg, portalquad[portalframe], (142+dx)*scale, (70+dy)*scale, 0, scale, scale)
+	love.graphics.setScissor()
+
+	--character
+	if rowcolor("skin_character") then
+		love.graphics.setColor(0, 0, 0, 200)
+		love.graphics.rectangle("fill", 240*scale, 41*scale, 95*scale, 41*scale)
+		love.graphics.setColor(255, 255, 255)
+		properprintF(TEXT["press m to\nopen your\ncharacters\nfolder"], 241*scale, 43*scale)
+	end
+
+	--hat
+	if rowcolor("skin_hat") and not v.hats then
+		love.graphics.setColor(150, 150, 150, 255)
+	end
+	local hatlabel = TEXT["hat: "]:gsub("%s+$", "")
+	properprintF(hatlabel, 30*scale, (SKINS_HAT_Y+math.floor((SKINS_HAT_ROW-7)/2))*scale)
+
+	if hascolorables then
+		--colourable
+		rowcolor("skin_colorable")
+		properprintF(TEXT["colour:"], 30*scale, (SKINS_COLORABLE_Y+2)*scale)
+
+		--r, g and b, bright on the selected row
+		local letters = {{"r", {255, 0, 0}}, {"g", {0, 255, 0}}, {"b", {0, 0, 255}}}
+		local names = {"skin_red", "skin_green", "skin_blue"}
+		for i, t in ipairs(letters) do
+			local y = SKINS_RGB_Y+(i-1)*10+1
+			local selected = guielements[names[i]] and guielements[names[i]].forcehover
+			local c = t[2]
+			local k = selected and 1 or 0.6
+			love.graphics.setColor(c[1]*0.4*k, c[2]*0.4*k, c[3]*0.4*k)
+			properprint(t[1], 31*scale, (y+1)*scale)
+			love.graphics.setColor(c[1]*k, c[2]*k, c[3]*k)
+			properprint(t[1], 30*scale, y*scale)
+		end
+
+		--the colour itself, right of its sliders
+		local color = skins_editcolor()
+		if color then
+			skins_drawswatch(SKINS_SWATCH_X, SKINS_RGB_Y, SKINS_SWATCH_W, 20+SKINS_SLIDER_H, color)
+		end
+	end
+
+	--coop portal colours, with each colour aside its slider
+	rowcolor("skin_portal1")
+	properprintF(TEXT["coop portal 1 color:"], 30*scale, SKINS_PORTAL1_Y*scale)
+	skins_drawswatch(SKINS_SWATCH_X, SKINS_PORTAL1_Y+10, SKINS_SWATCH_W, SKINS_SLIDER_H, portalcolor[pn][1])
+	rowcolor("skin_portal2")
+	properprintF(TEXT["coop portal 2 color:"], 30*scale, SKINS_PORTAL2_Y*scale)
+	skins_drawswatch(SKINS_SWATCH_X, SKINS_PORTAL2_Y+10, SKINS_SWATCH_W, SKINS_SLIDER_H, portalcolor[pn][2])
+
+	--widgets, an open dropdown list on top of the rest
+	local ontop = {}
+	for i = 1, #optionsskinsgui do
+		local w = guielements[optionsskinsgui[i]]
+		if w and (w.type ~= "scrollbar" or w.active) then
+			if optionsskinsgui[i] == "skin_colorable" and not hascolorables then
+				--no colourables, nothing to pick
+			elseif w.extended or (w.listvalue and w.listvalue > 0) then
+				table.insert(ontop, w)
+			else
+				w:draw()
+			end
+		end
+	end
+	for i = 1, #ontop do
+		ontop[i]:draw()
+	end
+end
+
 function menu_load()
 	love.audio.stop()
 	pausedaudio = nil
@@ -1367,6 +2124,7 @@ function menu_load()
 	menupopupanimations.resetwarning = {from = 0, to = 0}
 	skinningplayer = 1
 	characteri = characters.data[mariocharacter[1]].i
+	optionsskins_preload() --every character's skin, ready for the skins menu
 	rgbselection = 1
 	colorsetedit = 1
 	mappackselection = 1
@@ -1470,9 +2228,9 @@ function menu_update(dt)
 	end
 
 	updatecustombackgrounds(dt)
+	optionscontrols_update()
 	optionsmisc_update()
 	optionscheats_update()
-	optionscontrols_update()
 	if utilsmenuopen then
 		utilsmenu_update(dt)
 	end
@@ -1592,7 +2350,7 @@ function menu_update(dt)
 			infmarioR = infmarioR - math.pi*2
 		end
 	
-		if characters.data[mariocharacter[skinningplayer]].colorables and optionsselection > 5 and optionsselection < 9 then
+		if skins_hascolorables() and optionsselection > 5 and optionsselection < 9 and skins_editcolor() then
 			local colorRGB = optionsselection-5
 			
 			if (love.keyboard.isDown("right") or love.keyboard.isDown("d")) and mariocolors[skinningplayer][colorsetedit][colorRGB] < 255 then
@@ -1607,7 +2365,7 @@ function menu_update(dt)
 				end
 			end
 			
-		elseif (characters.data[mariocharacter[skinningplayer]].colorables and optionsselection == 9) or (not characters.data[mariocharacter[skinningplayer]].colorables and optionsselection == 5) then
+		elseif (skins_hascolorables() and optionsselection == 9) or (not skins_hascolorables() and optionsselection == 5) then
 			if (love.keyboard.isDown("right") or love.keyboard.isDown("d")) and portalhues[skinningplayer][1] < 1 then
 				portalhues[skinningplayer][1] = portalhues[skinningplayer][1] + huechangespeed*dt
 				if portalhues[skinningplayer][1] > 1 then
@@ -1623,7 +2381,7 @@ function menu_update(dt)
 				portalcolor[skinningplayer][1] = getrainbowcolor(portalhues[skinningplayer][1])
 			end
 			
-		elseif (characters.data[mariocharacter[skinningplayer]].colorables and optionsselection == 10) or (not characters.data[mariocharacter[skinningplayer]].colorables and optionsselection == 6) then
+		elseif (skins_hascolorables() and optionsselection == 10) or (not skins_hascolorables() and optionsselection == 6) then
 			if (love.keyboard.isDown("right") or love.keyboard.isDown("d")) and portalhues[skinningplayer][2] < 1 then
 				portalhues[skinningplayer][2] = portalhues[skinningplayer][2] + huechangespeed*dt
 				if portalhues[skinningplayer][2] > 1 then
@@ -1644,6 +2402,7 @@ function menu_update(dt)
 	elseif gamestate == "lobby" then
 		lobby_update(dt)
 	end
+	optionsskins_update() --after the held keys above changed the colours, so the sliders show this frame's
 	
 	if titleframes > 1 and gamestate == "menu" and titledelay ~= nil then
 		titletimer = titletimer + dt
@@ -2627,224 +3386,8 @@ function menu_draw()
 				love.graphics.pop()
 			end
 		elseif optionstab == 2 then
-			--SKINS
-			if optionsselection == 2 then
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			
-			properprintF(TEXT["edit player:"] .. skinningplayer, (130-4-utf8.len(TEXT["edit player:"])*4)*scale, 32*scale)
-			
-			--PREVIEW MARIO IN BIG. WITH BIG LETTERS
-			local v = characters.data[mariocharacter[skinningplayer]]
-			if v.portalgununderhat then
-				love.graphics.setColor(255, 255, 255, 255)
-				love.graphics.draw(v["animations"][0], v["small"]["idle"][3], (34+46+v.smalloffsetX*2)*scale, (32+32-v.smalloffsetY*2)*scale, 0, scale*2, scale*2, v.smallquadcenterX, v.smallquadcenterY)
-			end
-			love.graphics.setColor(255, 255, 255, 255)
-			for i = 1, #v.colorables do
-				if mariocolors[skinningplayer][i] then
-					love.graphics.setColor(unpack(mariocolors[skinningplayer][i]))
-				end
-				if mariocharacter[skinningplayer] then
-					love.graphics.draw(v["animations"][i], v["small"]["idle"][3], (34+46+v.smalloffsetX*2)*scale, (32+32-v.smalloffsetY*2)*scale, 0, scale*2, scale*2, v.smallquadcenterX, v.smallquadcenterY)
-				end
-			end
-			
-			--character
-			if optionsselection == 3 then
-				love.graphics.setColor(0, 0, 0, 200)
-				love.graphics.rectangle("fill", 240*scale, 41*scale, 95*scale, 41*scale)
-				love.graphics.setColor(255, 255, 255)
-				properprintF(TEXT["press m to\nopen your\ncharacters\nfolder"], 241*scale, 43*scale)
-
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			
-			properprintF("{", 64*scale, 56*scale)
-			properprintF("}", 112*scale, 56*scale)
-			properprint(characters.data[characters.list[characteri]].name, (118-#characters.data[characters.list[characteri]].name*4)*scale, 80*scale)
-			
-			--hat
-			offsets = customplayerhatoffsets(mariocharacter[skinningplayer], "hatoffsets", "idle") or hatoffsets["idle"]
-			if v.hats then
-				if #mariohats[skinningplayer] > 1 or mariohats[skinningplayer][1] ~= 1 then
-					local yadd = 0
-					for i = 1, #mariohats[skinningplayer] do
-						love.graphics.setColor(255, 255, 255)
-						love.graphics.draw(hat[mariohats[skinningplayer][i]].graphic, hat[mariohats[skinningplayer][i]].quad[1], (80+v.smalloffsetX*2)*scale, (64-v.smalloffsetY*2)*scale, 0, scale*2, scale*2, v.smallquadcenterX - hat[mariohats[skinningplayer][i]].x + offsets[1], v.smallquadcenterY - hat[mariohats[skinningplayer][i]].y + offsets[2] + yadd)
-						yadd = yadd + hat[mariohats[skinningplayer][i]].height
-					end
-				elseif #mariohats[skinningplayer] == 1 then
-					love.graphics.setColor(mariocolors[skinningplayer][1])
-					love.graphics.draw(hat[mariohats[skinningplayer][1]].graphic, hat[mariohats[skinningplayer][1]].quad[1], (80+v.smalloffsetX*2)*scale, (64-v.smalloffsetY*2)*scale, 0, scale*2, scale*2, v.smallquadcenterX - hat[mariohats[skinningplayer][1]].x + offsets[1], v.smallquadcenterY - hat[mariohats[skinningplayer][1]].y + offsets[2])
-				end
-			end
-			
-			if not v.portalgununderhat then
-				love.graphics.setColor(255, 255, 255, 255)
-				love.graphics.draw(v["animations"][0], v["small"]["idle"][3], (34+46+v.smalloffsetX*2)*scale, (32+32-v.smalloffsetY*2)*scale, 0, scale*2, scale*2, v.smallquadcenterX, v.smallquadcenterY)
-			end
-			
-			--PREVIEW PORTALS WITH FALLING MARIO BECAUSE I CAN AND IT LOOKS RAD
-			love.graphics.setScissor(142*scale, 42*scale, 32*scale, 32*scale)
-			
-			for j = 1, #v.colorables do
-				if v.portalgununderhat then
-					love.graphics.setColor(255, 255, 255, 255)
-					love.graphics.draw(v["animations"][0], v["small"]["jump"][3][1], (152+v.smalloffsetX)*scale, (2+((j-1)*32)+infmarioY-v.smalloffsetY)*scale, infmarioR, scale, scale, v.smallquadcenterX, v.smallquadcenterY)
-				end
-				for i = 1, #v.colorables do
-					love.graphics.setColor(mariocolors[skinningplayer][i])
-					love.graphics.draw(v["animations"][i], v["small"]["jump"][3][1], (152+v.smalloffsetX)*scale, (2+((j-1)*32)+infmarioY-v.smalloffsetY)*scale, infmarioR, scale, scale, v.smallquadcenterX, v.smallquadcenterY)
-				end
-				if not v.portalgununderhat then
-					love.graphics.setColor(255, 255, 255, 255)
-					love.graphics.draw(v["animations"][0], v["small"]["jump"][3][1], (152+v.smalloffsetX)*scale, (2+((j-1)*32)+infmarioY-v.smalloffsetY)*scale, infmarioR, scale, scale, v.smallquadcenterX, v.smallquadcenterY)
-				end
-			end
-			
-			local portalframe = portalanimation
-			
-			love.graphics.setColor(255, 255, 255, 80 - math.abs(portalframe-3)*10)
-			love.graphics.draw(portalglowimg, 174*scale, 59*scale, math.pi, scale, scale)
-			love.graphics.draw(portalglowimg, 142*scale, 57*scale, 0, scale, scale)
-			
-			love.graphics.setColor(portalcolor[skinningplayer][1])
-			love.graphics.draw(portalimg, portalquad[portalframe], 174*scale, 46*scale, math.pi, scale, scale)
-			love.graphics.setColor(portalcolor[skinningplayer][2])
-			love.graphics.draw(portalimg, portalquad[portalframe], 142*scale, 70*scale, 0, scale, scale)
-			
-			love.graphics.setScissor()
-			
-			--HAT
-			if optionsselection == 4 then
-				if mariocharacter[skinningplayer] and not characters.data[mariocharacter[skinningplayer]].hats then
-					love.graphics.setColor(150, 150, 150, 255)
-				else
-					love.graphics.setColor(255, 255, 255, 255)
-				end
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			if mariocharacter[skinningplayer] and not characters.data[mariocharacter[skinningplayer]].hats then
-				properprintF(TEXT["hat: "] .. TEXT["disabled"], (120-utf8.len(TEXT["hat: "] .. TEXT["disabled"])*4)*scale, 90*scale)
-			elseif mariohats[skinningplayer][1] == nil then
-				properprintF(TEXT["hat: "] .. TEXT["none"], (120-utf8.len(TEXT["hat: "] .. TEXT["none"])*4)*scale, 90*scale)
-			else
-				properprintF(TEXT["hat: "] .. mariohats[skinningplayer][1], (120-utf8.len(TEXT["hat: "] .. mariohats[skinningplayer][1])*4)*scale, 90*scale)
-			end
-
-			if v.colorables then
-				if optionsselection == 5 then
-					love.graphics.setColor(255, 255, 255, 255)
-				else
-					love.graphics.setColor(100, 100, 100, 255)
-				end
-				
-				--NEW SKIN CUSTOMIZATION
-				local v = characters.data[mariocharacter[skinningplayer]]
-				properprint("{ " .. v.colorables[colorsetedit] .. " }", 120*scale-string.len("{ " .. v.colorables[colorsetedit] .. " }")*4*scale, 105*scale)
-				
-				if optionsselection > 5 and optionsselection < 9 then
-					love.graphics.setColor(255, 255, 255, 255)
-					love.graphics.rectangle("fill", 39*scale, 114*scale + (optionsselection-6)*10*scale, 142*scale, 10*scale)
-				end
-			
-				love.graphics.setColor(100, 0, 0)
-				properprint("r", 40*scale, (116)*scale)
-				love.graphics.setColor(255, 0, 0)
-				properprint("r", 39*scale, (115)*scale)
-				
-				love.graphics.setColor(0, 100, 0)
-				properprint("g", 40*scale, (126)*scale)
-				love.graphics.setColor(0, 255, 0)
-				properprint("g", 39*scale, (125)*scale)
-				
-				love.graphics.setColor(0, 0, 100)
-				properprint("b", 40*scale, (136)*scale)
-				love.graphics.setColor(0, 0, 255)
-				properprint("b", 39*scale, (135)*scale)
-				
-				love.graphics.setColor(100, 0, 0)
-				love.graphics.rectangle("fill", 51*scale, (116)*scale, math.floor(129*scale * (mariocolors[skinningplayer][colorsetedit][1]/255)), 7*scale)
-				love.graphics.setColor(255, 0, 0)
-				love.graphics.rectangle("fill", 50*scale, (115)*scale, math.floor(129*scale * (mariocolors[skinningplayer][colorsetedit][1]/255)), 7*scale)
-				
-				love.graphics.setColor(100, 100, 100)
-				local s = math.floor(mariocolors[skinningplayer][colorsetedit][1])
-				properprint(s, 200*scale-string.len(s)*4*scale, 116*scale)
-				
-				love.graphics.setColor(0, 100, 0)
-				love.graphics.rectangle("fill", 51*scale, (126)*scale, math.floor(129*scale * (mariocolors[skinningplayer][colorsetedit][2]/255)), 7*scale)
-				love.graphics.setColor(0, 255, 0)
-				love.graphics.rectangle("fill", 50*scale, (125)*scale, math.floor(129*scale * (mariocolors[skinningplayer][colorsetedit][2]/255)), 7*scale)
-				
-				love.graphics.setColor(100, 100, 100)
-				s = math.floor(mariocolors[skinningplayer][colorsetedit][2])
-				properprintF(s, 200*scale-string.len(s)*4*scale, 126*scale)
-				
-				love.graphics.setColor(0, 0, 100)
-				love.graphics.rectangle("fill", 51*scale, (136)*scale, math.floor(129*scale * (mariocolors[skinningplayer][colorsetedit][3]/255)), 7*scale)
-				love.graphics.setColor(0, 0, 255)
-				love.graphics.rectangle("fill", 50*scale, (135)*scale, math.floor(129*scale * (mariocolors[skinningplayer][colorsetedit][3]/255)), 7*scale)
-				
-				love.graphics.setColor(100, 100, 100)
-				s = math.floor(mariocolors[skinningplayer][colorsetedit][3])
-				properprintF(s, 200*scale-string.len(s)*4*scale, 136*scale)
-			end
-			
-			--Portalhues
-			--hue
-			local alpha = 100
-			
-			if characters.data[mariocharacter[skinningplayer]].colorables then
-				if optionsselection == 9 then
-					alpha = 255
-				end
-			else
-				if optionsselection == 5 then
-					alpha = 255
-				end
-			end
-			
-			love.graphics.setColor(255, 255, 255, alpha)
-			
-			properprintF(TEXT["coop portal 1 color:"], 31*scale, 150*scale)
-			
-			love.graphics.draw(huebarimg, 32*scale, 170*scale, 0, scale, scale)
-			
-			--marker
-			love.graphics.setColor(portalcolor[skinningplayer][1])
-			love.graphics.rectangle("fill", math.floor(29 + (portalhues[skinningplayer][1])*178)*scale, 161*scale, 7*scale, 6*scale)
-			love.graphics.setColor(alpha, alpha, alpha)
-			love.graphics.draw(huebarmarkerimg, math.floor(28 + (portalhues[skinningplayer][1])*178)*scale, 160*scale, 0, scale, scale)
-			
-			alpha = 100
-			if characters.data[mariocharacter[skinningplayer]].colorables then
-				if optionsselection == 10 then
-					alpha = 255
-				end
-			else
-				if optionsselection == 6 then
-					alpha = 255
-				end
-			end
-			
-			love.graphics.setColor(255, 255, 255, alpha)
-			
-			properprintF(TEXT["coop portal 2 color:"], 31*scale, 180*scale)
-			
-			love.graphics.draw(huebarimg, 32*scale, 200*scale, 0, scale, scale)
-			
-			--marker
-			love.graphics.setColor(portalcolor[skinningplayer][2])
-			love.graphics.rectangle("fill", math.floor(29 + (portalhues[skinningplayer][2])*178)*scale, 191*scale, 7*scale, 6*scale)
-			love.graphics.setColor(alpha, alpha, alpha)
-			love.graphics.draw(huebarmarkerimg, math.floor(28 + (portalhues[skinningplayer][2])*178)*scale, 190*scale, 0, scale, scale)
+			--SKINS: player, character and hat dropdowns, colour sliders and previews
+			optionsskins_draw()
 		elseif optionstab == 3 then
 			if optionsselection == 2 then
 				love.graphics.setColor(255, 255, 255, 255)
@@ -3736,6 +4279,15 @@ function menu_keypressed(key, unicode)
 		if dropdown and dropdown:keypress(key) then
 			return
 		end
+		if dropdown and key == "escape" then
+			--escape closes the open list instead of leaving the options
+			dropdown:close()
+			return
+		end
+		if dropdown and optionstab == 2 then
+			--the other keys would change what's under the open list
+			return
+		end
 
 		-- F6: selected keybind to default; Ctrl+F6: full page reset / clear / copy
 		if optionstab == 1 and not keyprompt and key == "f6" then
@@ -3792,12 +4344,8 @@ function menu_keypressed(key, unicode)
 		if (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
 			if optionstab == 1 then
 				optionscontrols_activate(optionsselection)
-			elseif optionstab == 2 and optionsselection == 3 then
-				if characteri ~= characters.data[mariocharacter[skinningplayer]].i then
-					colorsetedit = 1
-					setcustomplayer(characters.list[characteri], skinningplayer)
-					saveconfig()
-				end
+			elseif optionstab == 2 then
+				optionsskins_activate(optionsselection)
 			elseif optionstab == 3 then
 				optionsmisc_activate(optionsselection)
 			elseif optionstab == 4 and gamefinished then
@@ -3817,7 +4365,7 @@ function menu_keypressed(key, unicode)
 				end
 
 				local limit = 6
-				if characters.data[mariocharacter[skinningplayer]].colorables then
+				if skins_hascolorables() then
 					limit = 10
 				end
 
@@ -3852,7 +4400,7 @@ function menu_keypressed(key, unicode)
 					optionsselection = optionscontrols_lastselection()
 				elseif optionstab == 2 then
 					local limit = 6
-					if characters.data[mariocharacter[skinningplayer]].colorables then
+					if skins_hascolorables() then
 						limit = 10
 					end
 					optionsselection = limit
@@ -3873,6 +4421,7 @@ function menu_keypressed(key, unicode)
 						if characteri > #characters.list then
 							characteri = 1
 						end
+						optionsskins_setcharacter(characteri)
 					end
 				elseif optionsselection == 4 and not (mariocharacter[skinningplayer] and not characters.data[mariocharacter[skinningplayer]].hats) then
 					if mariohats[skinningplayer][1] == nil then
@@ -3881,7 +4430,7 @@ function menu_keypressed(key, unicode)
 						mariohats[skinningplayer][1] = mariohats[skinningplayer][1] + 1
 					end
 					saveconfig()
-				elseif characters.data[mariocharacter[skinningplayer]].colorables and optionsselection == 5 then
+				elseif skins_hascolorables() and optionsselection == 5 then
 					--next color set
 					colorsetedit = colorsetedit + 1
 					if colorsetedit > #characters.data[mariocharacter[skinningplayer]].colorables then
@@ -4006,6 +4555,7 @@ function menu_keypressed(key, unicode)
 						if characteri < 1 then
 							characteri = #characters.list
 						end
+						optionsskins_setcharacter(characteri)
 					end
 				elseif optionsselection == 4 and not (mariocharacter[skinningplayer] and not characters.data[mariocharacter[skinningplayer]].hats) then
 					if mariohats[skinningplayer][1] == 1 then
@@ -4014,7 +4564,7 @@ function menu_keypressed(key, unicode)
 						mariohats[skinningplayer][1] = mariohats[skinningplayer][1] - 1
 					end
 					saveconfig()
-				elseif characters.data[mariocharacter[skinningplayer]].colorables and optionsselection == 5 then
+				elseif skins_hascolorables() and optionsselection == 5 then
 					--previous color set
 					colorsetedit = colorsetedit - 1
 					if colorsetedit < 1 then
@@ -4152,7 +4702,7 @@ function menu_keypressed(key, unicode)
 end
 
 function menu_keyreleased(key, unicode)
-	local colorables = characters.data[mariocharacter[skinningplayer]].colorables
+	local colorables = skins_hascolorables()
 	local changingColour = key == "left" or key == "right" or key == "a" or key == "d"
 	local anyHold = love.keyboard.isDown("left") or love.keyboard.isDown("right") or love.keyboard.isDown("a") or love.keyboard.isDown("d")
 

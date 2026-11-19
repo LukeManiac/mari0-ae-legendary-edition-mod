@@ -19,6 +19,61 @@ local function gui_anim_value(anim, clamp_output)
 	return lerp(anim.from, anim.to, p), t >= 1
 end
 
+--dropdown layout (all in game pixels). A plain dropdown has 10 pixel rows in one column, but a graphical one
+--(see guielement:setentrydrawing) can have taller rows, a grid of columns and draw its entries itself.
+--The header is a row tall plus 1 pixel, and the list below it is rows*rowheight tall
+local function dropdown_rowheight(self)
+	return self.rowheight or 10
+end
+
+local function dropdown_headerheight(self)
+	return dropdown_rowheight(self)+1
+end
+
+local function dropdown_columns(self)
+	return self.columns or 1
+end
+
+local function dropdown_listheight(self)
+	return math.ceil(#self.entries/dropdown_columns(self))*dropdown_rowheight(self)
+end
+
+--how far a list taller than the screen scrolls
+local function dropdown_scrollrange(self)
+	return dropdown_headerheight(self)+dropdown_listheight(self)-(height*16)
+end
+
+--column and row (both from 1) of an entry
+local function dropdown_cell(self, i)
+	local columns = dropdown_columns(self)
+	return (i-1)%columns+1, math.floor((i-1)/columns)+1
+end
+
+--left edge and width of a column: the columns share the list's inside, with a 1 pixel gap between them
+local function dropdown_columnspan(self, column)
+	local inside = 11+self.width*8
+	local columns = dropdown_columns(self)
+	local left = math.floor((column-1)*inside/columns)
+	local right = math.floor(column*inside/columns)
+	if column < columns then
+		right = right-1
+	end
+	return self.x+1+left, right-left
+end
+
+--the entry under a point of the list (game pixels, y from the top of the first row), 0 for a gap past the last entry
+local function dropdown_entryat(self, x, y)
+	local columns = dropdown_columns(self)
+	local row = math.floor(y/dropdown_rowheight(self))+1
+	local column = math.floor((x-self.x-1)*columns/(11+self.width*8))+1
+	column = math.max(1, math.min(columns, column))
+	local i = (row-1)*columns+column
+	if row < 1 or i > #self.entries then
+		return 0
+	end
+	return i
+end
+
 local android_key_repeat = false --bugfix: keep track of last pressed key to prevent glitchy keyboards from inputing letter twice
 typingintextinput = false --dirty fix, not neccessarily accurate but good enough to prevent unintended scrolling in editor
 
@@ -302,7 +357,7 @@ function guielement:update(dt)
 			end
 			if self.scrollbar then
 				self.scrollbar:update(dt)
-				local range = ((#self.entries+1)*10)-(height*16)+1
+				local range = dropdown_scrollrange(self)
 				if self.wheelanim then
 					if self.scrollbar.dragging then
 						self.wheelanim = nil --dragging the scrollbar takes over
@@ -372,6 +427,18 @@ local function setdropdownentrycolor(self, entry, i)
 	else
 		love.graphics.setColor(255, 255, 255)
 	end
+end
+
+--a graphical dropdown draws entry i in the box x, y, w, h (game pixels) itself
+--highlighted: the box is the bright list colour behind it (hovered or picked with the keyboard)
+--header: it is the closed dropdown's current entry (dimmed while the list is open)
+local function drawgraphicalentry(self, i, x, y, w, h, highlighted, header)
+	if not self.entries[i] then
+		return
+	end
+	local r, g, b, a = love.graphics.getColor()
+	self.drawentryfunc(self, i, x, y, w, h, highlighted, header)
+	love.graphics.setColor(r, g, b, a)
 end
 
 function guielement:draw(a, offx, offy)
@@ -478,17 +545,19 @@ function guielement:draw(a, offx, offy)
 		
 		local p = self:getlistprogress()
 		local ext = self.extended or p > 0
-		local listheight = 10*#self.entries
-		local listtop = self.y+11
+		local rowh = dropdown_rowheight(self)
+		local headh = dropdown_headerheight(self)
+		local listheight = dropdown_listheight(self)
+		local listtop = self.y+headh
 		local listr = math.min((3+self.width*8)*scale, 11*scale) * 0.2 --same corner radius as the header
-		
+
 		if ext and not self.cutoff then
 			love.graphics.setColor(127, 127, 127)
 			local y = self.y
 			if self.dropup then
-				y = (self.y-(10*#self.entries))
+				y = (self.y-listheight)
 			end
-			local fullheight = 10*(#self.entries+1)+1
+			local fullheight = headh+listheight
 			local shadowheight = fullheight - (1-p)*listheight
 			local shadowy = y+2
 			if self.dropup then
@@ -500,22 +569,22 @@ function guielement:draw(a, offx, offy)
 		love.graphics.setColor(bordergrey, bordergrey, bordergrey)
 		
 		local dw = (3+self.width*8)*scale
-		local dh = 11*scale
-		local dr = math.min(dw, dh) * 0.2
+		local dh = headh*scale
+		local dr = math.min(dw, 11*scale) * 0.2
 		--outer border for the whole control
 		love.graphics.rectangle("fill", self.x*scale, self.y*scale, dw, dh, dr)
 
 		--text area fill (left side)
 		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", (self.x+1)*scale, (self.y+1)*scale, (1+self.width*8)*scale, 9*scale, dr*0.7)
+		love.graphics.rectangle("fill", (self.x+1)*scale, (self.y+1)*scale, (1+self.width*8)*scale, (headh-2)*scale, dr*0.7)
 
 		--arrow button strip on the right (same border colour as the outer frame)
 		love.graphics.setColor(bordergrey, bordergrey, bordergrey)
 		local abx = (self.x + 2 + self.width*8)*scale
 		local aby = self.y*scale
 		local abw = 11*scale
-		local abh = 11*scale
-		local abr = math.min(abw, abh) * 0.2
+		local abh = headh*scale
+		local abr = math.min(abw, 11*scale) * 0.2
 		love.graphics.rectangle("fill", abx, aby, abw, abh, abr)
 		love.graphics.setColor(0, 0, 0)
 		love.graphics.rectangle("fill", abx+scale, aby+scale, abw-2*scale, abh-2*scale, abr*0.7)
@@ -523,25 +592,66 @@ function guielement:draw(a, offx, offy)
 		--↓ from the font, centred in the arrow button
 		love.graphics.setColor(bordergrey, bordergrey, bordergrey)
 		local arrowchar = self.dropup and "↑" or "↓"
-		properprintF(arrowchar, (self.x + 3 + self.width*8)*scale, (self.y + 2)*scale)
-		
+		properprintF(arrowchar, (self.x + 3 + self.width*8)*scale, (self.y + 2 + math.floor((headh-11)/2))*scale)
+
 		local s = self.entries[self.var]
-		if self.extended then
-			love.graphics.setColor(127, 127, 127)
-		elseif getdropdownentrycolor(self, self.var) then
-			love.graphics.setColor(getdropdownentrycolor(self, self.var))
-		elseif self.coloredtext then
-			if s == "black" then
-				love.graphics.setColor(80, 80, 80)
-			else
-				love.graphics.setColor(textcolors[s])
-			end
+		if self.drawentryfunc then
+			drawgraphicalentry(self, self.var, self.x+1, self.y+1, 1+self.width*8, headh-2, false, true)
 		else
-			love.graphics.setColor(255, 255, 255)
+			if self.extended then
+				love.graphics.setColor(127, 127, 127)
+			elseif getdropdownentrycolor(self, self.var) then
+				love.graphics.setColor(getdropdownentrycolor(self, self.var))
+			elseif self.coloredtext then
+				if s == "black" then
+					love.graphics.setColor(80, 80, 80)
+				else
+					love.graphics.setColor(textcolors[s])
+				end
+			else
+				love.graphics.setColor(255, 255, 255)
+			end
+
+			if self.displayentries then s = self.displayentries[self.var] end
+			drawdropdownentry(s, self.x+1, self.y+2, self.width)
 		end
 
-		if self.displayentries then s = self.displayentries[self.var] end
-		drawdropdownentry(s, self.x+1, self.y+2, self.width)
+		--one entry of the open list: boxtop is the top of its black box, texttop is where its text goes
+		local function drawlistentry(i, boxtop, texttop)
+			local cx, cw = dropdown_columnspan(self, (dropdown_cell(self, i)))
+			local s = self.entries[i]
+			if high ~= i then
+				love.graphics.setColor(0, 0, 0)
+				love.graphics.rectangle("fill", cx*scale, boxtop*scale, cw*scale, (rowh-1)*scale, listr*0.7)
+				if self.drawentryfunc then
+					drawgraphicalentry(self, i, cx, boxtop, cw, rowh-1, false, false)
+					return
+				end
+				setdropdownentrycolor(self, s, i)
+			else
+				if self.drawentryfunc then
+					drawgraphicalentry(self, i, cx, boxtop, cw, rowh-1, true, false)
+					return
+				end
+				love.graphics.setColor(0, 0, 0)
+			end
+			if self.displayentries then s = self.displayentries[i] end
+			drawdropdownentry(s, cx, texttop, self.width+1)
+		end
+
+		--a grid's cells after its last entry are black like the others
+		local function drawemptycells(firstrowtop)
+			local columns = dropdown_columns(self)
+			local n = #self.entries
+			if columns > 1 and n%columns ~= 0 then
+				local _, row = dropdown_cell(self, n)
+				love.graphics.setColor(0, 0, 0)
+				for column = n%columns+1, columns do
+					local cx, cw = dropdown_columnspan(self, column)
+					love.graphics.rectangle("fill", cx*scale, (firstrowtop+(row-1)*rowh)*scale, cw*scale, (rowh-1)*scale, listr*0.7)
+				end
+			end
+		end
 	
 		if ext then
 			love.graphics.setColor(127, 127, 127)
@@ -557,14 +667,14 @@ function guielement:draw(a, offx, offy)
 				if self.cutoff then
 					local fullh = height*16
 					local top = self.y*(1-p)
-					local bottom = (self.y+11) + (fullh-(self.y+11))*p
+					local bottom = (self.y+headh) + (fullh-(self.y+headh))*p
 					clipx, clipy, cliph = self.x*scale, top*scale, (bottom-top)*scale
 					slide = 0
 				elseif self.dropup then
 					clipx, clipy, cliph = self.x*scale, (self.y-listheight*p)*scale, listheight*p*scale
 					slide = (1-p)*listheight*scale
 				else
-					clipx, clipy, cliph = self.x*scale, (self.y+11)*scale, listheight*p*scale
+					clipx, clipy, cliph = self.x*scale, (self.y+headh)*scale, listheight*p*scale
 					slide = -(1-p)*listheight*scale
 				end
 				oldx, oldy, oldw, oldh = love.graphics.getScissor()
@@ -574,71 +684,51 @@ function guielement:draw(a, offx, offy)
 			end
 			
 			if self.cutoff then --have a scrollbar
-				love.graphics.rectangle("fill", self.x*scale, -self.scroll*scale, (13+self.width*8)*scale, (10*(#self.entries+1)+1)*scale, listr)
+				love.graphics.rectangle("fill", self.x*scale, -self.scroll*scale, (13+self.width*8)*scale, (headh+listheight)*scale, listr)
 				love.graphics.setColor(127, 127, 127)
 				if high then love.graphics.setColor(255, 255, 255) end
 				local ax = (self.x+2+self.width*8+4)*scale
-				local ay = (-self.scroll+5.5)*scale
+				local ay = (-self.scroll+headh/2)*scale
 				love.graphics.polygon("fill", ax-3*scale, ay-2*scale, ax+3*scale, ay-2*scale, ax, ay+3*scale)
 				love.graphics.setColor(0, 0, 0)
-				love.graphics.rectangle("fill", (self.x+1)*scale, (-self.scroll+1)*scale, (1+self.width*8)*scale, 9*scale)
-				love.graphics.setColor(127, 127, 127)
-				local selected = self.entries[self.var]
-				if self.displayentries then selected = self.displayentries[self.var] end
-				drawdropdownentry(selected, self.x+1, -self.scroll+2, self.width)
+				love.graphics.rectangle("fill", (self.x+1)*scale, (-self.scroll+1)*scale, (1+self.width*8)*scale, (headh-2)*scale)
+				if self.drawentryfunc then
+					drawgraphicalentry(self, self.var, self.x+1, -self.scroll+1, 1+self.width*8, headh-2, false, true)
+				else
+					love.graphics.setColor(127, 127, 127)
+					local selected = self.entries[self.var]
+					if self.displayentries then selected = self.displayentries[self.var] end
+					drawdropdownentry(selected, self.x+1, -self.scroll+2, self.width)
+				end
 				for i = 1, #self.entries do
-					local rowy = (2+10*i)-self.scroll
-					if rowy+10*scale > 0 and rowy < height*16 then
-						if high ~= i then
-							love.graphics.setColor(0, 0, 0)
-							love.graphics.rectangle("fill", (self.x+1)*scale, ((1+i*10)-self.scroll)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
-							love.graphics.setColor(255, 255, 255)
-						else
-							love.graphics.setColor(0, 0, 0)
-						end
-						local entry = self.entries[i]
-						if self.displayentries then entry = self.displayentries[i] end
-						if high ~= i then setdropdownentrycolor(self, entry, i) else love.graphics.setColor(0, 0, 0) end
-						drawdropdownentry(entry, self.x+1, rowy, self.width+1)
+					local _, row = dropdown_cell(self, i)
+					local rowtop = headh+(row-1)*rowh-self.scroll
+					if rowtop+rowh > 0 and rowtop < height*16 then
+						drawlistentry(i, rowtop, rowtop+1)
 					end
 				end
+				drawemptycells(headh-self.scroll)
 
 				self.scrollbar:draw()
 			elseif self.dropup then
-				love.graphics.rectangle("fill", self.x*scale, (self.y-(10*#self.entries))*scale, (13+self.width*8)*scale, (10*#self.entries)*scale, listr)
+				local top = self.y-listheight
+				love.graphics.rectangle("fill", self.x*scale, top*scale, (13+self.width*8)*scale, listheight*scale, listr)
 				
 				for i = 1, #self.entries do
-					if high ~= i then
-						love.graphics.setColor(0, 0, 0)
-						love.graphics.rectangle("fill", (self.x+1)*scale, ((self.y+2+i*10)-(11+(10*#self.entries)))*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
-						local s = self.entries[i]
-						setdropdownentrycolor(self, s, i)
-						if self.displayentries then s = self.displayentries[i] end
-						drawdropdownentry(s, self.x+1, (self.y+3+10*i)-(11+(10*#self.entries)), self.width+1)
-					else
-						local s = self.entries[i]
-						love.graphics.setColor(0, 0, 0)
-						if self.displayentries then s = self.displayentries[i] end
-						drawdropdownentry(s, self.x+1, (self.y+3+10*i)-(11+(10*#self.entries)), self.width+1)
-					end
+					local _, row = dropdown_cell(self, i)
+					local rowtop = top+(row-1)*rowh
+					drawlistentry(i, rowtop+1, rowtop+2)
 				end
+				drawemptycells(top+1)
 			else
-				love.graphics.rectangle("fill", self.x*scale, listtop*scale, (13+self.width*8)*scale, (10*#self.entries)*scale, listr)
+				love.graphics.rectangle("fill", self.x*scale, listtop*scale, (13+self.width*8)*scale, listheight*scale, listr)
 				
 				for i = 1, #self.entries do
-					local s = self.entries[i]
-					if high ~= i then
-						love.graphics.setColor(0, 0, 0)
-						love.graphics.rectangle("fill", (self.x+1)*scale, (listtop+(i-1)*10)*scale, (11+self.width*8)*scale, 9*scale, listr*0.7)
-						setdropdownentrycolor(self, s, i)
-						if self.displayentries then s = self.displayentries[i] end
-						drawdropdownentry(s, self.x+1, listtop+1+(i-1)*10, self.width+1)
-					else
-						love.graphics.setColor(0, 0, 0)
-						if self.displayentries then s = self.displayentries[i] end
-						drawdropdownentry(s, self.x+1, listtop+1+(i-1)*10, self.width+1)
-					end
+					local _, row = dropdown_cell(self, i)
+					local rowtop = listtop+(row-1)*rowh
+					drawlistentry(i, rowtop, rowtop+1)
 				end
+				drawemptycells(listtop)
 			end
 			if animating then
 				love.graphics.pop()
@@ -798,10 +888,7 @@ function guielement:draw(a, offx, offy)
 			love.graphics.setColor(self.backgroundcolor)
 			love.graphics.rectangle("fill", self.x*scale, self.y*scale, tw, th, tr)
 		
-			love.graphics.setColor(self.bordercolor)
-			if self.dragging or high or self.inputting then
-				love.graphics.setColor(self.bordercolorhigh)
-			end
+			self:setsliderbordercolor(self.dragging or high or self.inputting or (self.forcehover and not self.nohover))
 			
 			local sw, sh = self.width*scale, self.height*scale
 			local sr = math.min(sw, sh) * (self.buttonround and 0.15 or 0.25) -- buttons use 0.15
@@ -840,13 +927,15 @@ function guielement:draw(a, offx, offy)
 			
 			local tw, th = (self.xrange+self.width)*scale, self.height*scale
 			local tr = self:sliderradius() --the track is rounded like its handle
-			love.graphics.setColor(self.backgroundcolor)
-			love.graphics.rectangle("fill", self.x*scale, self.y*scale, tw, th, tr)
-		
-			love.graphics.setColor(self.bordercolor)
-			if self.dragging or high or self.inputting then
-				love.graphics.setColor(self.bordercolorhigh)
+			if self.drawtrack then
+				--a slider can paint its own track (a colour gradient, say): drawtrack(self, x, y, w, h, radius) in screen pixels
+				self:drawtrack(self.x*scale, self.y*scale, tw, th, tr)
+			else
+				love.graphics.setColor(self.backgroundcolor)
+				love.graphics.rectangle("fill", self.x*scale, self.y*scale, tw, th, tr)
 			end
+
+			self:setsliderbordercolor(self.dragging or high or self.inputting or (self.forcehover and not self.nohover))
 			
 			local sw, sh = self.width*scale, self.height*scale
 			local sr = math.min(sw, sh) * (self.buttonround and 0.15 or 0.25) -- buttons use 0.15
@@ -885,7 +974,12 @@ function guielement:draw(a, offx, offy)
 				else
 					s = self:displayfunction(self.value)
 				end
-				properprint(s, (self.x+self.xrange*self.value)*scale, (self.y+math.ceil((self.height-8)/2))*scale)
+				local textx = self.x+self.xrange*self.value
+				if self.centerdisplay and not self.inputting then
+					--the shown value sits in the middle of the handle
+					textx = textx + math.floor((self.width-utf8.len(tostring(s))*8)/2)
+				end
+				properprint(s, textx*scale, (self.y+math.ceil((self.height-8)/2))*scale)
 
 				--cursor: fades and glides like a text input's
 				if self.inputting then
@@ -1100,7 +1194,16 @@ function guielement:click(x, y, button)
 						if self.inputting then
 							self:stoptyping()
 						end
-						if self:inhighlight(x, y) then
+						local ontrack = false
+						if self.trackclick and button == "l" and not self:inhighlight(x, y) and self:insidertrack(x, y) then
+							--clicking the track jumps the handle under the mouse and grabs it
+							self.value = math.min(math.max((x/scale-self.x-self.width/2)/self.xrange, 0), 1)
+							if self.updatefunc then
+								self:updatefunc(self.value)
+							end
+							ontrack = true
+						end
+						if ontrack or self:inhighlight(x, y) then
 							self.dragging = true
 							self.draggingx = x-(self.x+self.xrange*self.value)*scale
 							if self.buttonround then
@@ -1172,7 +1275,43 @@ function guielement:keypress(key,textinput)
 		if self.type == "dropdown" then
 			--an open dropdown takes the up/down/enter keys: up and down move the highlighted option, enter sets it
 			if self.extended and not textinput then
-				if key == "up" or key == "w" or key == "down" or key == "s" then
+				local columns = dropdown_columns(self)
+				if columns > 1 and (key == "up" or key == "w" or key == "down" or key == "s" or key == "left" or key == "a" or key == "right" or key == "d") then
+					--a grid: left and right go along a row, up and down along a column (both wrap around)
+					local n = #self.entries
+					local i = math.max(1, math.min(n, self:getdropdowncursor()))
+					if key == "left" or key == "a" then
+						i = i - 1
+						if i < 1 then
+							i = n
+						end
+					elseif key == "right" or key == "d" then
+						i = i + 1
+						if i > n then
+							i = 1
+						end
+					else
+						local column = dropdown_cell(self, i)
+						local lastrow = math.floor((n-column)/columns)+1 --the column's last row
+						local _, row = dropdown_cell(self, i)
+						if key == "up" or key == "w" then
+							row = row - 1
+							if row < 1 then
+								row = lastrow
+							end
+						else
+							row = row + 1
+							if row > lastrow then
+								row = 1
+							end
+						end
+						i = (row-1)*columns+column
+					end
+					self.keycursor = i
+					self.keymouse = {love.mouse.getPosition()}
+					self:scrolltocursor()
+					return true
+				elseif key == "up" or key == "w" or key == "down" or key == "s" then
 					local i = self:getdropdowncursor()
 					if key == "up" or key == "w" then
 						i = i - 1
@@ -1561,6 +1700,40 @@ function guielement:setentrycolors(colors)
 	self.entrycolors = colors
 end
 
+--dropdown: make it graphical. Its entries are drawn by drawfunc(self, i, x, y, w, h, highlighted, header)
+--into the box x, y, w, h (game pixels) instead of printed, its rows are rowheight pixels tall (10 by default)
+--and its list is laid out in a grid of columns (1 by default). The header is a row tall plus a pixel.
+function guielement:setentrydrawing(drawfunc, rowheight, columns)
+	if self.type ~= "dropdown" then
+		return
+	end
+	self.drawentryfunc = drawfunc
+	self.rowheight = rowheight
+	self.columns = columns
+	--work the layout out again for the new size
+	if self.multiy then
+		self.y = self.multiy[1]
+	end
+	self.cutoff = false
+	self.scrollbar = nil
+	self:updatePos()
+end
+
+--dropdown: change its entries (and the current one), working the layout out again
+function guielement:setentries(entries, var)
+	if self.type ~= "dropdown" then
+		return
+	end
+	self.entries = entries
+	self.var = var or math.min(self.var, #entries)
+	if self.multiy then
+		self.y = self.multiy[1]
+	end
+	self.cutoff = false
+	self.scrollbar = nil
+	self:updatePos()
+end
+
 --dropdown: scroll a long (cut off) list with the mouse wheel, the way a web browser does (Chromium's wheel scrolling):
 --every notch moves the target DROPDOWN_WHEEL_PIXELS screen pixels (times how far the wheel turned, mousewheelamount,
 --so a fine scrolling wheel or a touchpad moves it a little), and the list slides there on an ease-in-out curve,
@@ -1625,7 +1798,7 @@ function guielement:wheelscroll(button)
 	if not (self.cutoff and self.scrollbar) then
 		return
 	end
-	local range = ((#self.entries+1)*10)-(height*16)+1
+	local range = dropdown_scrollrange(self)
 	if range <= 0 then
 		return
 	end
@@ -1687,9 +1860,10 @@ end
 --dropdown: scroll a long (cut off) list so the keyboard's option is on screen
 function guielement:scrolltocursor()
 	if self.cutoff and self.scrollbar and self.keycursor then
-		local range = ((#self.entries+1)*10)-(height*16)+1
-		local top = 10*self.keycursor
-		local bottom = top + 11
+		local range = dropdown_scrollrange(self)
+		local _, row = dropdown_cell(self, self.keycursor)
+		local top = dropdown_headerheight(self)-1 + (row-1)*dropdown_rowheight(self)
+		local bottom = top + dropdown_rowheight(self) + 1
 		local scroll = self.scroll or 0
 		if top < scroll then
 			scroll = top
@@ -1792,28 +1966,38 @@ function guielement:inhighlight(x, y, allow_dropdown_hover)
 			return true
 		end
 	elseif self.type == "dropdown" then
+		local headh = dropdown_headerheight(self)
+		local listheight = dropdown_listheight(self)
+		local inside = x >= self.x*scale and x < (self.x+13+self.width*8)*scale
 		if self.extended == false then
-			if x >= self.x*scale and x < (self.x+13+self.width*8)*scale and y >= self.y*scale and y < (self.y+11)*scale then
+			if inside and y >= self.y*scale and y < (self.y+headh)*scale then
 				return true
 			end
 		else
+			--the header is 0, the list gives the entry under the mouse
 			if self.cutoff then
-				if x >= self.x*scale and x < (self.x+13+self.width*8)*scale and y >= -self.scroll*scale and y < ((10*#self.entries+11)-self.scroll)*scale then
-					return math.max(0, math.min(#self.entries, math.floor((y+self.scroll*scale)/(10*scale))))
+				local top = -self.scroll
+				if inside and y >= top*scale and y < (top+headh+listheight)*scale then
+					local gy = y/scale-top
+					if gy < headh then
+						return 0
+					end
+					return dropdown_entryat(self, x/scale, gy-headh)
 				end
 			elseif self.dropup then
-				--(11+))
-				if x >= self.x*scale and x < (self.x+13+self.width*8)*scale and y >= (self.y-(10*#self.entries))*scale and y < (self.y+11)*scale then
-					--get which entry
-					local i = math.max(0, math.floor((y-(self.y-10-(10*#self.entries))*scale) / (10*scale)))
-					if i > #self.entries then
-						i = 0
+				local top = self.y-listheight
+				if inside and y >= top*scale and y < (self.y+headh)*scale then
+					if y >= self.y*scale then
+						return 0
 					end
-					return i
+					return dropdown_entryat(self, x/scale, y/scale-top)
 				end
 			else
-				if x >= self.x*scale and x < (self.x+13+self.width*8)*scale and y >= self.y*scale and y < (self.y+10*#self.entries+11)*scale then
-					return math.max(0, math.floor((y-(self.y+1)*scale)/(10*scale)))
+				if inside and y >= self.y*scale and y < (self.y+headh+listheight)*scale then
+					if y < (self.y+headh)*scale then
+						return 0
+					end
+					return dropdown_entryat(self, x/scale, y/scale-(self.y+headh))
 				end
 			end
 		end
@@ -1859,6 +2043,33 @@ end
 ------------------------------------------------------------
 -- sliders (horizontal scrollbars)
 ------------------------------------------------------------
+
+--sets the colour of a scrollbar's handle border: it fades between bordercolor and bordercolorhigh
+--on a motion curve (like a dropdown's border) as the handle is hovered, dragged, typed into or selected
+function guielement:setsliderbordercolor(highlighted)
+	local target = bool2int(highlighted)
+	if self.bordertarget == nil then
+		self.bordertarget = target
+		self.bordermix = target
+	elseif target ~= self.bordertarget then
+		self.bordertarget = target
+		self.borderanim = gui_anim_start(self.bordermix, target)
+	end
+	if self.borderanim then
+		local v, done = gui_anim_value(self.borderanim, true)
+		self.bordermix = v
+		if done then
+			self.borderanim = nil
+		end
+	end
+	local low, high, mix = self.bordercolor, self.bordercolorhigh, self.bordermix
+	love.graphics.setColor(
+		lerp(low[1], high[1], mix),
+		lerp(low[2], high[2], mix),
+		lerp(low[3], high[3], mix),
+		lerp(low[4] or 255, high[4] or 255, mix)
+	)
+end
 
 --corner radius of a scrollbar's handle; the track uses the same one
 function guielement:sliderradius()
@@ -1987,8 +2198,9 @@ end
 
 function guielement:updatePos()
 	if self.type == "dropdown" then
-		if 10*(#self.entries+1) > height*16 then
-			local yrange = (((#self.entries+1)*10)-(height*16)+1)
+		local fullheight = dropdown_headerheight(self)-1+dropdown_listheight(self) --10*(#self.entries+1) for a plain dropdown
+		if fullheight > height*16 then
+			local yrange = dropdown_scrollrange(self)
 			self.cutoff = true
 			self.scroll = 0
 			self.wheelanim = nil
@@ -1999,8 +2211,8 @@ function guielement:updatePos()
 			self.scrollbar.yrange = self.scrollbar.yrange - self.scrollbar.height
 			self.scrollbar.scrollstep = math.max(0.0001, 73/yrange)
 		end
-		if not self.cutoff and self.y+10*(#self.entries+1) > height*16 then
-			self.multiy = {self.y, height*16-(10*(#self.entries+1))}
+		if not self.cutoff and self.y+fullheight > height*16 then
+			self.multiy = {self.y, height*16-fullheight}
 		else
 			self.multiy = false
 		end

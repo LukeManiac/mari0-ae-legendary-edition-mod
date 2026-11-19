@@ -381,6 +381,76 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.2.2
+
+### 🧩 New Features
+
+#### 🎨 Skins Menu
+
+The skins tab has been rebuilt with graphical dropdowns and real sliders, in place of the old left-and-right arrows and fake sliders.
+
+* **Edit player** is now a dropdown, in the same place and with the same layout as the one in the controls tab.
+* **Character** is a dropdown next to the portal preview. Each option shows the character's skin with its name underneath, in one option.
+  * The character you're playing as is drawn in your colours and hat. Every other character is drawn in the colours and hat that picking it would give you (its `defaultcolors` and `defaulthat` for that player).
+  * Every skin stands on the same line just above its name, centred on the character's middle, which is where the game centres it in a course (`6 - smalloffsetX + smallquadcenterX` across its standing frame). Custom characters line up too, however their frames are padded. The big preview on the left is placed the same way.
+  * A name that's too long for the box slides along to its end and back, so all of it can be read.
+  * If the list is taller than the screen, it scrolls like any other long dropdown.
+* **Hat** is a dropdown of only the hat graphics, laid out in a grid 6 wide, so every hat fits on screen at once. The first one, a crossed-out circle, takes your hat off.
+  * The standard hat is drawn in your first colourable's colour, like it is on the player.
+  * A character that can't wear hats shows "disabled", and the dropdown doesn't open.
+* **Colour** is a dropdown of the character's colourables, each one shown with its colour next to its name.
+* **Red**, **green** and **blue** are sliders now.
+  * Each track shows what the colour would be along it, with the other two channels as they are.
+  * The value is shown in the middle of the handle.
+  * The full colour is shown to the right of the three sliders.
+* **Coop portal 1 color** and **coop portal 2 color** are sliders too. Their tracks are the hue bar, the handle is filled with the portal's colour, and the full colour is shown next to each one.
+* The sliders work like the volume slider: drag the handle, or right-click anywhere on one to type a number. Clicking anywhere on a track also jumps the handle there and grabs it. The mouse wheel doesn't move them, so a colour can't change without being saved. Letting go saves the game.
+* A character without any colourables doesn't show the colour dropdown or the red, green and blue sliders, and its portal colours are the next rows down for the keyboard, as before.
+* Every character's skin is loaded when the menu loads, so the skins tab never stops to load one. A character added later (a downloaded one, for example) loads the first time it's drawn.
+
+**Keyboard**
+
+* The rows are the same as before: tabs, edit player, character, hat, colour, red, green, blue, then the two portal colours.
+* Enter opens the selected row's dropdown. Up and Down move through an open list, Enter picks, and Escape closes it.
+* In the hat grid, Left and Right move along a row and Up and Down move along a column. Both wrap around.
+* Left and Right still change the player, character, hat and colourable without opening anything. A character is now picked straight away. Before, it was only applied once you left the row.
+* Holding Left or Right (or A and D) on a colour or portal row still changes it smoothly, and the slider follows it.
+* While a skins dropdown is open, the other keys don't change what's under it.
+
+#### 🎚️ Slider Animations
+
+* Every slider's handle border now fades between dim and bright on a random motion curve, like a dropdown's border, when it's hovered, dragged, typed into or selected with the keyboard. Before, it switched instantly. This covers all sliders: the volume slider, the Course Maker's sliders, the skins sliders and the scrollbars of long dropdowns.
+* Scrollbars now light up when they're selected with the keyboard too, the same as horizontal sliders.
+* In the skins tab, the red, green and blue sliders glide over to their new values when you switch to another player, character or colourable. The portal sliders glide when you switch to another player, since their colours belong to the player. Each glide takes 0.25 seconds on a random motion curve, and the handle shows the value it's heading to.
+* Holding a key on a colour row and dragging a handle stay instant. Grabbing a handle while it's gliding stops the glide.
+
+#### 🧱 GUI
+
+For anyone building menus with the GUI:
+
+* Dropdowns can be graphical. `dropdown:setentrydrawing(drawfunc, rowheight, columns)` makes a dropdown draw its own entries with `drawfunc(self, i, x, y, w, h, highlighted, header)`, gives it taller rows (`rowheight`, 10 by default), and lays the list out in a grid (`columns`, 1 by default). The header is a row tall plus a pixel. Opening, closing, scrolling, hovering, clicking and the keyboard all work with them.
+* `dropdown:setentries(entries, var)` changes a dropdown's entries and works its layout out again.
+* Horizontal sliders have a few new options:
+  * `drawtrack(self, x, y, w, h, radius)` paints the track instead of the plain background colour.
+  * `centerdisplay` puts the shown value in the middle of the handle.
+  * `trackclick` makes a click on the track jump the handle there and grab it.
+* `loadcustomplayergraphics(name)` loads a character's images and quads without picking it. `setcustomplayer` uses it too.
+
+### 🐛 Bug Fixes
+
+* A character's quads are now only built once. `setcustomplayer` checked a `quads` flag that was never set, so it rebuilt every quad of the character each time it ran.
+* In a dropdown list too long for the screen, the entry under the mouse is now the one drawn there. Before, the mouse was a pixel off at the line between two entries.
+* Switching to a player whose character has fewer colourables than the one you were editing no longer leaves the colour row pointing at a colourable that doesn't exist.
+* A character whose `colorables` list is empty is no longer treated as having colourables.
+
+### ✨ Improvements
+
+* Escape now closes an open dropdown first in every options tab, instead of leaving the options menu with the dropdown still open.
+
+### ❌ Removals
+
+* The skins tab's `{` and `}` arrows and the hue bar markers are gone, replaced by the dropdowns and sliders. `huebarmarkerimg` is still loaded, but the menu no longer draws it.
+
 ## v1.2.1
 
 ### 🧩 New Features
@@ -416,6 +486,7 @@ A new nitpick, `inertiaphysics`. When you jump or fall off something that's movi
 * Players can't die while the screen fades out for the next course, or for an animation's `loadlevel` or `loadlevelinstant` action. Before, falling into a pit or touching an enemy during the fade could kill you after you'd already finished.
 * Moving up through a top-only object from below no longer sticks you onto its top when you aren't holding jump. Letting go of jump ends the jump while you're still going up, and moving objects only skipped players who were still jumping, so your feet got pulled onto the top as soon as they reached it. Now you carry on up and only land on it when you come back down. This covers moving platforms, objects on tracks, custom enemies with `platform`, seesaws and donut blocks.
 * Standing on a rising custom enemy with `platform` no longer shows the running frames when you should be skidding. The game used to think you were falling, since the enemy was moving up from under you.
+* Going from big to bunny (with a Carrot) or from bunny to big now flashes between the two looks, like every other big-to-big change. Bunny Mario uses the big sprite with the ears drawn on top, and the ears only checked your real power-up, not the look the animation was showing. Both looks were the same big sprite, so nothing flashed and the ears just popped in or out. Now the ears follow the look that's on screen, with `modernsizechangeanimation` and with `dontfreezeonsizechange`. A custom power-up with bunny ears only shows them on the frames that show its own look.
 
 ### ✨ Improvements
 

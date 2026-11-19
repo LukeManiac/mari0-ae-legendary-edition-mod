@@ -567,6 +567,67 @@ function splitimage(img, color, exclude, imagedata) --split singe image into col
 	end
 end
 
+--loads a character's images and quads the first time they're needed (picking it, or previewing it in the skins menu)
+function loadcustomplayergraphics(i)
+	if not (i and characters.data[i]) then
+		return false
+	end
+	local imgs = characters.data[i].imgs
+	if not characters.data[i]["animations"] then
+		for i2, v in pairs(animfiles) do
+			local n = v .. "animations"
+			if imgs[n] then
+				characters.data[i][n] = {}
+				if #characters.data[i].colors == #characters.data[i].colorables and not characters.data[i].dontsplitcolors then
+					local img = love.image.newImageData("alesans_entities/characters/" .. i .. "/" .. n .. ".png")
+					characters.data[i][n][0] = splitimage(img, characters.data[i].colors, true)
+					for j = 1, #characters.data[i].colorables do
+						characters.data[i][n][j] = splitimage(img, characters.data[i].colors[j])
+					end
+				elseif love.filesystem.getInfo("alesans_entities/characters/" .. i .. "/" .. n .. "1.png") then
+					for j = 0, #characters.data[i].colorables do
+						if love.filesystem.getInfo("alesans_entities/characters/" .. i .. "/" .. n .. j .. ".png") then
+							characters.data[i][n][j] = love.graphics.newImage("alesans_entities/characters/" .. i .. "/" .. n .. j .. ".png")
+						else
+							characters.data[i][n][j] = blankimg
+						end
+					end
+				else
+					characters.data[i][n][0] = love.graphics.newImage("alesans_entities/characters/" .. i .. "/" .. n .. ".png")
+					for j = 1, #characters.data[i].colorables do
+						characters.data[i][n][j] = blankimg
+					end
+				end
+			elseif v ~= "fire" and v ~= "ice" and v ~= "superball" then
+				characters.data[i][n] = characters.data["mario"][n]--_G["mario" .. n]
+			end
+		end
+		--cape and bunnyears
+		if love.filesystem.getInfo("alesans_entities/characters/" .. i .. "/cape.png") then
+			characters.data[i].capeimg = love.graphics.newImage("alesans_entities/characters/" .. i .. "/cape.png")
+		end
+		if love.filesystem.getInfo("alesans_entities/characters/" .. i .. "/bunnyears.png") then
+			characters.data[i].bunnyears = love.graphics.newImage("alesans_entities/characters/" .. i .. "/bunnyears.png")
+		end
+		--health counter
+		if love.filesystem.getInfo("alesans_entities/characters/" .. i .. "/health.png") then
+			local img = love.graphics.newImage("alesans_entities/characters/" .. i .. "/health.png")
+			characters.data[i].healthimg = img
+			local w, h = img:getWidth(), img:getHeight()
+			local t = {}
+			for y = 1, 2 do
+				table.insert(t, love.graphics.newQuad(0, (h/2)*(y-1), w, h/2, w, h))
+			end
+			characters.data[i].healthquad = t
+		end
+	end
+	if not characters.data[i]["quads"] then
+		loadplayerquads(characters.data[i])
+		characters.data[i]["quads"] = true --only needs doing once, the quads come from the config
+	end
+	return true
+end
+
 function setcustomplayer(i, pn, initial) --name, player number, initial (don't change colors to defaults)
 	if i and characters.data[i] then
 		if love.filesystem.getInfo("alesans_entities/characters/" .. i .. "/config.txt") then
@@ -578,58 +639,7 @@ function setcustomplayer(i, pn, initial) --name, player number, initial (don't c
 			end
 		end
 
-		local imgs = characters.data[i].imgs
-		if not characters.data[i]["animations"] then
-			for i2, v in pairs(animfiles) do
-				local n = v .. "animations"
-				if imgs[n] then
-					characters.data[i][n] = {}
-					if #characters.data[i].colors == #characters.data[i].colorables and not characters.data[i].dontsplitcolors then
-						local img = love.image.newImageData("alesans_entities/characters/" .. i .. "/" .. n .. ".png")
-						characters.data[i][n][0] = splitimage(img, characters.data[i].colors, true)
-						for j = 1, #characters.data[i].colorables do
-							characters.data[i][n][j] = splitimage(img, characters.data[i].colors[j])
-						end
-					elseif love.filesystem.getInfo("alesans_entities/characters/" .. i .. "/" .. n .. "1.png") then
-						for j = 0, #characters.data[i].colorables do
-							if love.filesystem.getInfo("alesans_entities/characters/" .. i .. "/" .. n .. j .. ".png") then
-								characters.data[i][n][j] = love.graphics.newImage("alesans_entities/characters/" .. i .. "/" .. n .. j .. ".png")
-							else
-								characters.data[i][n][j] = blankimg
-							end
-						end
-					else
-						characters.data[i][n][0] = love.graphics.newImage("alesans_entities/characters/" .. i .. "/" .. n .. ".png")
-						for j = 1, #characters.data[i].colorables do
-							characters.data[i][n][j] = blankimg
-						end
-					end
-				elseif v ~= "fire" and v ~= "ice" and v ~= "superball" then
-					characters.data[i][n] = characters.data["mario"][n]--_G["mario" .. n]
-				end
-			end
-			--cape and bunnyears
-			if love.filesystem.getInfo("alesans_entities/characters/" .. i .. "/cape.png") then
-				characters.data[i].capeimg = love.graphics.newImage("alesans_entities/characters/" .. i .. "/cape.png")
-			end
-			if love.filesystem.getInfo("alesans_entities/characters/" .. i .. "/bunnyears.png") then
-				characters.data[i].bunnyears = love.graphics.newImage("alesans_entities/characters/" .. i .. "/bunnyears.png")
-			end
-			--health counter
-			if love.filesystem.getInfo("alesans_entities/characters/" .. i .. "/health.png") then
-				local img = love.graphics.newImage("alesans_entities/characters/" .. i .. "/health.png")
-				characters.data[i].healthimg = img
-				local w, h = img:getWidth(), img:getHeight()
-				local t = {}
-				for y = 1, 2 do
-					table.insert(t, love.graphics.newQuad(0, (h/2)*(y-1), w, h/2, w, h))
-				end
-				characters.data[i].healthquad = t
-			end
-		end
-		if not characters.data[i]["quads"] then
-			loadplayerquads(characters.data[i])
-		end
+		loadcustomplayergraphics(i)
 		if characters.data[i].defaultcolors and characters.data[i].defaultcolors[pn] then
 			if (not initial) or (mariocolors[pn] and #mariocolors[pn] < #characters.data[i].defaultcolors[pn]) then
 				--this doesn't work correctly
