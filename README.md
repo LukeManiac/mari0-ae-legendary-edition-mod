@@ -385,7 +385,16 @@ All notable releases and updates to **Legendary Edition** are documented here.
 
 ### 🧩 New Features
 
-* For enemies that have `updatewhensizechange` set to true, the enemies they spawn (via `spawnsenemy` or `spawnchildren`) or transform into will have the parameter passed onto them, unless `donotpassupdatewhensizechange` is set to true.
+#### 👾 Size Change Handling
+
+A new custom enemy property, `donotpassupdatewhensizechange`. Set it to `true` in the enemy's JSON file, and the enemy keeps `updatewhensizechange` to itself instead of passing it on.
+
+```json
+"donotpassupdatewhensizechange": true
+```
+
+* Normally, an enemy with `updatewhensizechange` set to `true` passes it on to the enemies it spawns (`spawnsenemy` or `spawnchildren`) and the enemies it transforms into.
+* With `donotpassupdatewhensizechange`, those enemies don't get it. They only keep updating during a size change if their own JSON has `updatewhensizechange`.
 
 #### 🛹 Inertia Physics
 
