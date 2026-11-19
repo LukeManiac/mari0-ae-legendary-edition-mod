@@ -4,7 +4,6 @@ local supported = true--love.graphics.isSupported and love.graphics.isSupported(
 local supports_npo2 = true --love.graphics.isSupported and love.graphics.isSupported("npot") or false -- on the safe side
 if not supported then 
 	shaderssupported = false
-	print("post-processing shaders not supported")
 end
 
 local function FindNextPO2(x)
@@ -204,7 +203,6 @@ function shaders:set(i, shadername)
 		pass.on = true
 		pass.cureffect = shadername
 		pass:useCanvas(supports_npo2 and not self.effects[shadername].needspo2)
-		print(string.format("post-processing shader selected for pass %d: %s", i, shadername))
 	end
 end
 
