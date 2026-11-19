@@ -4085,7 +4085,8 @@ function drawplayer_draw(i, x, y, r, pad, drop)
 			end
 		
 			--bunny mario
-			if (v.size == 11 or (v.fireenemy and v.fireenemy.bunnyears)) then
+			local shownsize = v.shownsize and v:shownsize() or v.size
+			if (shownsize == 11 or (shownsize == v.size and v.fireenemy and v.fireenemy.bunnyears)) then
 				local frame = 1
 				if v.float then
 					frame = (math.floor(v.floattimer*20-1)%2)+1

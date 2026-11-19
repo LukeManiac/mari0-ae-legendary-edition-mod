@@ -4661,7 +4661,7 @@ end
 
 --puts the look on the player for drawing, with the feet where the player's are. Returns what to put back
 local sizefxlookfields = {"graphic", "colors", "quadcenterX", "quadcenterY", "offsetX", "offsetY", "quad",
-	"quadanim", "quadanimi", "quadframe", "sizechangescaley", "yoshiquad", "animationstate"}
+	"quadanim", "quadanimi", "quadframe", "sizechangescaley", "yoshiquad", "animationstate", "sizefxshowsize"}
 
 function mario:applysizefxlook(look)
 	local saved = {}
@@ -4680,6 +4680,7 @@ function mario:applysizefxlook(look)
 		self.offsetX = snap.offsetX + (self.width - snap.width)*8
 		self.offsetY = snap.offsetY
 		self:setquad(look.anim, snap.size)
+		self.sizefxshowsize = snap.size --(what's drawn on top of the sprite, bunny ears for example, follows the snapshot)
 		self.animationstate = saved.animationstate
 		self.yoshiquad = saved.yoshiquad
 		if look.scaley and self.gravitydir == "down" then
@@ -4708,6 +4709,16 @@ function mario:restoresizefxlook(saved)
 end
 
 --whether this player is in a size change animation (the game is frozen for it, see game_update)
+--the size the player looks like right now: during a size change animation, the size of the snapshot that's showing
+function mario:shownsize()
+	if self.sizefxshowsize then
+		return self.sizefxshowsize
+	elseif self.modernsize and self.modernsize.showsize then
+		return self.modernsize.showsize
+	end
+	return self.size
+end
+
 function mario:sizechanging()
 	return self.animation == "grow1" or self.animation == "grow2" or self.animation == "shrink"
 		or self.animation == "modernsize"
