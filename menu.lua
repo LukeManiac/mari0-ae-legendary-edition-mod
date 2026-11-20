@@ -3365,7 +3365,7 @@ local function mappackmenu_drawpages()
 		if mappackhorscrollsmooth <= 0.01 then
 			love.graphics.setScissor()
 			love.graphics.setColor(0, 0, 0, 200)
-			love.graphics.rectangle("fill", 241*scale, 125*scale, 150*scale, 65*scale)
+			love.graphics.rectangle("fill", 241*scale, 125*scale, 150*scale, 75*scale)
 			love.graphics.setColor(255, 255, 255, 255)
 			if savefolderfailed then
 				properprintF(TEXT["mappack folder fail"], 244*scale, 129*scale)
