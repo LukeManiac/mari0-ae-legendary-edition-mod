@@ -419,15 +419,15 @@ The skins tab has been rebuilt with graphical dropdowns and real sliders, in pla
 
 #### 🎚️ Slider Animations
 
-* Every slider's handle border now fades between dim and bright on a random motion curve, like a dropdown's border, when it's hovered, dragged, typed into or selected with the keyboard. Before, it switched instantly. This covers all sliders: the volume slider, the Course Maker's sliders, the skins sliders and the scrollbars of long dropdowns.
+* Every slider's handle border now fades between dim and bright, easing in and out like a dropdown's border, when it's hovered, dragged, typed into or selected with the keyboard. Before, it switched instantly. This covers all sliders: the volume slider, the Course Maker's sliders, the skins sliders and the scrollbars of long dropdowns.
 * Scrollbars now light up when they're selected with the keyboard too, the same as horizontal sliders.
-* In the skins tab, the red, green and blue sliders glide over to their new values when you switch to another player, character or colourable. The portal sliders glide when you switch to another player, since their colours belong to the player. Each glide takes 0.25 seconds on a random motion curve, and the handle shows the value it's heading to.
+* In the skins tab, the red, green and blue sliders glide over to their new values when you switch to another player, character or colourable. The portal sliders glide when you switch to another player, since their colours belong to the player. Each glide takes 0.25 seconds and eases out (`ease_out_quad`), and the handle shows the value it's heading to.
 * Holding a key on a colour row and dragging a handle stay instant. Grabbing a handle while it's gliding stops the glide.
 * Everything showing those colours glides with the handles: the red, green and blue tracks, the full colour to the right of them, the colour square in the colour dropdown, and each portal slider's handle and colour. Before, the handles glided but the colours jumped straight to the new ones.
 
 #### 📑 Tab Animations
 
-* Switching tabs in the options menu and the Mappack Creator now slides the old tab out and the new one in, instead of swapping them instantly. Moving to a tab further right slides the pages left, and moving back slides them right. Each slide takes 0.25 seconds on a random motion curve.
+* Switching tabs in the options menu and the Mappack Creator now slides the old tab out and the new one in, instead of swapping them instantly. Moving to a tab further right slides the pages left, and moving back slides them right. Each slide takes 0.25 seconds and eases in and out (`ease_in_out_quad`).
 * The pages are cut to the menu's dark box while they slide, so they never spill over the course behind it.
 * The tab names, the line under the Mappack Creator's tabs and its **Back** button stay where they are.
 * Nothing on either tab can be clicked, typed into or hovered until the slide ends. Pressing Left or Right again, or clicking another Mappack Creator tab, starts a new slide straight away.
@@ -452,6 +452,14 @@ The skins tab has been rebuilt with graphical dropdowns and real sliders, in pla
 * It's saved as `joydeadzone` in `options.txt`, straight after `scale`. It starts at 25%, the same as before, and **Reset All Settings** puts it back there.
 * It covers every stick input: moving, button controls on a stick, and aiming. For aiming, the deadzone is measured by how far the stick is from its centre in any direction, instead of on each axis separately.
 * Binding a stick in the controls tab still needs a quarter of a push (`joystickbinddeadzone` in `variables.lua`), so a stick that drifts a little can't bind itself when the deadzone is low.
+
+#### 🎞️ Animation Curves
+
+Animations no longer pick a random motion curve each time they start. Every animation now eases in and out quadratically (`ease_in_out_quad` in `main.lua`), so the same animation always moves the same way.
+
+* This covers the GUI (buttons, checkboxes, dropdowns, slider borders and text cursors), the pause menu and its prompts, the language menu, the editor panels, the world selection cursor, transitions, splitscreen viewports and their death fades, the camera interpolation, the minigames' revive prompt, and the options menu and Mappack Creator tab slides.
+* A slider that moves to a new value by itself, without the mouse, eases out (`ease_out_quad`) whichever way it goes: Left and Right on the volume and joystick deadzone sliders, and the skins sliders gliding to another player's colours. Before, going left eased in and going right eased out.
+* Only the intro's scaling still uses a random motion curve (`random_motion_curve`).
 
 #### 🧱 GUI
 
