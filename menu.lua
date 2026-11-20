@@ -2934,13 +2934,20 @@ end
 --mappackhorscrollsmooth put it; now mappackhorscrollsmooth is always a whole page, and switching pages slides
 --the old page out and the new one in (easing in and out, like the options menu's tabs), cut to the page area
 local MAPPACKPAGE_TIME = 0.25
-local MAPPACKPAGE_X, MAPPACKPAGE_Y, MAPPACKPAGE_H = 21, 16, 200 --the page area: the list's box and the panel right of it
+--each page has two areas, and each one slides inside its own box: the list's box, and the panel right of it
+local MAPPACKPAGE_Y, MAPPACKPAGE_H = 16, 200
+local MAPPACKPAGE_LISTX, MAPPACKPAGE_LISTW, MAPPACKPAGE_PANELX = 21, 218, 241
 local mappackpageanim --{from, to, direction, start} while sliding
 local mappackpageshown --the page drawn last frame
 local mappackpagecanvases = {}
+local mappackpagequad --one area of a page's canvas
 
-local function mappackpage_width()
-	return width*16 - MAPPACKPAGE_X - 9
+--{x, w} of each area, in game pixels
+local function mappackpage_areas()
+	return {
+		{MAPPACKPAGE_LISTX, MAPPACKPAGE_LISTW},
+		{MAPPACKPAGE_PANELX, width*16 - MAPPACKPAGE_PANELX - 9},
+	}
 end
 
 --switches the slide on when mappackhorscroll changed (by a key, a click on a tab, or anything else).
@@ -3071,7 +3078,7 @@ local function mappackmenu_drawpages()
 			else
 				properprintF(TEXT["mappack folder instructions"], 244*scale, 129*scale)
 			end
-			properprintF("       open\n  mappacks folder", 239*scale, 194*scale)
+			openmappacksbutton:draw()
 			if mappacksearchbar.active then
 				mappacksearchbar:draw()
 			end
@@ -3332,6 +3339,7 @@ local function mappackmenu_pagecanvas(slot, page)
 	local smooth = mappackhorscrollsmooth
 	local ox, oy, ow, oh = love.graphics.getScissor()
 	love.graphics.setCanvas({c, stencil = true})
+	love.graphics.setScissor() --clear only clears inside the clip, and the whole canvas has to be emptied
 	love.graphics.clear(0, 0, 0, 0)
 	--the same clip the pages start with on screen (the list's box), set just before they're drawn
 	if ox then
@@ -3369,20 +3377,30 @@ function mappackmenu_drawslide()
 	end
 
 	local p = ease_in_out_quad(t)
-	local distance = mappackpage_width()
 	local oldcanvas = mappackmenu_pagecanvas(1, anim.from)
 	local newcanvas = mappackmenu_pagecanvas(2, anim.to)
 
-	--cut to the page area, wherever the current transform puts it
-	local sx1, sy1 = love.graphics.transformPoint(MAPPACKPAGE_X*scale, MAPPACKPAGE_Y*scale)
-	local sx2, sy2 = love.graphics.transformPoint((MAPPACKPAGE_X+distance)*scale, (MAPPACKPAGE_Y+MAPPACKPAGE_H)*scale)
+	--each area is cut to its own box (wherever the current transform puts it), and slides by its own width
+	local boxes = {}
+	for i, area in ipairs(mappackpage_areas()) do
+		local sx1, sy1 = love.graphics.transformPoint(area[1]*scale, MAPPACKPAGE_Y*scale)
+		local sx2, sy2 = love.graphics.transformPoint((area[1]+area[2])*scale, (MAPPACKPAGE_Y+MAPPACKPAGE_H)*scale)
+		boxes[i] = {math.floor(sx1), math.floor(sy1), math.max(0, math.ceil(sx2-sx1)), math.max(0, math.ceil(sy2-sy1)), area[2]}
+	end
 	love.graphics.push("all")
 	love.graphics.origin()
-	love.graphics.setScissor(math.floor(sx1), math.floor(sy1), math.max(0, math.ceil(sx2-sx1)), math.max(0, math.ceil(sy2-sy1)))
 	love.graphics.setColor(255, 255, 255, 255)
 	love.graphics.setBlendMode("alpha", "premultiplied") --the canvases already hold blended colours
-	love.graphics.draw(oldcanvas, -anim.direction*p*distance*scale, 0)
-	love.graphics.draw(newcanvas, anim.direction*(1-p)*distance*scale, 0)
+	local cw, ch = oldcanvas:getDimensions()
+	mappackpagequad = mappackpagequad or love.graphics.newQuad(0, 0, 1, 1, 1, 1)
+	for _, box in ipairs(boxes) do
+		local bx, by, bw, bh, distance = box[1], box[2], box[3], box[4], box[5]
+		love.graphics.setScissor(bx, by, bw, bh)
+		--only this area of each page, so the list and the panel never slide into each other's box
+		mappackpagequad:setViewport(bx, by, bw, bh, cw, ch)
+		love.graphics.draw(oldcanvas, mappackpagequad, bx - anim.direction*p*distance*scale, by)
+		love.graphics.draw(newcanvas, mappackpagequad, bx + anim.direction*(1-p)*distance*scale, by)
+	end
 	love.graphics.pop()
 end
 
