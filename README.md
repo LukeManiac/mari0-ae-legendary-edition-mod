@@ -466,6 +466,7 @@ Animations no longer pick a random motion curve each time they start. Every anim
 
 * When a dropdown's option changes without the mouse (Left and Right on its row, a controller, picking from the open list with the keyboard, or something else changing it), the new option slides into the header sideways and pushes the old one out, easing out (`ease_out_quad`). It comes in from the right when it's further down the list, and from the left when it's further up. Going past either end of the list keeps going the same way.
 * Picking an option with the mouse still changes it straight away.
+* An open dropdown (or one still animating closed) is always drawn above the rest of the game, so it stays on top of menus, the editor and course content. The FPS, battery, time and other overlay elements still draw above it.
 
 #### 🧱 GUI
 
