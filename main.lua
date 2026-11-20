@@ -1357,6 +1357,10 @@ function lovedraw(donotupdate)
 	
 	warptransition_draw()
 	notice.draw()
+
+	-- open dropdowns always sit above the rest of the game, but still under
+	-- FPS / BATTERY / TIME and the other overlay rendering
+	guielement.drawopendropdowns()
 	
 	--FPS: slides in from the top-left corner
 	local fps_p = overlayanim_progress(overlayanim.fps)
