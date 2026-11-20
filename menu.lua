@@ -2367,10 +2367,14 @@ function menu_update(dt)
 		--smooth the scroll
 		mappackscrollsmooth = mappackscroll_ease("local", mappackscrollsmooth, mappackscroll)
 	end
-	
+
 	if onlinemappackscroll then
 		--smooth the scroll
 		onlinemappackscrollsmooth = mappackscroll_ease("online", onlinemappackscrollsmooth, onlinemappackscroll)
+	end
+
+	if gamestate == "mappackmenu" then
+		mappackgui_update(dt)
 	end
 	
 	if onlinemappackiconchannel2 and onlinemappackiconchannel2:peek() then
@@ -2984,91 +2988,364 @@ function mappackpage_update()
 	end
 end
 
+------------------------------------------------------------
+-- mappack lists (local and online)
+-- every mappack is a button gui element (a mappack frame) and each list has a real scrollbar.
+-- the mouse and the arrow keys share one selection, and only the selected frame looks hovered.
+------------------------------------------------------------
+local MAPPACKFRAME_X, MAPPACKFRAME_TOP, MAPPACKFRAME_SPACING = 25, 20, 60
+local MAPPACKFRAME_WIDTH, MAPPACKFRAME_HEIGHT = 200, 58
+local MAPPACKLIST_VISIBLE = 3.233 --how many frames fit in the box
+local MAPPACKFRAME_CLIP = {16, 216} --the box the list shows in (game pixels, top and bottom)
+local mappackgui = {}
+
+--how many entries, the selected one, the scroll target and where the list is drawn right now
+local function mappackgui_vars(kind)
+	if kind == "online" then
+		return onlineassetlist and #onlineassetlist or 0, onlinemappackselection or 1, onlinemappackscroll or 0, onlinemappackscrollsmooth or 0
+	end
+	return mappacklist and #mappacklist or 0, mappackselection or 1, mappackscroll or 0, mappackscrollsmooth or 0
+end
+
+local function mappackgui_scrollrange(kind)
+	local n = mappackgui_vars(kind)
+	return math.max(0, n-MAPPACKLIST_VISIBLE)
+end
+
+--the list the current page shows, nil on the pages that aren't lists
+function mappackgui_kind()
+	if mappacktype == "local" or mappacktype == "online" then
+		return mappacktype
+	end
+end
+
+local function mappackgui_select(kind, i)
+	if kind == "online" then
+		onlinemappackselection = i
+	else
+		mappackselection = i
+	end
+end
+
+--click (or tap) on a frame: select it and open it, just like enter
+local function mappackgui_press(kind, i)
+	if mappackgui_kind() ~= kind then
+		return
+	end
+	mappackgui_select(kind, i)
+	menu_keypressed("return")
+end
+
+local function mappackframe_drawlocal(self, x, y)
+	local i = self.index
+	local selected = self.forcehover
+
+	--icon
+	love.graphics.setColor(255, 255, 255)
+	if mappackicon and mappackicon[i] ~= nil then
+		local scale2w = scale*50 / math.max(1, mappackicon[i]:getWidth())
+		local scale2h = scale*50 / math.max(1, mappackicon[i]:getHeight())
+		love.graphics.draw(mappackicon[i], (x+4)*scale, (y+4)*scale, 0, scale2w, scale2h)
+	elseif i > (mappacklistthreadn or 0) and i ~= #mappacklist then
+		love.graphics.setColor(0, 0, 0)
+		love.graphics.rectangle("fill", (x+4)*scale, (y+4)*scale, 50*scale, 50*scale)
+		love.graphics.setColor(255, 255, 255)
+		love.graphics.draw(mappackloadingicon, (x+4+25)*scale, (y+4+25)*scale, (coinanimation/5)*math.pi*2, scale, scale, 25, 25)
+	else
+		love.graphics.draw(mappacknoicon, (x+4)*scale, (y+4)*scale, 0, scale, scale)
+	end
+	love.graphics.draw(mappackoverlay, (x+4)*scale, (y+4)*scale, 0, scale, scale)
+
+	--name
+	if selected then
+		love.graphics.setColor(255, 255, 255)
+	else
+		love.graphics.setColor(200, 200, 200)
+	end
+	properprint(string.sub(mappackname[i] or mappacklist[i]:lower(), 1, 17), (x+58)*scale, (y+6)*scale)
+
+	--author
+	love.graphics.setColor(100, 100, 100)
+	if mappackauthor[i] then
+		local by = TEXT["by"]
+		if #by ~= utf8.len(by) then
+			properprintF(string.sub(by .. " " .. mappackauthor[i], 1, 17), (x+58)*scale, (y+15)*scale)
+		else
+			properprint(string.sub(by .. " " .. mappackauthor[i], 1, 17), (x+58)*scale, (y+15)*scale)
+		end
+	end
+
+	--description
+	if selected then
+		love.graphics.setColor(180, 180, 180)
+	else
+		love.graphics.setColor(130, 130, 130)
+	end
+	local description = mappackdescription[i]
+	if description then
+		properprint(string.sub(description, 1, 17), (x+58)*scale, (y+27)*scale)
+		if description:len() > 17 then
+			properprint(string.sub(description, 18, 34), (x+58)*scale, (y+36)*scale)
+		end
+		if description:len() > 34 then
+			properprint(string.sub(description, 35, 51), (x+58)*scale, (y+45)*scale)
+		end
+	end
+	love.graphics.setColor(255, 255, 255)
+end
+
+local function mappackframe_drawonline(self, x, y)
+	local i = self.index
+	local selected = self.forcehover
+	local asset = onlineassetlist[i]
+
+	--icon
+	love.graphics.setColor(255, 255, 255)
+	if asset.icon then
+		local scale2w = scale*50 / math.max(1, asset.icon:getWidth())
+		local scale2h = scale*50 / math.max(1, asset.icon:getHeight())
+		love.graphics.draw(asset.icon, (x+4)*scale, (y+4)*scale, 0, scale2w, scale2h)
+	else
+		love.graphics.draw(mappackonlineicon, mappackonlineiconquad[1], (x+4)*scale, (y+4)*scale, 0, scale, scale)
+	end
+	love.graphics.draw(mappackoverlay, (x+4)*scale, (y+4)*scale, 0, scale, scale)
+
+	--what kind of dlc it is
+	local qi = 2
+	if (not onlinedlc) then
+		qi = 3
+	elseif asset.type == "enemy" then
+		qi = 5
+	elseif asset.type == "character" then
+		qi = 6
+	elseif asset.type == "video" then
+		qi = 7
+	end
+	love.graphics.setColor(0, 0, 0, 150)
+	love.graphics.draw(mappackonlineicon, mappackonlineiconquad[qi], (x+38)*scale, (y+6)*scale, 0, scale, scale)
+	love.graphics.setColor(255, 255, 255)
+	love.graphics.draw(mappackonlineicon, mappackonlineiconquad[qi], (x+38)*scale, (y+5)*scale, 0, scale, scale)
+
+	--name
+	if selected then
+		love.graphics.setColor(255, 255, 255)
+	else
+		love.graphics.setColor(200, 200, 200)
+	end
+	properprint(string.sub(asset.name:lower(), 1, 17), (x+58)*scale, (y+6)*scale)
+
+	--author
+	love.graphics.setColor(100, 100, 100)
+	if asset.author then
+		local by = TEXT["by"]
+		if #by ~= utf8.len(by) then
+			properprintF(string.sub(by .. " " .. asset.author:lower(), 1, 17), (x+58)*scale, (y+15)*scale)
+		else
+			properprint(string.sub(by .. " " .. asset.author:lower(), 1, 17), (x+58)*scale, (y+15)*scale)
+		end
+	end
+
+	--description (at most 3 lines of 17 characters, newlines start a new line)
+	if selected then
+		love.graphics.setColor(180, 180, 180)
+	else
+		love.graphics.setColor(130, 130, 130)
+	end
+	if asset.description then
+		local description = asset.description:lower()
+		local lines = {}
+		local line = ""
+		for ci = 1, #description do
+			local c = description:sub(ci,ci)
+			if c == "\n" then
+				table.insert(lines, line)
+				if #lines >= 3 then break end
+				line = ""
+			elseif #line >= 17 then
+				table.insert(lines, line)
+				if #lines >= 3 then break end
+				line = c
+			else
+				line = line .. c
+			end
+		end
+		if line ~= "" and #lines < 3 then
+			table.insert(lines, line)
+		end
+		for li = 1, #lines do
+			properprint(lines[li], (x+58)*scale, (y+27+(li-1)*9)*scale)
+		end
+	end
+	love.graphics.setColor(255, 255, 255)
+end
+
+local function mappackgui_get(kind)
+	if not mappackgui[kind] then
+		mappackgui[kind] = {frames = {}}
+	end
+	return mappackgui[kind]
+end
+
+local function mappackgui_frame(kind, i)
+	local gui = mappackgui_get(kind)
+	local frame = gui.frames[i]
+	if not frame then
+		--button(x, y, text, func, space, arguments, height (in lines), width): the box is (3+width) x (1+height*10)
+		frame = guielement:new("button", MAPPACKFRAME_X, MAPPACKFRAME_TOP, "", function() mappackgui_press(kind, i) end,
+			0, nil, (MAPPACKFRAME_HEIGHT-1)/10, MAPPACKFRAME_WIDTH-3)
+		frame.index = i
+		frame.forcehoveronly = true
+		frame.clickswithinyrange = MAPPACKFRAME_CLIP
+		if kind == "online" then
+			frame.drawcontent = mappackframe_drawonline
+		else
+			frame.drawcontent = mappackframe_drawlocal
+		end
+		gui.frames[i] = frame
+	end
+	return frame
+end
+
+--dragging the scrollbar moves the list straight there, and keeps the selection on screen
+local function mappackgui_drag(kind, value)
+	local n, sel = mappackgui_vars(kind)
+	local range = mappackgui_scrollrange(kind)
+	local scroll = value*range
+	if kind == "online" then
+		onlinemappackscroll = scroll
+		onlinemappackscrollsmooth = scroll
+	else
+		mappackscroll = scroll
+		mappackscrollsmooth = scroll
+	end
+	sel = math.min(math.max(math.ceil(scroll), sel), math.ceil(scroll)+3)
+	mappackgui_select(kind, math.max(1, math.min(n, sel)))
+end
+
+function mappackgui_scrollbar(kind)
+	local gui = mappackgui_get(kind)
+	if not gui.scrollbar then
+		--scrollbar(x, y, range, width, height, start, dir)
+		local scrollbar = guielement:new("scrollbar", 227, MAPPACKFRAME_TOP, 192, 8, 32, 0, "ver")
+		scrollbar.scrollstepdisabled = true --the wheel moves the selection instead
+		scrollbar.updatefunc = function(self, value)
+			if mappackgui_scrollrange(kind) <= 0 then
+				self.value = 0
+			end
+			mappackgui_drag(kind, self.value)
+		end
+		gui.scrollbar = scrollbar
+	end
+	return gui.scrollbar
+end
+
+--puts the frames on screen where the list is scrolled to, and works out which one is selected.
+--returns the first and last frame that can be seen
+function mappackgui_layout(kind)
+	local n, sel, scroll, smooth = mappackgui_vars(kind)
+	local offset = round(smooth*MAPPACKFRAME_SPACING*scale)/scale --whole screen pixels, so the text stays sharp
+	local first, last = math.max(1, math.floor(smooth+1)), math.min(n, math.floor(smooth+5))
+	for i = first, last do
+		local frame = mappackgui_frame(kind, i)
+		frame.y = MAPPACKFRAME_TOP+(i-1)*MAPPACKFRAME_SPACING-offset
+		frame.forcehover = (i == sel)
+		if kind == "online" then
+			if downloadedmappacks[i] == true then
+				frame.fillcolor = {0, 70, 0}
+			elseif downloadedmappacks[i] == false then
+				frame.fillcolor = {70, 0, 0}
+			else
+				frame.fillcolor = {0, 0, 0}
+			end
+		end
+	end
+	return first, last
+end
+
+function mappackgui_update(dt)
+	for _, kind in ipairs({"local", "online"}) do
+		local gui = mappackgui[kind]
+		if gui and gui.scrollbar then
+			local scrollbar = gui.scrollbar
+			scrollbar.active = (mappackgui_kind() == kind)
+			scrollbar:update(dt)
+			if not scrollbar.dragging then
+				--follow the list as it eases to where it's going
+				local range = mappackgui_scrollrange(kind)
+				local _, _, _, smooth = mappackgui_vars(kind)
+				if range > 0 then
+					scrollbar.value = math.max(0, math.min(1, smooth/range))
+				else
+					scrollbar.value = 0
+				end
+			end
+		end
+	end
+end
+
+local function mappackgui_draw(kind)
+	local first, last = mappackgui_layout(kind)
+	for i = first, last do
+		mappackgui_frame(kind, i):draw()
+	end
+	mappackgui_scrollbar(kind):draw()
+end
+
+function mappackgui_mousepressed(x, y, button)
+	local kind = mappackgui_kind()
+	if not kind then
+		return false
+	end
+	if mappackgui_scrollbar(kind):click(x, y, button) or mappackgui_scrollbar(kind).dragging then
+		return true
+	end
+	if android then
+		return false
+	end
+	local first, last = mappackgui_layout(kind)
+	for i = first, last do
+		if mappackgui_frame(kind, i):click(x, y, button) then
+			return true
+		end
+	end
+	return false
+end
+
+function mappackgui_mousereleased(x, y)
+	for _, gui in pairs(mappackgui) do
+		if gui.scrollbar then
+			gui.scrollbar:unclick(x, y)
+		end
+		for _, frame in pairs(gui.frames) do
+			frame:unclick(x, y)
+		end
+	end
+end
+
+--the frame under the mouse becomes the selected one
+function mappackgui_mousemoved(x, y)
+	local kind = mappackgui_kind()
+	if not kind or android or mappackgui_scrollbar(kind).dragging then
+		return
+	end
+	local first, last = mappackgui_layout(kind)
+	for i = first, last do
+		if mappackgui_frame(kind, i):inhighlight(x, y) then
+			mappackgui_select(kind, i)
+		end
+	end
+end
+
 --every page, drawn where it sits when it's open (only the page mappackhorscrollsmooth is on gets drawn)
 local function mappackmenu_drawpages()
 	love.graphics.translate(-round(mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
 	
 	--mappacks
 	if mappackhorscrollsmooth < 1 then
-		--draw each butten (even if all you do, is press ONE. BUTTEN.)
-		--scrollbar offset
-		love.graphics.translate(0, -round(mappackscrollsmooth*60*scale))
-		
 		love.graphics.setScissor(21*scale, 16*scale, 218*scale, 200*scale)
 		
-		for i = math.max(1, math.floor(mappackscrollsmooth+1)), math.min(#mappacklist, math.floor(mappackscrollsmooth+5)) do
-			--back
-			love.graphics.draw(mappackback, 25*scale, (20+(i-1)*60)*scale, 0, scale, scale)
-			
-			--icon
-			if mappackicon[i] ~= nil then
-				local scale2w = scale*50 / math.max(1, mappackicon[i]:getWidth())
-				local scale2h = scale*50 / math.max(1, mappackicon[i]:getHeight())
-				love.graphics.draw(mappackicon[i], 29*scale, (24+(i-1)*60)*scale, 0, scale2w, scale2h)
-			elseif i > mappacklistthreadn and i ~= #mappacklist then
-				love.graphics.setColor(0, 0, 0)
-				love.graphics.rectangle("fill", 29*scale, (24+(i-1)*60)*scale, 50*scale, 50*scale)
-				love.graphics.setColor(255, 255, 255)
-				love.graphics.draw(mappackloadingicon, (29+25)*scale, (24+(i-1)*60+25)*scale, (coinanimation/5)*math.pi*2, scale, scale, 25, 25)
-			else
-				love.graphics.draw(mappacknoicon, 29*scale, (24+(i-1)*60)*scale, 0, scale, scale)
-			end
-			love.graphics.draw(mappackoverlay, 29*scale, (24+(i-1)*60)*scale, 0, scale, scale)
-			
-			--name
-			love.graphics.setColor(200, 200, 200)
-			if mappackselection == i then
-				love.graphics.setColor(255, 255, 255)
-			end
-			
-			properprint(string.sub(mappackname[i] or mappacklist[i]:lower(), 1, 17), 83*scale, (26+(i-1)*60)*scale)
-			
-			--author
-			love.graphics.setColor(100, 100, 100)
-			if mappackselection == i then
-				love.graphics.setColor(100, 100, 100)
-			end
-			
-			if mappackauthor[i] then
-				local by = TEXT["by"]
-				if #by ~= utf8.len(by) then
-					properprintF(string.sub(by .. " " .. mappackauthor[i], 1, 17), 83*scale, (35+(i-1)*60)*scale)
-				else
-					properprint(string.sub(by .. " " .. mappackauthor[i], 1, 17), 83*scale, (35+(i-1)*60)*scale)
-				end
-			end
-			
-			--description
-			love.graphics.setColor(130, 130, 130)
-			if mappackselection == i then
-				love.graphics.setColor(180, 180, 180)
-			end
-			
-			if mappackdescription[i] then
-				properprint( string.sub(mappackdescription[i] or "", 1, 17), 83*scale, (47+(i-1)*60)*scale)
-				
-				if mappackdescription[i]:len() > 17 then
-					properprint( string.sub(mappackdescription[i] or "", 18, 34), 83*scale, (56+(i-1)*60)*scale)
-				end
-				
-				if mappackdescription[i]:len() > 34 then
-					properprint( string.sub(mappackdescription[i] or "", 35, 51), 83*scale, (65+(i-1)*60)*scale)
-				end
-			end
-			
-			love.graphics.setColor(255, 255, 255)
-			
-			--highlight
-			if i == mappackselection then
-				love.graphics.draw(mappackhighlight, 25*scale, (20+(i-1)*60)*scale, 0, scale, scale)
-			end
-		end
-	
-		love.graphics.translate(0, round(mappackscrollsmooth*60*scale))
-	
-		local i = mappackscrollsmooth / (#mappacklist-3.233)
-	
-		love.graphics.draw(mappackscrollbar, 227*scale, (20+i*160)*scale, 0, scale, scale)
+		--every mappack is a mappack frame (a button), with a real scrollbar next to them
+		mappackgui_draw("local")
 	
 		if mappackhorscrollsmooth <= 0.01 then
 			love.graphics.setScissor()
@@ -3145,121 +3422,8 @@ local function mappackmenu_drawpages()
 			
 		love.graphics.setScissor(21*scale, 16*scale, 218*scale, 200*scale)
 		
-		--scrollbar offset
-		love.graphics.translate(0, -round(onlinemappackscrollsmooth*60*scale))
-		for i = math.max(1, math.floor(onlinemappackscrollsmooth+1)), math.min(#onlineassetlist, math.floor(onlinemappackscrollsmooth+5)) do
-			local asset = onlineassetlist[i]
-			local bonuscontent = asset.type == "enemy" or asset.type == "character"
-
-			--back
-			if downloadedmappacks[i] then
-				if downloadedmappacks[i] == true then
-					love.graphics.setColor(0, 100, 0, 179)
-				else
-					love.graphics.setColor(100, 0, 0, 179)
-				end
-				love.graphics.rectangle("fill", 25*scale, (20+(i-1)*60)*scale, 200*scale, 58*scale)
-			else
-				love.graphics.draw(mappackback, 25*scale, (20+(i-1)*60)*scale, 0, scale, scale)
-			end
-			
-			--icon
-			love.graphics.setColor(255, 255, 255)
-			if asset.icon then
-				local scale2w = scale*50 / math.max(1, asset.icon:getWidth())
-				local scale2h = scale*50 / math.max(1, asset.icon:getHeight())
-				love.graphics.draw(asset.icon, 29*scale, (24+(i-1)*60)*scale, 0, scale2w, scale2h)
-			else
-				love.graphics.draw(mappackonlineicon, mappackonlineiconquad[1], 29*scale, (24+(i-1)*60)*scale, 0, scale, scale)
-			end
-
-			love.graphics.draw(mappackoverlay, 29*scale, (24+(i-1)*60)*scale, 0, scale, scale)
-			local qi = 2
-			if (not onlinedlc) then
-				qi = 3
-			elseif asset.type == "enemy" then
-				qi = 5
-			elseif asset.type == "character" then
-				qi = 6
-			elseif asset.type == "video" then
-				qi = 7
-			end
-			love.graphics.setColor(0, 0, 0, 150)
-			love.graphics.draw(mappackonlineicon, mappackonlineiconquad[qi], 63*scale, (26+(i-1)*60)*scale, 0, scale, scale)
-			love.graphics.setColor(255, 255, 255)
-			love.graphics.draw(mappackonlineicon, mappackonlineiconquad[qi], 63*scale, (25+(i-1)*60)*scale, 0, scale, scale)
-			
-			--name
-			love.graphics.setColor(200, 200, 200)
-			if onlinemappackselection == i then
-				love.graphics.setColor(255, 255, 255)
-			end
-			
-			properprint(string.sub(asset.name:lower(), 1, 17), 83*scale, (26+(i-1)*60)*scale)
-			
-			--author
-			love.graphics.setColor(100, 100, 100)
-			if onlinemappackselection == i then
-				love.graphics.setColor(100, 100, 100)
-			end
-			
-			if asset.author then
-				local by = TEXT["by"]
-				if #by ~= utf8.len(by) then
-					properprintF(string.sub(by .. " " .. asset.author:lower(), 1, 17), 83*scale, (35+(i-1)*60)*scale)
-				else
-					properprint(string.sub(by .. " " .. asset.author:lower(), 1, 17), 83*scale, (35+(i-1)*60)*scale)
-				end
-			end
-			
-			--description
-			love.graphics.setColor(130, 130, 130)
-			if onlinemappackselection == i then
-				love.graphics.setColor(180, 180, 180)
-			end
-			
-			if asset.description then
-				-- compute description lines (max 3 lines, max length 17 char per line, accept newline)
-				local description = asset.description:lower()
-				local lines = {}
-				local line = ""
-				for ci = 1, #description do
-					local c = description:sub(ci,ci)
-					if c == "\n" then
-						table.insert(lines, line)
-						if #lines >= 3 then break end
-						line = ""
-					elseif #line >= 17 then
-						table.insert(lines, line)
-						if #lines >= 3 then break end
-						line = c
-					else
-						line = line .. c
-					end
-				end
-				if line ~= "" then
-					table.insert(lines, line)
-				end
-
-				-- display lines
-				for li = 1, #lines do
-					properprint(lines[li], 83*scale, (47+(li-1)*9+(i-1)*60)*scale)
-				end
-			end
-			
-			love.graphics.setColor(255, 255, 255)
-			
-			--highlight
-			if i == onlinemappackselection then
-				love.graphics.draw(mappackhighlight, 25*scale, (20+(i-1)*60)*scale, 0, scale, scale)
-			end
-		end
-	
-		love.graphics.translate(0, round(onlinemappackscrollsmooth*60*scale))
-	
-		local i = onlinemappackscrollsmooth / (#onlineassetlist-3.233)
-	
-		love.graphics.draw(mappackscrollbar, 227*scale, (20+i*160)*scale, 0, scale, scale)
+		--every dlc is a mappack frame (a button), with a real scrollbar next to them
+		mappackgui_draw("online")
 	end
 	
 	love.graphics.translate(- round(mappackhorscrollrange*scale - mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
@@ -5217,30 +5381,13 @@ function menu_mousepressed(x, y, button)
 				minigame_menu_mousepressed(x, y, button)
 				return
 			end
-			--mappack selection
-			if not android then
-				if mappacktype ~= "daily_challenge" then
-					local i = mappackselection
-					local scrollsmooth = mappackscrollsmooth
-					if mappacktype == "online" then
-						i = onlinemappackselection
-						scrollsmooth = onlinemappackscrollsmooth
-					end
-					if x > 25*scale and y > (20+(i-1)*60-round(scrollsmooth*60))*scale and y > 15*scale
-						and x < (mappackhighlight:getWidth()-30)*scale and y < (20+mappackhighlight:getHeight()+(i-1)*60-round(scrollsmooth*60))*scale then
-						menu_keypressed("return")
-					end
-				else
+			--mappack frames and the scrollbar
+			if mappacktype == "daily_challenge" then
+				if not android then
 					menu_keypressed("return")
 				end
-			end
-			--mappack scrollbar
-			local i = mappackscrollsmooth / (#mappacklist-3.233)
-			if mappacktype == "online" then
-				i = onlinemappackscrollsmooth / (#onlineassetlist-3.233)
-			end
-			if x > 227*scale and x < 235*scale and y > (20+i*160)*scale and y < (52+i*160)*scale then --scrollbar
-				mappackscrollmouse = true
+			else
+				mappackgui_mousepressed(x, y, button)
 			end
 		end
 	end
@@ -5292,7 +5439,7 @@ function menu_mousereleased(x, y, button)
 		end
 		mouseonselecthold = false
 	elseif gamestate == "mappackmenu" then
-		mappackscrollmouse = false
+		mappackgui_mousereleased(x, y)
 		mappacksearchbar:unclick(x, y)
 		if mappacktype == "minigames" then
 			minigame_menu_mousereleased(x, y, button)
@@ -5317,37 +5464,8 @@ function menu_mousemoved(x, y, dx, dy)
 			minigame_menu_mousemoved(x, y)
 			return
 		end
-		--mappack selection
-		if (not android) and mappacktype ~= "daily_challenge" then
-			local scrollsmooth = mappackscrollsmooth
-			local list = mappacklist
-			if mappacktype == "online" then
-				scrollsmooth = onlinemappackscrollsmooth
-				list = onlineassetlist
-			end
-			for i = math.max(1, math.floor(scrollsmooth+1)), math.min(#list, math.floor(scrollsmooth+5)) do
-				if x > 25*scale and y > (20+(i-1)*60-round(scrollsmooth*60))*scale
-					and x < (mappackhighlight:getWidth()-30)*scale and y < (20+mappackhighlight:getHeight()+(i-1)*60-round(scrollsmooth*60))*scale then
-					if mappacktype == "online" then
-						onlinemappackselection = i
-					else
-						mappackselection = i
-					end
-				end
-			end
-		end
-		--mappack scrollbar
-		if mappackscrollmouse then
-			if mappacktype == "online" then
-				onlinemappackscroll = math.min(math.max(onlinemappackscroll+((dy/(159*scale)) * ((#onlineassetlist-3.233))), 0), #onlineassetlist-3.233)
-				onlinemappackscrollsmooth = onlinemappackscroll
-				onlinemappackselection = math.min(math.max(math.ceil(onlinemappackscroll), onlinemappackselection), math.ceil(onlinemappackscroll)+3)
-			else
-				mappackscroll = math.min(math.max(mappackscroll+((dy/(159*scale)) * ((#mappacklist-3.233))), 0), #mappacklist-3.233)
-				mappackscrollsmooth = mappackscroll
-				mappackselection = math.min(math.max(math.ceil(mappackscroll), mappackselection), math.ceil(mappackscroll)+3)
-			end
-		end
+		--the frame under the mouse is the selected one (the scrollbar drags itself in mappackgui_update)
+		mappackgui_mousemoved(x, y)
 	end
 end
 

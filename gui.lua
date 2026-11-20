@@ -902,6 +902,11 @@ function guielement:draw(a, offx, offy)
 		love.graphics.setColor(self.fillcolor[1], self.fillcolor[2], self.fillcolor[3], alpha)
 		love.graphics.rectangle("fill", (self.x+1)*scale, (self.y+1)*scale, (1+self.width+self.space*2)*scale, (-1+self.height*10+self.space*2)*scale, br * 0.7)
 
+		--a button can draw its own content inside the box (a mappack frame, say): drawcontent(self, x, y, alpha) in game pixels
+		if self.drawcontent then
+			self:drawcontent(self.x, self.y, alpha)
+		end
+
 		if self.image then
 			if self.imagecolor then
 				love.graphics.setColor(self.imagecolor[1], self.imagecolor[2], self.imagecolor[3], alpha)
@@ -1723,6 +1728,10 @@ function guielement:hovered()
 	if editormode and not self.alwaysinteractable and
 		(not editor_gui_interaction_enabled(self) or (dropdown_open and opened_dropdown ~= self)) and not hover_only then
 		return false
+	end
+	if self.forcehoveronly then
+		--only looks hovered when it's the selected one (a list where the mouse and the arrow keys share one selection)
+		return self.forcehover and not self.nohover
 	end
 	local x, y = love.mouse.getPosition()
 	if self:inhighlight(x, y, hover_only) then
