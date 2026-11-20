@@ -41,7 +41,7 @@ function menupopupscale(name, now)
 		return anim.to
 	end
 
-	progress = motion_curve(progress, anim.curve, anim.opening, not anim.opening, true, true)
+	progress = ease_in_out_quad(progress)
 	return lerp(anim.from, anim.to, progress)
 end
 
@@ -86,7 +86,6 @@ function setmenupopupvisible(name, visible)
 	anim.from = menupopupscale(name, now)
 	anim.to = bool2int(visible)
 	anim.start = now
-	anim.curve = random_motion_curve()
 	anim.opening = visible
 
 	if name == "newgamewarning" then
@@ -550,8 +549,7 @@ optionscontrols_change_page = function(delta)
 		from = keybindpage,
 		to = page,
 		direction = delta,
-		start = love.timer.getTime(),
-		curve = random_motion_curve()
+		start = love.timer.getTime()
 	}
 	keybindpage = page
 	if guielements["ctrl_mouse"] then
@@ -579,7 +577,7 @@ local function optionscontrols_pageviews()
 		return {{page = keybindpage, offset = 0}}
 	end
 
-	progress = motion_curve(progress, animation.curve, true, false, true, true)
+	progress = ease_in_out_quad(progress)
 	local distance = 240 * math.abs(animation.to - animation.from)
 	local direction = animation.to > animation.from and 1 or -1
 	return {
@@ -777,7 +775,6 @@ function volumeslider_commit(slider)
 end
 
 --left/right key: change the volume (or another slider with a commit function) by delta and animate the handle
---right/d (positive delta) uses easeout, left/a (negative delta) uses easein, with a random curve each press
 function volumeslider_step(slider, delta)
 	if not slider then
 		return
@@ -797,7 +794,7 @@ function volumeslider_step(slider, delta)
 
 	if from ~= target then
 		slider.value = from --show the handle where it was, then slide it
-		slider.valueanim = {from = from, to = target, start = love.timer.getTime(), curve = random_motion_curve()}
+		slider.valueanim = {from = from, to = target, start = love.timer.getTime()}
 	end
 end
 
@@ -815,7 +812,7 @@ function volumeslider_animate(slider)
 	end
 
 	local t = (love.timer.getTime() - anim.start) / 0.25
-	slider.value = lerp(anim.from, anim.to, motion_curve(t, anim.curve, true, true, true, true))
+	slider.value = lerp(anim.from, anim.to, ease_out_quad(t))
 	if t >= 1 then
 		slider.value = anim.to
 		slider.valueanim = nil
@@ -1946,13 +1943,13 @@ local function skins_followvalue(slider, target, glide)
 		return
 	end
 	if glide and math.abs(slider.value-target) > 1e-9 then
-		slider.valueanim = {from = slider.value, to = target, start = love.timer.getTime(), curve = random_motion_curve()}
+		slider.valueanim = {from = slider.value, to = target, start = love.timer.getTime()}
 	end
 	local anim = slider.valueanim
 	if anim and anim.to == target then
 		local t = (love.timer.getTime()-anim.start)/SKINS_GLIDE_TIME
 		if t < 1 then
-			slider.value = lerp(anim.from, anim.to, motion_curve(t, anim.curve, true, true, true, true))
+			slider.value = lerp(anim.from, anim.to, ease_out_quad(t))
 			return
 		end
 	end
@@ -2603,7 +2600,7 @@ function options_tabshown(tab)
 	return optionstab == tab or (optionspageanimation ~= nil and optionspageanimation.from == tab)
 end
 
---switches to another tab, sliding the old one out and the new one in on a random motion curve
+--switches to another tab, sliding the old one out and the new one in
 function options_switchtab(tab)
 	if tab == optionstab or tab < 1 or tab > 4 then
 		return
@@ -2611,8 +2608,7 @@ function options_switchtab(tab)
 	optionspageanimation = {
 		from = optionstab,
 		to = tab,
-		start = love.timer.getTime(),
-		curve = random_motion_curve()
+		start = love.timer.getTime()
 	}
 	optionstab = tab
 end
@@ -2627,7 +2623,7 @@ local function options_pageprogress()
 	if t >= 1 then
 		return nil
 	end
-	return motion_curve(t, animation.curve, true, false, true, true)
+	return ease_in_out_quad(t)
 end
 
 --gives the frozen widgets back what they had before the slide; their tab's sync puts anything else right this frame
@@ -3274,7 +3270,7 @@ function menu_draw()
 
                     if drawcursor and selectworldcursor == i then
                         local cursorprogress = math.min((now - selectworldcursoranimstart) / 0.22, 1)
-                        cursorprogress = motion_curve(cursorprogress, selectworldcursorcurve, true, false, true, true)
+                        cursorprogress = ease_in_out_quad(cursorprogress)
                         local cursorx = 55 + (i-page)*20
                         local cursoroffset = 0
                         if previousselectworldx then
@@ -3294,7 +3290,7 @@ function menu_draw()
             end
 
             if scrollrawprogress and scrollrawprogress < 1 then
-                local scrollprogress = motion_curve(scrollrawprogress, selectworldscrollcurve, true, false, true, true)
+                local scrollprogress = ease_in_out_quad(scrollrawprogress)
                 local direction = v > selectworldpreviouspage and -1 or 1
                 drawworldpage(selectworldpreviouspage, direction * scrollprogress * 160, false)
                 drawworldpage(v, -direction * (1 - scrollprogress) * 160, true)
@@ -5396,12 +5392,9 @@ function setselectworldcursor(target)
         if targetpage ~= currentpage then
             selectworldpreviouspage = currentpage
             selectworldscrollstart = now + math.random() * 0.12
-            selectworldscrollcurve = random_motion_curve()
             previousselectworldx = nil
-            selectworldcursorcurve = selectworldscrollcurve
         else
             previousselectworldx = 55 + (selectworldcursor-currentpage)*20
-            selectworldcursorcurve = random_motion_curve()
         end
 
         selectworldcursor = target
@@ -5451,7 +5444,6 @@ function selectworld()
 	previousselectworldcursor = nil
 	previousselectworldtime = nil
 	selectworldcursoranimstart = love.timer.getTime()
-	selectworldcursorcurve = random_motion_curve()
 	--no slide or page scroll left over from the last time it was open, the cursor just drops in
 	previousselectworldx = nil
 	selectworldpreviouspage = nil

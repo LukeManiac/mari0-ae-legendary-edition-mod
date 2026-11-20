@@ -8,16 +8,6 @@ splitscreenfade = {}
 splitscreencanvases = {}
 splitscreenwasactive = false
 splitscreenfadetime = 0.8
---all of these are "ease out", one gets picked at random every time a player dies or respawns
-splitscreencurves = {
-	function(t) return 1-(1-t)^2 end, --quad
-	function(t) return 1-(1-t)^3 end, --cubic
-	function(t) return 1-(1-t)^4 end, --quart
-	function(t) return 1-(1-t)^5 end, --quint
-	function(t) return math.sin(t*math.pi/2) end, --sine
-	function(t) if t >= 1 then return 1 end return 1-2^(-10*t) end, --expo
-	function(t) return math.sqrt(1-(t-1)^2) end, --circ
-}
 
 --a minigame can pick which players get a viewport (splitscreenviewplayers = {1, 3}, a single one is fine too)
 --and who a viewport follows (splitscreenviewtarget(view) returns a player object, or nil for the viewport's own player)
@@ -84,7 +74,7 @@ function splitscreen_rangemul(view)
 end
 
 --a new list of players with a viewport (a minigame taking away a player who's out, for example).
---Every viewport keeps its camera and fade, and they all move and resize into the new layout with a random motion curve;
+--Every viewport keeps its camera and fade, and they all move and resize into the new layout;
 --one that's new grows out of the middle of where it goes
 function splitscreen_setviewplayers(list)
 	local old = getsplitscreenviews()
@@ -106,7 +96,7 @@ function splitscreen_setviewplayers(list)
 	end
 	splitscreenviewscache = nil
 	if old then
-		splitscreenlayoutanim = {from = from, t = 0, curve = random_motion_curve()}
+		splitscreenlayoutanim = {from = from, t = 0}
 	else
 		splitscreenlayoutanim = nil
 	end
@@ -186,7 +176,7 @@ function getsplitscreenviews()
 	--a layout change: every viewport on its way from where it was to where it goes
 	local A = splitscreenlayoutanim
 	if A then
-		local k = motion_curve(A.t, A.curve, true, false, true, true)
+		local k = ease_in_out_quad(A.t)
 		for i, v in ipairs(views) do
 			local target = {x = v.x, y = v.y, w = v.w, h = v.h}
 			local tmul = splitscreen_rangemul(target)
@@ -243,14 +233,13 @@ function splitscreen_update(dt)
 		local f = splitscreenfade[i]
 		local revived = false
 		if not f then
-			f = {dead = dead, alpha = bool2int(shouldfade), from = 0, to = 0, t = 1, curve = splitscreencurves[1]}
+			f = {dead = dead, alpha = bool2int(shouldfade), from = 0, to = 0, t = 1}
 			splitscreenfade[i] = f
 		elseif dead ~= f.dead then
 			f.dead = dead
 			f.from = f.alpha
 			f.to = bool2int(shouldfade)
 			f.t = 0
-			f.curve = splitscreencurves[math.random(#splitscreencurves)]
 			revived = not dead
 		end
 		if f.t < 1 then
@@ -258,7 +247,7 @@ function splitscreen_update(dt)
 			if f.t >= 1 then
 				f.alpha = f.to
 			else
-				f.alpha = lerp(f.from, f.to, f.curve(f.t))
+				f.alpha = lerp(f.from, f.to, ease_in_out_quad(f.t))
 			end
 		end
 

@@ -1,21 +1,19 @@
 guielement = class:new()
 
 --GUI animations
---every animation lasts 0.25 seconds and uses a random curve from motion_curve (main.lua),
---picked at the moment the animation starts. Animations are time based (love.timer) so they
+--every animation lasts 0.25 seconds. Animations are time based (love.timer) so they
 --keep working even if an element is only drawn and never updated.
 local GUI_ANIM_TIME = 0.25
 local opened_dropdown = false
 
-local function gui_anim_start(from, to, curve_in, curve_out)
-	--default to ease-out (curve_in=true, curve_out=false)
-	return {from = from, to = to, start = love.timer.getTime(), curve = random_motion_curve(), curve_in = curve_in ~= false, curve_out = curve_out or false}
+local function gui_anim_start(from, to)
+	return {from = from, to = to, start = love.timer.getTime()}
 end
 
 --returns the current value of the animation, and whether it has finished
-local function gui_anim_value(anim, clamp_output)
+local function gui_anim_value(anim)
 	local t = (love.timer.getTime() - anim.start) / GUI_ANIM_TIME
-	local p = motion_curve(t, anim.curve, anim.curve_in, anim.curve_out, true, clamp_output)
+	local p = ease_in_out_quad(t)
 	return lerp(anim.from, anim.to, p), t >= 1
 end
 
@@ -188,7 +186,6 @@ function guielement:init(...)
 		self.timer = 0
 		self.offsettimer = 0
 		self.cursoralpha = 1
-		self.cursorcurve = random_motion_curve()
 		self.inputting = false
 		self.lastinputting = false
 		self.cursorpos = string.len(self.value)+1
@@ -225,19 +222,18 @@ function guielement:update(dt)
 			--typing cursor: the same animation as text inputs
 			self.timer = self.timer + dt
 			if self.inputting ~= self.lastinputting then
-				self.cursorcurve = random_motion_curve()
 				self.lastinputting = self.inputting
 				self.timer = 0
 				if self.inputting then
 					self.cursoralpha = 0
 				end
 			end
-			--full oscillation over 1 second (0 → 1 → 0), shaped by the random curve
+			--full oscillation over 1 second (0 → 1 → 0)
 			local t = self.timer % 1
 			if t < 0.5 then
-				self.cursoralpha = motion_curve(t * 2, self.cursorcurve, false, true, true, true)
+				self.cursoralpha = ease_in_out_quad(t * 2)
 			else
-				self.cursoralpha = 1 - motion_curve((t - 0.5) * 2, self.cursorcurve, false, true, true, true)
+				self.cursoralpha = 1 - ease_in_out_quad((t - 0.5) * 2)
 			end
 			if self.dragging then
 				if self.dir == "ver" then
@@ -259,7 +255,6 @@ function guielement:update(dt)
 			self.timer = self.timer + dt
 			self.offsettimer = math.max(self.offsettimer-dt, 0)
 			if self.inputting ~= self.lastinputting then
-				self.cursorcurve = random_motion_curve()
 				self.lastinputting = self.inputting
 				--only reset when the active state actually changes
 				self.timer = 0
@@ -268,12 +263,12 @@ function guielement:update(dt)
 					self.cursoralpha = 0
 				end
 			end
-			--full oscillation over 1 second (0 → 1 → 0), shaped by the random curve
+			--full oscillation over 1 second (0 → 1 → 0)
 			local t = self.timer % 1
 			if t < 0.5 then
-				self.cursoralpha = motion_curve(t * 2, self.cursorcurve, false, true, true, true)
+				self.cursoralpha = ease_in_out_quad(t * 2)
 			else
-				self.cursoralpha = 1 - motion_curve((t - 0.5) * 2, self.cursorcurve, false, true, true, true)
+				self.cursoralpha = 1 - ease_in_out_quad((t - 0.5) * 2)
 			end
 			self.shift = love.keyboard.isDown("lshift") or love.keyboard.isDown("rshift")
 			self.ctrl = love.keyboard.isDown("rctrl") or love.keyboard.isDown("lctrl") or ((love.keyboard.isDown("rgui") or love.keyboard.isDown("lgui")) and love.system.getOS() == "OS X")
@@ -459,7 +454,7 @@ function guielement:draw(a, offx, offy)
 		end
 		local hoverscale = self.hoverscale or 1
 		if self.hoveranim then
-			local v, done = gui_anim_value(self.hoveranim, true)
+			local v, done = gui_anim_value(self.hoveranim)
 			hoverscale = v
 			self.hoverscale = v
 			if done then self.hoveranim = nil end
@@ -537,7 +532,7 @@ function guielement:draw(a, offx, offy)
 			self.borderanim = gui_anim_start(self.bordermix, bordertarget)
 		end
 		if self.borderanim then
-			local v, done = gui_anim_value(self.borderanim, true)
+			local v, done = gui_anim_value(self.borderanim)
 			self.bordermix = v
 			if done then self.borderanim = nil end
 		end
@@ -805,7 +800,7 @@ function guielement:draw(a, offx, offy)
 		end
 		local hoverscale = self.hoverscale or 1
 		if self.hoveranim then
-			local v, done = gui_anim_value(self.hoveranim, true)
+			local v, done = gui_anim_value(self.hoveranim)
 			hoverscale = v
 			self.hoverscale = v
 			if done then self.hoveranim = nil end
@@ -1023,7 +1018,7 @@ function guielement:draw(a, offx, offy)
 			self.borderanim = gui_anim_start(self.bordermix, bordertarget)
 		end
 		if self.borderanim then
-			local v, done = gui_anim_value(self.borderanim, true)
+			local v, done = gui_anim_value(self.borderanim)
 			self.bordermix = v
 			if done then self.borderanim = nil end
 		end
@@ -1895,7 +1890,7 @@ end
 function guielement:getlistprogress()
 	local target = bool2int(self.extended)
 	if target ~= self.listtarget then
-		self.listanim = gui_anim_start(self.listvalue, target, target == 1, false)
+		self.listanim = gui_anim_start(self.listvalue, target)
 		self.listtarget = target
 	end
 	if self.listanim then
@@ -1926,21 +1921,16 @@ function guielement:smoothcursor(x, y)
 		self.cursoranim = nil
 	elseif x ~= self.cursortx or y ~= self.cursorty then
 		self.cursorfromx, self.cursorfromy = self.cursordx, self.cursordy
-		local moving_forward = (x + y * 1000) > (self.cursortx + self.cursorty * 1000)
-		--reuse the curve picked when inputting toggled; only the easing direction changes
 		self.cursoranim = {
 			from = 0, to = 1,
-			start = love.timer.getTime(),
-			curve = self.cursorcurve or random_motion_curve(),
-			curve_in = not moving_forward,
-			curve_out = false
+			start = love.timer.getTime()
 		}
 		self.cursortx, self.cursorty = x, y
 	end
 	
 	if self.cursoranim then
 		local t = (love.timer.getTime() - self.cursoranim.start) / CURSOR_ANIM_TIME
-		local p = motion_curve(t, self.cursoranim.curve, self.cursoranim.curve_in, self.cursoranim.curve_out, true, true)
+		local p = ease_in_out_quad(t)
 		if t >= 1 then
 			self.cursoranim = nil
 			self.cursordx, self.cursordy = self.cursortx, self.cursorty
@@ -2064,7 +2054,7 @@ function guielement:setsliderbordercolor(highlighted)
 		self.borderanim = gui_anim_start(self.bordermix, target)
 	end
 	if self.borderanim then
-		local v, done = gui_anim_value(self.borderanim, true)
+		local v, done = gui_anim_value(self.borderanim)
 		self.bordermix = v
 		if done then
 			self.borderanim = nil

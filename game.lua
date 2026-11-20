@@ -11,29 +11,19 @@ function game_load(suspended, deletesuspend)
 	backgroundrgb = {0, 0, 0}
 	backgroundcolor[4] = backgroundrgb
 	pausemenuopen = false
-	lastpausemenuopen = false
-	pausemenucurve = random_motion_curve()
 	pausemenuopentimer = 0
 	pausemenuopenduration = pausemenuduration
 	menuprompt = false
-	lastmenuprompt = false
-	menupromptcurve = random_motion_curve()
 	menuprompttimer = 0
 	menupromptduration = pausemenuduration
 	desktopprompt = false
-	lastdesktopprompt = false
-	desktoppromptcurve = random_motion_curve()
 	desktopprompttimer = 0
 	desktoppromptduration = pausemenuduration
 	suspendprompt = false
-	lastsuspendprompt = false
-	suspendpromptcurve = random_motion_curve()
 	suspendprompttimer = 0
 	suspendpromptduration = pausemenuduration
 	--minigames: "save highscore?" after confirming a quit, on top of the quit prompt (highscorepromptquit: "menu" or "desktop")
 	highscoreprompt = false
-	lasthighscoreprompt = false
-	highscorepromptcurve = random_motion_curve()
 	highscoreprompttimer = 0
 	highscorepromptduration = pausemenuduration
 	highscorepromptquit = false
@@ -265,8 +255,7 @@ local function startcenteredcameraanimation()
 	centeredcameraanim = {
 		fromx = fromx,
 		fromy = fromy,
-		start = love.timer.getTime(),
-		curve = randomitem({"sine", "quad", "cubic", "quart", "quint", "back", "expo", "circ"})
+		start = love.timer.getTime()
 	}
 end
 
@@ -301,7 +290,7 @@ local function interpolatecenteredcamera(axis, split, target)
 	if t >= 1 then
 		return target
 	end
-	local p = motion_curve(t, anim.curve, true, false, true, true)
+	local p = ease_in_out_quad(t)
 	return lerp(from, target, p)
 end
 
@@ -315,8 +304,7 @@ function registercameraportaltransition()
 			modernmultiplayeranim = {
 				fromx = last.x,
 				fromy = last.y,
-				start = love.timer.getTime(),
-				curve = randomitem({"sine", "quad", "cubic", "quart", "quint", "back", "expo", "circ"})
+				start = love.timer.getTime()
 			}
 		end
 	end
@@ -328,26 +316,6 @@ function game_update(dt)
 	--------
 	
 	--pausemenu
-	if pausemenuopen ~= lastpausemenuopen then
-		pausemenucurve = random_motion_curve()
-		lastpausemenuopen = pausemenuopen
-	end
-	if menuprompt ~= lastmenuprompt then
-		menupromptcurve = random_motion_curve()
-		lastmenuprompt = menuprompt
-	end
-	if desktopprompt ~= lastdesktopprompt then
-		desktoppromptcurve = random_motion_curve()
-		lastdesktopprompt = desktopprompt
-	end
-	if suspendprompt ~= lastsuspendprompt then
-		suspendpromptcurve = random_motion_curve()
-		lastsuspendprompt = suspendprompt
-	end
-	if highscoreprompt ~= lasthighscoreprompt then
-		highscorepromptcurve = random_motion_curve()
-		lasthighscoreprompt = highscoreprompt
-	end
 	pausemenuopentimer = math.max(0, math.min(pausemenuopentimer + (dt * (pausemenuopen and 1 or -1)), pausemenuopenduration))
 	menuprompttimer = math.max(0, math.min(menuprompttimer + (dt * (menuprompt and 1 or -1)), menupromptduration))
 	desktopprompttimer = math.max(0, math.min(desktopprompttimer + (dt * (desktopprompt and 1 or -1)), desktoppromptduration))
@@ -2927,7 +2895,7 @@ function game_draw()
 		if overlayanim and overlayanim.coords then
 			local anim = overlayanim.coords
 			if OVERLAY_ANIM_DURATION and OVERLAY_ANIM_DURATION > 0 then
-				coords_p = motion_curve(anim.timer / OVERLAY_ANIM_DURATION, anim.curve, anim.want, not anim.want, true, true)
+				coords_p = ease_in_out_quad(anim.timer / OVERLAY_ANIM_DURATION)
 			else
 				coords_p = bool2int(anim.want)
 			end
@@ -3333,7 +3301,7 @@ function game_draw()
 	
 	--pause menu
 	if pausemenuopentimer > 0 then
-		bettertimer = motion_curve(pausemenuopentimer / pausemenuopenduration, pausemenucurve, pausemenuopen, not pausemenuopen, true, true)
+		bettertimer = ease_in_out_quad(pausemenuopentimer / pausemenuopenduration)
 		pausewidth = winwidth*0.75
 		pauseheight = winheight*0.75
 		pauseradius = get_corner_radius(pausewidth, pauseheight) / 2
@@ -3419,14 +3387,14 @@ function game_draw()
 
 		if menuprompttimer > 0 then
 			local lines, options = {prompttext("quit to menu?")}, {prompttext("yes"), prompttext("no")}
-			drawprompt(menuprompttimer, menupromptduration, menuprompt, menupromptcurve, #lines + #options)
+			drawprompt(menuprompttimer, menupromptduration, menuprompt, #lines + #options)
 			drawpromptcontent(lines, options, pausemenuselected2)
 			love.graphics.pop()
 		end
 		
 		if desktopprompttimer > 0 then
 			local lines, options = {prompttext("quit to desktop?")}, {prompttext("yes"), prompttext("no")}
-			drawprompt(desktopprompttimer, desktoppromptduration, desktopprompt, desktoppromptcurve, #lines + #options)
+			drawprompt(desktopprompttimer, desktoppromptduration, desktopprompt, #lines + #options)
 			drawpromptcontent(lines, options, pausemenuselected2)
 			love.graphics.pop()
 		end
@@ -3439,7 +3407,7 @@ function game_draw()
 				lines = {prompttext("save game? this will"), prompttext("overwrite last save.")}
 			end
 			local options = {prompttext("yes"), prompttext("no")}
-			drawprompt(suspendprompttimer, suspendpromptduration, suspendprompt, suspendpromptcurve, #lines + #options)
+			drawprompt(suspendprompttimer, suspendpromptduration, suspendprompt, #lines + #options)
 			drawpromptcontent(lines, options, pausemenuselected2)
 			love.graphics.pop()
 		end
@@ -3447,7 +3415,7 @@ function game_draw()
 		--on top of the quit prompt it came from
 		if highscoreprompttimer > 0 then
 			local lines, options = {prompttext("save highscore?")}, {prompttext("yes"), prompttext("no"), prompttext("cancel")}
-			drawprompt(highscoreprompttimer, highscorepromptduration, highscoreprompt, highscorepromptcurve, #lines + #options)
+			drawprompt(highscoreprompttimer, highscorepromptduration, highscoreprompt, #lines + #options)
 			drawpromptcontent(lines, options, highscorepromptselected)
 			love.graphics.pop()
 		end
@@ -3465,9 +3433,9 @@ function prompttext(s)
 end
 
 --rows: how many lines of text and options the prompt holds, it grows taller to fit them
-function drawprompt(timer, duration, open, curve, rows)
+function drawprompt(timer, duration, open, rows)
 	local winwidth, winheight = getproperwindowsize()
-	prompttimer = motion_curve(timer / duration, curve, open, not open, true, true)
+	prompttimer = ease_in_out_quad(timer / duration)
 	promptwidth = winwidth/2
     promptheight = math.max(winheight/4, ((rows or 0)*PROMPT_ROW + PROMPT_GAP + 20)*scale)
     promptradius = get_corner_radius(promptwidth, promptheight) / 2
@@ -10062,7 +10030,7 @@ function getmodernmultiplayerfocus()
 		modernmultiplayeroffscreen = not onscreen
 		modernmultiplayeralive = alive
 		if last and now - last.time < 0.5 then
-			modernmultiplayeranim = {fromx = last.x, fromy = last.y, start = now, curve = randomitem({"sine", "quad", "cubic", "quart", "quint", "back", "expo", "circ"})}
+			modernmultiplayeranim = {fromx = last.x, fromy = last.y, start = now}
 		else
 			modernmultiplayeranim = nil
 		end
@@ -10075,7 +10043,7 @@ function getmodernmultiplayerfocus()
 		if t >= 1 then
 			modernmultiplayeranim = nil
 		else
-			local p = motion_curve(t, anim.curve, true, false, true, true)
+			local p = ease_in_out_quad(t)
 			x = lerp(anim.fromx, targetx, p)
 			y = lerp(anim.fromy, targety, p)
 		end

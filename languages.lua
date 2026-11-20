@@ -26,8 +26,6 @@ local languagemenu_select
 
 --opening and closing animate like the pause menu prompts (drawprompt in game.lua)
 local languagemenushown = false --open as far as the animation knows, set by languagemenu_open/languagemenu_update
-local lastlanguagemenushown = false
-local languagemenucurve = random_motion_curve()
 local languagemenutimer = 0
 local languagemenuduration = pausemenuduration
 
@@ -86,10 +84,6 @@ end
 --open: whether the menu is open right now (it keeps drawing while it shrinks away after closing)
 function languagemenu_update(dt, open)
 	languagemenushown = (open == true)
-	if languagemenushown ~= lastlanguagemenushown then
-		languagemenucurve = random_motion_curve()
-		lastlanguagemenushown = languagemenushown
-	end
 	local direction = 1
 	if not languagemenushown then
 		direction = -1
@@ -104,7 +98,7 @@ function languagemenu_draw()
 		return
 	end
 	local lines, options = languagemenu_lines(), languagemenu_options()
-	drawprompt(languagemenutimer, languagemenuduration, languagemenushown, languagemenucurve, #lines + #options)
+	drawprompt(languagemenutimer, languagemenuduration, languagemenushown, #lines + #options)
 	drawpromptcontent(lines, options, sel)
 	love.graphics.pop()
 end

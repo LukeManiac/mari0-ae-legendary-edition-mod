@@ -245,7 +245,6 @@ local function overlayanim_update(dt)
 		local anim, want = item[1], not not item[2]
 		if want ~= anim.want then
 			anim.want = want
-			anim.curve = random_motion_curve()
 		end
 		local dir = want and 1 or -1
 		anim.timer = math.max(0, math.min(anim.timer + dt * dir, OVERLAY_ANIM_DURATION))
@@ -257,7 +256,7 @@ local function overlayanim_progress(anim)
 		return bool2int(anim.want)
 	end
 	local t = anim.timer / OVERLAY_ANIM_DURATION
-	return motion_curve(t, anim.curve, anim.want, not anim.want, true, true)
+	return ease_in_out_quad(t)
 end
 
 function getFilesRecursive(folder, extension, includeext, basename_only)
@@ -3389,6 +3388,19 @@ table.sort(motion_curve_names)
 
 function random_motion_curve()
     return randomitem(motion_curve_names)
+end
+
+function ease_in_out_quad(t)
+	t = math.max(0, math.min(t, 1))
+	if t < 0.5 then
+		return 2*t*t
+	end
+	return 1 - (2 - 2*t)^2/2
+end
+
+function ease_out_quad(t)
+	t = math.max(0, math.min(t, 1))
+	return 1 - (1 - t)^2
 end
 
 function get_corner_radius(width, height)

@@ -635,7 +635,7 @@ editor_menu_progress = function()
 	
 	local animation = editorMenuAnimation
 	local t = (love.timer.getTime() - animation.start) / EDITOR_MENU_ANIM_TIME
-	local progress = motion_curve(t, animation.curve, animation.curve_in, false, true, true)
+	local progress = ease_in_out_quad(t)
 	return lerp(animation.from, animation.to, progress), t >= 1
 end
 
@@ -646,7 +646,7 @@ editor_minimap_progress = function()
 
 	local animation = editorMinimapAnimation
 	local t = (love.timer.getTime() - animation.start) / EDITOR_MENU_ANIM_TIME
-	local progress = motion_curve(t, animation.curve, animation.curve_in, false, true, true)
+	local progress = ease_in_out_quad(t)
 	return lerp(animation.from, animation.to, progress), t >= 1
 end
 
@@ -657,7 +657,7 @@ editor_resize_progress = function()
 
 	local animation = editorResizeAnimation
 	local t = (love.timer.getTime() - animation.start) / EDITOR_MENU_ANIM_TIME
-	local progress = motion_curve(t, animation.curve, animation.curve_in, false, true, true)
+	local progress = ease_in_out_quad(t)
 	return lerp(animation.from, animation.to, progress), t >= 1
 end
 
@@ -689,7 +689,7 @@ local function editor_update_entity_category_animations()
 		if animation then
 			layoutChanged = true
 			local t = (love.timer.getTime() - animation.start) / EDITOR_ENTITY_CATEGORY_ANIM_TIME
-			local progress = motion_curve(t, animation.curve, animation.curve_in, false, true, true)
+			local progress = ease_in_out_quad(t)
 			form.h = lerp(animation.from, animation.to, progress)
 			if t >= 1 then
 				form.h = animation.to
@@ -735,8 +735,6 @@ editor_set_menu_view = function(open)
 			from = progress,
 			to = bool2int(open),
 			start = love.timer.getTime(),
-			curve = random_motion_curve(),
-			curve_in = open
 		}
 		editormenuopen = open
 		editor_reset_tooltip()
@@ -750,8 +748,6 @@ editor_set_minimap_visible = function(open)
 			from = progress,
 			to = bool2int(open),
 			start = love.timer.getTime(),
-			curve = random_motion_curve(),
-			curve_in = open
 		}
 		minimapmoving = open
 	end
@@ -764,8 +760,6 @@ editor_set_resize_visible = function(open)
 			from = progress,
 			to = bool2int(open),
 			start = love.timer.getTime(),
-			curve = random_motion_curve(),
-			curve_in = open
 		}
 		editorResizeOverlayVisible = open
 	end
@@ -778,7 +772,7 @@ editor_confirm_progress = function()
 
 	local animation = editorConfirmAnimation
 	local t = (love.timer.getTime() - animation.start) / EDITOR_CONFIRM_ANIM_TIME
-	local progress = motion_curve(t, animation.curve, animation.curve_in, false, true, true)
+	local progress = ease_in_out_quad(t)
 	return lerp(animation.from, animation.to, progress), t >= 1
 end
 
@@ -789,8 +783,6 @@ editor_set_confirm_visible = function(open)
 		from = progress,
 		to = bool2int(open),
 		start = love.timer.getTime(),
-		curve = random_motion_curve(),
-		curve_in = open
 	}
 end
 
@@ -850,7 +842,7 @@ editor_rc_progress = function()
 	
 	local animation = editorRCAnimation
 	local t = (love.timer.getTime() - animation.start) / EDITOR_RC_ANIM_TIME
-	local progress = motion_curve(t, animation.curve, animation.curve_in, false, true, true)
+	local progress = ease_in_out_quad(t)
 	return lerp(animation.from, animation.to, progress), t >= 1
 end
 
@@ -869,8 +861,6 @@ editor_rc_track = function()
 			from = progress,
 			to = bool2int(open),
 			start = love.timer.getTime(),
-			curve = random_motion_curve(),
-			curve_in = open
 		}
 		if open then
 			editorRCClosingDropdown = nil
@@ -4152,12 +4142,12 @@ function levelpropertiestoggle()
 end
 
 --how far the level properties panel is open, from 0 (closed) to 1 (open).
---Whenever levelpropertiesdropdown changes, a new 0.25 second animation with a random curve starts
+--Whenever levelpropertiesdropdown changes, a new 0.25 second animation starts
 --(opening: ease-out, closing: ease-in), same as the dropdowns in gui.lua.
 function levelpropertiesprogress()
 	local target = bool2int(levelpropertiesdropdown)
 	if target ~= levelpropertiestarget then
-		levelpropertiesanim = {from = levelpropertiesvalue, to = target, start = love.timer.getTime(), curve = random_motion_curve(), curve_in = (target == 1)}
+		levelpropertiesanim = {from = levelpropertiesvalue, to = target, start = love.timer.getTime()}
 		levelpropertiestarget = target
 	end
 	if levelpropertiesanim then
@@ -4166,7 +4156,7 @@ function levelpropertiesprogress()
 			levelpropertiesanim = nil
 			levelpropertiesvalue = target
 		else
-			local p = motion_curve(t, levelpropertiesanim.curve, levelpropertiesanim.curve_in, false, true, true)
+			local p = ease_in_out_quad(t)
 			levelpropertiesvalue = math.max(0, math.min(1, lerp(levelpropertiesanim.from, levelpropertiesanim.to, p)))
 		end
 	end
@@ -6097,8 +6087,6 @@ function editor_mousepressed(x, y, button)
 							from = form.h,
 							to = form.hidden and 0 or 17*(math.ceil(#form/22)),
 							start = love.timer.getTime(),
-							curve = random_motion_curve(),
-							curve_in = not form.hidden
 						}
 					end
 				end

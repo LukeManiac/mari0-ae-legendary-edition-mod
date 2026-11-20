@@ -237,7 +237,7 @@ function mpslide.progress()
 	if t >= 1 then
 		return nil
 	end
-	return motion_curve(t, mpslide.anim.curve, true, false, true, true)
+	return ease_in_out_quad(t)
 end
 
 local function drawtitle(s)
@@ -2705,12 +2705,12 @@ function mpslide.index(name)
 	return 1
 end
 
---switches to another tab, sliding the old one out and the new one in on a random motion curve
+--switches to another tab, sliding the old one out and the new one in
 function mpslide.settab(name)
 	if name == mptab then
 		return
 	end
-	mpslide.anim = {from = mptab, to = name, start = love.timer.getTime(), curve = random_motion_curve()}
+	mpslide.anim = {from = mptab, to = name, start = love.timer.getTime()}
 	mptab = name
 end
 

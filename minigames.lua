@@ -4404,7 +4404,7 @@ local function beat_gameover(S)
 		S.phase = "revive"
 		S.revivechoice = 1 --1 = yes, 2 = no
 		--opens and closes like the pause menu's prompts (see beat_updateprompt)
-		S.reviveprompt = {open = true, timer = 0, curve = random_motion_curve()}
+		S.reviveprompt = {open = true, timer = 0}
 	else
 		S.phase = "over"
 		minigame_finish("lose", 1)
@@ -4414,7 +4414,6 @@ end
 local function beat_revive(S, accept)
 	if S.reviveprompt then
 		S.reviveprompt.open = false --it shrinks away over whatever comes next
-		S.reviveprompt.curve = random_motion_curve()
 	end
 	if accept then
 		--spend the points from the revive-check score, the real score stays the same
@@ -4630,7 +4629,7 @@ addminigame({
 		local P = S.reviveprompt
 		if P and P.timer > 0 then
 			local lines, options = beat_promptcontent()
-			drawprompt(P.timer, pausemenuduration, P.open, P.curve, #lines + #options)
+			drawprompt(P.timer, pausemenuduration, P.open, #lines + #options)
 			drawpromptcontent(lines, options, S.revivechoice)
 			love.graphics.pop()
 		end
