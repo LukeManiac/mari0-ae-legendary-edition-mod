@@ -9042,6 +9042,7 @@ function mario:axe()
 		objects["platform"][i] = nil
 	end
 
+	stopmusic()
 	self.static = false
 	self.animation = "axe"
 	self.fireanimationtimer = fireanimationtime
