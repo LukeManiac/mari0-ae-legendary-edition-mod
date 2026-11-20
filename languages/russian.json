@@ -40,6 +40,7 @@
 			"coop portal 1 color:": "цвет портала 1:",
 			"coop portal 2 color:": "цвет портала 2:",
 		"^_Misc.":"",
+			"joy deadzone:": "мёртвая зона:",
 			"scale:": "размер:",
 			"resizable": "изменяемый размер",
 			"letterbox:": "сжать экран:",

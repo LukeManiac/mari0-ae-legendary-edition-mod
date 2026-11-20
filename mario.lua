@@ -2874,11 +2874,30 @@ end
 local function getjoystickaimaxis(player, name)
 	local selectedvalue
 	for _, binding in ipairs(getcontrolbindings(player, name)) do
+		local value
 		if binding[1] == "joy" and binding[3] == "axe" then
-			local value = -love.joystick.getAxis(binding[2], binding[4])
+			value = -love.joystick.getAxis(binding[2], binding[4])
 			if binding[5] == "neg" then
 				value = -value
 			end
+		elseif binding[1] == "joy" and (binding[3] == "but" or binding[3] == "hat") then
+			--a button or hat aims like the axis pushed all the way: a hat bound while pushed left or up aims that way,
+			--anything else aims right or down
+			value = 0
+			local held
+			if binding[3] == "but" then
+				held = love.joystick.isDown(binding[2], binding[4])
+			else
+				held = string.match(love.joystick.getHat(binding[2], binding[4]), binding[5]) ~= nil
+			end
+			if held then
+				value = -1
+				if binding[3] == "hat" and (binding[5] == "l" or binding[5] == "u") then
+					value = 1
+				end
+			end
+		end
+		if value then
 			if not selectedvalue or math.abs(value) > math.abs(selectedvalue) then
 				selectedvalue = value
 			end
@@ -2939,7 +2958,8 @@ function mario:updateangle()
 			return
 		end
 		
-		if math.abs(x) > joystickaimdeadzone or math.abs(y) > joystickaimdeadzone then
+		--how far the stick is from its centre, against the adjustable deadzone
+		if joystickpastdeadzone(math.sqrt(x*x + y*y)) then
 			self.pointingangle = math.atan2(x, y)
 			if self.pointingangle == 0 then
 				self.pointingangle = 0 --this is really silly, but will crash the game if I don't do this. It's because it's -0 or something. I'm not good with computers.

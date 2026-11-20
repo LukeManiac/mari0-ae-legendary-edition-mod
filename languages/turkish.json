@@ -40,6 +40,7 @@
 		"coop portal 1 color:": "eşli portal 1 rengi:",
 		"coop portal 2 color:": "eşli portal 2 rengi:",
 	"^_Misc.":"",
+		"joy deadzone:": "ölü bölge:",
 		"scale:": "boyut:",
 		"resizable": "tekrar boyutlanabilir",
 		"letterbox:": "posta kutusu:",
@@ -224,7 +225,7 @@
 		"real time": "eş zamanlu",
 		"save settings": "ayarları kaydet",
 		"tool descriptions": [
-			"test ekipmanını bağlamak için, \n satırını kırmızı cihazlardan \nsarı etkinleştiriciye sürükleyerek \ nyeşil hale getirin ve bağlanın. ",
+			"test ekipmanını bağlamak için, \n satırını kırmızı cihazlardan \nsarı etkinleştiriciye sürükleyerek \nyeşil hale getirin ve bağlanın. ",
 			"test amacıyla \n bunu portalları çekmek için\nkullanın!",
 			"Varlıkları seçmek için tıklayın ve \n sürükleyin. \ntümünü aynı anda yapılandırmak\niçin sağ tıklayın. \n\nsilmek için sil.",
 			"elektrik hatlarını çizmek için\ntıklayın ve sürükleyin. \n\nSilmek için sağ tıklayın."

@@ -8901,18 +8901,39 @@ function isPauseKey(key)
 	return false
 end
 
+--whether an axis value, or how far a stick is from its centre, is far enough out to count, going by the adjustable deadzone
+--(joystickdeadzone, saved as joydeadzone): at 0 any movement off the centre counts, at 1 only a stick pushed all the way does,
+--and anything in between counts once the stick is past that point
+function joystickpastdeadzone(value)
+	value = math.abs(value)
+	if joystickdeadzone >= 1 then
+		return value >= 1
+	end
+	return value > joystickdeadzone
+end
+
+--the button a joystick binding acts as. A real button is its number; an axis or hat bound to a control is a virtual button
+--named after it ("axe3pos", "hat1u"), pressed and released by joystickvirtualbuttons_update like a real one
+function joystickbindingbutton(binding)
+	if binding[3] == "but" then
+		return binding[4]
+	end
+	return binding[3] .. tostring(binding[4]) .. tostring(binding[5])
+end
+
 function controlbindingmatchesjoy(player, name, joystick, button)
 	for _, binding in ipairs(getcontrolbindings(player, name)) do
-		if binding[1] == "joy" and binding[2] == joystick and binding[3] == "but" and binding[4] == button then
+		if binding[1] == "joy" and binding[2] == joystick and joystickbindingbutton(binding) == button then
 			return true
 		end
 	end
 	return false
 end
 
+--any joystick input bound to the control: a button, or an axis or hat acting as one
 function hasjoystickbuttonbinding(player, name)
 	for _, binding in ipairs(getcontrolbindings(player, name)) do
-		if binding[1] == "joy" and binding[3] == "but" then
+		if binding[1] == "joy" then
 			return true
 		end
 	end
@@ -8936,8 +8957,12 @@ local function getjoystickdirectionaxis(player, direction, joystick)
 		for _, binding in ipairs(getcontrolbindings(player, name)) do
 			if binding[1] == "joy" and binding[2] == joystick and binding[3] == "axe" then
 				local value = love.joystick.getAxis(binding[2], binding[4])
-				local active = binding[5] == "pos" and value > joystickdeadzone
-					or binding[5] ~= "pos" and value < -joystickdeadzone
+				local active = joystickpastdeadzone(value)
+				if binding[5] == "pos" then
+					active = active and value > 0
+				else
+					active = active and value < 0
+				end
 				if active and (not activemagnitude or math.abs(value) > activemagnitude) then
 					activeaxis = binding[4]
 					activemagnitude = math.abs(value)
@@ -8998,11 +9023,12 @@ local function checkkeybinding(s, i, n)
 			local directionalinput = joystickdirectiondown(s, n, i)
 			if directionalinput == false then
 				return false
-			elseif s[5] == "pos" then
-				return love.joystick.getAxis(s[2], s[4]) > joystickdeadzone
-			else
-				return love.joystick.getAxis(s[2], s[4]) < -joystickdeadzone
 			end
+			local value = love.joystick.getAxis(s[2], s[4])
+			if s[5] == "pos" then
+				return value > 0 and joystickpastdeadzone(value)
+			end
+			return value < 0 and joystickpastdeadzone(value)
 		end
 	elseif s[1] then
 		local success, keyIsDown = pcall(love.keyboard.isDown, s[1])
@@ -9041,7 +9067,7 @@ local function controlbindingactiveexcept(player, name, sourcetype, source, sour
 			iscurrentinput = binding[1] ~= "joy" and binding[1] == source
 		elseif sourcetype == "joybutton" then
 			iscurrentinput = binding[1] == "joy" and binding[2] == source
-				and binding[3] == "but" and binding[4] == sourcebutton
+				and joystickbindingbutton(binding) == sourcebutton
 		elseif sourcetype == "axis" then
 			iscurrentinput = binding[1] == "joy" and binding[3] ~= "but"
 		end
@@ -9086,6 +9112,56 @@ function joystickaxisdown(player, name)
 		end
 	end
 	return false
+end
+
+--controls that act on a press (run, jump and so on) only hear joystick button events, so an axis or hat bound to one
+--is turned into a virtual button: pressed when it goes past the deadzone (or the hat turns that way), released when it comes back
+local JOYSTICK_VIRTUALCONTROLS = {"run", "jump", "reload", "use", "portal1", "portal2", "pause"}
+local joystickvirtualdown = {} --"joystick:button" -> true while that virtual button is held
+
+function joystickvirtualbuttons_update()
+	if not controls then
+		return
+	end
+	local down, seen = {}, {}
+	for player = 1, #controls do
+		for _, name in ipairs(JOYSTICK_VIRTUALCONTROLS) do
+			for _, binding in ipairs(getcontrolbindings(player, name)) do
+				if binding[1] == "joy" and binding[3] ~= "but" then
+					local key = tostring(binding[2]) .. ":" .. joystickbindingbutton(binding)
+					if not seen[key] then
+						seen[key] = {binding[2], joystickbindingbutton(binding)}
+					end
+					if checkkeybinding(binding, player, name) then
+						down[key] = true
+					end
+				end
+			end
+		end
+	end
+
+	--while a key prompt is waiting for an input, the axis it's listening to mustn't be bound as a button, and
+	--letting go of it afterwards mustn't count as a release either, so the state just follows along
+	local fire = not (keypromptvisible and keypromptvisible())
+	for key, v in pairs(seen) do
+		if down[key] and not joystickvirtualdown[key] then
+			joystickvirtualdown[key] = true
+			if fire then
+				love.joystickpressed(v[1], v[2], true)
+			end
+		elseif not down[key] and joystickvirtualdown[key] then
+			joystickvirtualdown[key] = nil
+			if fire then
+				love.joystickreleased(v[1], v[2], true)
+			end
+		end
+	end
+	--a binding that was removed while held lets go quietly
+	for key in pairs(joystickvirtualdown) do
+		if not seen[key] then
+			joystickvirtualdown[key] = nil
+		end
+	end
 end
 
 function game_joystickpressed( joystick, button )

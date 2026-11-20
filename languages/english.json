@@ -51,6 +51,7 @@
 		"coop portal 2 color:": "coop portal 2 color:",
 		"Can't load %s!\nyou need to un-zip it!": "Can't load %s!\nyou need to un-zip it!",
 	"^_Misc.":"",
+		"joy deadzone:": "joy deadzone:",
 		"scale:": "scale:",
 		"resizable": "resizable",
 		"letterbox:": "letterbox:",

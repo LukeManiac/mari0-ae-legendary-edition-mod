@@ -45,6 +45,7 @@
 		"coop portal 1 color:": "color de portal 1 (co-op)",
 		"coop portal 2 color:": "color de portal 2 (co-op)",
 	"^_Misc.":"",
+		"joy deadzone:": "zona muerta:",
 		"scale:": "tamaño:",
 		"resizable": "escalable",
 		"letterbox:": "letterbox:",

@@ -40,6 +40,7 @@
 		"coop portal 1 color:": "cor do portal 1 (coop):",
 		"coop portal 2 color:": "cor do portal 2 (coop):",
 	"^_Misc.":"^_Misc.",
+		"joy deadzone:": "zona morta:",
 		"scale:": "escala:",
 		"resizable": "redimensionável",
 		"letterbox:": "letterbox:",

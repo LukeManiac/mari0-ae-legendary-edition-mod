@@ -1207,6 +1207,9 @@ function love.update(dt)
 		music:update()
 	end
 	dt = math.min(0.01666667, dt)
+
+	--axes and hats bound to button controls press and release them like buttons
+	joystickvirtualbuttons_update()
 	
 	--speed
 	if speed ~= speedtarget then
@@ -1573,6 +1576,8 @@ function saveconfig()
 		s = s .. "scale:" .. scale .. ";"
 	end
 
+	s = s .. "joydeadzone:" .. string.format("%.2f", joystickdeadzone) .. ";"
+
 	s = s .. "letterbox:" .. tostring(letterboxfullscreen) .. ";"
 	
 	s = s .. "shader1:" .. shaderlist[currentshaderi1] .. ";"
@@ -1718,6 +1723,11 @@ function loadconfig(nodefaultconfig)
 			if not nodefaultconfig and not android then
 				scale = tonumber(s2[2])
 			end
+		elseif s2[1] == "joydeadzone" then
+			local value = tonumber(s2[2])
+			if value then
+				joystickdeadzone = math.max(0, math.min(1, value))
+			end
 		elseif s2[1] == "letterbox" then
 			if s2[2] then
 				letterboxfullscreen = (s2[2] == "true")
@@ -1812,7 +1822,8 @@ function defaultconfig()
 	-- joy, #, hat, #, direction (r, u, ru, etc)
 	-- joy, #, axe, #, pos/neg
 	-- joy, #, but, #
-	-- You cannot set Hats and Axes as the jump button. Bummer.
+	-- Any of them can go on any control: an axis or hat on a button control acts as a button (see joystickvirtualbuttons_update),
+	-- and a button or hat on aimx/aimy aims like the axis pushed all the way.
 	
 	mouseowner = 1
 	mouseowner2 = 0
@@ -1907,6 +1918,7 @@ function defaultconfig()
 		scale = 2
 	end
 	resizable = true
+	joystickdeadzone = 0.25 --how far a stick has to move to count (0 to 1, see joystickpastdeadzone), saved as joydeadzone
 	letterboxfullscreen = true
 	volume = 1
 	mappack = "smb"
@@ -2852,11 +2864,11 @@ function keyprompt_update()
 			
 			for j = 1, prompt.joystick[i].axes do
 				local value = love.joystick.getAxis(i, j)
-				if value > prompt.joystick[i].axisposition[j] + joystickdeadzone then
+				if value > prompt.joystick[i].axisposition[j] + joystickbinddeadzone then
 					keypromptenter("joyaxis", i, j, "pos")
 					saveconfig()
 					return
-				elseif value < prompt.joystick[i].axisposition[j] - joystickdeadzone then
+				elseif value < prompt.joystick[i].axisposition[j] - joystickbinddeadzone then
 					keypromptenter("joyaxis", i, j, "neg")
 					saveconfig()
 					return

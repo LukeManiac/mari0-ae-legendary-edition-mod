@@ -12,6 +12,12 @@ local controlsbuttonpadding = 4
 local keybindpage = 1
 local keybindpageanimation
 local keybindpageduration = 0.25
+local optionspageanimation --{from, to, start, curve} while the options menu slides between tabs
+local optionspageduration = 0.25
+local OPTIONS_BOX_X, OPTIONS_BOX_Y, OPTIONS_BOX_W, OPTIONS_BOX_H = 21, 16, 218, 200 --the options menu's dark box, which the tabs slide inside
+local OPTIONS_TABPREFIXES = {"ctrl_", "skin_", "opt_", "cheat_"} --the start of the names of each tab's widgets
+--misc. tab: the joystick deadzone row sits above scale, packed in above shader1 (which stays at 63)
+local OPTIONS_MISC_DEADZONE_Y, OPTIONS_MISC_SCALE_Y, OPTIONS_MISC_LETTERBOX_Y = 32, 42, 53
 local keypromptpage = 1
 local menupopupduration = 0.25
 local menupopupanimations = {
@@ -105,7 +111,7 @@ function setmenupopupvisible(name, visible)
 end
 
 --Misc. options tab (optionstab == 3) widgets
-local optionsmiscgui = {"opt_scale", "opt_letterbox", "opt_shader1", "opt_shader2", "opt_volume", "opt_language", "opt_nitpicks", "opt_resetmaps", "opt_resetall", "opt_vsync", "opt_mappackfolder"}
+local optionsmiscgui = {"opt_deadzone", "opt_scale", "opt_letterbox", "opt_shader1", "opt_shader2", "opt_volume", "opt_language", "opt_nitpicks", "opt_resetmaps", "opt_resetall", "opt_vsync", "opt_mappackfolder"}
 local optionsmiscselection = {}
 
 for i, option in ipairs(optionsmiscgui) do
@@ -302,7 +308,7 @@ local function optionscheats_draw()
 end
 
 local function optionscheats_update()
-    if gamestate == "options" and optionstab == 4 and gamefinished then
+    if gamestate == "options" and options_tabshown(4) and gamefinished then
         if not guielements["cheat_mode"] then
             optionscheats_create()
         end
@@ -740,7 +746,7 @@ function optionscontrols_transformmouse(x, y)
 end
 
 function optionscontrols_update()
-	if (gamestate == "options" and optionstab == 1) or controlsopen then
+	if (gamestate == "options" and options_tabshown(1)) or controlsopen then
 		if not guielements["ctrl_player"] then
 			optionscontrols_create()
 		end
@@ -770,7 +776,7 @@ function volumeslider_commit(slider)
 	end
 end
 
---left/right key: change the volume by delta (0.1 or -0.1) and animate the handle
+--left/right key: change the volume (or another slider with a commit function) by delta and animate the handle
 --right/d (positive delta) uses easeout, left/a (negative delta) uses easein, with a random curve each press
 function volumeslider_step(slider, delta)
 	if not slider then
@@ -786,7 +792,8 @@ function volumeslider_step(slider, delta)
 
 	slider.valueanim = nil
 	slider.value = target
-	volumeslider_commit(slider)
+	local commit = slider.commit or volumeslider_commit --the deadzone slider steps the same way
+	commit(slider)
 
 	if from ~= target then
 		slider.value = from --show the handle where it was, then slide it
@@ -813,6 +820,57 @@ function volumeslider_animate(slider)
 		slider.value = anim.to
 		slider.valueanim = nil
 	end
+end
+
+--joystick deadzone slider (options > misc.): 0 to 1, shown in percent, saved as joydeadzone
+local DEADZONE_LOW = 0.1 --below this, a stick that rests a little off its centre can start pressing things by itself
+local deadzonelownotice --the notice warning about it, while it's on screen
+
+--warns that the deadzone is low. The text is the same in every language (like the other notices here), and changing
+--the deadzone again while the warning is up keeps that one on screen instead of stacking another
+local function deadzoneslider_warnlow()
+	for _, v in ipairs(notice.notices) do
+		if v == deadzonelownotice then
+			v.life = math.max(v.life, v.duration - notice.fadetime)
+			return
+		end
+	end
+	notice.new("joystick deadzone below 10%!\nsticks may drift and\npress things by themselves", notice.red, 4)
+	deadzonelownotice = notice.notices[#notice.notices]
+end
+
+function deadzoneslider_commit(slider)
+	slider.value = math.min(math.max(slider.value, 0), 1)
+	joystickdeadzone = round(slider.value, 2)
+	if joystickdeadzone ~= slider.savedvalue then
+		slider.savedvalue = joystickdeadzone
+		saveconfig()
+		if joystickdeadzone < DEADZONE_LOW then
+			deadzoneslider_warnlow()
+		end
+	end
+end
+
+function deadzoneslider_new(x, y, range)
+	local slider = guielement:new("scrollbar", x, y, range, 33, 9, joystickdeadzone, "hor")
+	slider.backgroundcolor = {0, 0, 0}
+	slider.buttonround = true
+	slider.scrollstepdisabled = true --the mouse wheel would change the value without a release
+	slider.savedvalue = joystickdeadzone
+	slider.commit = deadzoneslider_commit
+	slider.displayfunction = function(self, v)
+		if self.valueanim then
+			v = self.valueanim.to --show where it's going while the handle slides
+		end
+		return round(v*100) .. "%"
+	end
+	slider.updatefunc = function(self, v)
+		joystickdeadzone = round(math.min(math.max(v, 0), 1), 2)
+	end
+	slider.releasefunc = function(self, v)
+		deadzoneslider_commit(self)
+	end
+	return slider
 end
 
 function volumeslider_new(x, y, range)
@@ -1011,8 +1069,12 @@ end
 local function optionsmisc_create()
 	local right = 235 --right edge of the dropdowns and checkboxes
 
+	--Joystick deadzone, after its label
+	local deadzonex = 30 + utf8.len(TEXT["joy deadzone:"])*8 + 4
+	guielements["opt_deadzone"] = deadzoneslider_new(deadzonex, OPTIONS_MISC_DEADZONE_Y, right-deadzonex)
+
 	--Scale
-	guielements["opt_scale"] = guielement:new("dropdown", right-(13+9*8), 38, 9, function(i)
+	guielements["opt_scale"] = guielement:new("dropdown", right-(13+9*8), OPTIONS_MISC_SCALE_Y, 9, function(i)
 		changescale(i)
 		guielements["opt_scale"].var = i
 		saveconfig()
@@ -1020,7 +1082,7 @@ local function optionsmisc_create()
 	guielements["opt_scale"].displayentries = {"*1", "*2", "*3", "*4", "resizable"}
 
 	--Letterbox
-	guielements["opt_letterbox"] = guielement:new("checkbox", right-9, 51, function(v)
+	guielements["opt_letterbox"] = guielement:new("checkbox", right-9, OPTIONS_MISC_LETTERBOX_Y, function(v)
 		letterboxfullscreen = v
 		guielements["opt_letterbox"].var = v
 		saveconfig()
@@ -1248,6 +1310,13 @@ local function optionsmisc_sync()
 		guielements["opt_shader2"].var = currentshaderi2
 	end
 
+	local deadzone = guielements["opt_deadzone"]
+	volumeslider_animate(deadzone)
+	if not deadzone.dragging and not deadzone.valueanim and not deadzone.inputting and deadzone.value ~= joystickdeadzone then
+		deadzone.value = joystickdeadzone
+		deadzone.savedvalue = joystickdeadzone
+	end
+
 	--the slider follows the volume unless it is being dragged or is animating from a key press
 	volumeslider_animate(guielements["opt_volume"])
 	if not guielements["opt_volume"].dragging and not guielements["opt_volume"].valueanim and guielements["opt_volume"].value ~= volume then
@@ -1271,7 +1340,7 @@ local function optionsmisc_sync()
 end
 
 function optionsmisc_update()
-	if gamestate == "options" and optionstab == 3 then
+	if gamestate == "options" and options_tabshown(3) then
 		if not guielements["opt_scale"] then
 			optionsmisc_create()
 		end
@@ -1938,7 +2007,7 @@ local function optionsskins_sync()
 end
 
 function optionsskins_update()
-	if gamestate == "options" and optionstab == 2 then
+	if gamestate == "options" and options_tabshown(2) then
 		if not guielements["skin_player"] then
 			optionsskins_create()
 		end
@@ -1989,32 +2058,33 @@ local function optionsskins_draw()
 
 	--PREVIEW PORTALS WITH FALLING MARIO BECAUSE I CAN AND IT LOOKS RAD
 	local dx, dy = SKINS_PORTAL_X-142, SKINS_PORTAL_Y-42 --this preview was made for 142, 42
-	love.graphics.setScissor(SKINS_PORTAL_X*scale, SKINS_PORTAL_Y*scale, 32*scale, 32*scale)
-	local colorables = type(v.colorables) == "table" and v.colorables or {}
-	for j = 1, #colorables do
-		local fx, fy = (152+dx+v.smalloffsetX)*scale, (2+dy+((j-1)*32)+infmarioY-v.smalloffsetY)*scale
-		if v.portalgununderhat then
-			love.graphics.setColor(255, 255, 255, 255)
-			love.graphics.draw(v["animations"][0], v["small"]["jump"][3][1], fx, fy, infmarioR, scale, scale, v.smallquadcenterX, v.smallquadcenterY)
+	--cut inside whatever clip is already set (the tab slide's), and moved along with the tab
+	skins_clip(SKINS_PORTAL_X, SKINS_PORTAL_Y, 32, 32, function()
+		local colorables = type(v.colorables) == "table" and v.colorables or {}
+		for j = 1, #colorables do
+			local fx, fy = (152+dx+v.smalloffsetX)*scale, (2+dy+((j-1)*32)+infmarioY-v.smalloffsetY)*scale
+			if v.portalgununderhat then
+				love.graphics.setColor(255, 255, 255, 255)
+				love.graphics.draw(v["animations"][0], v["small"]["jump"][3][1], fx, fy, infmarioR, scale, scale, v.smallquadcenterX, v.smallquadcenterY)
+			end
+			for i = 1, #colorables do
+				love.graphics.setColor(mariocolors[pn][i] or {255, 255, 255})
+				love.graphics.draw(v["animations"][i], v["small"]["jump"][3][1], fx, fy, infmarioR, scale, scale, v.smallquadcenterX, v.smallquadcenterY)
+			end
+			if not v.portalgununderhat then
+				love.graphics.setColor(255, 255, 255, 255)
+				love.graphics.draw(v["animations"][0], v["small"]["jump"][3][1], fx, fy, infmarioR, scale, scale, v.smallquadcenterX, v.smallquadcenterY)
+			end
 		end
-		for i = 1, #colorables do
-			love.graphics.setColor(mariocolors[pn][i] or {255, 255, 255})
-			love.graphics.draw(v["animations"][i], v["small"]["jump"][3][1], fx, fy, infmarioR, scale, scale, v.smallquadcenterX, v.smallquadcenterY)
-		end
-		if not v.portalgununderhat then
-			love.graphics.setColor(255, 255, 255, 255)
-			love.graphics.draw(v["animations"][0], v["small"]["jump"][3][1], fx, fy, infmarioR, scale, scale, v.smallquadcenterX, v.smallquadcenterY)
-		end
-	end
-	local portalframe = portalanimation
-	love.graphics.setColor(255, 255, 255, 80 - math.abs(portalframe-3)*10)
-	love.graphics.draw(portalglowimg, (174+dx)*scale, (59+dy)*scale, math.pi, scale, scale)
-	love.graphics.draw(portalglowimg, (142+dx)*scale, (57+dy)*scale, 0, scale, scale)
-	love.graphics.setColor(portalcolor[pn][1])
-	love.graphics.draw(portalimg, portalquad[portalframe], (174+dx)*scale, (46+dy)*scale, math.pi, scale, scale)
-	love.graphics.setColor(portalcolor[pn][2])
-	love.graphics.draw(portalimg, portalquad[portalframe], (142+dx)*scale, (70+dy)*scale, 0, scale, scale)
-	love.graphics.setScissor()
+		local portalframe = portalanimation
+		love.graphics.setColor(255, 255, 255, 80 - math.abs(portalframe-3)*10)
+		love.graphics.draw(portalglowimg, (174+dx)*scale, (59+dy)*scale, math.pi, scale, scale)
+		love.graphics.draw(portalglowimg, (142+dx)*scale, (57+dy)*scale, 0, scale, scale)
+		love.graphics.setColor(portalcolor[pn][1])
+		love.graphics.draw(portalimg, portalquad[portalframe], (174+dx)*scale, (46+dy)*scale, math.pi, scale, scale)
+		love.graphics.setColor(portalcolor[pn][2])
+		love.graphics.draw(portalimg, portalquad[portalframe], (142+dx)*scale, (70+dy)*scale, 0, scale, scale)
+	end)
 
 	--character
 	if rowcolor("skin_character") then
@@ -2069,7 +2139,7 @@ local function optionsskins_draw()
 	local ontop = {}
 	for i = 1, #optionsskinsgui do
 		local w = guielements[optionsskinsgui[i]]
-		if w and (w.type ~= "scrollbar" or w.active) then
+		if w and (w.type ~= "scrollbar" or options_widgetactive(w)) then
 			if optionsskinsgui[i] == "skin_colorable" and not hascolorables then
 				--no colourables, nothing to pick
 			elseif w.extended or (w.listvalue and w.listvalue > 0) then
@@ -2118,6 +2188,7 @@ function menu_load()
 	scrollsmoothrate = 4
 	optionstab = 2
 	optionsselection = 1
+	optionspageanimation = nil
 	keybindpage = 1
 	keybindpageanimation = nil
 	resetwarningopen = false
@@ -2129,7 +2200,7 @@ function menu_load()
 	colorsetedit = 1
 	mappackselection = 1
 	onlinemappackselection = 1
-	openmappacksbutton = guielement:new("button", 241, 190, "", function() openSaveFolder(mappackfolder) end, nil, 0, 2.5, 147, true)
+	openmappacksbutton = guielement:new("button", 241, 190, "open folder", function() openSaveFolder(mappackfolder) end, nil, 0, 2.5, 147, true)
 	openmappacksbutton.active = false
 	opendlcbutton = guielement:new("button", 241, 190, "open dlc folder", opendlcfolder, nil, 0, 2.5, 147, true)
 	opendlcbutton.active = false
@@ -2228,6 +2299,7 @@ function menu_update(dt)
 	end
 
 	updatecustombackgrounds(dt)
+	options_updatepageanimation()
 	optionscontrols_update()
 	optionsmisc_update()
 	optionscheats_update()
@@ -2403,6 +2475,7 @@ function menu_update(dt)
 		lobby_update(dt)
 	end
 	optionsskins_update() --after the held keys above changed the colours, so the sliders show this frame's
+	options_freezepages()
 	
 	if titleframes > 1 and gamestate == "menu" and titledelay ~= nil then
 		titletimer = titletimer + dt
@@ -2488,6 +2561,352 @@ function menu_update(dt)
 	end
 
 	languagemenu_update(dt, languagemenuopen)
+end
+
+--whether a tab's widgets should exist: the open tab, and the tab sliding out while the menu switches tabs
+function options_tabshown(tab)
+	return optionstab == tab or (optionspageanimation ~= nil and optionspageanimation.from == tab)
+end
+
+--switches to another tab, sliding the old one out and the new one in on a random motion curve
+function options_switchtab(tab)
+	if tab == optionstab or tab < 1 or tab > 4 then
+		return
+	end
+	optionspageanimation = {
+		from = optionstab,
+		to = tab,
+		start = love.timer.getTime(),
+		curve = random_motion_curve()
+	}
+	optionstab = tab
+end
+
+--how far along the tab slide is (0 to 1, after the motion curve), or nil when the menu isn't sliding
+local function options_pageprogress()
+	local animation = optionspageanimation
+	if not animation then
+		return nil
+	end
+	local t = (love.timer.getTime() - animation.start) / optionspageduration
+	if t >= 1 then
+		return nil
+	end
+	return motion_curve(t, animation.curve, true, false, true, true)
+end
+
+--gives the frozen widgets back what they had before the slide; their tab's sync puts anything else right this frame
+local function options_unfreezepages()
+	for _, el in pairs(guielements) do
+		if el.optionspagesaved then
+			el.active = el.optionspagesaved.active
+			el.nohover = el.optionspagesaved.nohover
+			el.optionspagesaved = nil
+		end
+	end
+end
+
+--whether a widget is active, going by what it was before the tab slide froze it
+function options_widgetactive(el)
+	if el.optionspagesaved then
+		return el.optionspagesaved.active
+	end
+	return el.active
+end
+
+--ends the tab slide once it's over, before the tabs' updates remove the widgets of the tab that slid out
+function options_updatepageanimation()
+	if optionspageanimation and (gamestate ~= "options" or not options_pageprogress()) then
+		optionspageanimation = nil
+		options_unfreezepages()
+	end
+end
+
+--while the tabs slide, neither tab's widgets can be clicked, typed into or hovered, since they aren't where the mouse thinks they are
+function options_freezepages()
+	local animation = optionspageanimation
+	if gamestate ~= "options" or not animation then
+		return
+	end
+	local fromprefix, toprefix = OPTIONS_TABPREFIXES[animation.from], OPTIONS_TABPREFIXES[animation.to]
+	for name, el in pairs(guielements) do
+		if type(name) == "string" and (name:sub(1, #fromprefix) == fromprefix or name:sub(1, #toprefix) == toprefix) then
+			if not el.optionspagesaved then
+				el.optionspagesaved = {active = el.active, nohover = el.nohover}
+			end
+			el.active = false
+			el.nohover = true
+			el.forcehover = false
+		end
+	end
+end
+
+--the f6 note of the controls tab, right of the options box with its middle halfway down the screen, like the dlc tips in the mappack menu.
+--It's outside the box, so it fades with the tab slide instead of sliding
+local function optionscontrols_drawresetnote()
+	local shown = 0
+	local progress = options_pageprogress()
+	if progress then
+		if optionspageanimation.to == 1 then
+			shown = progress
+		elseif optionspageanimation.from == 1 then
+			shown = 1 - progress
+		end
+	elseif optionstab == 1 then
+		shown = 1
+	end
+	if shown <= 0 then
+		return
+	end
+
+	local boxx = OPTIONS_BOX_X + OPTIONS_BOX_W + 2 --241, where the dlc tips start
+	local boxw = width*16 - boxx - 9
+	local line1, line2 = optionscontrols_resettooltip()
+	--rewrapped to the box's width, since the lines are longer than it
+	local lines, line = {}, ""
+	local maxchars = math.max(1, math.floor((boxw - 6)/8))
+	for word in (line1 .. " " .. line2):gmatch("%S+") do
+		if line == "" then
+			line = word
+		elseif utf8.len(line) + 1 + utf8.len(word) <= maxchars then
+			line = line .. " " .. word
+		else
+			table.insert(lines, line)
+			line = word
+		end
+	end
+	table.insert(lines, line)
+
+	local boxh = #lines*10 + 4
+	local boxy = height*16/2 - boxh/2
+	love.graphics.setColor(0, 0, 0, 200*shown)
+	love.graphics.rectangle("fill", boxx*scale, boxy*scale, boxw*scale, boxh*scale)
+	love.graphics.setColor(255, 255, 255, 255*shown)
+	for i = 1, #lines do
+		properprintF(lines[i], (boxx + 3)*scale, (boxy + 3 + (i-1)*10)*scale)
+	end
+end
+
+--labels and widgets of the open tab (optionstab)
+local function options_drawtab()
+	if optionstab == 1 then
+		--CONTROLS
+		if optionsselection == 2 then
+			love.graphics.setColor(255, 255, 255, 255)
+		else
+			love.graphics.setColor(100, 100, 100, 255)
+		end
+		properprintF(TEXT["edit player:"], 30*scale, 40*scale)
+		
+		if optionsselection == 4 then
+			love.graphics.setColor(255, 255, 255, 255)
+		else
+			love.graphics.setColor(100, 100, 100, 255)
+		end
+		local currentbindlabel = TEXT["current bind:"]
+		local bindlabelwidth = utf8.len(currentbindlabel) * 8
+		local bindgroupwidth = bindlabelwidth + 4 + 21
+		properprintF(currentbindlabel, (130 - bindgroupwidth/2)*scale, 66*scale)
+
+		if optionsselection == 3 then
+			love.graphics.setColor(255, 255, 255, 255)
+		else
+			love.graphics.setColor(100, 100, 100, 255)
+		end
+		properprintF(TEXT["uses the mouse:"], 30*scale, 52*scale)
+		
+		skins_clip(OPTIONS_BOX_X, OPTIONS_BOX_Y, OPTIONS_BOX_W, OPTIONS_BOX_H, function()
+			local pageviews = optionscontrols_pageviews()
+			for i = 1, #pageviews do
+				optionscontrols_draw_page(pageviews[i].page, pageviews[i].offset)
+			end
+		end)
+		optionscontrols_draw(nil, false, true)
+
+			
+		local now = love.timer.getTime()
+		local keypromptscale = menupopupscale("keyprompt", now)
+		if keyprompt or keypromptscale > 0 then
+			love.graphics.push()
+			love.graphics.translate(130*scale, 130*scale)
+			love.graphics.scale(keypromptscale, keypromptscale)
+			love.graphics.translate(-130*scale, -130*scale)
+
+			local progress = keypromptscale
+			love.graphics.translate(0, (1 - progress) * 8 * scale)
+
+			local popupradius = math.min(200, 60) * scale * 0.2
+			love.graphics.setColor(0, 0, 0)
+			love.graphics.rectangle("fill", 30*scale, 100*scale, 200*scale, 60*scale, popupradius)
+			love.graphics.setColor(255, 255, 255)
+			local previouslinewidth = love.graphics.getLineWidth()
+			love.graphics.setLineWidth(scale)
+			love.graphics.rectangle("line", 30*scale, 100*scale, 200*scale, 60*scale, popupradius)
+			love.graphics.setLineWidth(previouslinewidth)
+			local controlname = optionscontrols_controlnames[optionsselection-4]
+			if controlname == "aimx" then
+				properprintF(TEXT["move stick right"], 40*scale, 110*scale)
+			elseif controlname == "aimy" then
+				properprintF(TEXT["move stick down"], 40*scale, 110*scale)
+			else
+				properprintF(TEXT["press key for '"] .. TEXT[controlname] .. "'", 40*scale, 110*scale)
+			end
+			local escapetext = TEXT["press 'esc' to cancel"]
+			if keypromptpage > 1 then
+				escapetext = TEXT["press 'esc' to clear"]
+			end
+			properprintF(escapetext, 40*scale, 140*scale)
+			
+			if axiserror then
+				love.graphics.setColor(200, 0, 0)
+				properprintF(TEXT["you can only set"], 40*scale, 120*scale)
+				properprintF(TEXT["axes for this"], 40*scale, 130*scale)
+			end
+			love.graphics.pop()
+		end
+	elseif optionstab == 2 then
+		--SKINS: player, character and hat dropdowns, colour sliders and previews
+		optionsskins_draw()
+	elseif optionstab == 3 then
+		if optionsselection == 2 then
+			love.graphics.setColor(255, 255, 255, 255)
+		else
+			love.graphics.setColor(100, 100, 100, 255)
+		end
+		properprintF(TEXT["joy deadzone:"], 30*scale, (OPTIONS_MISC_DEADZONE_Y+1)*scale)
+
+		if optionsselection == 3 then
+			love.graphics.setColor(255, 255, 255, 255)
+		else
+			love.graphics.setColor(100, 100, 100, 255)
+		end
+		properprintF(TEXT["scale:"], 30*scale, (OPTIONS_MISC_SCALE_Y+2)*scale)
+
+		if optionsselection == 4 then
+			love.graphics.setColor(255, 255, 255, 255)
+		else
+			love.graphics.setColor(100, 100, 100, 255)
+		end
+		properprintF(TEXT["letterbox:"], 30*scale, (OPTIONS_MISC_LETTERBOX_Y+1)*scale)
+		
+		if optionsselection == 5 then
+			love.graphics.setColor(255, 255, 255, 255)
+		else
+			love.graphics.setColor(100, 100, 100, 255)
+		end
+		
+		properprintF(TEXT["shader1:"], 30*scale, 65*scale)
+		if shaderssupported == false then
+			properprintF(TEXT["unsupported"], (180-utf8.len("unsupported")*8)*scale, 65*scale)
+		end
+		
+		if optionsselection == 6 then
+			love.graphics.setColor(255, 255, 255, 255)
+		else
+			love.graphics.setColor(100, 100, 100, 255)
+		end
+		properprintF(TEXT["shader2:"], 30*scale, 78*scale)
+		if shaderssupported == false then
+			properprintF(TEXT["unsupported"], (180-utf8.len("unsupported")*8)*scale, 78*scale)
+		end
+		
+		love.graphics.setColor(100, 100, 100, 255)
+		properprintF(TEXT["shaders will really\nreduce performance!"], 30*scale, 89*scale)
+		
+		if optionsselection == 7 then
+			love.graphics.setColor(255, 255, 255, 255)
+		else
+			love.graphics.setColor(100, 100, 100, 255)
+		end
+		properprintF(TEXT["volume:"], 30*scale, 110*scale)
+		
+		if optionsselection == 12 then
+			love.graphics.setColor(255, 255, 255, 255)
+		else
+			love.graphics.setColor(100, 100, 100, 255)
+		end
+		
+		properprintF(TEXT["vsync:"], 30*scale, 172*scale)
+		
+		if optionsselection == 13 then
+			love.graphics.setColor(255, 255, 255, 255)
+		else
+			love.graphics.setColor(100, 100, 100, 255)
+		end
+		
+		properprintF(TEXT["mappack folder:"], 30*scale, 182*scale)
+		
+		--love.graphics.setColor(100, 100, 100, 255)
+		--properprintF(TEXT["lock mouse with f12"], 30*scale, 195*scale)
+		
+		love.graphics.setColor(255, 255, 255, 255)
+		properprintF("mari0 le " .. VERSIONSTRING, 30*scale, 205*scale)
+		
+		--widgets (scale, letterbox, shaders, language, nitpicks, resets, vsync, mappack folder)
+		optionsmisc_draw()
+	elseif optionstab == 4 then
+		love.graphics.setColor(255, 255, 255, 255)
+
+		if gamefinished then
+			properprintF(TEXT["have fun with these!"], 30*scale, 45*scale)
+		else
+			properprintF(TEXT["unlock this by completing"], 30*scale, 40*scale)
+			properprintF(TEXT["the original levels pack!"], 30*scale, 50*scale)
+		end
+
+		local labels = {
+			"mode:",
+			"knockback:",
+			"bullettime:",
+			"huge mario:",
+			"goomba attack:",
+			"sonic rainboom:",
+			"playercollision:",
+			"infinite time:",
+			"infinite lives:",
+			"dark mode:"
+		}
+
+		for i, label in ipairs(labels) do
+			if optionsselection == i + 1 then
+				love.graphics.setColor(255, 255, 255, 255)
+			else
+				love.graphics.setColor(100, 100, 100, 255)
+			end
+
+			properprintF(TEXT[label] or label, 30*scale, (65 + (i - 1)*14)*scale)
+		end
+
+		optionscheats_draw()
+	end
+end
+
+--the open tab, or while switching tabs, the old tab sliding out and the new one sliding in, cut to the options box
+local function options_drawpages()
+	local progress = options_pageprogress()
+	if not progress then
+		options_drawtab()
+		return
+	end
+
+	local animation = optionspageanimation
+	local direction = animation.to > animation.from and 1 or -1
+	local distance = OPTIONS_BOX_W
+	local tab, selection = optionstab, optionsselection
+	skins_clip(OPTIONS_BOX_X, OPTIONS_BOX_Y, OPTIONS_BOX_W, OPTIONS_BOX_H, function()
+		--the old tab is drawn as it was left: tabs only switch while the tab row is selected
+		optionstab, optionsselection = animation.from, 1
+		love.graphics.push()
+		love.graphics.translate(-direction * progress * distance * scale, 0)
+		options_drawtab()
+		love.graphics.pop()
+		optionstab, optionsselection = tab, selection
+
+		love.graphics.push()
+		love.graphics.translate(direction * (1 - progress) * distance * scale, 0)
+		options_drawtab()
+		love.graphics.pop()
+	end)
 end
 
 function menu_draw()
@@ -2971,7 +3390,7 @@ function menu_draw()
 				if mappackhorscrollsmooth <= 0.01 then
 					love.graphics.setScissor()
 					love.graphics.setColor(0, 0, 0, 200)
-					love.graphics.rectangle("fill", 241*scale, 125*scale, 150*scale, 65*scale, 10*scale)
+					love.graphics.rectangle("fill", 241*scale, 125*scale, 150*scale, 65*scale)
 					love.graphics.setColor(255, 255, 255, 255)
 					if savefolderfailed then
 						properprintF(TEXT["mappack folder fail"], 244*scale, 129*scale)
@@ -2979,7 +3398,6 @@ function menu_draw()
 						properprintF(TEXT["mappack folder instructions"], 244*scale, 129*scale)
 					end
 					openmappacksbutton:draw()
-					properprintF("       open\n  mappacks folder", 239*scale, 194*scale)
 					if mappacksearchbar.active then
 						mappacksearchbar:draw()
 					end
@@ -3299,200 +3717,9 @@ function menu_draw()
 			tabX = tabX + utf8.len(s)*8+6
 		end
 		
-		if optionstab == 1 then
-			--CONTROLS
-			if optionsselection == 2 then
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			properprintF(TEXT["edit player:"], 30*scale, 40*scale)
-			
-			if optionsselection == 4 then
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			local currentbindlabel = TEXT["current bind:"]
-			local bindlabelwidth = utf8.len(currentbindlabel) * 8
-			local bindgroupwidth = bindlabelwidth + 4 + 21
-			properprintF(currentbindlabel, (130 - bindgroupwidth/2)*scale, 66*scale)
-
-			if optionsselection == 3 then
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			properprintF(TEXT["uses the mouse:"], 30*scale, 52*scale)
-			
-			love.graphics.setScissor(21*scale, 16*scale, 218*scale, 200*scale)
-			local pageviews = optionscontrols_pageviews()
-			for i = 1, #pageviews do
-				optionscontrols_draw_page(pageviews[i].page, pageviews[i].offset)
-			end
-			love.graphics.setScissor()
-			optionscontrols_draw(nil, false, true)
-
-			local tooltipline1, tooltipline2 = optionscontrols_resettooltip()
-			local tooltipwidth = math.max(utf8.len(tooltipline1), utf8.len(tooltipline2)) * 8
-			local tooltipx = 130 - tooltipwidth / 2
-			love.graphics.setColor(0, 0, 0, 200)
-			love.graphics.rectangle("fill", (tooltipx - 3)*scale, 0, (tooltipwidth + 6)*scale, 18*scale)
-			love.graphics.setColor(255, 255, 255, 255)
-			properprintF(tooltipline1 .. "\n" .. tooltipline2, tooltipx*scale, 0)
-				
-			local now = love.timer.getTime()
-			local keypromptscale = menupopupscale("keyprompt", now)
-			if keyprompt or keypromptscale > 0 then
-				love.graphics.push()
-				love.graphics.translate(130*scale, 130*scale)
-				love.graphics.scale(keypromptscale, keypromptscale)
-				love.graphics.translate(-130*scale, -130*scale)
-
-				local progress = keypromptscale
-				love.graphics.translate(0, (1 - progress) * 8 * scale)
-
-				local popupradius = math.min(200, 60) * scale * 0.2
-				love.graphics.setColor(0, 0, 0)
-				love.graphics.rectangle("fill", 30*scale, 100*scale, 200*scale, 60*scale, popupradius)
-				love.graphics.setColor(255, 255, 255)
-				local previouslinewidth = love.graphics.getLineWidth()
-				love.graphics.setLineWidth(scale)
-				love.graphics.rectangle("line", 30*scale, 100*scale, 200*scale, 60*scale, popupradius)
-				love.graphics.setLineWidth(previouslinewidth)
-				local controlname = optionscontrols_controlnames[optionsselection-4]
-				if controlname == "aimx" then
-					properprintF(TEXT["move stick right"], 40*scale, 110*scale)
-				elseif controlname == "aimy" then
-					properprintF(TEXT["move stick down"], 40*scale, 110*scale)
-				else
-					properprintF(TEXT["press key for '"] .. TEXT[controlname] .. "'", 40*scale, 110*scale)
-				end
-				local escapetext = TEXT["press 'esc' to cancel"]
-				if keypromptpage > 1 then
-					escapetext = TEXT["press 'esc' to clear"]
-				end
-				properprintF(escapetext, 40*scale, 140*scale)
-				
-				if buttonerror then
-					love.graphics.setColor(200, 0, 0)
-					properprintF(TEXT["you can only set"], 40*scale, 120*scale)
-					properprintF(TEXT["buttons for this"], 40*scale, 130*scale)
-				elseif axiserror then
-					love.graphics.setColor(200, 0, 0)
-					properprintF(TEXT["you can only set"], 40*scale, 120*scale)
-					properprintF(TEXT["axes for this"], 40*scale, 130*scale)
-				end
-				love.graphics.pop()
-			end
-		elseif optionstab == 2 then
-			--SKINS: player, character and hat dropdowns, colour sliders and previews
-			optionsskins_draw()
-		elseif optionstab == 3 then
-			if optionsselection == 2 then
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			properprintF(TEXT["scale:"], 30*scale, 40*scale)
-
-			if optionsselection == 3 then
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			properprintF(TEXT["letterbox:"], 30*scale, 52*scale)
-			
-			if optionsselection == 4 then
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			
-			properprintF(TEXT["shader1:"], 30*scale, 65*scale)
-			if shaderssupported == false then
-				properprintF(TEXT["unsupported"], (180-utf8.len("unsupported")*8)*scale, 65*scale)
-			end
-			
-			if optionsselection == 5 then
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			properprintF(TEXT["shader2:"], 30*scale, 78*scale)
-			if shaderssupported == false then
-				properprintF(TEXT["unsupported"], (180-utf8.len("unsupported")*8)*scale, 78*scale)
-			end
-			
-			love.graphics.setColor(100, 100, 100, 255)
-			properprintF(TEXT["shaders will really\nreduce performance!"], 30*scale, 89*scale)
-			
-			if optionsselection == 6 then
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			properprintF(TEXT["volume:"], 30*scale, 110*scale)
-			
-			if optionsselection == 11 then
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			
-			properprintF(TEXT["vsync:"], 30*scale, 172*scale)
-			
-			if optionsselection == 12 then
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			
-			properprintF(TEXT["mappack folder:"], 30*scale, 182*scale)
-			
-			--love.graphics.setColor(100, 100, 100, 255)
-			--properprintF(TEXT["lock mouse with f12"], 30*scale, 195*scale)
-			
-			love.graphics.setColor(255, 255, 255, 255)
-			properprintF("mari0 le " .. VERSIONSTRING, 30*scale, 205*scale)
-			
-			--widgets (scale, letterbox, shaders, language, nitpicks, resets, vsync, mappack folder)
-			optionsmisc_draw()
-		elseif optionstab == 4 then
-			love.graphics.setColor(255, 255, 255, 255)
-
-			if gamefinished then
-				properprintF(TEXT["have fun with these!"], 30*scale, 45*scale)
-			else
-				properprintF(TEXT["unlock this by completing"], 30*scale, 40*scale)
-				properprintF(TEXT["the original levels pack!"], 30*scale, 50*scale)
-			end
-
-			local labels = {
-				"mode:",
-				"knockback:",
-				"bullettime:",
-				"huge mario:",
-				"goomba attack:",
-				"sonic rainboom:",
-				"playercollision:",
-				"infinite time:",
-				"infinite lives:",
-				"dark mode:"
-			}
-
-			for i, label in ipairs(labels) do
-				if optionsselection == i + 1 then
-					love.graphics.setColor(255, 255, 255, 255)
-				else
-					love.graphics.setColor(100, 100, 100, 255)
-				end
-
-				properprintF(TEXT[label] or label, 30*scale, (65 + (i - 1)*14)*scale)
-			end
-
-			optionscheats_draw()
-		end
+		--the open tab, or the two tabs sliding past each other
+		options_drawpages()
+		optionscontrols_drawresetnote()
 	end
 	resetwarning_draw()
 	love.graphics.translate(0, yoffset*scale)
@@ -4313,11 +4540,11 @@ function menu_keypressed(key, unicode)
 		if optionsselection == 1 then
 			if (key == "left" or key == "a") then
 				if optionstab > 1 then
-					optionstab = optionstab - 1
+					options_switchtab(optionstab - 1)
 				end
 			elseif (key == "right" or key == "d") then
 				if optionstab < 4 then
-					optionstab = optionstab + 1
+					options_switchtab(optionstab + 1)
 				end
 			end
 		elseif optionsselection == 2 then
@@ -4375,7 +4602,7 @@ function menu_keypressed(key, unicode)
 					optionsselection = 1
 				end
 			elseif optionstab == 3 then
-				if optionsselection < 12 then
+				if optionsselection < 13 then
 					optionsselection = optionsselection + 1
 				else
 					optionsselection = 1
@@ -4405,7 +4632,7 @@ function menu_keypressed(key, unicode)
 					end
 					optionsselection = limit
 				elseif optionstab == 3 then
-					optionsselection = 12
+					optionsselection = 13
 				elseif optionstab == 4 and gamefinished then
 					optionsselection = 11
 				end
@@ -4439,15 +4666,17 @@ function menu_keypressed(key, unicode)
 				end
 			elseif optionstab == 3 then
 				if optionsselection == 2 then
+					volumeslider_step(guielements["opt_deadzone"], 0.05)
+				elseif optionsselection == 3 then
 					if resizable then
 					elseif scale < 5 then
 						changescale(scale+1)
 					end
 					saveconfig()
-				elseif optionsselection == 3 then
+				elseif optionsselection == 4 then
 					letterboxfullscreen = not letterboxfullscreen
 					saveconfig()
-				elseif optionsselection == 4 then
+				elseif optionsselection == 5 then
 					currentshaderi1 = currentshaderi1 + 1
 					if currentshaderi1 > #shaderlist then
 						currentshaderi1 = 1
@@ -4459,7 +4688,7 @@ function menu_keypressed(key, unicode)
 					end
 					saveconfig()
 					
-				elseif optionsselection == 5 then
+				elseif optionsselection == 6 then
 					currentshaderi2 = currentshaderi2 + 1
 					if currentshaderi2 > #shaderlist then
 						currentshaderi2 = 1
@@ -4471,13 +4700,13 @@ function menu_keypressed(key, unicode)
 					end
 					saveconfig()
 					
-				elseif optionsselection == 6 then
+				elseif optionsselection == 7 then
 					volumeslider_step(guielements["opt_volume"], 0.1)
-				elseif optionsselection == 11 then
+				elseif optionsselection == 12 then
 					vsync = not vsync
 					changescale(scale)
 					saveconfig()
-				elseif optionsselection == 12 then
+				elseif optionsselection == 13 then
 					if mappackfolder == "mappacks" then
 						mappackfolder = "alesans_entities/mappacks"
 						savesfolder = "alesans_entities/saves"
@@ -4573,16 +4802,18 @@ function menu_keypressed(key, unicode)
 				end
 			elseif optionstab == 3 then
 				if optionsselection == 2 then
+					volumeslider_step(guielements["opt_deadzone"], -0.05)
+				elseif optionsselection == 3 then
 					if resizable then
 						changescale(4)
 					elseif scale > 1 then
 						changescale(scale-1)
 					end
 					saveconfig()
-				elseif optionsselection == 3 then
+				elseif optionsselection == 4 then
 					letterboxfullscreen = not letterboxfullscreen
 					saveconfig()
-				elseif optionsselection == 4 then
+				elseif optionsselection == 5 then
 					currentshaderi1 = currentshaderi1 - 1
 					if currentshaderi1 < 1 then
 						currentshaderi1 = #shaderlist
@@ -4594,7 +4825,7 @@ function menu_keypressed(key, unicode)
 					end
 					saveconfig()
 
-				elseif optionsselection == 5 then
+				elseif optionsselection == 6 then
 					currentshaderi2 = currentshaderi2 - 1
 					if currentshaderi2 < 1 then
 						currentshaderi2 = #shaderlist
@@ -4606,13 +4837,13 @@ function menu_keypressed(key, unicode)
 					end
 					saveconfig()
 					
-				elseif optionsselection == 6 then
+				elseif optionsselection == 7 then
 					volumeslider_step(guielements["opt_volume"], -0.1)
-				elseif optionsselection == 11 then
+				elseif optionsselection == 12 then
 					vsync = not vsync
 					changescale(scale)
 					saveconfig()
-				elseif optionsselection == 12 then
+				elseif optionsselection == 13 then
 					if mappackfolder == "alesans_entities/mappacks" then
 						mappackfolder = "mappacks"
 						savesfolder = "saves"
@@ -4984,9 +5215,8 @@ function keypromptenter(t, ...)
 	if t == "key" and (arg[1] == ";" or arg[1] == "," or arg[1] == "," or arg[1] == "-") then
 		return
 	end
-	buttonerror = false
 	axiserror = false
-	local buttononly = {"run", "jump", "reload", "use", "portal1", "portal2", "pause"}
+	--any joystick input (button, hat or axis) can go on any control. Only the keyboard can't aim, since a key has no axis
 	local axisonly = {"aimx", "aimy"}
 	local controlset = getcontrolset(keypromptpage)
 	local controlname = optionscontrols_controlnames[optionsselection-4]
@@ -5002,36 +5232,21 @@ function keypromptenter(t, ...)
 				controlset[skinningplayer][controlname] = {arg[1]}
 			end
 		elseif t == "joybutton" then
-			if tablecontains(axisonly, controlname) then
-				axiserror = true
-			else
-				controlset[skinningplayer][controlname] = {"joy", arg[1], "but", arg[2]}
-			end
+			controlset[skinningplayer][controlname] = {"joy", arg[1], "but", arg[2]}
 		elseif t == "joyhat" then
-			if tablecontains(buttononly, controlname) then
-				buttonerror = true
-			elseif tablecontains(axisonly, controlname) then
-				axiserror = true
-			else
-				controlset[skinningplayer][controlname] = {"joy", arg[1], "hat", arg[2], arg[3]}
-			end
+			controlset[skinningplayer][controlname] = {"joy", arg[1], "hat", arg[2], arg[3]}
 		elseif t == "joyaxis" then
-			if tablecontains(buttononly, controlname) then
-				buttonerror = true
-			else
-				controlset[skinningplayer][controlname] = {"joy", arg[1], "axe", arg[2], arg[3]}
-			end
+			controlset[skinningplayer][controlname] = {"joy", arg[1], "axe", arg[2], arg[3]}
 		end
 	end
 	
-	if (not buttonerror and not axiserror) or arg[1] == "escape" then
+	if not axiserror or arg[1] == "escape" then
 		setmenupopupvisible("keyprompt", false)
 	end
 end
 
 function keypromptstart()
 	keypromptpage = keybindpage
-	buttonerror = false
 	axiserror = false
 	
 	--save number of stuff
@@ -5173,6 +5388,7 @@ end
 function optionsmenu_resettab()
 	optionstab = 2
 	optionsselection = 1 --a row from another tab could be past the end of this one
+	optionspageanimation = nil
 end
 
 function selectworld()
@@ -5515,11 +5731,7 @@ function drawcontrolsoverlay()
 		end
 		properprintF(escapetext, 40*scale, 140*scale)
 
-		if buttonerror then
-			love.graphics.setColor(200, 0, 0)
-			properprintF(TEXT["you can only set"], 40*scale, 120*scale)
-			properprintF(TEXT["buttons for this"], 40*scale, 130*scale)
-		elseif axiserror then
+		if axiserror then
 			love.graphics.setColor(200, 0, 0)
 			properprintF(TEXT["you can only set"], 40*scale, 120*scale)
 			properprintF(TEXT["axes for this"], 40*scale, 130*scale)

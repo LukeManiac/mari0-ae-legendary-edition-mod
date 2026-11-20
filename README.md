@@ -424,6 +424,34 @@ The skins tab has been rebuilt with graphical dropdowns and real sliders, in pla
 * In the skins tab, the red, green and blue sliders glide over to their new values when you switch to another player, character or colourable. The portal sliders glide when you switch to another player, since their colours belong to the player. Each glide takes 0.25 seconds on a random motion curve, and the handle shows the value it's heading to.
 * Holding a key on a colour row and dragging a handle stay instant. Grabbing a handle while it's gliding stops the glide.
 
+#### 📑 Tab Animations
+
+* Switching tabs in the options menu and the Mappack Creator now slides the old tab out and the new one in, instead of swapping them instantly. Moving to a tab further right slides the pages left, and moving back slides them right. Each slide takes 0.25 seconds on a random motion curve.
+* The pages are cut to the menu's dark box while they slide, so they never spill over the course behind it.
+* The tab names, the line under the Mappack Creator's tabs and its **Back** button stay where they are.
+* Nothing on either tab can be clicked, typed into or hovered until the slide ends. Pressing Left or Right again, or clicking another Mappack Creator tab, starts a new slide straight away.
+* The controls tab's keybind pages are cut to the options box the same way, and follow the tab while it slides.
+
+#### 🎮 Joysticks
+
+**Any input on any control**
+
+* A controller's buttons, hats and sticks can now be bound to any control. Before, run, jump, reload, use, the portals and pause only took buttons, and the aim controls only took sticks. The "you can only set buttons/axes for this" messages are gone, apart from one case: a keyboard key still can't be bound to aim, since a key has no direction to aim with.
+* A stick or hat bound to a button control acts like a button: it presses the control once when it goes past the deadzone (or the hat turns that way), and releases it when it comes back. This works everywhere a controller button does: in courses, the pause menu, the menus and the level screens.
+* A button bound to aim aims right or down while it's held, as if that stick were pushed all the way. A hat aims the way it was pushed when it was bound.
+
+**Joystick deadzone**
+
+* A new **Joy deadzone** slider in the misc. tab, right above **Scale**, sets how far a stick has to move before it counts. **Scale** and **Letterbox** moved up to make room, and everything from **Shader1** down stays where it was.
+  * At **0%**, any movement off the centre counts.
+  * At **100%**, only a stick pushed all the way counts.
+  * Anything in between counts once the stick is further from the centre than that.
+* It works like the volume slider: drag it, click the track, right-click to type a value, or use Left and Right on its row to change it in steps of 5%. Letting go saves the game.
+* Setting it below 10% shows a red notice warning that sticks may drift and press things by themselves. The notice is in English whatever the language, like the game's other notices. Changing it again while the notice is up keeps that notice on screen instead of adding another.
+* It's saved as `joydeadzone` in `options.txt`, straight after `scale`. It starts at 25%, the same as before, and **Reset All Settings** puts it back there.
+* It covers every stick input: moving, button controls on a stick, and aiming. For aiming, the deadzone is measured by how far the stick is from its centre in any direction, instead of on each axis separately.
+* Binding a stick in the controls tab still needs a quarter of a push (`joystickbinddeadzone` in `variables.lua`), so a stick that drifts a little can't bind itself when the deadzone is low.
+
 #### 🧱 GUI
 
 For anyone building menus with the GUI:
@@ -450,6 +478,11 @@ For anyone building menus with the GUI:
 ### ✨ Improvements
 
 * Escape now closes an open dropdown first in every options tab, instead of leaving the options menu with the dropdown still open.
+* The controls tab's **F6** note now sits in a box on the right of the options menu, centred halfway down the screen, where the DLC tips are in the mappack menu. Before, it was squeezed in at the top of the screen. Its lines wrap to fit the box, and it fades in and out when you switch to or from the controls tab.
+
+#### 🔤 Font Renderer
+
+* The red, green and blue sliders now show what the text colour would be along each track, with the other two channels as they are, the same as the skins tab's sliders. Before, each track was a flat dark red, green or blue. The tracks update live as you move any of the three sliders or press **HUD Colour**.
 
 ### ❌ Removals
 

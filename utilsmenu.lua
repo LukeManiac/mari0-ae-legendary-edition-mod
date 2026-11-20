@@ -48,6 +48,7 @@ local confirmuntil = {} --two-click buttons: name -> time the "click again" stat
 
 local mptab = "general"
 local MPTABS = {"general", "worlds", "hud", "text", "course", "create"}
+local mpslide = {time = 0.25} --the mappack creator's tab slide: anim is {from, to, start, curve} while it slides (one table for the 200 locals limit)
 
 local utils_back --forward declarations
 local inner_utilsmenu_openpage
@@ -213,6 +214,32 @@ local function drawpanel()
 	love.graphics.rectangle("fill", PX*scale, PY*scale, panelwidth()*scale, PH*scale)
 end
 
+--runs f with drawing cut to a box (game pixels, wherever the current transform puts it), inside any clip already set
+function ui.clipto(x, y, w, h, f)
+	local sx1, sy1 = love.graphics.transformPoint(x*scale, y*scale)
+	local sx2, sy2 = love.graphics.transformPoint((x+w)*scale, (y+h)*scale)
+	local ox, oy, ow, oh = love.graphics.getScissor()
+	love.graphics.intersectScissor(math.floor(sx1), math.floor(sy1), math.max(0, math.ceil(sx2-sx1)), math.max(0, math.ceil(sy2-sy1)))
+	f()
+	if ox then
+		love.graphics.setScissor(ox, oy, ow, oh)
+	else
+		love.graphics.setScissor()
+	end
+end
+
+--how far along the mappack creator's tab slide is (0 to 1, after the motion curve), or nil when it isn't sliding
+function mpslide.progress()
+	if not mpslide.anim or page ~= "mappack" then
+		return nil
+	end
+	local t = (love.timer.getTime() - mpslide.anim.start)/mpslide.time
+	if t >= 1 then
+		return nil
+	end
+	return motion_curve(t, mpslide.anim.curve, true, false, true, true)
+end
+
 local function drawtitle(s)
 	love.graphics.setColor(255, 255, 255)
 	properprintF(s, (PX+5)*scale, (PY+6)*scale)
@@ -329,11 +356,15 @@ local function updateelements(dt)
 		end
 	end
 
+	if mpslide.anim and not mpslide.progress() then
+		mpslide.anim = nil
+	end
+	local sliding = mpslide.anim ~= nil --tabs' elements aren't where the mouse thinks they are while they slide
 	for _, v in ipairs(elements) do
 		local el = v.el
 		local visible = onpage(v) and not el.utilshidden
-		el.active = visible and not el.utilsdisabled
-		el.nohover = el.utilsdisabled
+		el.active = visible and not el.utilsdisabled and not (sliding and v.tab)
+		el.nohover = el.utilsdisabled or (sliding and v.tab ~= nil)
 		if not visible and el.type == "input" and el.inputting then
 			closeinput(el)
 		end
@@ -343,11 +374,21 @@ local function updateelements(dt)
 	end
 end
 
-local function drawelements()
+--tab: nil draws everything on the page, false only what's on every tab, or a mappack tab's name only that tab's
+function ui.intab(entry, tab)
+	if tab == nil then
+		return onpage(entry)
+	elseif tab == false then
+		return entry.tab == nil
+	end
+	return entry.tab == tab
+end
+
+local function drawelements(tab)
 	local ontop = {}
 	for _, v in ipairs(elements) do
 		local el = v.el
-		if onpage(v) and not el.utilshidden then
+		if ui.intab(v, tab) and not el.utilshidden then
 			if el.type == "dropdown" and (el.extended or (el.listvalue and el.listvalue > 0)) then
 				table.insert(ontop, el)
 			elseif el.type == "button" and el.utilsdisabled then
@@ -362,9 +403,9 @@ local function drawelements()
 	end
 end
 
-local function drawlabels()
+local function drawlabels(tab)
 	for _, v in ipairs(labels) do
-		if v.tab == nil or v.tab == mptab then
+		if ui.intab(v, tab) then
 			love.graphics.setColor(v.color or {255, 255, 255})
 			properprintF(v.text, v.x*scale, v.y*scale)
 		end
@@ -1323,8 +1364,19 @@ end
 
 local function fr_slider(c, y)
 	local slider = newslider(36, y, 280, 0, 255, 1, fr.color[c])
-	local backgrounds = {{90, 0, 0}, {0, 90, 0}, {0, 0, 90}}
-	slider.backgroundcolor = backgrounds[c]
+	slider.backgroundcolor = {0, 0, 0}
+	--the track shows what the colour would be along it, with the other two channels as they are, like the skins tab's sliders
+	slider.drawtrack = function(self, x, y, w, h, r)
+		love.graphics.setColor(0, 0, 0)
+		love.graphics.rectangle("fill", x, y, w, h, r)
+		local steps = math.max(1, math.floor(w/scale)-2)
+		local color = {fr.color[1], fr.color[2], fr.color[3]}
+		for i = 0, steps-1 do
+			color[c] = i/math.max(1, steps-1)*255
+			love.graphics.setColor(color)
+			love.graphics.rectangle("fill", x+(1+i)*scale, y+scale, scale, h-2*scale)
+		end
+	end
 	return slider
 end
 
@@ -2644,6 +2696,24 @@ local function filecountcolour(count)
 	return c[1], c[2], c[3]
 end
 
+function mpslide.index(name)
+	for i, n in ipairs(MPTABS) do
+		if n == name then
+			return i
+		end
+	end
+	return 1
+end
+
+--switches to another tab, sliding the old one out and the new one in on a random motion curve
+function mpslide.settab(name)
+	if name == mptab then
+		return
+	end
+	mpslide.anim = {from = mptab, to = name, start = love.timer.getTime(), curve = random_motion_curve()}
+	mptab = name
+end
+
 local function mp_draw()
 	drawpanel()
 
@@ -2666,9 +2736,36 @@ local function mp_draw()
 	love.graphics.setColor(60, 60, 60)
 	love.graphics.rectangle("fill", (PX+5)*scale, 32*scale, (panelwidth()-10)*scale, scale)
 
+	--the open tab, or while switching tabs, the old tab sliding out and the new one sliding in, cut to the panel
+	local progress = mpslide.progress()
+	if progress then
+		local anim = mpslide.anim
+		local direction = mpslide.index(anim.to) > mpslide.index(anim.from) and 1 or -1
+		local distance = panelwidth()
+		ui.clipto(PX, PY, panelwidth(), PH, function()
+			love.graphics.push()
+			love.graphics.translate(-direction*progress*distance*scale, 0)
+			mpslide.drawtab(anim.from)
+			love.graphics.pop()
+			love.graphics.push()
+			love.graphics.translate(direction*(1 - progress)*distance*scale, 0)
+			mpslide.drawtab(anim.to)
+			love.graphics.pop()
+		end)
+	else
+		mpslide.drawtab(mptab)
+	end
+
+	--what's on every tab (the back button) stays put
+	drawlabels(false)
+	drawelements(false)
+end
+
+--labels, elements and extras of one mappack creator tab
+function mpslide.drawtab(tab)
 	local v = mpcheck.values or mp_values()
 
-	if mptab == "general" then
+	if tab == "general" then
 		--icon preview
 		local f = ui.iconframe
 		local cx, cy = f.x + f.size/2, f.y + f.size/2
@@ -2692,7 +2789,7 @@ local function mp_draw()
 			love.graphics.setColor(100, 255, 100)
 			properprintF(T("infinite lives!"), ui.mp.livesx*scale, 117*scale)
 		end
-	elseif mptab == "worlds" then
+	elseif tab == "worlds" then
 		if mp.drop_shadow then
 			love.graphics.setColor(255, 80, 80)
 			properprintF(T("will reduce performance!"), ui.mp.performancex*scale, 37*scale)
@@ -2704,17 +2801,17 @@ local function mp_draw()
 		--fades from grey through orange and reds as the count passes each warning
 		love.graphics.setColor(filecountcolour(mpcheck.filecount))
 		properprintF(TF("files to create: %s", mpcheck.filecount), 26*scale, 172*scale)
-	elseif mptab == "hud" then
+	elseif tab == "hud" then
 		if mp.use_character_name then
 			love.graphics.setColor(150, 150, 150)
 			properprintF(T("the character's name"), ui.mp.hudx*scale, 37*scale)
 		end
-	elseif mptab == "course" then
+	elseif tab == "course" then
 		if v.time_limit == 0 then
 			love.graphics.setColor(100, 255, 100)
 			properprintF(T("infinite time!"), ui.mp.timex*scale, 37*scale)
 		end
-	elseif mptab == "create" then
+	elseif tab == "create" then
 		local y = 50
 		local maxlines = 7
 		for _, message in ipairs(mpcheck.requirements) do
@@ -2769,8 +2866,8 @@ local function mp_draw()
 		properprintF(ui.cut(mpstatus, math.floor((panelright() - ui.mp.statusx)/8)), ui.mp.statusx*scale, 181*scale)
 	end
 
-	drawlabels()
-	drawelements()
+	drawlabels(tab)
+	drawelements(tab)
 end
 
 local function mp_filedropped(file)
@@ -2799,12 +2896,7 @@ local function mp_filedropped(file)
 end
 
 local function mp_switchtab(delta)
-	for i, name in ipairs(MPTABS) do
-		if name == mptab then
-			mptab = MPTABS[(i - 1 + delta) % #MPTABS + 1]
-			return
-		end
-	end
+	mpslide.settab(MPTABS[(mpslide.index(mptab) - 1 + delta) % #MPTABS + 1])
 end
 
 ------------------------------------------------------------
@@ -2964,7 +3056,7 @@ local function inner_utilsmenu_mousepressed(x, y, button)
 		if gy >= 20 and gy < 31 then
 			for i, r in ipairs(mp_tabrects()) do
 				if gx >= r.x - 1 and gx < r.x + r.w + 2 then
-					mptab = MPTABS[i]
+					mpslide.settab(MPTABS[i])
 				end
 			end
 		end

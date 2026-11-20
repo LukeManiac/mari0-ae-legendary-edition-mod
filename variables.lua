@@ -10,9 +10,9 @@ playertypelist = {"portal", "minecraft", "gelcannon", "cappy", "classic"}
 authorname = "lukemaniac"
 authorcolour = {33, 173, 16}
 
-joystickdeadzone = 0.25
+--joystickdeadzone is a setting now (options > misc., saved as joydeadzone), its default is in defaultconfig in main.lua
 joystickdiagonalzone = 0.25
-joystickaimdeadzone = 0.25
+joystickbinddeadzone = 0.25 --how far an axis has to move to be picked up while binding a control (fixed, so a drifting stick can't bind itself at a low deadzone)
 
 --*most of the player physics variables are overridden by custom character properties*
 walkacceleration = 8 --acceleration of walking on ground
