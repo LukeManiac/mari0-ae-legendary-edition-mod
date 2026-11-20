@@ -2415,17 +2415,7 @@ function menu_update(dt)
 	end
 	
 	if mappackhorscroll then
-		if mappackhorscrollsmooth > mappackhorscroll then
-			mappackhorscrollsmooth = mappackhorscrollsmooth - (mappackhorscrollsmooth-mappackhorscroll)*dt*5-0.03*dt
-			if mappackhorscrollsmooth < mappackhorscroll then
-				mappackhorscrollsmooth = mappackhorscroll
-			end
-		elseif mappackhorscrollsmooth < mappackhorscroll then
-			mappackhorscrollsmooth = mappackhorscrollsmooth - (mappackhorscrollsmooth-mappackhorscroll)*dt*5+0.03*dt
-			if mappackhorscrollsmooth > mappackhorscroll then
-				mappackhorscrollsmooth = mappackhorscroll
-			end
-		end
+		mappackpage_update() --switching pages slides them (see mappackmenu_drawslide)
 	end
 	if mappacksearchbar.active then
 		mappacksearchbar:update(dt)
@@ -2940,6 +2930,462 @@ local function options_drawpages()
 	end)
 end
 
+--the mappack menu's pages (local, dlc, daily challenge, minigames). Each page used to be drawn wherever
+--mappackhorscrollsmooth put it; now mappackhorscrollsmooth is always a whole page, and switching pages slides
+--the old page out and the new one in (easing in and out, like the options menu's tabs), cut to the page area
+local MAPPACKPAGE_TIME = 0.25
+local MAPPACKPAGE_X, MAPPACKPAGE_Y, MAPPACKPAGE_H = 21, 16, 200 --the page area: the list's box and the panel right of it
+local mappackpageanim --{from, to, direction, start} while sliding
+local mappackpageshown --the page drawn last frame
+local mappackpagecanvases = {}
+
+local function mappackpage_width()
+	return width*16 - MAPPACKPAGE_X - 9
+end
+
+--switches the slide on when mappackhorscroll changed (by a key, a click on a tab, or anything else).
+--direction: 1 if the new page comes in from the right, -1 from the left, nil to work it out from the page numbers
+local mappackpagelastupdate = 0
+function mappackpage_update()
+	local now = love.timer.getTime()
+	local fresh = now - mappackpagelastupdate > 0.1 --back from somewhere the menu doesn't update (a course, say)
+	mappackpagelastupdate = now
+	if gamestate ~= "mappackmenu" or fresh then
+		mappackpageshown = nil --opening the menu shows its page straight away
+		mappackpageanim = nil
+		mappackpagedirection = nil
+		mappackhorscrollsmooth = mappackhorscroll
+		return
+	end
+	if mappackpageshown ~= nil and mappackhorscroll ~= mappackpageshown then
+		local direction = mappackpagedirection
+		if not direction then
+			direction = 1
+			if mappackhorscroll < mappackpageshown then
+				direction = -1
+			end
+		end
+		mappackpageanim = {from = mappackpageshown, to = mappackhorscroll, direction = direction, start = love.timer.getTime()}
+	end
+	mappackpagedirection = nil
+	mappackpageshown = mappackhorscroll
+	mappackhorscrollsmooth = mappackhorscroll
+	if mappackpageanim and love.timer.getTime() - mappackpageanim.start >= MAPPACKPAGE_TIME then
+		mappackpageanim = nil
+	end
+end
+
+--every page, drawn where it sits when it's open (only the page mappackhorscrollsmooth is on gets drawn)
+local function mappackmenu_drawpages()
+	love.graphics.translate(-round(mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
+	
+	--mappacks
+	if mappackhorscrollsmooth < 1 then
+		--draw each butten (even if all you do, is press ONE. BUTTEN.)
+		--scrollbar offset
+		love.graphics.translate(0, -round(mappackscrollsmooth*60*scale))
+		
+		love.graphics.setScissor(21*scale, 16*scale, 218*scale, 200*scale)
+		
+		for i = math.max(1, math.floor(mappackscrollsmooth+1)), math.min(#mappacklist, math.floor(mappackscrollsmooth+5)) do
+			--back
+			love.graphics.draw(mappackback, 25*scale, (20+(i-1)*60)*scale, 0, scale, scale)
+			
+			--icon
+			if mappackicon[i] ~= nil then
+				local scale2w = scale*50 / math.max(1, mappackicon[i]:getWidth())
+				local scale2h = scale*50 / math.max(1, mappackicon[i]:getHeight())
+				love.graphics.draw(mappackicon[i], 29*scale, (24+(i-1)*60)*scale, 0, scale2w, scale2h)
+			elseif i > mappacklistthreadn and i ~= #mappacklist then
+				love.graphics.setColor(0, 0, 0)
+				love.graphics.rectangle("fill", 29*scale, (24+(i-1)*60)*scale, 50*scale, 50*scale)
+				love.graphics.setColor(255, 255, 255)
+				love.graphics.draw(mappackloadingicon, (29+25)*scale, (24+(i-1)*60+25)*scale, (coinanimation/5)*math.pi*2, scale, scale, 25, 25)
+			else
+				love.graphics.draw(mappacknoicon, 29*scale, (24+(i-1)*60)*scale, 0, scale, scale)
+			end
+			love.graphics.draw(mappackoverlay, 29*scale, (24+(i-1)*60)*scale, 0, scale, scale)
+			
+			--name
+			love.graphics.setColor(200, 200, 200)
+			if mappackselection == i then
+				love.graphics.setColor(255, 255, 255)
+			end
+			
+			properprint(string.sub(mappackname[i] or mappacklist[i]:lower(), 1, 17), 83*scale, (26+(i-1)*60)*scale)
+			
+			--author
+			love.graphics.setColor(100, 100, 100)
+			if mappackselection == i then
+				love.graphics.setColor(100, 100, 100)
+			end
+			
+			if mappackauthor[i] then
+				local by = TEXT["by"]
+				if #by ~= utf8.len(by) then
+					properprintF(string.sub(by .. " " .. mappackauthor[i], 1, 17), 83*scale, (35+(i-1)*60)*scale)
+				else
+					properprint(string.sub(by .. " " .. mappackauthor[i], 1, 17), 83*scale, (35+(i-1)*60)*scale)
+				end
+			end
+			
+			--description
+			love.graphics.setColor(130, 130, 130)
+			if mappackselection == i then
+				love.graphics.setColor(180, 180, 180)
+			end
+			
+			if mappackdescription[i] then
+				properprint( string.sub(mappackdescription[i] or "", 1, 17), 83*scale, (47+(i-1)*60)*scale)
+				
+				if mappackdescription[i]:len() > 17 then
+					properprint( string.sub(mappackdescription[i] or "", 18, 34), 83*scale, (56+(i-1)*60)*scale)
+				end
+				
+				if mappackdescription[i]:len() > 34 then
+					properprint( string.sub(mappackdescription[i] or "", 35, 51), 83*scale, (65+(i-1)*60)*scale)
+				end
+			end
+			
+			love.graphics.setColor(255, 255, 255)
+			
+			--highlight
+			if i == mappackselection then
+				love.graphics.draw(mappackhighlight, 25*scale, (20+(i-1)*60)*scale, 0, scale, scale)
+			end
+		end
+	
+		love.graphics.translate(0, round(mappackscrollsmooth*60*scale))
+	
+		local i = mappackscrollsmooth / (#mappacklist-3.233)
+	
+		love.graphics.draw(mappackscrollbar, 227*scale, (20+i*160)*scale, 0, scale, scale)
+	
+		if mappackhorscrollsmooth <= 0.01 then
+			love.graphics.setScissor()
+			love.graphics.setColor(0, 0, 0, 200)
+			love.graphics.rectangle("fill", 241*scale, 125*scale, 150*scale, 65*scale)
+			love.graphics.setColor(255, 255, 255, 255)
+			if savefolderfailed then
+				properprintF(TEXT["mappack folder fail"], 244*scale, 129*scale)
+			else
+				properprintF(TEXT["mappack folder instructions"], 244*scale, 129*scale)
+			end
+			properprintF("       open\n  mappacks folder", 239*scale, 194*scale)
+			if mappacksearchbar.active then
+				mappacksearchbar:draw()
+			end
+		end
+	end
+	
+	love.graphics.translate(round(mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
+	----------
+	--ONLINE--
+	----------
+	
+	love.graphics.translate(round(mappackhorscrollrange*scale - mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
+	
+	if mappackhorscrollsmooth > 0 and mappackhorscrollsmooth < 2 and onlineassetlist then
+		if #onlineassetlist == 0 then -- todo uhh i dont think this can be reached, it looks broken
+			properprintF("something went wrong\n\n      sorry d:\n\nmaybe your internet\ndoes not work right?", 40*scale, 80*scale)
+		end
+		
+		love.graphics.setScissor()
+		if mappackhorscrollsmooth <= 1.01 then
+			love.graphics.setColor(0, 0, 0, 200)
+			love.graphics.rectangle("fill", 241*scale, 16*scale, 150*scale, 180*scale)
+			love.graphics.setColor(255, 255, 255, 255)
+			local asset = onlineassetlist[onlinemappackselection]
+
+			local message
+			if asset and asset.downloadable then
+				message = TEXT["dlc dl instructions"]
+			else
+				message = TEXT["dlc instructions"]
+
+				local y = (19 + 10 * (1 + #(message:split("\n"))))*scale
+				if asset and asset.type == "enemy" then
+					properprintF(TEXT["dlc enemy instructions"], 244*scale, y)
+				elseif asset and (asset.type == "mappack" or asset.type == "character") then
+					properprintF(TEXT["dlc asset instructions"], 244*scale, y)
+				end
+			end
+			properprintF(message, 244*scale, 19*scale)
+
+			love.graphics.setColor(255, 255, 255, 255)
+			-- TODO: these aren't initialized
+			if outdated then
+				love.graphics.setColor(255, 0, 0, 255)
+				properprintF("version outdated!\nyou have an old\nversion of mari0!\nmappacks could not\nbe downloaded.\ngo to\nstabyourself.net\nto download latest", 244*scale, 130*scale)
+				love.graphics.setColor(255, 255, 255, 255)
+			elseif onlinemappackerror then
+				love.graphics.setColor(255, 0, 0, 255)
+				properprintF("download error!\nsomething went\nwrong while\ndownloading\nyour mappack.\ntry again.\nsorry.", 244*scale, 130*scale)
+				love.graphics.setColor(255, 255, 255, 255)
+			end
+
+			if asset and asset.type == "character" then
+				love.graphics.setColor(255, 255, 255, 255)
+				opendlcbutton.text = TEXT["characters folder"]
+			else
+				opendlcbutton.text = TEXT["open dlc folder"]
+			end
+
+			opendlcbutton:draw()
+		end
+			
+		love.graphics.setScissor(21*scale, 16*scale, 218*scale, 200*scale)
+		
+		--scrollbar offset
+		love.graphics.translate(0, -round(onlinemappackscrollsmooth*60*scale))
+		for i = math.max(1, math.floor(onlinemappackscrollsmooth+1)), math.min(#onlineassetlist, math.floor(onlinemappackscrollsmooth+5)) do
+			local asset = onlineassetlist[i]
+			local bonuscontent = asset.type == "enemy" or asset.type == "character"
+
+			--back
+			if downloadedmappacks[i] then
+				if downloadedmappacks[i] == true then
+					love.graphics.setColor(0, 100, 0, 179)
+				else
+					love.graphics.setColor(100, 0, 0, 179)
+				end
+				love.graphics.rectangle("fill", 25*scale, (20+(i-1)*60)*scale, 200*scale, 58*scale)
+			else
+				love.graphics.draw(mappackback, 25*scale, (20+(i-1)*60)*scale, 0, scale, scale)
+			end
+			
+			--icon
+			love.graphics.setColor(255, 255, 255)
+			if asset.icon then
+				local scale2w = scale*50 / math.max(1, asset.icon:getWidth())
+				local scale2h = scale*50 / math.max(1, asset.icon:getHeight())
+				love.graphics.draw(asset.icon, 29*scale, (24+(i-1)*60)*scale, 0, scale2w, scale2h)
+			else
+				love.graphics.draw(mappackonlineicon, mappackonlineiconquad[1], 29*scale, (24+(i-1)*60)*scale, 0, scale, scale)
+			end
+
+			love.graphics.draw(mappackoverlay, 29*scale, (24+(i-1)*60)*scale, 0, scale, scale)
+			local qi = 2
+			if (not onlinedlc) then
+				qi = 3
+			elseif asset.type == "enemy" then
+				qi = 5
+			elseif asset.type == "character" then
+				qi = 6
+			elseif asset.type == "video" then
+				qi = 7
+			end
+			love.graphics.setColor(0, 0, 0, 150)
+			love.graphics.draw(mappackonlineicon, mappackonlineiconquad[qi], 63*scale, (26+(i-1)*60)*scale, 0, scale, scale)
+			love.graphics.setColor(255, 255, 255)
+			love.graphics.draw(mappackonlineicon, mappackonlineiconquad[qi], 63*scale, (25+(i-1)*60)*scale, 0, scale, scale)
+			
+			--name
+			love.graphics.setColor(200, 200, 200)
+			if onlinemappackselection == i then
+				love.graphics.setColor(255, 255, 255)
+			end
+			
+			properprint(string.sub(asset.name:lower(), 1, 17), 83*scale, (26+(i-1)*60)*scale)
+			
+			--author
+			love.graphics.setColor(100, 100, 100)
+			if onlinemappackselection == i then
+				love.graphics.setColor(100, 100, 100)
+			end
+			
+			if asset.author then
+				local by = TEXT["by"]
+				if #by ~= utf8.len(by) then
+					properprintF(string.sub(by .. " " .. asset.author:lower(), 1, 17), 83*scale, (35+(i-1)*60)*scale)
+				else
+					properprint(string.sub(by .. " " .. asset.author:lower(), 1, 17), 83*scale, (35+(i-1)*60)*scale)
+				end
+			end
+			
+			--description
+			love.graphics.setColor(130, 130, 130)
+			if onlinemappackselection == i then
+				love.graphics.setColor(180, 180, 180)
+			end
+			
+			if asset.description then
+				-- compute description lines (max 3 lines, max length 17 char per line, accept newline)
+				local description = asset.description:lower()
+				local lines = {}
+				local line = ""
+				for ci = 1, #description do
+					local c = description:sub(ci,ci)
+					if c == "\n" then
+						table.insert(lines, line)
+						if #lines >= 3 then break end
+						line = ""
+					elseif #line >= 17 then
+						table.insert(lines, line)
+						if #lines >= 3 then break end
+						line = c
+					else
+						line = line .. c
+					end
+				end
+				if line ~= "" then
+					table.insert(lines, line)
+				end
+
+				-- display lines
+				for li = 1, #lines do
+					properprint(lines[li], 83*scale, (47+(li-1)*9+(i-1)*60)*scale)
+				end
+			end
+			
+			love.graphics.setColor(255, 255, 255)
+			
+			--highlight
+			if i == onlinemappackselection then
+				love.graphics.draw(mappackhighlight, 25*scale, (20+(i-1)*60)*scale, 0, scale, scale)
+			end
+		end
+	
+		love.graphics.translate(0, round(onlinemappackscrollsmooth*60*scale))
+	
+		local i = onlinemappackscrollsmooth / (#onlineassetlist-3.233)
+	
+		love.graphics.draw(mappackscrollbar, 227*scale, (20+i*160)*scale, 0, scale, scale)
+	end
+	
+	love.graphics.translate(- round(mappackhorscrollrange*scale - mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
+	
+	-------------------
+	--DAILY CHALLENGE--
+	-------------------
+	
+	love.graphics.translate(round(((mappackhorscrollrange*scale)*2) - mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
+	
+	love.graphics.setScissor(21*scale, 16*scale, 218*scale, 200*scale)
+	if mappackhorscrollsmooth > 1 and mappackhorscrollsmooth < 3 then
+		love.graphics.setColor(255, 255, 255)
+		properprint("daily challenge:" .. datet[1] .. "/" .. datet[2] .. "/" .. datet[3], 25*scale, 21*scale)
+		properprint("no. " .. DCcompleted, 25*scale, 33*scale)
+		love.graphics.setColor(30, 30, 30, 150)
+		properprint("v." .. DCversion, (21+mappackhorscrollrange-5-(#("v." .. DCversion)*8))*scale, 33*scale)
+		love.graphics.setColor(0, 0, 0, 150)
+		love.graphics.rectangle("fill", 24*scale, 45*scale, 212*scale, 80*scale)
+		love.graphics.rectangle("fill", 24*scale, 129*scale, (utf8.len(TEXT["highscores"])*8+8)*scale, 13*scale)
+		love.graphics.rectangle("fill", 24*scale, 145*scale, 213*scale, 42*scale)
+		love.graphics.setColor(160, 160, 160)
+		for i = 1, #DCchalobjectivet do
+			properprint(DCchalobjectivet[i], 106*scale, (75+((i-1)*10))*scale)
+		end
+		local high1, high2, high3 = DChigh[1], DChigh[2], DChigh[3]
+		if tonumber(high1) then
+			high1 = string.format("%.2f", tonumber(high1) or 0)
+		end
+		if tonumber(high2) then
+			high2 = string.format("%.2f", tonumber(high2) or 0)
+		end
+		if tonumber(high3) then
+			high3 = string.format("%.2f", tonumber(high3) or 0)
+		end
+		properprint("1. " .. high1 .. "\n2. " .. high2 .. "\n3. " .. high3, 30*scale, 152*scale)
+		love.graphics.setColor(255, 255, 255)
+		properprintF(TEXT["today's\nchallenge"], 106*scale, 48*scale)
+		properprintF(TEXT["highscores"], 28*scale, 132*scale)
+		if blinktimer < 0.5 then
+			properprintF(TEXT["press start to play!"], (130-utf8.len(TEXT["press start to play!"])*4)*scale, 199*scale)
+		end
+		love.graphics.setColor(calendarcolors[tonumber(datet[1]) or 1])
+		love.graphics.rectangle("fill", 26*scale, 47*scale, 76*scale, 76*scale)
+		love.graphics.setColor(255, 255, 255)
+		love.graphics.draw(calendarimg, 26*scale, 47*scale, 0, scale, scale)
+	end
+	love.graphics.setScissor()
+	
+	love.graphics.translate(- (round(((mappackhorscrollrange*scale)*2) - mappackhorscrollsmooth*scale*mappackhorscrollrange)), 0)
+	
+	-------------
+	--MINIGAMES--
+	-------------
+	
+	love.graphics.translate(round(((mappackhorscrollrange*scale)*3) - mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
+	
+	if mappackhorscrollsmooth > 2 then
+		minigame_menu_draw()
+	end
+	love.graphics.setScissor()
+	
+	love.graphics.translate(- (round(((mappackhorscrollrange*scale)*3) - mappackhorscrollsmooth*scale*mappackhorscrollrange)), 0)
+end
+
+--one page drawn on its own canvas, the size of what's being drawn to, exactly as it looks when it's open.
+--A canvas keeps the page's own clipping (its list, its panels) out of the way of the slide
+local function mappackmenu_pagecanvas(slot, page)
+	local target = love.graphics.getCanvas()
+	local cw, ch = love.graphics.getDimensions()
+	if target then
+		cw, ch = target:getDimensions()
+	end
+	local c = mappackpagecanvases[slot]
+	if not c or c:getWidth() ~= cw or c:getHeight() ~= ch then
+		c = love.graphics.newCanvas(cw, ch)
+		mappackpagecanvases[slot] = c
+	end
+	local smooth = mappackhorscrollsmooth
+	local ox, oy, ow, oh = love.graphics.getScissor()
+	love.graphics.setCanvas({c, stencil = true})
+	love.graphics.clear(0, 0, 0, 0)
+	--the same clip the pages start with on screen (the list's box), set just before they're drawn
+	if ox then
+		love.graphics.setScissor(ox, oy, ow, oh)
+	else
+		love.graphics.setScissor()
+	end
+	mappackhorscrollsmooth = page
+	love.graphics.push("all")
+	mappackmenu_drawpages()
+	love.graphics.pop()
+	mappackhorscrollsmooth = smooth
+	if target then
+		love.graphics.setCanvas({target, stencil = true})
+	else
+		love.graphics.setCanvas()
+	end
+	if ox then
+		love.graphics.setScissor(ox, oy, ow, oh)
+	else
+		love.graphics.setScissor()
+	end
+	return c
+end
+
+function mappackmenu_drawslide()
+	local anim = mappackpageanim
+	local t = 1
+	if anim then
+		t = (love.timer.getTime() - anim.start)/MAPPACKPAGE_TIME
+	end
+	if not anim or t >= 1 then
+		mappackmenu_drawpages()
+		return
+	end
+
+	local p = ease_in_out_quad(t)
+	local distance = mappackpage_width()
+	local oldcanvas = mappackmenu_pagecanvas(1, anim.from)
+	local newcanvas = mappackmenu_pagecanvas(2, anim.to)
+
+	--cut to the page area, wherever the current transform puts it
+	local sx1, sy1 = love.graphics.transformPoint(MAPPACKPAGE_X*scale, MAPPACKPAGE_Y*scale)
+	local sx2, sy2 = love.graphics.transformPoint((MAPPACKPAGE_X+distance)*scale, (MAPPACKPAGE_Y+MAPPACKPAGE_H)*scale)
+	love.graphics.push("all")
+	love.graphics.origin()
+	love.graphics.setScissor(math.floor(sx1), math.floor(sy1), math.max(0, math.ceil(sx2-sx1)), math.max(0, math.ceil(sy2-sy1)))
+	love.graphics.setColor(255, 255, 255, 255)
+	love.graphics.setBlendMode("alpha", "premultiplied") --the canvases already hold blended colours
+	love.graphics.draw(oldcanvas, -anim.direction*p*distance*scale, 0)
+	love.graphics.draw(newcanvas, anim.direction*(1-p)*distance*scale, 0)
+	love.graphics.pop()
+end
+
 function menu_draw()
 	--GUI LIBRARY?! Never heard of that.
 	--I'm not proud of this at all; But I'm even lazier than not proud.
@@ -3334,343 +3780,8 @@ function menu_draw()
 			drawrectangle(50, 55, 152, 10)
 			love.graphics.rectangle("fill", 50*scale, 55*scale, 152*((currentfiledownload-1)/(filecount-1))*scale, 10*scale)
 		else
-			love.graphics.translate(-round(mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
-			
-			--mappacks
-			if mappackhorscrollsmooth < 1 then
-				--draw each butten (even if all you do, is press ONE. BUTTEN.)
-				--scrollbar offset
-				love.graphics.translate(0, -round(mappackscrollsmooth*60*scale))
-				
-				love.graphics.setScissor(21*scale, 16*scale, 218*scale, 200*scale)
-				
-				for i = math.max(1, math.floor(mappackscrollsmooth+1)), math.min(#mappacklist, math.floor(mappackscrollsmooth+5)) do
-					--back
-					love.graphics.draw(mappackback, 25*scale, (20+(i-1)*60)*scale, 0, scale, scale)
-					
-					--icon
-					if mappackicon[i] ~= nil then
-						local scale2w = scale*50 / math.max(1, mappackicon[i]:getWidth())
-						local scale2h = scale*50 / math.max(1, mappackicon[i]:getHeight())
-						love.graphics.draw(mappackicon[i], 29*scale, (24+(i-1)*60)*scale, 0, scale2w, scale2h)
-					elseif i > mappacklistthreadn and i ~= #mappacklist then
-						love.graphics.setColor(0, 0, 0)
-						love.graphics.rectangle("fill", 29*scale, (24+(i-1)*60)*scale, 50*scale, 50*scale)
-						love.graphics.setColor(255, 255, 255)
-						love.graphics.draw(mappackloadingicon, (29+25)*scale, (24+(i-1)*60+25)*scale, (coinanimation/5)*math.pi*2, scale, scale, 25, 25)
-					else
-						love.graphics.draw(mappacknoicon, 29*scale, (24+(i-1)*60)*scale, 0, scale, scale)
-					end
-					love.graphics.draw(mappackoverlay, 29*scale, (24+(i-1)*60)*scale, 0, scale, scale)
-					
-					--name
-					love.graphics.setColor(200, 200, 200)
-					if mappackselection == i then
-						love.graphics.setColor(255, 255, 255)
-					end
-					
-					properprint(string.sub(mappackname[i] or mappacklist[i]:lower(), 1, 17), 83*scale, (26+(i-1)*60)*scale)
-					
-					--author
-					love.graphics.setColor(100, 100, 100)
-					if mappackselection == i then
-						love.graphics.setColor(100, 100, 100)
-					end
-					
-					if mappackauthor[i] then
-						local by = TEXT["by"]
-						if #by ~= utf8.len(by) then
-							properprintF(string.sub(by .. " " .. mappackauthor[i], 1, 17), 83*scale, (35+(i-1)*60)*scale)
-						else
-							properprint(string.sub(by .. " " .. mappackauthor[i], 1, 17), 83*scale, (35+(i-1)*60)*scale)
-						end
-					end
-					
-					--description
-					love.graphics.setColor(130, 130, 130)
-					if mappackselection == i then
-						love.graphics.setColor(180, 180, 180)
-					end
-					
-					if mappackdescription[i] then
-						properprint( string.sub(mappackdescription[i] or "", 1, 17), 83*scale, (47+(i-1)*60)*scale)
-						
-						if mappackdescription[i]:len() > 17 then
-							properprint( string.sub(mappackdescription[i] or "", 18, 34), 83*scale, (56+(i-1)*60)*scale)
-						end
-						
-						if mappackdescription[i]:len() > 34 then
-							properprint( string.sub(mappackdescription[i] or "", 35, 51), 83*scale, (65+(i-1)*60)*scale)
-						end
-					end
-					
-					love.graphics.setColor(255, 255, 255)
-					
-					--highlight
-					if i == mappackselection then
-						love.graphics.draw(mappackhighlight, 25*scale, (20+(i-1)*60)*scale, 0, scale, scale)
-					end
-				end
-			
-				love.graphics.translate(0, round(mappackscrollsmooth*60*scale))
-			
-				local i = mappackscrollsmooth / (#mappacklist-3.233)
-			
-				love.graphics.draw(mappackscrollbar, 227*scale, (20+i*160)*scale, 0, scale, scale)
-			
-				if mappackhorscrollsmooth <= 0.01 then
-					love.graphics.setScissor()
-					love.graphics.setColor(0, 0, 0, 200)
-					love.graphics.rectangle("fill", 241*scale, 125*scale, 150*scale, 65*scale)
-					love.graphics.setColor(255, 255, 255, 255)
-					if savefolderfailed then
-						properprintF(TEXT["mappack folder fail"], 244*scale, 129*scale)
-					else
-						properprintF(TEXT["mappack folder instructions"], 244*scale, 129*scale)
-					end
-					openmappacksbutton:draw()
-					if mappacksearchbar.active then
-						mappacksearchbar:draw()
-					end
-				end
-			end
-			
-			love.graphics.translate(round(mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
-			----------
-			--ONLINE--
-			----------
-			
-			love.graphics.translate(round(mappackhorscrollrange*scale - mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
-			
-			if mappackhorscrollsmooth > 0 and mappackhorscrollsmooth < 2 and onlineassetlist then
-				if #onlineassetlist == 0 then -- todo uhh i dont think this can be reached, it looks broken
-					properprintF("something went wrong\n\n      sorry d:\n\nmaybe your internet\ndoes not work right?", 40*scale, 80*scale)
-				end
-				
-				love.graphics.setScissor()
-				if mappackhorscrollsmooth <= 1.01 then
-					love.graphics.setColor(0, 0, 0, 200)
-					love.graphics.rectangle("fill", 241*scale, 16*scale, 150*scale, 180*scale)
-					love.graphics.setColor(255, 255, 255, 255)
-					local asset = onlineassetlist[onlinemappackselection]
-
-					local message
-					if asset and asset.downloadable then
-						message = TEXT["dlc dl instructions"]
-					else
-						message = TEXT["dlc instructions"]
-
-						local y = (19 + 10 * (1 + #(message:split("\n"))))*scale
-						if asset and asset.type == "enemy" then
-							properprintF(TEXT["dlc enemy instructions"], 244*scale, y)
-						elseif asset and (asset.type == "mappack" or asset.type == "character") then
-							properprintF(TEXT["dlc asset instructions"], 244*scale, y)
-						end
-					end
-					properprintF(message, 244*scale, 19*scale)
-
-					love.graphics.setColor(255, 255, 255, 255)
-					-- TODO: these aren't initialized
-					if outdated then
-						love.graphics.setColor(255, 0, 0, 255)
-						properprintF("version outdated!\nyou have an old\nversion of mari0!\nmappacks could not\nbe downloaded.\ngo to\nstabyourself.net\nto download latest", 244*scale, 130*scale)
-						love.graphics.setColor(255, 255, 255, 255)
-					elseif onlinemappackerror then
-						love.graphics.setColor(255, 0, 0, 255)
-						properprintF("download error!\nsomething went\nwrong while\ndownloading\nyour mappack.\ntry again.\nsorry.", 244*scale, 130*scale)
-						love.graphics.setColor(255, 255, 255, 255)
-					end
-
-					if asset and asset.type == "character" then
-						love.graphics.setColor(255, 255, 255, 255)
-						opendlcbutton.text = TEXT["characters folder"]
-					else
-						opendlcbutton.text = TEXT["open dlc folder"]
-					end
-
-					opendlcbutton:draw()
-				end
-					
-				love.graphics.setScissor(21*scale, 16*scale, 218*scale, 200*scale)
-				
-				--scrollbar offset
-				love.graphics.translate(0, -round(onlinemappackscrollsmooth*60*scale))
-				for i = math.max(1, math.floor(onlinemappackscrollsmooth+1)), math.min(#onlineassetlist, math.floor(onlinemappackscrollsmooth+5)) do
-					local asset = onlineassetlist[i]
-					local bonuscontent = asset.type == "enemy" or asset.type == "character"
-
-					--back
-					if downloadedmappacks[i] then
-						if downloadedmappacks[i] == true then
-							love.graphics.setColor(0, 100, 0, 179)
-						else
-							love.graphics.setColor(100, 0, 0, 179)
-						end
-						love.graphics.rectangle("fill", 25*scale, (20+(i-1)*60)*scale, 200*scale, 58*scale)
-					else
-						love.graphics.draw(mappackback, 25*scale, (20+(i-1)*60)*scale, 0, scale, scale)
-					end
-					
-					--icon
-					love.graphics.setColor(255, 255, 255)
-					if asset.icon then
-						local scale2w = scale*50 / math.max(1, asset.icon:getWidth())
-						local scale2h = scale*50 / math.max(1, asset.icon:getHeight())
-						love.graphics.draw(asset.icon, 29*scale, (24+(i-1)*60)*scale, 0, scale2w, scale2h)
-					else
-						love.graphics.draw(mappackonlineicon, mappackonlineiconquad[1], 29*scale, (24+(i-1)*60)*scale, 0, scale, scale)
-					end
-
-					love.graphics.draw(mappackoverlay, 29*scale, (24+(i-1)*60)*scale, 0, scale, scale)
-					local qi = 2
-					if (not onlinedlc) then
-						qi = 3
-					elseif asset.type == "enemy" then
-						qi = 5
-					elseif asset.type == "character" then
-						qi = 6
-					elseif asset.type == "video" then
-						qi = 7
-					end
-					love.graphics.setColor(0, 0, 0, 150)
-					love.graphics.draw(mappackonlineicon, mappackonlineiconquad[qi], 63*scale, (26+(i-1)*60)*scale, 0, scale, scale)
-					love.graphics.setColor(255, 255, 255)
-					love.graphics.draw(mappackonlineicon, mappackonlineiconquad[qi], 63*scale, (25+(i-1)*60)*scale, 0, scale, scale)
-					
-					--name
-					love.graphics.setColor(200, 200, 200)
-					if onlinemappackselection == i then
-						love.graphics.setColor(255, 255, 255)
-					end
-					
-					properprint(string.sub(asset.name:lower(), 1, 17), 83*scale, (26+(i-1)*60)*scale)
-					
-					--author
-					love.graphics.setColor(100, 100, 100)
-					if onlinemappackselection == i then
-						love.graphics.setColor(100, 100, 100)
-					end
-					
-					if asset.author then
-						local by = TEXT["by"]
-						if #by ~= utf8.len(by) then
-							properprintF(string.sub(by .. " " .. asset.author:lower(), 1, 17), 83*scale, (35+(i-1)*60)*scale)
-						else
-							properprint(string.sub(by .. " " .. asset.author:lower(), 1, 17), 83*scale, (35+(i-1)*60)*scale)
-						end
-					end
-					
-					--description
-					love.graphics.setColor(130, 130, 130)
-					if onlinemappackselection == i then
-						love.graphics.setColor(180, 180, 180)
-					end
-					
-					if asset.description then
-						-- compute description lines (max 3 lines, max length 17 char per line, accept newline)
-						local description = asset.description:lower()
-						local lines = {}
-						local line = ""
-						for ci = 1, #description do
-							local c = description:sub(ci,ci)
-							if c == "\n" then
-								table.insert(lines, line)
-								if #lines >= 3 then break end
-								line = ""
-							elseif #line >= 17 then
-								table.insert(lines, line)
-								if #lines >= 3 then break end
-								line = c
-							else
-								line = line .. c
-							end
-						end
-						if line ~= "" then
-							table.insert(lines, line)
-						end
-
-						-- display lines
-						for li = 1, #lines do
-							properprint(lines[li], 83*scale, (47+(li-1)*9+(i-1)*60)*scale)
-						end
-					end
-					
-					love.graphics.setColor(255, 255, 255)
-					
-					--highlight
-					if i == onlinemappackselection then
-						love.graphics.draw(mappackhighlight, 25*scale, (20+(i-1)*60)*scale, 0, scale, scale)
-					end
-				end
-			
-				love.graphics.translate(0, round(onlinemappackscrollsmooth*60*scale))
-			
-				local i = onlinemappackscrollsmooth / (#onlineassetlist-3.233)
-			
-				love.graphics.draw(mappackscrollbar, 227*scale, (20+i*160)*scale, 0, scale, scale)
-			end
-			
-			love.graphics.translate(- round(mappackhorscrollrange*scale - mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
-			
-			-------------------
-			--DAILY CHALLENGE--
-			-------------------
-			
-			love.graphics.translate(round(((mappackhorscrollrange*scale)*2) - mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
-			
-			love.graphics.setScissor(21*scale, 16*scale, 218*scale, 200*scale)
-			if mappackhorscrollsmooth > 1 and mappackhorscrollsmooth < 3 then
-				love.graphics.setColor(255, 255, 255)
-				properprint("daily challenge:" .. datet[1] .. "/" .. datet[2] .. "/" .. datet[3], 25*scale, 21*scale)
-				properprint("no. " .. DCcompleted, 25*scale, 33*scale)
-				love.graphics.setColor(30, 30, 30, 150)
-				properprint("v." .. DCversion, (21+mappackhorscrollrange-5-(#("v." .. DCversion)*8))*scale, 33*scale)
-				love.graphics.setColor(0, 0, 0, 150)
-				love.graphics.rectangle("fill", 24*scale, 45*scale, 212*scale, 80*scale)
-				love.graphics.rectangle("fill", 24*scale, 129*scale, (utf8.len(TEXT["highscores"])*8+8)*scale, 13*scale)
-				love.graphics.rectangle("fill", 24*scale, 145*scale, 213*scale, 42*scale)
-				love.graphics.setColor(160, 160, 160)
-				for i = 1, #DCchalobjectivet do
-					properprint(DCchalobjectivet[i], 106*scale, (75+((i-1)*10))*scale)
-				end
-				local high1, high2, high3 = DChigh[1], DChigh[2], DChigh[3]
-				if tonumber(high1) then
-					high1 = string.format("%.2f", tonumber(high1) or 0)
-				end
-				if tonumber(high2) then
-					high2 = string.format("%.2f", tonumber(high2) or 0)
-				end
-				if tonumber(high3) then
-					high3 = string.format("%.2f", tonumber(high3) or 0)
-				end
-				properprint("1. " .. high1 .. "\n2. " .. high2 .. "\n3. " .. high3, 30*scale, 152*scale)
-				love.graphics.setColor(255, 255, 255)
-				properprintF(TEXT["today's\nchallenge"], 106*scale, 48*scale)
-				properprintF(TEXT["highscores"], 28*scale, 132*scale)
-				if blinktimer < 0.5 then
-					properprintF(TEXT["press start to play!"], (130-utf8.len(TEXT["press start to play!"])*4)*scale, 199*scale)
-				end
-				love.graphics.setColor(calendarcolors[tonumber(datet[1]) or 1])
-				love.graphics.rectangle("fill", 26*scale, 47*scale, 76*scale, 76*scale)
-				love.graphics.setColor(255, 255, 255)
-				love.graphics.draw(calendarimg, 26*scale, 47*scale, 0, scale, scale)
-			end
-			love.graphics.setScissor()
-			
-			love.graphics.translate(- (round(((mappackhorscrollrange*scale)*2) - mappackhorscrollsmooth*scale*mappackhorscrollrange)), 0)
-			
-			-------------
-			--MINIGAMES--
-			-------------
-			
-			love.graphics.translate(round(((mappackhorscrollrange*scale)*3) - mappackhorscrollsmooth*scale*mappackhorscrollrange), 0)
-			
-			if mappackhorscrollsmooth > 2 then
-				minigame_menu_draw()
-			end
-			love.graphics.setScissor()
-			
-			love.graphics.translate(- (round(((mappackhorscrollrange*scale)*3) - mappackhorscrollsmooth*scale*mappackhorscrollrange)), 0)
+			--the open page, or while switching pages, the old one sliding out and the new one sliding in
+			mappackmenu_drawslide()
 		end
 		
 		love.graphics.setScissor()
@@ -4512,8 +4623,10 @@ function menu_keypressed(key, unicode)
 			--change mappack selection tab
 			if (key == "right" or key == "d") then
 				mappackhorscroll = mappackhorscroll + 1
+				mappackpagedirection = 1
 			else
 				mappackhorscroll = mappackhorscroll - 1
+				mappackpagedirection = -1
 			end
 			if mappackhorscroll > 3 then
 				mappackhorscroll = 0

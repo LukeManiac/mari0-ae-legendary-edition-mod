@@ -589,26 +589,86 @@ function guielement:draw(a, offx, offy)
 		local arrowchar = self.dropup and "↑" or "↓"
 		properprintF(arrowchar, (self.x + 3 + self.width*8)*scale, (self.y + 2 + math.floor((headh-11)/2))*scale)
 
-		local s = self.entries[self.var]
-		if self.drawentryfunc then
-			drawgraphicalentry(self, self.var, self.x+1, self.y+1, 1+self.width*8, headh-2, false, true)
-		else
-			if self.extended then
-				love.graphics.setColor(127, 127, 127)
-			elseif getdropdownentrycolor(self, self.var) then
-				love.graphics.setColor(getdropdownentrycolor(self, self.var))
-			elseif self.coloredtext then
-				if s == "black" then
-					love.graphics.setColor(80, 80, 80)
-				else
-					love.graphics.setColor(textcolors[s])
-				end
+		--the option shown in the header
+		local function drawheader(var)
+			local s = self.entries[var]
+			if self.drawentryfunc then
+				drawgraphicalentry(self, var, self.x+1, self.y+1, 1+self.width*8, headh-2, false, true)
 			else
-				love.graphics.setColor(255, 255, 255)
-			end
+				if self.extended then
+					love.graphics.setColor(127, 127, 127)
+				elseif getdropdownentrycolor(self, var) then
+					love.graphics.setColor(getdropdownentrycolor(self, var))
+				elseif self.coloredtext then
+					if s == "black" then
+						love.graphics.setColor(80, 80, 80)
+					else
+						love.graphics.setColor(textcolors[s])
+					end
+				else
+					love.graphics.setColor(255, 255, 255)
+				end
 
-			if self.displayentries then s = self.displayentries[self.var] end
-			drawdropdownentry(s, self.x+1, self.y+2, self.width)
+				if self.displayentries then s = self.displayentries[var] end
+				drawdropdownentry(s, self.x+1, self.y+2, self.width)
+			end
+		end
+
+		--a new option picked without the mouse (keys, a controller, or something else changing it) slides in sideways and
+		--pushes the old one out, easing out: from the right when it's further down the list, from the left when it's further up
+		local now = love.timer.getTime()
+		if self.headervar == nil or self.headerentries ~= self.entries or not self.entries[self.headervar] then
+			self.headeranim = nil --first draw, or the list itself changed
+		elseif self.var ~= self.headervar then
+			if self.mousepicked and now - self.mousepicked < 0.5 then
+				self.headeranim = nil
+			else
+				local n = #self.entries
+				local direction = 1
+				if self.var < self.headervar then
+					direction = -1
+				end
+				--going past either end wraps around, so it keeps going the way it was going
+				if n > 2 and self.headervar == n and self.var == 1 then
+					direction = 1
+				elseif n > 2 and self.headervar == 1 and self.var == n then
+					direction = -1
+				end
+				self.headeranim = {from = self.headervar, direction = direction, start = now}
+			end
+		end
+		self.headervar, self.headerentries = self.var, self.entries
+		self.mousepicked = nil
+
+		local anim = self.headeranim
+		local t = 1
+		if anim then
+			t = (now - anim.start)/GUI_ANIM_TIME
+		end
+		if anim and t < 1 and self.entries[anim.from] then
+			local p = ease_out_quad(t)
+			local w = 1+self.width*8
+			--cut to the header's black box, wherever the current transform puts it
+			local sx1, sy1 = love.graphics.transformPoint((self.x+1)*scale, (self.y+1)*scale)
+			local sx2, sy2 = love.graphics.transformPoint((self.x+1+w)*scale, (self.y+headh-1)*scale)
+			local ox, oy, ow, oh = love.graphics.getScissor()
+			love.graphics.intersectScissor(math.floor(sx1), math.floor(sy1), math.max(0, math.ceil(sx2-sx1)), math.max(0, math.ceil(sy2-sy1)))
+			love.graphics.push()
+			love.graphics.translate(-anim.direction*p*w*scale, 0)
+			drawheader(anim.from)
+			love.graphics.pop()
+			love.graphics.push()
+			love.graphics.translate(anim.direction*(1-p)*w*scale, 0)
+			drawheader(self.var)
+			love.graphics.pop()
+			if ox then
+				love.graphics.setScissor(ox, oy, ow, oh)
+			else
+				love.graphics.setScissor()
+			end
+		else
+			self.headeranim = nil
+			drawheader(self.var)
 		end
 
 		--one entry of the open list: boxtop is the top of its black box, texttop is where its text goes
@@ -1147,6 +1207,7 @@ function guielement:click(x, y, button)
 					
 					if high then
 						if high ~= 0 then
+							self.mousepicked = love.timer.getTime() --picked with the mouse: the header doesn't slide (see the header slide in draw)
 							self.func(high)
 						end
 						return true

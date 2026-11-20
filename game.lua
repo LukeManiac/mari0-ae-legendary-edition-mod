@@ -5768,8 +5768,6 @@ function game_keypressed(key, textinput)
 			elseif (key == "right" or key == "d") then
 				if pausemenuoptions[pausemenuselected] == "volume" then
 					volumeslider_step(guielements["pause_volume"], 0.1)
-				elseif pausemenuselected == #pausemenuoptions + 1 then
-					setmenupopupvisible("controls", true)
 				elseif pausemenuselected == #pausemenuoptions + 2 then
 					currentshaderi1 = currentshaderi1 + 1
 					if currentshaderi1 > #shaderlist then
