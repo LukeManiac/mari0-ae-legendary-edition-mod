@@ -589,15 +589,11 @@ function love.load()
 	--IMAGES--
 	
 	menuselectimg = love.graphics.newImage("graphics/" .. graphicspack .. "/menuselect.png")
-	mappackback = love.graphics.newImage("graphics/GUI/mappackback.png")
 	mappacknoicon = love.graphics.newImage("graphics/GUI/mappacknoicon.png")
 	mappackonlineicon = love.graphics.newImage("graphics/GUI/mappackonlineicon.png")
 	mappackloadingicon = love.graphics.newImage("graphics/GUI/mappackloading.png")
 	mappackoverlay = love.graphics.newImage("graphics/GUI/mappackoverlay.png")
-	mappackhighlight = love.graphics.newImage("graphics/GUI/mappackhighlight.png")
-	
-	mappackscrollbar = love.graphics.newImage("graphics/GUI/mappackscrollbar.png")
-	
+
 	uparrowimg = love.graphics.newImage("graphics/GUI/uparrow.png")
 	downarrowimg = love.graphics.newImage("graphics/GUI/downarrow.png")
 	customenemyiconimg = love.graphics.newImage("graphics/GUI/customenemy.png")
