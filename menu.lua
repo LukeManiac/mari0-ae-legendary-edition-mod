@@ -4309,6 +4309,27 @@ function onlineupdatescroll()
 end
 
 function mappacks()
+	--reset button hover animation progress so the selected frame animates in cleanly
+	for _, kind in ipairs({"local", "online", "minigames"}) do
+		local gui = mappackgui[kind]
+		if gui and gui.frames then
+			for _, frame in pairs(gui.frames) do
+				frame.hoveranim = nil
+				frame.hoverscale = 1
+				frame.lasthigh = false
+				frame.pressanim = nil
+			end
+		end
+	end
+	for _, btn in ipairs({openmappacksbutton, opendlcbutton}) do
+		if btn then
+			btn.hoveranim = nil
+			btn.hoverscale = 1
+			btn.lasthigh = false
+			btn.pressanim = nil
+		end
+	end
+
 	opendlcbutton.active = false
 	openmappacksbutton.active = false
 	mappacksearchbar.active = false
