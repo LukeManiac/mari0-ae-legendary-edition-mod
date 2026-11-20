@@ -3298,7 +3298,7 @@ function mappackgui_update(dt)
 	end
 end
 
-local function mappackgui_draw(kind)
+function mappackgui_draw(kind)
 	local first, last = mappackgui_layout(kind)
 	for i = first, last do
 		mappackgui_frame(kind, i):draw()
