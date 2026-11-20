@@ -3783,15 +3783,10 @@ function deepcopy(orig)
     return copy
 end
 
-function get_mouse_pos()
+function mouseinrect(x, y, w, h)
 	local mousex, mousey = love.mouse.getPosition()
 	local mousex = math.floor(mousex / scale)
 	local mousey = math.floor(mousey / scale)
-	return mousex, mousey
-end
-
-function mouseinrect(x, y, w, h)
-	local mousex, mousey = get_mouse_pos()
 	return mousex >= x and mousex <= x + w and mousey >= y and mousey <= y + h
 end
 
@@ -3800,30 +3795,18 @@ function countlines(str)
     return select(2, str:gsub("\n", "")) + 1
 end
 
-function iswhole(num)
-	return num == math.floor(num)
-end
-
-function makewhole(num)
-	if iswhole(num) then
-		return math.floor(num)
-	else
-		return num
-	end
-end
-
+--how much the game's canvas is scaled to fit the window (letterboxed), measured from the canvas and the window.
+--Without a resizable window the game is drawn straight to the window, so nothing is scaled
 function getCanvasSize()
-	local cw, ch = 400*scale, 224*scale
-	if canvas then
-		local cw, ch = canvas:getWidth(), canvas:getHeight()--current size
+	if not (resizable and canvas) then
+		return 1
 	end
-	local tw, th = winwidth, winheight
-	local s
+	local cw, ch = canvas:getDimensions()
+	local tw, th = love.graphics.getDimensions()
 	if cw/tw > ch/th then
 		return tw/cw
-	else
-		return th/ch
 	end
+	return th/ch
 end
 
 function newsound(soundname, soundtype, soundloop, soundvolume)

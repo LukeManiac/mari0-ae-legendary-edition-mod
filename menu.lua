@@ -577,7 +577,7 @@ local function optionscontrols_pageviews()
 		return {{page = keybindpage, offset = 0}}
 	end
 
-	progress = ease_in_out_quad(progress)
+	progress = ease_out_quad(progress)
 	local distance = 240 * math.abs(animation.to - animation.from)
 	local direction = animation.to > animation.from and 1 or -1
 	return {
@@ -2613,7 +2613,7 @@ local function options_pageprogress()
 	if t >= 1 then
 		return nil
 	end
-	return ease_in_out_quad(t)
+	return ease_out_quad(t)
 end
 
 --gives the frozen widgets back what they had before the slide; their tab's sync puts anything else right this frame
@@ -2952,12 +2952,8 @@ end
 
 --switches the slide on when mappackhorscroll changed (by a key, a click on a tab, or anything else).
 --direction: 1 if the new page comes in from the right, -1 from the left, nil to work it out from the page numbers
-local mappackpagelastupdate = 0
 function mappackpage_update()
-	local now = love.timer.getTime()
-	local fresh = now - mappackpagelastupdate > 0.1 --back from somewhere the menu doesn't update (a course, say)
-	mappackpagelastupdate = now
-	if gamestate ~= "mappackmenu" or fresh then
+	if gamestate ~= "mappackmenu" then
 		mappackpageshown = nil --opening the menu shows its page straight away
 		mappackpageanim = nil
 		mappackpagedirection = nil
@@ -2972,12 +2968,14 @@ function mappackpage_update()
 				direction = -1
 			end
 		end
-		mappackpageanim = {from = mappackpageshown, to = mappackhorscroll, direction = direction, start = love.timer.getTime()}
+		--the clock starts on the slide's first drawn frame: opening a page can stop the game for a moment first
+		--(the dlc page downloads its list), and the slide shouldn't be over before it's seen
+		mappackpageanim = {from = mappackpageshown, to = mappackhorscroll, direction = direction}
 	end
 	mappackpagedirection = nil
 	mappackpageshown = mappackhorscroll
 	mappackhorscrollsmooth = mappackhorscroll
-	if mappackpageanim and love.timer.getTime() - mappackpageanim.start >= MAPPACKPAGE_TIME then
+	if mappackpageanim and mappackpageanim.start and love.timer.getTime() - mappackpageanim.start >= MAPPACKPAGE_TIME then
 		mappackpageanim = nil
 	end
 end
@@ -3369,6 +3367,9 @@ function mappackmenu_drawslide()
 	local anim = mappackpageanim
 	local t = 1
 	if anim then
+		if not anim.start then
+			anim.start = love.timer.getTime()
+		end
 		t = (love.timer.getTime() - anim.start)/MAPPACKPAGE_TIME
 	end
 	if not anim or t >= 1 then
@@ -3376,7 +3377,7 @@ function mappackmenu_drawslide()
 		return
 	end
 
-	local p = ease_in_out_quad(t)
+	local p = ease_out_quad(t)
 	local oldcanvas = mappackmenu_pagecanvas(1, anim.from)
 	local newcanvas = mappackmenu_pagecanvas(2, anim.to)
 
@@ -3734,7 +3735,7 @@ function menu_draw()
 
                     if drawcursor and selectworldcursor == i then
                         local cursorprogress = math.min((now - selectworldcursoranimstart) / 0.22, 1)
-                        cursorprogress = ease_in_out_quad(cursorprogress)
+                        cursorprogress = ease_out_quad(cursorprogress)
                         local cursorx = 55 + (i-page)*20
                         local cursoroffset = 0
                         if previousselectworldx then
@@ -3754,7 +3755,7 @@ function menu_draw()
             end
 
             if scrollrawprogress and scrollrawprogress < 1 then
-                local scrollprogress = ease_in_out_quad(scrollrawprogress)
+                local scrollprogress = ease_out_quad(scrollrawprogress)
                 local direction = v > selectworldpreviouspage and -1 or 1
                 drawworldpage(selectworldpreviouspage, direction * scrollprogress * 160, false)
                 drawworldpage(v, -direction * (1 - scrollprogress) * 160, true)

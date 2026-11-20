@@ -11083,8 +11083,12 @@ end
 function truncatedecimal(number, decplaces)
 	if decplaces == nil then decplaces = 3 end
 	factor = math.pow(10, decplaces)
-	newnumber = math.floor(number * factor) / factor
-	return makewhole(newnumber)
+	output = math.floor(number * factor) / factor
+	if output == math.floor(output) then
+		return math.floor(output)
+	else
+		return output
+	end
 end
 
 function centerprint(text, x, y, scalemult, hudoutlineoverride)
@@ -11148,8 +11152,11 @@ function renderoverlay(text, donotpresentgraphics, donotupdate)
 	love.graphics.present()
 end
 
+--the size of what the game is drawn on, measured from it: the game's own canvas when the window can be resized
+--(love.draw stretches it to the window afterwards, so that's the size everything is drawn in), otherwise the window itself
 function getproperwindowsize()
-	local winwidth = width*16*scale
-	local winheight = height*16*scale
-	return winwidth, winheight
+	if resizable and canvas then
+		return canvas:getDimensions()
+	end
+	return love.graphics.getDimensions()
 end

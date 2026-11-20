@@ -432,7 +432,7 @@ The skins tab has been rebuilt with graphical dropdowns and real sliders, in pla
 * The tab names, the line under the Mappack Creator's tabs and its **Back** button stay where they are.
 * Nothing on either tab can be clicked, typed into or hovered until the slide ends. Pressing Left or Right again, or clicking another Mappack Creator tab, starts a new slide straight away.
 * The controls tab's keybind pages are cut to the options box the same way, and follow the tab while it slides.
-* The mappack menu's pages (**Local**, **DLC**, **Daily Challenge** and **Minigames**) slide the same way. Before, they crept towards the new page, the panel right of each list popped in and out, and they overlapped each other on the way. Now the whole page, panel included, slides out while the new one slides in, cut to the page area. Left and Right keep going the same way when they wrap around from one end to the other, and clicking a tab slides towards it.
+* The mappack menu's pages (**Local**, **DLC**, **Daily Challenge** and **Minigames**) slide the same way. Before, they crept towards the new page, the panel right of each list popped in and out, and they overlapped each other on the way. Now the old page slides out while the new one slides in, and each of the page's two areas slides inside its own box: the list (or the daily challenge) in the list's box, and the panel right of it in the panel's box. Nothing from one area shows up in the other, and nothing is left behind or disappears when the slide ends. The slide starts on its first frame on screen, so opening **DLC** still slides even when the game stops for a moment to download its list. Left and Right keep going the same way when they wrap around from one end to the other, and clicking a tab slides towards it.
 
 #### 🎮 Joysticks
 
@@ -493,6 +493,8 @@ For anyone building menus with the GUI:
 ### ✨ Improvements
 
 * Pressing Right on **Controls** in the pause menu no longer opens the controls. Enter (or clicking it) still does.
+* `getproperwindowsize` now measures what the game is drawn on, instead of working it out from `width`, `height` and `scale`: the game's own canvas when the window is resizable (it's stretched to the window afterwards), otherwise the window itself. Prompts, the controls popup and the fades that use it line up with the real window when it isn't the size those variables say, like in fullscreen without the resizable scale.
+* `getCanvasSize` (how much the game's canvas is scaled to fit the window) now measures the canvas and the window too. Before, it always used `400*scale` by `224*scale` and the `winwidth` and `winheight` variables, since the canvas's real size was read into variables that were thrown away straight after. Without a resizable window it returns 1, since nothing is scaled.
 * Escape now closes an open dropdown first in every options tab, instead of leaving the options menu with the dropdown still open.
 * Sliders that show their value in the middle of the handle (like the skins tab's red, green and blue) now keep it in the middle while you type a value after right-clicking. Before, the text jumped to the left edge of the handle. The text glides along with the typing cursor as it grows or shrinks.
 * The controls tab's **F6** note now sits in a box on the right of the options menu, centred halfway down the screen, where the DLC tips are in the mappack menu. Before, it was squeezed in at the top of the screen. Its lines wrap to fit the box, and it fades in and out when you switch to or from the controls tab.
