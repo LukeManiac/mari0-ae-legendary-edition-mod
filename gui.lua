@@ -975,18 +975,26 @@ function guielement:draw(a, offx, offy)
 					s = self:displayfunction(self.value)
 				end
 				local textx = self.x+self.xrange*self.value
-				if self.centerdisplay and not self.inputting then
-					--the shown value sits in the middle of the handle
-					textx = textx + math.floor((self.width-utf8.len(tostring(s))*8)/2)
+				local column --where the typing cursor is, in characters (it glides, so it can be between two)
+				if self.inputting then
+					column = self:smoothcursor(string.len(self.textvalue), 1)
+				end
+				if self.centerdisplay then
+					--the value sits in the middle of the handle. While typing it stays in the middle too,
+					--gliding with the cursor (which is always at the end) instead of jumping half a character per key
+					if self.inputting then
+						textx = textx + (self.width - column*8)/2
+					else
+						textx = textx + math.floor((self.width-utf8.len(tostring(s))*8)/2)
+					end
 				end
 				properprint(s, textx*scale, (self.y+math.ceil((self.height-8)/2))*scale)
 
 				--cursor: fades and glides like a text input's
 				if self.inputting then
-					local column = self:smoothcursor(string.len(self.textvalue), 1)
 					if self.cursoralpha and self.cursoralpha > 0 then
 						love.graphics.setColor(255, 255, 255, self.cursoralpha * 255)
-						love.graphics.rectangle("fill", (self.x+self.xrange*self.value+column*8)*scale, (self.y+math.ceil((self.height-8)/2)-1)*scale, 2*scale, 9*scale)
+						love.graphics.rectangle("fill", (textx+column*8)*scale, (self.y+math.ceil((self.height-8)/2)-1)*scale, 2*scale, 9*scale)
 					end
 				end
 			end

@@ -478,6 +478,7 @@ For anyone building menus with the GUI:
 ### ✨ Improvements
 
 * Escape now closes an open dropdown first in every options tab, instead of leaving the options menu with the dropdown still open.
+* Sliders that show their value in the middle of the handle (like the skins tab's red, green and blue) now keep it in the middle while you type a value after right-clicking. Before, the text jumped to the left edge of the handle. The text glides along with the typing cursor as it grows or shrinks.
 * The controls tab's **F6** note now sits in a box on the right of the options menu, centred halfway down the screen, where the DLC tips are in the mappack menu. Before, it was squeezed in at the top of the screen. Its lines wrap to fit the box, and it fades in and out when you switch to or from the controls tab.
 
 #### 🔤 Font Renderer
