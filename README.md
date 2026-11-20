@@ -423,6 +423,7 @@ The skins tab has been rebuilt with graphical dropdowns and real sliders, in pla
 * Scrollbars now light up when they're selected with the keyboard too, the same as horizontal sliders.
 * In the skins tab, the red, green and blue sliders glide over to their new values when you switch to another player, character or colourable. The portal sliders glide when you switch to another player, since their colours belong to the player. Each glide takes 0.25 seconds on a random motion curve, and the handle shows the value it's heading to.
 * Holding a key on a colour row and dragging a handle stay instant. Grabbing a handle while it's gliding stops the glide.
+* Everything showing those colours glides with the handles: the red, green and blue tracks, the full colour to the right of them, the colour square in the colour dropdown, and each portal slider's handle and colour. Before, the handles glided but the colours jumped straight to the new ones.
 
 #### 📑 Tab Animations
 

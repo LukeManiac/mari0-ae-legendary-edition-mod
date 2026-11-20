@@ -1722,10 +1722,45 @@ local function skins_drawswatch(x, y, w, h, color)
 	love.graphics.rectangle("fill", (x+1)*scale, (y+1)*scale, (w-2)*scale, (h-2)*scale, r*0.7)
 end
 
---colourable dropdown entry: its colour and its name
+--the colour the red, green and blue sliders show right now. While they glide over to another player's, character's or
+--colourable's colour, that's the colour in between, so everything showing the colour glides along with them
+local SKINS_RGBSLIDERS = {"skin_red", "skin_green", "skin_blue"}
+local function skins_shownrgb()
+	local color = skins_editcolor()
+	if not color then
+		return nil
+	end
+	local shown = {}
+	for channel, name in ipairs(SKINS_RGBSLIDERS) do
+		local slider = guielements[name]
+		if slider then
+			shown[channel] = slider.value*255
+		else
+			shown[channel] = color[channel] or 0 --before the sliders exist
+		end
+	end
+	return shown
+end
+
+--the colour a coop portal slider shows right now, gliding along with its handle
+local function skins_shownportalcolor(portal)
+	local slider = guielements["skin_portal" .. portal]
+	if slider then
+		return getrainbowcolor(slider.value)
+	end
+	return portalcolor[skinningplayer][portal]
+end
+
+--colourable dropdown entry: its colour and its name. The header's colour is the one being edited, so it glides with the sliders
 local function skins_drawcolorableentry(self, i, x, y, w, h, highlighted, header)
 	local colors = mariocolors[skinningplayer]
-	skins_drawswatch(x+1, y+1, 7, 7, colors and colors[i] or {255, 255, 255})
+	local color = {255, 255, 255}
+	if header and i == colorsetedit and skins_shownrgb() then
+		color = skins_shownrgb()
+	elseif colors and colors[i] then
+		color = colors[i]
+	end
+	skins_drawswatch(x+1, y+1, 7, 7, color)
 	skins_entrytextcolor(self, highlighted, header)
 	local s = tostring(self.entries[i])
 	local maxchars = math.floor((w-11)/8)
@@ -1775,9 +1810,9 @@ local function skins_rgbslider(channel, y)
 	slider.releasefunc = function(self, v)
 		saveconfig()
 	end
-	--the track shows what the colour would be along it
+	--the track shows what the colour would be along it, with the other two channels as their sliders show them (gliding too)
 	slider.drawtrack = function(self, x, y, w, h, r)
-		local color = skins_editcolor() or {0, 0, 0}
+		local color = skins_shownrgb() or {0, 0, 0}
 		skins_drawgradienttrack(x, y, w, h, r, function(t)
 			local c = {color[1], color[2], color[3]}
 			c[channel] = t*255
@@ -1993,7 +2028,7 @@ local function optionsskins_sync()
 	for portal = 1, 2 do
 		local slider = guielements["skin_portal" .. portal]
 		skins_followvalue(slider, portalhues[pn][portal], glideportals)
-		slider.fillcolor = portalcolor[pn][portal] --the handle is the portal's colour
+		slider.fillcolor = skins_shownportalcolor(portal) --the handle is the portal's colour, gliding with it
 	end
 
 	--the widget the keyboard has selected looks hovered
@@ -2121,7 +2156,7 @@ local function optionsskins_draw()
 		end
 
 		--the colour itself, right of its sliders
-		local color = skins_editcolor()
+		local color = skins_shownrgb()
 		if color then
 			skins_drawswatch(SKINS_SWATCH_X, SKINS_RGB_Y, SKINS_SWATCH_W, 20+SKINS_SLIDER_H, color)
 		end
@@ -2130,10 +2165,10 @@ local function optionsskins_draw()
 	--coop portal colours, with each colour aside its slider
 	rowcolor("skin_portal1")
 	properprintF(TEXT["coop portal 1 color:"], 30*scale, SKINS_PORTAL1_Y*scale)
-	skins_drawswatch(SKINS_SWATCH_X, SKINS_PORTAL1_Y+10, SKINS_SWATCH_W, SKINS_SLIDER_H, portalcolor[pn][1])
+	skins_drawswatch(SKINS_SWATCH_X, SKINS_PORTAL1_Y+10, SKINS_SWATCH_W, SKINS_SLIDER_H, skins_shownportalcolor(1))
 	rowcolor("skin_portal2")
 	properprintF(TEXT["coop portal 2 color:"], 30*scale, SKINS_PORTAL2_Y*scale)
-	skins_drawswatch(SKINS_SWATCH_X, SKINS_PORTAL2_Y+10, SKINS_SWATCH_W, SKINS_SLIDER_H, portalcolor[pn][2])
+	skins_drawswatch(SKINS_SWATCH_X, SKINS_PORTAL2_Y+10, SKINS_SWATCH_W, SKINS_SLIDER_H, skins_shownportalcolor(2))
 
 	--widgets, an open dropdown list on top of the rest
 	local ontop = {}
