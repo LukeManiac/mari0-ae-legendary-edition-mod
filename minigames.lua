@@ -965,38 +965,31 @@ local function drawgraphicoverlay(def, x, y, selected)
 	love.graphics.setColor(255, 255, 255)
 end
 
+function minigame_frame_draw(self, x, y)
+	local i = self.index
+	local selected = self.forcehover
+	local def = minigamelist[i]
+	if not def then
+		return
+	end
+
+	local img = minigame_getgraphic(def)
+	if img then
+		love.graphics.setColor(255, 255, 255)
+		love.graphics.draw(img, (x+4)*scale, (y+4)*scale, 0,
+			scale*GRAPHIC_W/math.max(1, img:getWidth()),
+			scale*GRAPHIC_H/math.max(1, img:getHeight()))
+	else
+		love.graphics.setColor(0, 0, 0, 160)
+		love.graphics.rectangle("fill", (x+4)*scale, (y+4)*scale, GRAPHIC_W*scale, GRAPHIC_H*scale)
+	end
+	drawgraphicoverlay(def, x+4, y+4, selected)
+	love.graphics.setColor(255, 255, 255)
+end
+
 function minigame_menu_draw()
 	love.graphics.setScissor(21*scale, 16*scale, 218*scale, 200*scale)
-	love.graphics.translate(0, -round(minigamescrollsmooth*OPTION_SPACING*scale))
-	for i = math.max(1, math.floor(minigamescrollsmooth+1)), math.min(#minigamelist, math.floor(minigamescrollsmooth+5)) do
-		local def = minigamelist[i]
-		local y = OPTION_Y+(i-1)*OPTION_SPACING
-		love.graphics.setColor(255, 255, 255)
-		love.graphics.draw(mappackback, OPTION_X*scale, y*scale, 0, scale, scale)
-
-		local img = minigame_getgraphic(def)
-		if img then
-			love.graphics.draw(img, (OPTION_X+4)*scale, (y+4)*scale, 0, scale*GRAPHIC_W/math.max(1, img:getWidth()), scale*GRAPHIC_H/math.max(1, img:getHeight()))
-		else
-			--placeholder until graphics/minigames/<id>.png exists
-			love.graphics.setColor(0, 0, 0, 160)
-			love.graphics.rectangle("fill", (OPTION_X+4)*scale, (y+4)*scale, GRAPHIC_W*scale, GRAPHIC_H*scale)
-		end
-		drawgraphicoverlay(def, OPTION_X+4, y+4, i == minigameselection)
-
-		if i == minigameselection then
-			love.graphics.setColor(255, 255, 255)
-			love.graphics.draw(mappackhighlight, OPTION_X*scale, y*scale, 0, scale, scale)
-		end
-	end
-	love.graphics.translate(0, round(minigamescrollsmooth*OPTION_SPACING*scale))
-
-	if #minigamelist > 3 then
-		love.graphics.setColor(255, 255, 255)
-		local i = minigamescrollsmooth / (#minigamelist-3.233)
-		love.graphics.draw(mappackscrollbar, 227*scale, (20+i*160)*scale, 0, scale, scale)
-	end
-
+	mappackgui_draw("minigames")
 	love.graphics.setScissor()
 	if menusettled() then
 		drawpanel()
@@ -1125,26 +1118,8 @@ function minigame_menu_mousepressed(x, y, button)
 			end
 		end
 	end
-	if button == "l" and not android then
-		local i = optionat(x, y)
-		if i and i == minigameselection then
-			minigame_start(i)
-			return true
-		elseif i then
-			changeselection(i)
-			return true
-		end
-	end
+	--list clicks go through mappackgui
 	return false
-end
-
-function minigame_menu_mousereleased(x, y, button)
-	for _, el in pairs(minigamescrollbars) do
-		el:unclick(x, y)
-	end
-	for _, el in ipairs(minigamegui) do
-		el:unclick(x, y)
-	end
 end
 
 function minigame_menu_mousemoved(x, y)
@@ -1154,10 +1129,7 @@ function minigame_menu_mousemoved(x, y)
 	if android or openminigamedropdown() then
 		return
 	end
-	local i = optionat(x, y)
-	if i then
-		changeselection(i)
-	end
+	--list hover selection goes through mappackgui_mousemoved
 end
 
 ----------------------

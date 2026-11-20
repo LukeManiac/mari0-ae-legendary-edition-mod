@@ -3003,6 +3003,8 @@ local mappackgui = {}
 local function mappackgui_vars(kind)
 	if kind == "online" then
 		return onlineassetlist and #onlineassetlist or 0, onlinemappackselection or 1, onlinemappackscroll or 0, onlinemappackscrollsmooth or 0
+	elseif kind == "minigames" then
+		return minigamelist and #minigamelist or 0, minigameselection or 1, minigamescroll or 0, minigamescrollsmooth or 0
 	end
 	return mappacklist and #mappacklist or 0, mappackselection or 1, mappackscroll or 0, mappackscrollsmooth or 0
 end
@@ -3014,7 +3016,7 @@ end
 
 --the list the current page shows, nil on the pages that aren't lists
 function mappackgui_kind()
-	if mappacktype == "local" or mappacktype == "online" then
+	if mappacktype == "local" or mappacktype == "online" or mappacktype == "minigames" then
 		return mappacktype
 	end
 end
@@ -3022,6 +3024,14 @@ end
 local function mappackgui_select(kind, i)
 	if kind == "online" then
 		onlinemappackselection = i
+	elseif kind == "minigames" then
+		if i ~= minigameselection then
+			minigameselection = i
+			minigame_updatescroll()
+			minigame_buildgui()
+			minigamepanelscroll = minigame_newpanelscroll()
+			minigamescrollbars = {}
+		end
 	else
 		mappackselection = i
 	end
@@ -3198,6 +3208,8 @@ local function mappackgui_frame(kind, i)
 		frame.clickswithinyrange = MAPPACKFRAME_CLIP
 		if kind == "online" then
 			frame.drawcontent = mappackframe_drawonline
+		elseif kind == "minigames" then
+			frame.drawcontent = minigame_frame_draw
 		else
 			frame.drawcontent = mappackframe_drawlocal
 		end
@@ -3214,6 +3226,9 @@ local function mappackgui_drag(kind, value)
 	if kind == "online" then
 		onlinemappackscroll = scroll
 		onlinemappackscrollsmooth = scroll
+	elseif kind == "minigames" then
+		minigamescroll = scroll
+		minigamescrollsmooth = scroll
 	else
 		mappackscroll = scroll
 		mappackscrollsmooth = scroll
@@ -3263,7 +3278,7 @@ function mappackgui_layout(kind)
 end
 
 function mappackgui_update(dt)
-	for _, kind in ipairs({"local", "online"}) do
+	for _, kind in ipairs({"local", "online", "minigames"}) do
 		local gui = mappackgui[kind]
 		if gui and gui.scrollbar then
 			local scrollbar = gui.scrollbar
@@ -5378,8 +5393,9 @@ function menu_mousepressed(x, y, button)
 				end
 			end
 			if mappacktype == "minigames" then
-				minigame_menu_mousepressed(x, y, button)
-				return
+				if minigame_menu_mousepressed(x, y, button) then
+					return
+				end
 			end
 			--mappack frames and the scrollbar
 			if mappacktype == "daily_challenge" then
@@ -5462,7 +5478,6 @@ function menu_mousemoved(x, y, dx, dy)
 	if gamestate == "mappackmenu" then
 		if mappacktype == "minigames" then
 			minigame_menu_mousemoved(x, y)
-			return
 		end
 		--the frame under the mouse is the selected one (the scrollbar drags itself in mappackgui_update)
 		mappackgui_mousemoved(x, y)
