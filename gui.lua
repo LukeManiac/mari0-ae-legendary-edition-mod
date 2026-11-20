@@ -17,36 +17,6 @@ local function gui_anim_value(anim)
 	return lerp(anim.from, anim.to, p), t >= 1
 end
 
--- continuous hold-squish + decaying jelly wobble on release (buttons, checkboxes, dropdowns)
-local function gui_jelly_update(self, dt)
-	if self.holding then
-		self.squashx = 1.14
-		self.squashy = 0.86
-		self.jellyt = nil
-	elseif self.jellyt then
-		self.jellyt = self.jellyt + dt
-		local decay = math.exp(-self.jellyt * 9)
-		local wobble = math.sin(self.jellyt * 32) * decay * (self.jellyamp or 0.12)
-		self.squashx = 1 + wobble
-		self.squashy = 1 - wobble
-		if decay < 0.008 then
-			self.jellyt = nil
-			self.squashx = 1
-			self.squashy = 1
-		end
-	else
-		self.squashx = lerp(self.squashx or 1, 1, math.min(1, dt * 12))
-		self.squashy = lerp(self.squashy or 1, 1, math.min(1, dt * 12))
-	end
-end
-
--- soft magnetic pan; target is only non-zero while the pointer is over the control
-local function gui_pan_update(self, dt)
-	local pan_speed = 14
-	self.panx = lerp(self.panx or 0, self.targetpanx or 0, math.min(1, dt * pan_speed))
-	self.pany = lerp(self.pany or 0, self.targetpany or 0, math.min(1, dt * pan_speed))
-end
-
 --dropdown layout (all in game pixels). A plain dropdown has 10 pixel rows in one column, but a graphical one
 --(see guielement:setentrydrawing) can have taller rows, a grid of columns and draw its entries itself.
 --The header is a row tall plus 1 pixel, and the list below it is rows*rowheight tall
@@ -120,14 +90,6 @@ function guielement:init(...)
 			self.var = true
 		end
 		self.text = arg[6]
-		-- liquid glass / jelly state
-		self.panx = 0
-		self.pany = 0
-		self.targetpanx = 0
-		self.targetpany = 0
-		self.squashx = 1
-		self.squashy = 1
-		self.holding = false
 	elseif self.type == "dropdown" then --dropdown(x, y, width (in chars), func, start, {entries})
 		self.width = arg[4]
 		self.func = arg[5]
@@ -141,11 +103,6 @@ function guielement:init(...)
 		self.listvalue = 0
 		self.listtarget = 0
 		self.timer = 0--[DROID]
-		-- jelly open/close
-		self.squashx = 1
-		self.squashy = 1
-		self.jellyt = nil
-		self.jellyamp = 0.08
 
 		self:updatePos()
 	elseif self.type == "rightclick" then --rightclick(x, y, width (in chars), func, start, {entries})
@@ -190,23 +147,6 @@ function guielement:init(...)
 		
 		self.fillcolor = {0, 0, 0}
 		self.textcolor = {255, 255, 255}
-
-		-- liquid glass / jelly state
-		self.panx = 0
-		self.pany = 0
-		self.targetpanx = 0
-		self.targetpany = 0
-		self.squashx = 1
-		self.squashy = 1
-		self.holding = false
-
-		-- liquid glass interaction state (iOS-style magnetic pan + inverse squash)
-		self.panx = 0
-		self.pany = 0
-		self.targetpanx = 0
-		self.targetpany = 0
-		self.squashx = 1
-		self.squashy = 1
 	elseif self.type == "scrollbar" then --scrollbar(x, y, yrange, width, height, start, dir)
 		self.range = arg[4]
 		self.width = arg[5]
@@ -380,12 +320,7 @@ function guielement:update(dt)
 				self.didtype = false
 				self.didtypetextinput = false
 			end
-		elseif self.type == "checkbox" then
-			gui_jelly_update(self, dt)
-			gui_pan_update(self, dt)
 		elseif self.type == "button" then
-			gui_jelly_update(self, dt)
-			gui_pan_update(self, dt)
 			if self.autorepeat then
 				if self.holding then
 					if self.repeatwaittimer <= 0 then
@@ -405,7 +340,6 @@ function guielement:update(dt)
 				end
 			end
 		elseif self.type == "dropdown" then
-			gui_jelly_update(self, dt)
 			self:getlistprogress()
 			if opened_dropdown == self and not self.extended then
 				opened_dropdown = false
@@ -541,34 +475,12 @@ function guielement:draw(a, offx, offy)
 				s = hoverscale * math.max(v, 0)
 			end
 		end
-
-		-- magnetic pan only while the pointer is inside the checkbox region
-		local mx, my = love.mouse.getPosition()
-		local cx, cy = (self.x + 4.5) * scale, (self.y + 4.5) * scale
-		if hovering then
-			local dx = (mx - cx) / math.max(4.5 * scale, 1)
-			local dy = (my - cy) / math.max(4.5 * scale, 1)
-			dx = math.max(-1, math.min(1, dx))
-			dy = math.max(-1, math.min(1, dy))
-			local strength = 2.2 * scale
-			if dx < -0.12 and dy < -0.12 then
-				strength = strength * 1.55
-			end
-			self.targetpanx = dx * strength * 0.32
-			self.targetpany = dy * strength * 0.32
-		else
-			self.targetpanx = 0
-			self.targetpany = 0
-		end
-
-		-- non-uniform scale: hover + hold-squish / jelly wobble
-		local sx = s * (self.squashx or 1)
-		local sy = s * (self.squashy or 1)
 		
 		local border = high == 2 and 255 or 127
+		local cx, cy = (self.x + 4.5) * scale, (self.y + 4.5) * scale
 		love.graphics.push()
-		love.graphics.translate(cx + (self.panx or 0), cy + (self.pany or 0))
-		love.graphics.scale(sx, sy)
+		love.graphics.translate(cx, cy)
+		love.graphics.scale(s, s)
 		love.graphics.translate(-4.5 * scale, -4.5 * scale)
 
 		-- border (same corner ratio as the buttons: 0.15, inner fill 0.7 of that)
@@ -941,7 +853,7 @@ function guielement:draw(a, offx, offy)
 		local alpha = a or 255
 		local high = self:hovered()
 		
-		--smooth hover scale (1 → 1.04)
+		--smooth hover scale (1 → 1.04) and press zoom
 		if high ~= self.lasthigh then
 			self.lasthigh = high
 			self.hoveranim = gui_anim_start(self.hoverscale or 1, high and 1.04 or 1)
@@ -954,40 +866,21 @@ function guielement:draw(a, offx, offy)
 			if done then self.hoveranim = nil end
 		end
 
-		local bw = (3+self.width+self.space*2)*scale
-		local bh = (1+self.height*10+self.space*2)*scale
-		local bx = self.x*scale
-		local by = self.y*scale
-		local cx = bx + bw/2
-		local cy = by + bh/2
-
-		-- magnetic pan only while the pointer is inside the button region
-		local mx, my = love.mouse.getPosition()
-		if high then
-			local dx = (mx - cx) / math.max(bw * 0.5, 1)
-			local dy = (my - cy) / math.max(bh * 0.5, 1)
-			dx = math.max(-1, math.min(1, dx))
-			dy = math.max(-1, math.min(1, dy))
-			local strength = 2.6 * scale
-			if dx < -0.12 and dy < -0.12 then
-				strength = strength * 1.55
+		local zoom = hoverscale
+		if self.pressanim then
+			local p, done = gui_anim_value(self.pressanim)
+			if done then
+				self.pressanim = nil
+			else
+				zoom = hoverscale * (1 - 0.15*math.sin(math.pi*p))
 			end
-			self.targetpanx = dx * strength * 0.32
-			self.targetpany = dy * strength * 0.32
-		else
-			self.targetpanx = 0
-			self.targetpany = 0
 		end
-
-		-- non-uniform scale: hover + continuous hold-squish / jelly wobble on release
-		local sx = hoverscale * (self.squashx or 1)
-		local sy = hoverscale * (self.squashy or 1)
-
-		local need_transform = (sx ~= 1 or sy ~= 1 or (self.panx or 0) ~= 0 or (self.pany or 0) ~= 0)
-		if need_transform then
+		if zoom ~= 1 then
+			local cx = (self.x + (3+self.width+self.space*2)/2)*scale
+			local cy = (self.y + (1+self.height*10+self.space*2)/2)*scale
 			love.graphics.push()
-			love.graphics.translate(cx + (self.panx or 0), cy + (self.pany or 0))
-			love.graphics.scale(sx, sy)
+			love.graphics.translate(cx, cy)
+			love.graphics.scale(zoom, zoom)
 			love.graphics.translate(-cx, -cy)
 		end
 
@@ -1001,6 +894,8 @@ function guielement:draw(a, offx, offy)
 			alpha
 		)
 		
+		local bw = (3+self.width+self.space*2)*scale
+		local bh = (1+self.height*10+self.space*2)*scale
 		local br = math.min(bw, bh) * 0.15
 		love.graphics.rectangle("fill", self.x*scale, self.y*scale, bw, bh, br)
 		
@@ -1040,7 +935,7 @@ function guielement:draw(a, offx, offy)
 			end
 		end
 		
-		if need_transform then
+		if zoom ~= 1 then
 			love.graphics.pop()
 		end
 		
@@ -1291,10 +1186,6 @@ function guielement:click(x, y, button)
 	if self.active then
 		if self.type == "checkbox" then
 			if self:inhighlight(x, y) and button ~= "wd" and button ~= "wu" then
-				self.holding = true
-				self.squashx = 1.14
-				self.squashy = 0.86
-				self.jellyt = nil
 				self.func(not self.var)
 			end
 		elseif self.type == "dropdown" then
@@ -1341,9 +1232,6 @@ function guielement:click(x, y, button)
 			if button ~= "wd" and button ~= "wu" and button ~= "r" then
 				if self:inhighlight(x, y) then
 					self.holding = true
-					self.squashx = 1.14
-					self.squashy = 0.86
-					self.jellyt = nil
 					self.pressanim = gui_anim_start(0, 1)
 					if self.func then
 						self.func(unpack(self.arguments))
@@ -1828,17 +1716,7 @@ function guielement:unclick(x, y)
 				self.scrollbar:unclick(x, y)
 			end
 		elseif self.type == "button" then
-			if self.holding then
-				self.holding = false
-				self.jellyt = 0
-				self.jellyamp = 0.13
-			end
-		elseif self.type == "checkbox" then
-			if self.holding then
-				self.holding = false
-				self.jellyt = 0
-				self.jellyamp = 0.13
-			end
+			self.holding = false
 		end
 	end
 end
@@ -1880,11 +1758,6 @@ function guielement:open(keyboard)
 	if self.scrollbar then
 		self.scrollbar.active = true
 	end
-	-- jelly open
-	self.jellyt = 0
-	self.jellyamp = 0.09
-	self.squashx = 1.06
-	self.squashy = 0.94
 
 	if keyboard then
 		self.keycursor = self.var
@@ -2043,11 +1916,6 @@ function guielement:close()
 	if self.scrollbar then
 		self.scrollbar.active = false
 	end
-	-- jelly close
-	self.jellyt = 0
-	self.jellyamp = 0.1
-	self.squashx = 0.94
-	self.squashy = 1.08
 end
 
 --dropdown: the option up/down/enter works on (keyboard highlight, else the hovered option, else the current one)
@@ -2090,7 +1958,7 @@ function guielement.getopendropdown()
 end
 
 -- draw every open / still-animating dropdown on top of the rest of the game
--- (called from lovedraw after world/UI content, before FPS / battery / time overlays)
+-- (called from lovedraw after notice.draw, before FPS / battery / time overlays)
 function guielement.drawopendropdowns()
 	for _, v in pairs(guielements) do
 		if v.type == "dropdown" and v.active and ((v.listvalue and v.listvalue > 0) or v.extended) then
@@ -2104,9 +1972,6 @@ function guielement:getlistprogress()
 	if target ~= self.listtarget then
 		self.listanim = gui_anim_start(self.listvalue, target)
 		self.listtarget = target
-		-- extra jelly kick whenever the list starts opening or closing
-		self.jellyt = 0
-		self.jellyamp = 0.08
 	end
 	if self.listanim then
 		local v, done = gui_anim_value(self.listanim)
