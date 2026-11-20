@@ -14,6 +14,30 @@ local keybindpageanimation
 local keybindpageduration = 0.25
 local optionspageanimation --{from, to, start, curve} while the options menu slides between tabs
 local optionspageduration = 0.25
+
+--vertical scrolling in the mappack menu: every time the target row changes, the list glides
+--from wherever it is to the new target on an ease-out-quad curve
+local MAPPACK_SCROLL_DURATION = 0.25
+local mappackscrollanims = {} --[list] = {from, to, start, last}
+function mappackscroll_ease(list, current, target)
+	local anim = mappackscrollanims[list]
+	--a new target, or something else snapped the list (opening the menu, searching): start from where it is now
+	if not anim or anim.to ~= target or anim.last ~= current then
+		if current == target then
+			mappackscrollanims[list] = nil
+			return target
+		end
+		anim = {from = current, to = target, start = love.timer.getTime()}
+		mappackscrollanims[list] = anim
+	end
+	local t = (love.timer.getTime() - anim.start) / MAPPACK_SCROLL_DURATION
+	if t >= 1 then
+		mappackscrollanims[list] = nil
+		return target
+	end
+	anim.last = anim.from + (anim.to - anim.from)*ease_out_quad(t)
+	return anim.last
+end
 local OPTIONS_BOX_X, OPTIONS_BOX_Y, OPTIONS_BOX_W, OPTIONS_BOX_H = 21, 16, 218, 200 --the options menu's dark box, which the tabs slide inside
 local OPTIONS_TABPREFIXES = {"ctrl_", "skin_", "opt_", "cheat_"} --the start of the names of each tab's widgets
 --misc. tab: the joystick deadzone row sits above scale, packed in above shader1 (which stays at 63)
@@ -2341,32 +2365,12 @@ function menu_update(dt)
 	
 	if mappackscroll then
 		--smooth the scroll
-		if mappackscrollsmooth > mappackscroll then
-			mappackscrollsmooth = mappackscrollsmooth - (mappackscrollsmooth-mappackscroll)*dt*5-0.1*dt
-			if mappackscrollsmooth < mappackscroll then
-				mappackscrollsmooth = mappackscroll
-			end
-		elseif mappackscrollsmooth < mappackscroll then
-			mappackscrollsmooth = mappackscrollsmooth - (mappackscrollsmooth-mappackscroll)*dt*5+0.1*dt
-			if mappackscrollsmooth > mappackscroll then
-				mappackscrollsmooth = mappackscroll
-			end
-		end
+		mappackscrollsmooth = mappackscroll_ease("local", mappackscrollsmooth, mappackscroll)
 	end
 	
 	if onlinemappackscroll then
 		--smooth the scroll
-		if onlinemappackscrollsmooth > onlinemappackscroll then
-			onlinemappackscrollsmooth = onlinemappackscrollsmooth - (onlinemappackscrollsmooth-onlinemappackscroll)*dt*5-0.1*dt
-			if onlinemappackscrollsmooth < onlinemappackscroll then
-				onlinemappackscrollsmooth = onlinemappackscroll
-			end
-		elseif onlinemappackscrollsmooth < onlinemappackscroll then
-			onlinemappackscrollsmooth = onlinemappackscrollsmooth - (onlinemappackscrollsmooth-onlinemappackscroll)*dt*5+0.1*dt
-			if onlinemappackscrollsmooth > onlinemappackscroll then
-				onlinemappackscrollsmooth = onlinemappackscroll
-			end
-		end
+		onlinemappackscrollsmooth = mappackscroll_ease("online", onlinemappackscrollsmooth, onlinemappackscroll)
 	end
 	
 	if onlinemappackiconchannel2 and onlinemappackiconchannel2:peek() then
