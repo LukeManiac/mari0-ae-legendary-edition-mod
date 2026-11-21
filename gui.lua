@@ -237,6 +237,19 @@ function guielement:update(dt)
 			else
 				self.cursoralpha = 1 - ease_in_out_quad((t - 0.5) * 2)
 			end
+			--a wheel slide: dragging, or anything else setting the value, takes over from it
+			if self.wheelanim then
+				if self.dragging or self.value ~= self.wheelvalue then
+					self.wheelanim = nil
+				else
+					local pos, done = gui_wheelanimposition(self.wheelanim, love.timer.getTime())
+					if done then
+						self.wheelanim = nil
+					end
+					self.value = math.max(0, math.min(1, pos))
+					self.wheelvalue = self.value
+				end
+			end
 			if self.dragging then
 				if self.dir == "ver" then
 					local y = (love.mouse.getY()-self.draggingy) - self.y*scale
@@ -1366,12 +1379,8 @@ function guielement:click(x, y, button)
 					end
 				end
 			end
-			if not self.scrollstepdisabled then
-				if button == "wd" then
-					self.value = math.min(1, self.value+(self.scrollstep or 0.2))
-				elseif button == "wu" then
-					self.value = math.max(0, self.value-(self.scrollstep or 0.2))
-				end
+			if not self.scrollstepdisabled and (button == "wd" or button == "wu") then
+				self:wheelscrollbar(button) --slides there, like a dropdown's list
 			end
 		elseif self.type == "input" then
 			if button ~= "wd" and button ~= "wu" then
@@ -1983,6 +1992,50 @@ function guielement:wheelscroll(button)
 	slope = math.max(-1000, math.min(1000, slope))
 	self.wheelanim = {from = current, to = target, start = now, duration = duration, y1 = 0.42*slope}
 	self.keycursor = nil --the hovered option takes over again
+end
+
+--scrollbar: the mouse wheel slides it the same way a dropdown's list slides (see wheelscroll above). A scrollbar with
+--a scrollstep moves through 73/scrollstep game pixels (that's how the editor sets it up for its lists), so a notch
+--moves DROPDOWN_WHEEL_PIXELS screen pixels of that, like a dropdown. One without a scrollstep moves 0.2 a notch.
+function guielement:wheelscrollbar(button)
+	local step = self.scrollstep or 0.2
+	if step <= 0 then
+		return --a slider that the wheel doesn't move
+	end
+	local content = 73/step --game pixels the whole bar scrolls through
+	local amount = mousewheelamount or 1
+	local dv
+	if self.scrollstep then
+		dv = amount*DROPDOWN_WHEEL_PIXELS/scale/content
+	else
+		dv = amount*step
+	end
+	if button == "wu" then
+		dv = -dv
+	end
+	local now = love.timer.getTime()
+	local anim = self.wheelanim
+	if anim and self.value ~= self.wheelvalue then
+		anim = nil --something else moved it since
+	end
+	local current = self.value
+	local velocity = 0 --value per second
+	if anim then
+		local a = gui_wheelanimposition(anim, now - 0.001)
+		local b = gui_wheelanimposition(anim, now)
+		current = b
+		velocity = (b-a)/0.001
+	end
+	local target = math.max(0, math.min(1, ((anim and anim.to) or current) + dv))
+	local delta = target - current
+	if math.abs(delta) < 1e-6 then
+		return --already at the end
+	end
+	local duration = wheelduration(delta*content)
+	local slope = velocity*duration/delta
+	slope = math.max(-1000, math.min(1000, slope))
+	self.wheelanim = {from = current, to = target, start = now, duration = duration, y1 = 0.42*slope}
+	self.wheelvalue = self.value
 end
 
 --dropdown: close the list without picking anything

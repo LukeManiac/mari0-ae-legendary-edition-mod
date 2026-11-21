@@ -1567,9 +1567,9 @@ function editor_update(dt)
 		
 		if v ~= oldworldscrollbarv then
 			for i = 1, #mappacklevels do --world
-				guielements["world-" .. i].y = math.floor(20+((i-1)*16)-v)
+				guielements["world-" .. i].y = 20+((i-1)*16)-v
 			end
-			guielements["newworld"].y = math.floor(20+((#mappacklevels)*16)-v)
+			guielements["newworld"].y = 20+((#mappacklevels)*16)-v
 		end
 		
 		oldworldscrollbarv = v
@@ -1580,14 +1580,14 @@ function editor_update(dt)
 				for k = 0, mappacklevels[currentworldselection][j] do --sublevel
 					local name = currentworldselection .. "-" .. j .. "_" .. k
 					if k < 1 then
-						guielements[name].y = math.floor(20+((j-1)*39)-v)
+						guielements[name].y = 20+((j-1)*39)-v
 					else
-						guielements[name].y = math.floor(41+((j-1)*39)-v)
+						guielements[name].y = 41+((j-1)*39)-v
 					end
 				end
-				guielements["newsublevel-" .. currentworldselection .. "-" .. j].y = math.floor(41+((j-1)*39)-v)
+				guielements["newsublevel-" .. currentworldselection .. "-" .. j].y = 41+((j-1)*39)-v
 			end
-			guielements["newlevel-" .. currentworldselection].y = math.floor(20+((#mappacklevels[currentworldselection])*39)-v)
+			guielements["newlevel-" .. currentworldselection].y = 20+((#mappacklevels[currentworldselection])*39)-v
 		end
 		oldlevelscrollbarv = v
 		oldlevelscrollbar = guielements["levelscrollbar"].value
