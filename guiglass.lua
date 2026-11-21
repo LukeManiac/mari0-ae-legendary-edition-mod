@@ -211,7 +211,7 @@ local FULL_REFRESH = 1/60 --full mode blurs it again at most this often: past 60
 --the game faster; if it didn't, the slowness is something else: it steps back and stops trying. Once there are far
 --fewer glass panels than when it stepped down (another screen), it goes back to full.
 local automode = "full"
-local STEPS = {full = "lite"}
+local STEPS = {full = "lite"} --never down to flat on its own: that swaps the glass for black panes (pick "flat" by hand)
 local monitor = {start = nil, frames = 0, backdropframes = 0, panels = 0, slow = 0}
 local framebackdrop, framepanels = false, 0
 local lastbackdropframe = -math.huge --the last frame glass wanted a blurred backdrop
@@ -259,8 +259,27 @@ local function monitor_window(fps, panels, withbackdrop)
 	end
 end
 
+guiglass.debug = false --true: shows the glass state in the top left corner
+local dbg = {with = 0, without = 0, nosrc = 0, src = "-"}
+local dbgshown = {}
+
 local present = love.graphics.present
 function love.graphics.present(...)
+	if guiglass.debug then
+		dbgshown.text = string.format("glass: %s (auto %s)  backdrop %d  none %d  nosrc %d  src %s  wantscanvas %s",
+			guiglass.mode(), automode, dbg.with, dbg.without, dbg.nosrc, dbg.src, tostring(guiglass.wantscanvas()))
+		love.graphics.push("all")
+		love.graphics.setCanvas()
+		love.graphics.origin()
+		love.graphics.setScissor()
+		love.graphics.setShader()
+		love.graphics.setColor(0, 0, 0, 200)
+		love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), 14)
+		love.graphics.setColor(255, 255, 0, 255)
+		love.graphics.print(dbgshown.text, 2, 0)
+		love.graphics.pop()
+	end
+	dbg.with, dbg.without, dbg.nosrc, dbg.src = 0, 0, 0, "-"
 	frame = frame + 1
 	local m = monitor
 	local now = love.timer.getTime()
@@ -535,6 +554,16 @@ function guiglass.panel(x, y, w, h, r, o)
 			if not o.base then
 				table.insert(backdrop.dirty, {sx0, sy0, sx1, sy1})
 			end
+		end
+	end
+	if guiglass.debug and wants then
+		if backdrop then
+			dbg.with = dbg.with + 1
+			dbg.src = src:getWidth() .. "x" .. src:getHeight() .. (transparent[src] and " transparent" or "")
+		elseif not src then
+			dbg.nosrc = dbg.nosrc + 1
+		else
+			dbg.without = dbg.without + 1
 		end
 	end
 
