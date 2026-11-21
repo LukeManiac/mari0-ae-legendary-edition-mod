@@ -211,7 +211,7 @@ local FULL_REFRESH = 1/60 --full mode blurs it again at most this often: past 60
 --the game faster; if it didn't, the slowness is something else: it steps back and stops trying. Once there are far
 --fewer glass panels than when it stepped down (another screen), it goes back to full.
 local automode = "full"
-local STEPS = {full = "lite", lite = "flat"}
+local STEPS = {full = "lite"}
 local monitor = {start = nil, frames = 0, backdropframes = 0, panels = 0, slow = 0}
 local framebackdrop, framepanels = false, 0
 local lastbackdropframe = -math.huge --the last frame glass wanted a blurred backdrop
