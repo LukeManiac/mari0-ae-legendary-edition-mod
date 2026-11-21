@@ -592,9 +592,6 @@ function love.load()
 	mappacknoicon = love.graphics.newImage("graphics/GUI/mappacknoicon.png")
 	mappackonlineicon = love.graphics.newImage("graphics/GUI/mappackonlineicon.png")
 	mappackloadingicon = love.graphics.newImage("graphics/GUI/mappackloading.png")
-
-	uparrowimg = love.graphics.newImage("graphics/GUI/uparrow.png")
-	downarrowimg = love.graphics.newImage("graphics/GUI/downarrow.png")
 	customenemyiconimg = love.graphics.newImage("graphics/GUI/customenemy.png")
 
 	pathmarkerimg = love.graphics.newImage("graphics/GUI/pathmarker.png")
