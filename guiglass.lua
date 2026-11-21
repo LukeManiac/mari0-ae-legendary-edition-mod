@@ -27,8 +27,8 @@ local PRESS_STRETCH = 1.12 --scale x while held (scale y is 1/this, so the area 
 local PRESS_TIME = 0.2
 local SPRING_K = 520       --jelly stiffness
 local SPRING_D = 9         --jelly damping (lower wobbles longer)
-local MAGNET_PULL = 0.15   --how much of the distance to the mouse the element leans
-local MAGNET_MAX = 1/8     --at most this much of the element's diagonal (a quarter of the centre-to-corner distance)
+local MAGNET_PULL = 0.025  --how much of the distance to the mouse the element leans
+local MAGNET_MAX = 1/64    --at most this much of the element's diagonal (a quarter of the centre-to-corner distance)
 local MAGNET_SPEED = 14    --lerp speed of the lean (per second)
 
 local blurshader, glassshader, mesh, dummy
