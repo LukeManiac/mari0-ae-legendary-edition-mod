@@ -381,6 +381,110 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.3
+
+### 🧩 New Features
+
+#### 🫧 Liquid Glass
+
+The GUI is now made of liquid glass, in the style of iOS 26. The glass itself is in the new `guiglass.lua`.
+
+* Every glass panel blurs whatever is already drawn behind it, but only inside its own rounded shape, so the blur is cut to exactly the part of the element you can see.
+* The edges bend what's behind them like a lens, with a little colour split. A light rim runs along the edge, brightest at the top left with a softer glow on the bottom right, and a soft shadow sits underneath.
+* An element's fill colour tints its glass and its border colour becomes the rim, so custom colours (the red save button, for example) still show.
+* Corners are rounder: buttons, text inputs, checkboxes and dropdown headers use 0.3 of their shorter side. Slider and scrollbar handles are pill-shaped, or 0.3 for sliders with `buttonround`.
+* This covers buttons, checkboxes, dropdowns, text inputs, sliders, scrollbars and right-click menus.
+
+Glass also replaces the black boxes and outlines of things that aren't GUI elements:
+
+* The world selection popup, the new game warning, the reset warning and the language menu.
+* The pause menu and all of its prompts: quit to menu, quit to desktop, save game and save highscore.
+* The pause menu's controls popup and both key prompts.
+* Notices.
+* The two tip boxes right of the mappack menu's lists (the mappack folder tip and the DLC tip).
+* The controls tab's **F6** note.
+* The minigames' description, settings and highscores boxes.
+* The Course Maker's background. It's one big pane of glass over the course, lighter on the **Maps** tab like before. The elements on it read the course behind it, so they stand out from it.
+
+Glass drawn on a canvas of its own reads what's on the canvas underneath. This keeps the mappack menu's pages glassy while they slide, and the Course Maker's panels while they zoom in and out. Before the fix, glass there came out as a solid tint.
+
+#### 🧲 Motion
+
+Every element now moves the same way.
+
+* **Hover:** The element leans towards the mouse. It moves by 15% of the distance from its centre to the mouse, never more than an eighth of its diagonal (a quarter of the distance from its centre to a corner). The lean is lerped every frame, so it follows the mouse smoothly. Buttons still grow a little (1.03) and checkboxes pop up (1.12) while hovered.
+* **Press:** Clicking an element squashes it wide (1.12 times as wide and 1/1.12 times as tall, so its area stays the same) on an ease-out curve over 0.2 seconds. It holds that shape until the mouse button comes up, wherever the mouse is by then, so moving the mouse away while holding doesn't let go early.
+* **Jelly:** Once you let go, a spring wobbles the element back into shape.
+* This works on buttons, checkboxes, dropdown headers, text inputs, and slider and scrollbar handles. Clicking a slider's track also squashes the handle it grabs. Handles don't lean while they're being dragged.
+* A checkbox's tick still pops in when it's toggled.
+
+#### 🔽 Dropdowns
+
+* The header is one glass capsule with a thin divider before the arrow. The arrow turns over as the list opens and back as it closes.
+* The list pops out of the header with a jelly, and each option pops in after it, one after another, starting with the one nearest the header. The gap between them is at most 0.022 seconds, and the whole cascade never takes more than 0.16 seconds, however long the list is.
+* Closing runs the other way: the options furthest from the header shrink first, each swelling a little before it goes, then the panel follows 0.06 seconds later. Each shrink takes 0.2 seconds.
+* The hovered option has a glass highlight that glides from option to option and fades in and out. Options keep their own colours instead of turning black on white.
+* Lists taller than the screen still scroll, with a copy of the header at the top.
+* Right-click menus pop out of the corner they opened at with a jelly. The picked option has a green highlight and the hovered one has a highlight that glides.
+
+#### 🛠️ Course Properties
+
+The Course Maker's **Course Properties** panel now opens and closes like a dropdown.
+
+* Its button looks like a dropdown header, with the same divider and turning arrow. The button draws the arrow itself, so the `↓` at the end of its translated text is left out.
+* The panel pops out of the button with the same jelly as a dropdown list, and its checkboxes pop in one after another. Closing shrinks them from the bottom up.
+* Clicking anywhere outside the panel and its button closes it, like a dropdown.
+
+#### 🖼️ Mappack and Minigame Icons
+
+* Mappack icons (local and DLC), the "no icon" picture, the loading icon and the minigames' graphics now have rounded corners. Their radius is the frame's radius minus the 4 pixel gap around the icon, so the corners run alongside the frame's. A minigame's title and tagline are drawn on top and aren't cut.
+
+#### ⚙️ Liquid Glass Settings
+
+At the top of `guiglass.lua`:
+
+* `guiglass.quality`:
+  * `"full"`: the blur behind the glass is redone up to 60 times a second.
+  * `"lite"`: redone 4 times a second. It looks the same, since the blur is always taken before any glass is drawn.
+  * `"flat"`: no blur, just tinted glass.
+  * `"auto"` (the default): see below.
+* `guiglass.minfps` (200 by default): the frame rate `auto` aims for with vsync off. With vsync on, it aims for the monitor's refresh rate instead.
+* `guiglass.enabled`: `false` is the same as `"flat"`.
+* `guiglass.blur` (3), `guiglass.refraction` (1.6) and `guiglass.tintstrength` (0.42) set how blurry the glass is, how much its edges bend (both in game pixels) and how much of the fill colour is laid over it.
+
+**Auto quality** watches the frame rate one second at a time:
+
+* If the game stays below its target for 2 seconds while glass is on screen, it steps down from full to lite, or from lite to flat.
+* A step is only kept if it makes the game at least 10% faster. If it doesn't, the slowdown is coming from something else: auto steps back and stops trying.
+* Once a screen has less than half the glass panels it had when it stepped down (leaving the Course Maker, for example), it goes back to full.
+
+#### 🧱 GUI
+
+For anyone building menus:
+
+* `guiglass.panel(x, y, w, h, r, options)` draws a glass panel where `love.graphics.rectangle("fill", x, y, w, h, r)` would go. Its options include `tint`, `tintstrength`, `rim`, `rimstrength`, `alpha`, `shadow`, `nobackdrop` (a tinted pane without the blur, for things inside another panel) and `base` (the glass on top of it reads what's behind it instead).
+* `guiglass.box(x, y, w, h, r, alpha)` is a popup box: glass with a bright rim, in place of a black box with a white outline.
+* `guiglass.pill(x, y, w, h, r, color)` is a cheap tinted pane, like a dropdown's highlight.
+* `guiglass.push(element, cx, cy, w, h, hovering, options)` and `guiglass.pop()` give anything drawn between them an element's lean, squash and jelly.
+* `guiglass.beginround(x, y, w, h, r)` and `guiglass.endround()` cut everything drawn between them to a box with rounded corners. `guiglass.insetradius(button, inset)` gives the radius that runs alongside a button's corners.
+* `guielement.drawdroppanel(owner, open, x, y, w, h, rows, options)` draws a panel that opens and closes like a dropdown list, with each row popping in after the last.
+* A button with `droparrow` (a function that returns how far it's open, from 0 to 1) ends with a dropdown's divider and turning arrow.
+* `element:mousepos()` gives the mouse in the element's own coordinates.
+
+### ✨ Improvements
+
+* The pause menu's controls popup now shows the **F6** note to the right of the popup, in a glass box centred halfway down the screen, like the note in the options menu. Before, it was squeezed in under the popup's title. Its lines wrap to fit the box.
+* Each canvas is blurred once a frame and every glass panel on it reads that blur. It's only blurred again when a panel would sit on top of glass drawn since, like an open dropdown over the buttons below it. Slider tracks don't count, so their handles don't make it blur again.
+* The blur is done at the game's own resolution (400x224), so it costs the same however big the window is.
+* The middle of a glass panel only reads and tints the blur. The bending, colour split and rim are only worked out in a band along the edge, at most 6 game pixels wide.
+* When the window isn't resizable, the frame is drawn to a canvas first so the glass can read it back. This only happens while glass with a blur has been on screen in the last 30 frames, and never in flat mode, so plain gameplay draws straight to the window. A menu's first frame on screen shows its glass without the blur.
+
+### ❌ Removals
+
+* The mappack icon border (`graphics/GUI/mappackoverlay.png`) is no longer drawn or loaded. The file is no longer there.
+* Buttons no longer zoom in and out when pressed, and the Course Maker's scroll factor sliders no longer push-zoom. The press squash and jelly replace both.
+* Dropdown lists no longer slide out of a clipped box, and no longer have a grey drop shadow behind them. They pop out with the jelly and cast the glass's soft shadow instead.
+
 ## v1.2.2
 
 ### 🧩 New Features
