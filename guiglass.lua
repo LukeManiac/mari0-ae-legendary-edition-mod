@@ -20,6 +20,7 @@ guiglass.downsample = nil    --the backdrop is blurred at 1/downsample size. nil
 guiglass.refraction = 1.6    --how far the edges bend the backdrop, in game pixels
 guiglass.tintstrength = 0.42 --how much of the element's fill colour is laid over the blurred backdrop
 guiglass.clarity = 0.6       --scales the tint of every element except bases (the editor's background pane): lower is clearer
+guiglass.shine = 1           --how strongly the curved edge catches the light (0: off)
 
 local PRESS_STRETCH = 1.18 --scale x while held (scale y is 1/this, so the area stays the same)
 local PRESS_TIME = 0.2
@@ -31,6 +32,7 @@ local MAGNET_SPEED = 14    --lerp speed of the lean (per second)
 
 local blurshader, glassshader, mesh, dummy
 local sentimage --the backdrop the glass shader has now
+local sentshine --the shine the glass shader has now
 local NOSCALE, NOCLAMP = {0, 0}, {0, 0, 0, 0}
 local u = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
 local function setu(i, a, b, c, d)
@@ -77,6 +79,7 @@ extern Image backdrop;
 //      pixel, for smooth edges), refraction (target pixels)
 //u[5]: bezel (how far in from the edge the lens bends), shadow, opacity without a backdrop, has a backdrop (0/1)
 extern vec4 u[6];
+extern float shine;
 
 float sdbox(vec2 p, vec2 b, float r)
 {
@@ -180,6 +183,30 @@ vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc)
 	col = mix(col, rim.rgb, clamp(band*rim.a*spec, 0.0, 1.0));
 	col += rim.rgb*(1.0 - smoothstep(0.0, bezel*0.7, depth))*0.10*rim.a*spec;
 	a = max(a, band*rim.a*spec);
+
+	//3D shine: the bezel is a rounded edge (a quarter circle from the flat top down to the rim), lit from the top left.
+	//Its normal leans out by x across the bezel, so the curve facing the light catches a soft highlight, the side facing
+	//away darkens a little, and the steepest part reflects a little more (fresnel). The flat middle's lighting is taken
+	//off, so everything past the bezel stays as it is.
+	if (shine > 0.0) {
+		float x = clamp(1.0 - depth/max(bezel, 0.0001), 0.0, 1.0);
+		vec3 N = vec3(n*x, sqrt(max(1.0 - x*x, 0.0)));
+		const vec3 L = vec3(-0.4342, -0.6513, 0.6224); //normalize(-0.4, -0.6, 0.5734): top left, towards the viewer
+		const vec3 H = vec3(-0.2410, -0.3615, 0.9007); //normalize(L + view)
+		float nh = max(dot(N, H), 0.0);
+		float s = nh*nh; s *= s; s *= s; s *= s; s *= s; //nh^32: a soft but tight highlight
+		float flat_s = 0.0352;                          //H.z^32, what the flat top gets
+		float highlight = max(s - flat_s, 0.0);
+		float shade = dot(N, L) - L.z;                  //>0 facing the light, <0 facing away
+		float fres = x*x*x;
+		//smart: less over a bright backdrop (it would blow out), more while hovered (the rim is brighter then)
+		float bright = dot(col, vec3(0.299, 0.587, 0.114));
+		float amount = shine*(1.0 - 0.55*bright)*(0.6 + 0.6*rim.a);
+		col += vec3(1.0)*highlight*0.55*amount;
+		col *= 1.0 + clamp(shade, -1.0, 0.4)*0.14*shine;
+		col += mix(vec3(1.0), rim.rgb, 0.5)*fres*0.06*amount;
+		a = max(a, highlight*0.55*amount);
+	}
 
 	float ga = a*inside;
 	float outa = ga + sh*(1.0 - ga);
@@ -496,6 +523,10 @@ function guiglass.panel(x, y, w, h, r, o)
 	if image ~= sentimage then
 		shader:send("backdrop", image)
 		sentimage = image
+	end
+	if guiglass.shine ~= sentshine then
+		shader:send("shine", guiglass.shine)
+		sentshine = guiglass.shine
 	end
 	shader:send("u", u[1], u[2], u[3], u[4], u[5], u[6])
 
