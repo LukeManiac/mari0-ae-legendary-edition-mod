@@ -13,7 +13,6 @@ guiglass = {}
 
 guiglass.enabled = true      --false: plain tinted panes, no backdrop blur
 guiglass.quality = "full"    --"full": the backdrop is blurred again every frame
-                             --"lite": blurred again 4 times a second (the backdrop of a frame or two ago, cheap)
                              --"flat": no backdrop blur at all, tinted panes
 guiglass.blur = 3            --blur radius (sigma), in game pixels
 guiglass.downsample = nil    --the backdrop is blurred at 1/downsample size. nil: at the game's own resolution
@@ -192,17 +191,12 @@ function guiglass.load()
 	dummy = love.graphics.newImage(data)
 end
 
---Blurred copies of the canvases glass is drawn on. Each canvas is blurred once a frame and every panel on it reads
---the same copy. A canvas is blurred again only when a panel would sit on another panel drawn since the last copy
---(an open dropdown list over the buttons below it, say), so it can show that panel through its glass, or when the
---canvas gets cleared.
-local backdrops = setmetatable({}, {__mode = "k"}) --canvas → {a, b, w, h, frame, dirty}
-local frame = 0
-
---every love.graphics.present() starts a new frame, so the blurred copies are made again
-local LITE_REFRESH = 0.25 --how often lite mode blurs the backdrop again (seconds)
-local FULL_REFRESH = 1/60 --full mode blurs it again at most this often: past 60 frames a second, the frames in
-                          --between reuse the last blur (only ever one made before any glass was drawn)
+--Blurred copies of the canvases glass is drawn on. Each canvas is blurred at the frame's first panel on it, before
+--any glass is on it, and every panel after that reads the same copy. It's never blurred again in the middle of a
+--frame, so a blur never has glass in it (the editor's big background pane, say). Only clearing the canvas makes the
+--next panel blur it again. Nothing is kept from one frame to the next.
+local backdrops = setmetatable({}, {__mode = "k"}) --canvas → {a, b, w, h, frame}
+local frame = 0 --every love.graphics.present() starts a new frame
 
 local framebackdrop = false
 local lastbackdropframe = -math.huge --the last frame glass wanted a blurred backdrop
@@ -311,38 +305,15 @@ local function backdropsource(canvas)
 	return canvas
 end
 
-local function overlaps(list, x0, y0, x1, y1)
-	for _, r in ipairs(list) do
-		if x0 < r[3] and x1 > r[1] and y0 < r[4] and y1 > r[2] then
-			return true
-		end
-	end
-	return false
-end
-
---the blurred copy of src that a panel covering x0, y0 - x1, y1 (target pixels) should read, or nil
-local function getbackdrop(src, x0, y0, x1, y1)
+--the blurred copy of src for a panel drawn on it, or nil
+local function getbackdrop(src)
 	local sw, sh = src:getDimensions()
 	local ds = guiglass.downsample or scale
 	local rw, rh = math.ceil(sw/ds), math.ceil(sh/ds)
 	local bd = backdrops[src]
-	if bd and bd.ds == ds and bd.w == rw and bd.h == rh then
-		if guiglass.mode() == "lite" then
-			--blurred again only at the frame's first panel on this canvas, so it never has glass in it
-			if bd.frame == frame or love.timer.getTime() - bd.time < LITE_REFRESH then
-				bd.frame = frame
-				return bd
-			end
-		elseif bd.frame == frame then
-			if not overlaps(bd.dirty, x0, y0, x1, y1) then
-				return bd
-			end
-		elseif bd.clean and love.timer.getTime() - bd.time < FULL_REFRESH then
-			--the frame's first panel, and the last blur is recent and has no glass in it: use it again
-			bd.frame = frame
-			bd.dirty = {}
-			return bd
-		end
+	if bd and bd.ds == ds and bd.w == rw and bd.h == rh and bd.frame == frame then
+		--already blurred this frame, before any glass went on it
+		return bd
 	end
 	if not bd or bd.w ~= rw or bd.h ~= rh then
 		local ok, a = pcall(love.graphics.newCanvas, rw, rh)
@@ -381,13 +352,9 @@ local function getbackdrop(src, x0, y0, x1, y1)
 	love.graphics.draw(bd.b, 0, 0)
 	love.graphics.pop()
 
-	--clean: made before any glass on this canvas this frame, so a later frame can use it again
-	bd.clean = (bd.frame ~= frame)
 	bd.frame = frame
-	bd.time = love.timer.getTime()
 	bd.ds = ds
 	bd.scale = {1/sw, 1/sh} --uv per target pixel
-	bd.dirty = {}
 	return bd
 end
 
@@ -406,7 +373,8 @@ end
 --	shadow = 0-1 or false  shadow opacity (0.28 by default)
 --	nobackdrop = true      just a tinted pane: cheaper, for things inside another panel (highlights, pills)
 --	glassalpha = 0-1       opacity of the pane where there is no backdrop to read
---	base = true            other glass sits on it (a slider's track): that glass doesn't blur again to show it
+--	base = true            other glass sits on it (a slider's track). Kept for the callers; every panel reads the
+--	                       blur from before any glass now, so it changes nothing
 function guiglass.panel(x, y, w, h, r, o)
 	if supported and not glassshader then
 		guiglass.load()
@@ -469,23 +437,11 @@ function guiglass.panel(x, y, w, h, r, o)
 		framebackdrop = true
 	end
 	if wants and src and src.getDimensions then
-		--the panel's own shape on the target (without the shadow around it)
-		local ax0, ay0 = love.graphics.transformPoint(x, y)
-		local ax1, ay1 = love.graphics.transformPoint(x+w, y)
-		local ax2, ay2 = love.graphics.transformPoint(x+w, y+h)
-		local ax3, ay3 = love.graphics.transformPoint(x, y+h)
-		local sx0, sx1 = math.min(ax0, ax1, ax2, ax3), math.max(ax0, ax1, ax2, ax3)
-		local sy0, sy1 = math.min(ay0, ay1, ay2, ay3), math.max(ay0, ay1, ay2, ay3)
-		backdrop = getbackdrop(src, sx0, sy0, sx1, sy1)
+		backdrop = getbackdrop(src)
 		if backdrop then
 			hasbackdrop = 1
 			uvscale = backdrop.scale
 			uvclamp = backdrop.region
-			--a panel drawn on top of this one later blurs again, so it shows this one through its glass
-			--(not for a base, like a slider's track: what sits on it reads the blur from under the base instead)
-			if not o.base then
-				table.insert(backdrop.dirty, {sx0, sy0, sx1, sy1})
-			end
 		end
 	end
 	if guiglass.debug and wants then
