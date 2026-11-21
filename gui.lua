@@ -2169,8 +2169,13 @@ function guielement:inhighlight(x, y, allow_dropdown_hover)
 		(not editor_gui_interaction_enabled(self) or (dropdown_open and opened_dropdown ~= self)) and not hover_only then
 		return false
 	end
+	--the element's real shape as it was drawn (leaning, grown on hover, squashed, round corners), or nil to use the
+	--rectangle below (not drawn with glass lately, or the mouse is moved into another space first)
+	local shapehit
 	if (self.controlbindpage or (self.controlspopup and gamestate == "game")) and optionscontrols_transformmouse then
 		x, y = optionscontrols_transformmouse(x, y)
+	elseif guiglass then
+		shapehit = guiglass.hit(self, x, y)
 	end
 	if self.nohover then --e.g. the level properties panel while it is still sliding, or a menu on top of it
 		return false
@@ -2180,7 +2185,15 @@ function guielement:inhighlight(x, y, allow_dropdown_hover)
 		if self.text then
 			xadd = utf8.len(self.text)*8+1
 		end
-		if x >= self.x*scale and x < (self.x+9+xadd)*scale and y >= self.y*scale and y < (self.y+9)*scale then
+		if shapehit then
+			return true --on the box
+		end
+		--the label (and the box, when there's no shape to go by)
+		local left = self.x
+		if shapehit == false then
+			left = self.x+9
+		end
+		if x >= left*scale and x < (self.x+9+xadd)*scale and y >= self.y*scale and y < (self.y+9)*scale then
 			return true
 		end
 	elseif self.type == "dropdown" then
@@ -2188,6 +2201,9 @@ function guielement:inhighlight(x, y, allow_dropdown_hover)
 		local listheight = dropdown_listheight(self)
 		local inside = x >= self.x*scale and x < (self.x+13+self.width*8)*scale
 		if self.extended == false then
+			if shapehit ~= nil then
+				return shapehit
+			end
 			if inside and y >= self.y*scale and y < (self.y+headh)*scale then
 				return true
 			end
@@ -2236,10 +2252,16 @@ function guielement:inhighlight(x, y, allow_dropdown_hover)
 			--ignore clicks outside y range
 			return false
 		end
+		if shapehit ~= nil then
+			return shapehit
+		end
 		if x >= self.x*scale and x < (self.x+3+self.width+self.space*2)*scale and y >= self.y*scale and y < (self.y+1+self.height*10+self.space*2)*scale then
 			return true
 		end
 	elseif self.type == "scrollbar" then
+		if shapehit ~= nil then
+			return shapehit --the handle
+		end
 		if self.dir == "ver" then
 			if x >= self.x*scale and x < (self.x+self.width)*scale and y >= (self.y+self.yrange*self.value)*scale and y < (self.height+self.y+self.yrange*self.value)*scale then
 				return true
@@ -2250,6 +2272,9 @@ function guielement:inhighlight(x, y, allow_dropdown_hover)
 			end
 		end
 	elseif self.type == "input" then
+		if shapehit ~= nil then
+			return shapehit
+		end
 		if x >= self.x*scale and x < (self.x+3+self.width*8+2*self.spacing)*scale and y >= self.y*scale and y < (self.y+1+self.height*10+2*self.spacing)*scale then
 			return true
 		end

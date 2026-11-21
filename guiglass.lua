@@ -244,6 +244,32 @@ local backdrops = setmetatable({}, {__mode = "k"}) --canvas → {a, b, w, h, fra
 local frame = 0 --every love.graphics.present() starts a new frame
 
 local framebackdrop = false
+
+local pushed = {} --the elements being drawn between guiglass.push and guiglass.pop, innermost last
+--each element's shape on screen (see guiglass.hit)
+local shapes = setmetatable({}, {__mode = "k"}) --element → {frame, ox, oy, ux, uy, vx, vy, w, h, r}
+
+local function recordshape(x, y, w, h, r)
+	local el = pushed[#pushed]
+	if not el then
+		return
+	end
+	local sh = shapes[el]
+	if sh and sh.frame == frame then
+		return --only the first panel: the element's own body, not what's drawn inside it
+	end
+	sh = sh or {}
+	shapes[el] = sh
+	local ox, oy = love.graphics.transformPoint(x, y)
+	local ax, ay = love.graphics.transformPoint(x+w, y)
+	local bx, by = love.graphics.transformPoint(x, y+h)
+	sh.frame = frame
+	sh.ox, sh.oy = ox, oy
+	sh.ux, sh.uy = ax-ox, ay-oy --the panel's x axis on screen, w long
+	sh.vx, sh.vy = bx-ox, by-oy --and its y axis, h long
+	sh.w, sh.h, sh.r = w, h, math.min(r or 0, w/2, h/2)
+end
+guiglass.recordshape = recordshape
 local lastbackdropframe = -math.huge --the last frame glass wanted a blurred backdrop
 
 guiglass.debug = false --true: shows the glass state in the top left corner
@@ -478,6 +504,9 @@ function guiglass.panel(x, y, w, h, r, o)
 	local backdrop
 	local uvscale, uvclamp = NOSCALE, NOCLAMP
 	local src = backdropsource(love.graphics.getCanvas())
+	if pushed[1] then
+		recordshape(x, y, w, h, r)
+	end
 	local wants = guiglass.mode() ~= "flat" and not o.nobackdrop
 	if wants then
 		framebackdrop = true
@@ -659,10 +688,45 @@ function guiglass.push(el, cx, cy, w, h, hovering, o)
 	love.graphics.translate(cx+ox, cy+oy)
 	love.graphics.scale(sx, sy)
 	love.graphics.translate(-cx, -cy)
+	table.insert(pushed, el)
 end
 
 function guiglass.pop()
+	table.remove(pushed)
 	love.graphics.pop()
+end
+
+------------------------------------------------------------
+-- hover by the element's real shape
+------------------------------------------------------------
+
+--The first glass panel an element draws between guiglass.push and guiglass.pop is its shape on screen: where it sits
+--after leaning, growing on hover and squashing, with its round corners. guiglass.hit tests the mouse against that, so
+--an element counts as hovered exactly while the mouse is on what you see (and stays hovered while it grows towards
+--the mouse), instead of on a fixed rectangle.
+
+--whether (mx, my) (render target pixels, like love.mouse.getPosition) is on el's shape as it was last drawn.
+--nil when el hasn't been drawn with glass lately (the caller falls back to its own rectangle then)
+function guiglass.hit(el, mx, my)
+	local sh = shapes[el]
+	if not sh or frame - sh.frame > 2 then
+		return nil
+	end
+	--back into the panel's own coordinates
+	local det = sh.ux*sh.vy - sh.uy*sh.vx
+	if math.abs(det) < 1e-9 then
+		return false
+	end
+	local dx, dy = mx - sh.ox, my - sh.oy
+	local s = (dx*sh.vy - dy*sh.vx)/det
+	local t = (sh.ux*dy - sh.uy*dx)/det
+	local lx, ly = s*sh.w, t*sh.h
+	--the rounded box: inside when the distance to its edge is at most 0
+	local hw, hh, r = sh.w/2, sh.h/2, sh.r
+	local qx = math.abs(lx - hw) - hw + r
+	local qy = math.abs(ly - hh) - hh + r
+	local outside = math.sqrt(math.max(qx, 0)^2 + math.max(qy, 0)^2) + math.min(math.max(qx, qy), 0) - r
+	return outside <= 0
 end
 
 ------------------------------------------------------------
