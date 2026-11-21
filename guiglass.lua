@@ -407,6 +407,7 @@ end
 --	shadow = 0-1 or false  shadow opacity (0.28 by default)
 --	nobackdrop = true      just a tinted pane: cheaper, for things inside another panel (highlights, pills)
 --	glassalpha = 0-1       opacity of the pane where there is no backdrop to read
+--	solid = true           the tint is shown as it is, not made clearer by guiglass.clarity (colour swatches)
 --	base = true            other glass sits on it (a slider's track). Kept for the callers; every panel reads the
 --	                       blur from before any glass now, so it changes nothing
 function guiglass.panel(x, y, w, h, r, o)
@@ -491,7 +492,7 @@ function guiglass.panel(x, y, w, h, r, o)
 
 	--every setting goes in one send (u in the shader), with its tables reused
 	local tint = o.tintstrength or guiglass.tintstrength
-	if not o.base then
+	if not (o.base or o.solid) then
 		tint = tint*guiglass.clarity
 	end
 	setu(1, uvscale[1], uvscale[2], w, h)

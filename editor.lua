@@ -229,6 +229,9 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	guielements["autoscrollcheckbox"] = guielement:new("checkbox", width*16-14-utf8.len(TEXT["follow player"])*8, 20, toggleautoscroll, autoscroll, TEXT["follow player"])
 	for i = 1, #backgroundcolor do
 		guielements["defaultcolor" .. i] = guielement:new("button", 17+(i-1)*12, 78, " ", defaultbackground, 0, {i})
+		--a colour swatch: shows its own colour, not the level behind it
+		guielements["defaultcolor" .. i].tintstrength = 1
+		guielements["defaultcolor" .. i].solidtint = true
 		if i == 4 then
 			guielements["defaultcolor" .. i].fillcolor = backgroundrgb
 		else

@@ -1043,6 +1043,8 @@ function guielement:draw(a, offx, offy)
 
 		guiglass.panel(self.x*scale, self.y*scale, bw, bh, br, {
 			tint = self.fillcolor,
+			tintstrength = self.tintstrength, --nil: the usual glass
+			solid = self.solidtint,           --true: the fill colour shows as it is (colour swatches)
 			rim = lerpcolor(self.bordercolor, self.bordercolorhigh, mix),
 			rimstrength = lerp(0.45, 0.95, mix),
 			alpha = alpha/255,
