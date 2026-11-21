@@ -2298,6 +2298,30 @@ function love.mouse.getPosition()
 	return x, y
 end
 
+--konami code: marks every world of the open mappack as reached, returns how many were newly unlocked
+function konami_unlockworlds()
+	if not mappack or not mappacklevels then
+		return 0
+	end
+	if not reachedworlds[mappack] then
+		reachedworlds[mappack] = {}
+	end
+	local worlds = reachedworlds[mappack]
+	local count = 0
+	for i = 1, #mappacklevels do
+		--only worlds that actually exist, so the world select never offers one that can't load
+		if love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/" .. i .. "-1.txt") then
+			if not worlds[i] then
+				count = count + 1
+			end
+			worlds[i] = true
+		elseif worlds[i] == nil then
+			worlds[i] = false --keeps the indexes in order for the save string
+		end
+	end
+	return count
+end
+
 ----------------
 
 function love.keypressed(key, scancode, isrepeat, textinput)
@@ -2392,9 +2416,13 @@ function love.keypressed(key, scancode, isrepeat, textinput)
 					playsound(konamisound)
 				end
 				gamefinished = true
+				local unlockedworlds = konami_unlockworlds()
 				saveconfig()
 				konamii = 1
 				notice.new("Cheats unlocked!")
+				if unlockedworlds > 0 then
+					notice.new("All worlds unlocked!")
+				end
 			end
 		else
 			konamii = 1

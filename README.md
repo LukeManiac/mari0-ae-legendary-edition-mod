@@ -471,6 +471,12 @@ For anyone building menus:
 * A button with `droparrow` (a function that returns how far it's open, from 0 to 1) ends with a dropdown's divider and turning arrow.
 * `element:mousepos()` gives the mouse in the element's own coordinates.
 
+#### 🕹️ Konami Code
+
+* Typing the Konami code in the menus now also unlocks every world in the open mappack, on top of unlocking cheats. Every world can then be picked straight away in the world selection popup.
+* Only worlds that actually exist (with a `N-1.txt` course) are unlocked, so the popup never offers a world that can't load.
+* The unlocked worlds are saved straight away, like the cheats. A second notice, "All worlds unlocked!", shows under "Cheats unlocked!" whenever at least one new world was unlocked.
+
 ### ✨ Improvements
 
 * The pause menu's controls popup now shows the **F6** note to the right of the popup, in a glass box centred halfway down the screen, like the note in the options menu. Before, it was squeezed in under the popup's title. Its lines wrap to fit the box.
