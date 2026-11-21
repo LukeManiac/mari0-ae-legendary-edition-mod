@@ -47,11 +47,7 @@ function notice.draw()
 		
 		love.graphics.setScissor(unpack(scissor))
 		
-		love.graphics.setColor(0, 0, 0, 200)
-		love.graphics.rectangle("fill", targetrect[1]*scale, targetrect[2]*scale, targetrect[3]*scale, targetrect[4]*scale)
-		
-		love.graphics.setColor(255, 255, 255, 255)
-		drawrectangle(targetrect[1]+1, targetrect[2]+1, targetrect[3]-2, targetrect[4]-2)
+		guiglass.box(targetrect[1]*scale, targetrect[2]*scale, targetrect[3]*scale, targetrect[4]*scale, 3*scale)
 		
 		love.graphics.setColor(v.color)
 		properprintF(v.text, (targetrect[1]+2)*scale, (actualy+3)*scale)

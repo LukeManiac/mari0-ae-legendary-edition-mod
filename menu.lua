@@ -1032,13 +1032,8 @@ local function resetwarning_draw()
 
 	local alpha = 255*popupscale
 	local popupradius = 60 * scale * 0.2
-	love.graphics.setColor(0, 0, 0, alpha)
-	love.graphics.rectangle("fill", 20*scale, 92*scale, 220*scale, 60*scale, popupradius)
+	guiglass.box(20*scale, 92*scale, 220*scale, 60*scale, popupradius, alpha/255)
 	love.graphics.setColor(255, 255, 255, alpha)
-	local previouslinewidth = love.graphics.getLineWidth()
-	love.graphics.setLineWidth(scale)
-	love.graphics.rectangle("line", 20*scale, 92*scale, 220*scale, 60*scale, popupradius)
-	love.graphics.setLineWidth(previouslinewidth)
 	local line1 = TEXT["all settings and controls"]
 	local line2 = TEXT["will be reset to default!"]
 	if resetwarningstage == 2 then
@@ -2690,10 +2685,15 @@ local function optionscontrols_drawresetnote()
 
 	local boxx = OPTIONS_BOX_X + OPTIONS_BOX_W + 2 --241, where the dlc tips start
 	local boxw = width*16 - boxx - 9
+	optionscontrols_drawnotebox(boxx*scale, boxw*scale, height*16/2*scale, shown)
+end
+
+--the f6 note in a glass box (screen pixels): left edge x, width w, its middle at centery, shown fades it (0-1).
+--The text is rewrapped to the box's width, since the lines are longer than it
+function optionscontrols_drawnotebox(x, w, centery, shown)
 	local line1, line2 = optionscontrols_resettooltip()
-	--rewrapped to the box's width, since the lines are longer than it
 	local lines, line = {}, ""
-	local maxchars = math.max(1, math.floor((boxw - 6)/8))
+	local maxchars = math.max(1, math.floor((w/scale - 6)/8))
 	for word in (line1 .. " " .. line2):gmatch("%S+") do
 		if line == "" then
 			line = word
@@ -2706,13 +2706,12 @@ local function optionscontrols_drawresetnote()
 	end
 	table.insert(lines, line)
 
-	local boxh = #lines*10 + 4
-	local boxy = height*16/2 - boxh/2
-	love.graphics.setColor(0, 0, 0, 200*shown)
-	love.graphics.rectangle("fill", boxx*scale, boxy*scale, boxw*scale, boxh*scale)
+	local h = (#lines*10 + 4)*scale
+	local y = centery - h/2
+	guiglass.box(x, y, w, h, 4*scale, shown, {rimstrength = 0.55})
 	love.graphics.setColor(255, 255, 255, 255*shown)
 	for i = 1, #lines do
-		properprintF(lines[i], (boxx + 3)*scale, (boxy + 3 + (i-1)*10)*scale)
+		properprintF(lines[i], x + 3*scale, y + (3 + (i-1)*10)*scale)
 	end
 end
 
@@ -2765,13 +2764,8 @@ local function options_drawtab()
 			love.graphics.translate(0, (1 - progress) * 8 * scale)
 
 			local popupradius = math.min(200, 60) * scale * 0.2
-			love.graphics.setColor(0, 0, 0)
-			love.graphics.rectangle("fill", 30*scale, 100*scale, 200*scale, 60*scale, popupradius)
+			guiglass.box(30*scale, 100*scale, 200*scale, 60*scale, popupradius, 1)
 			love.graphics.setColor(255, 255, 255)
-			local previouslinewidth = love.graphics.getLineWidth()
-			love.graphics.setLineWidth(scale)
-			love.graphics.rectangle("line", 30*scale, 100*scale, 200*scale, 60*scale, popupradius)
-			love.graphics.setLineWidth(previouslinewidth)
 			local controlname = optionscontrols_controlnames[optionsselection-4]
 			if controlname == "aimx" then
 				properprintF(TEXT["move stick right"], 40*scale, 110*scale)
@@ -3050,7 +3044,8 @@ local function mappackframe_drawlocal(self, x, y)
 	local i = self.index
 	local selected = self.forcehover
 
-	--icon
+	--icon, with round corners that follow the frame's (no border image)
+	guiglass.beginround((x+4)*scale, (y+4)*scale, 50*scale, 50*scale, guiglass.insetradius(self, 4)*scale)
 	love.graphics.setColor(255, 255, 255)
 	if mappackicon and mappackicon[i] ~= nil then
 		local scale2w = scale*50 / math.max(1, mappackicon[i]:getWidth())
@@ -3064,7 +3059,7 @@ local function mappackframe_drawlocal(self, x, y)
 	else
 		love.graphics.draw(mappacknoicon, (x+4)*scale, (y+4)*scale, 0, scale, scale)
 	end
-	love.graphics.draw(mappackoverlay, (x+4)*scale, (y+4)*scale, 0, scale, scale)
+	guiglass.endround()
 
 	--name
 	if selected then
@@ -3109,7 +3104,8 @@ local function mappackframe_drawonline(self, x, y)
 	local selected = self.forcehover
 	local asset = onlineassetlist[i]
 
-	--icon
+	--icon, with round corners that follow the frame's (no border image)
+	guiglass.beginround((x+4)*scale, (y+4)*scale, 50*scale, 50*scale, guiglass.insetradius(self, 4)*scale)
 	love.graphics.setColor(255, 255, 255)
 	if asset.icon then
 		local scale2w = scale*50 / math.max(1, asset.icon:getWidth())
@@ -3118,7 +3114,7 @@ local function mappackframe_drawonline(self, x, y)
 	else
 		love.graphics.draw(mappackonlineicon, mappackonlineiconquad[1], (x+4)*scale, (y+4)*scale, 0, scale, scale)
 	end
-	love.graphics.draw(mappackoverlay, (x+4)*scale, (y+4)*scale, 0, scale, scale)
+	guiglass.endround()
 
 	--what kind of dlc it is
 	local qi = 2
@@ -3364,8 +3360,7 @@ local function mappackmenu_drawpages()
 	
 		if mappackhorscrollsmooth <= 0.01 then
 			love.graphics.setScissor()
-			love.graphics.setColor(0, 0, 0, 200)
-			love.graphics.rectangle("fill", 241*scale, 125*scale, 150*scale, 75*scale)
+			guiglass.box(241*scale, 125*scale, 150*scale, 75*scale, 4*scale, 1, {rimstrength = 0.55})
 			love.graphics.setColor(255, 255, 255, 255)
 			if savefolderfailed then
 				properprintF(TEXT["mappack folder fail"], 244*scale, 129*scale)
@@ -3393,8 +3388,7 @@ local function mappackmenu_drawpages()
 		
 		love.graphics.setScissor()
 		if mappackhorscrollsmooth <= 1.01 then
-			love.graphics.setColor(0, 0, 0, 200)
-			love.graphics.rectangle("fill", 241*scale, 16*scale, 150*scale, 180*scale)
+			guiglass.box(241*scale, 16*scale, 150*scale, 180*scale, 4*scale, 1, {rimstrength = 0.55})
 			love.graphics.setColor(255, 255, 255, 255)
 			local asset = onlineassetlist[onlinemappackselection]
 
@@ -3834,13 +3828,8 @@ function menu_draw()
             love.graphics.translate(0, (1 - warningprogress) * 8 * scale)
 
             local popupradius = math.min(220, 60) * scale * 0.2
-            love.graphics.setColor(0, 0, 0)
-            love.graphics.rectangle("fill", 20*scale, 92*scale, 220*scale, 60*scale, popupradius)
+            guiglass.box(20*scale, 92*scale, 220*scale, 60*scale, popupradius, 1)
             love.graphics.setColor(255, 255, 255)
-            local previouslinewidth = love.graphics.getLineWidth()
-            love.graphics.setLineWidth(scale)
-            love.graphics.rectangle("line", 20*scale, 92*scale, 220*scale, 60*scale, popupradius)
-            love.graphics.setLineWidth(previouslinewidth)
             properprintF(TEXT["starting a new game will"], (130-(utf8.len(TEXT["starting a new game will"])*4))*scale, 100*scale)
             properprintF(TEXT["delete your existing save!"], (130-(utf8.len(TEXT["delete your existing save!"])*4))*scale, 110*scale)
             
@@ -3869,13 +3858,8 @@ function menu_draw()
 			love.graphics.translate(-130*scale, -122*scale)
 
 			local popupradius = math.min(220, 60) * scale * 0.2
-			love.graphics.setColor(0, 0, 0)
-			love.graphics.rectangle("fill", 20*scale, 92*scale, 220*scale, 60*scale, popupradius)
+			guiglass.box(20*scale, 92*scale, 220*scale, 60*scale, popupradius, 1)
 			love.graphics.setColor(255, 255, 255)
-			local previouslinewidth = love.graphics.getLineWidth()
-			love.graphics.setLineWidth(scale)
-			love.graphics.rectangle("line", 20*scale, 92*scale, 220*scale, 60*scale, popupradius)
-			love.graphics.setLineWidth(previouslinewidth)
 			properprintF(TEXT["select world"], (130-(utf8.len(TEXT["select world"])*4))*scale, 105*scale)
 			
 			local sc = selectworldcursor
@@ -5960,20 +5944,14 @@ function drawcontrolsoverlay()
 	local popupx, popupy, popupw, popuph, offsetx, offsety = controlspopup_geometry()
 	local popupradius = get_corner_radius(popupw, popuph) / 2
 
-	love.graphics.setColor(0, 0, 0, 255)
-	love.graphics.rectangle("fill", popupx, popupy, popupw, popuph, popupradius)
-	love.graphics.setColor(255, 255, 255, 255)
-	local previouslinewidth = love.graphics.getLineWidth()
-	love.graphics.setLineWidth(scale)
-	love.graphics.rectangle("line", popupx, popupy, popupw, popuph, popupradius)
-	love.graphics.setLineWidth(previouslinewidth)
+	guiglass.box(popupx, popupy, popupw, popuph, popupradius, 1)
+	love.graphics.setColor(255, 255, 255)
 
-	-- Title and keybind reset hint
+	-- Title, and the f6 note right of the popup with its middle halfway down the screen (like in the options menu)
 	properprintF("controls:", (winwidth/2 - 36*scale), popupy + 3*scale)
-	local tooltipline1, tooltipline2 = optionscontrols_resettooltip()
-	local tooltipwidth = math.max(utf8.len(tooltipline1), utf8.len(tooltipline2)) * 8
+	local notex = popupx + popupw + 2*scale
+	optionscontrols_drawnotebox(notex, winwidth - notex - 9*scale, winheight/2, 1)
 	love.graphics.setColor(255, 255, 255, 255)
-	properprintF(tooltipline1 .. "\n" .. tooltipline2, winwidth/2 - tooltipwidth*scale/2, popupy + 13*scale)
 
 	-- Draw the controls content (repositioned, the widgets are laid out like in the options menu)
 	love.graphics.push()
@@ -6027,13 +6005,8 @@ function drawcontrolsoverlay()
 		love.graphics.translate(0, (1 - progress) * 8 * scale)
 
 		local popupradius = math.min(200, 60) * scale * 0.2
-		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", 30*scale, 100*scale, 200*scale, 60*scale, popupradius)
+		guiglass.box(30*scale, 100*scale, 200*scale, 60*scale, popupradius, 1)
 		love.graphics.setColor(255, 255, 255)
-		local previouslinewidth = love.graphics.getLineWidth()
-		love.graphics.setLineWidth(scale)
-		love.graphics.rectangle("line", 30*scale, 100*scale, 200*scale, 60*scale, popupradius)
-		love.graphics.setLineWidth(previouslinewidth)
 		local controlname = optionscontrols_controlnames[optionsselection-4]
 		if controlname == "aimx" then
 			properprintF(TEXT["move stick right"], 40*scale, 110*scale)

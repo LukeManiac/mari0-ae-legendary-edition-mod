@@ -272,6 +272,9 @@ function shaders:postdraw()
 	for i,v in ipairs(activepasses) do
 		if i < #activepasses then
 			activepasses[i+1]:predraw()
+		elseif glassrootactive then
+			--the liquid glass GUI draws the frame into its own canvas first (see love.draw)
+			love.graphics.setCanvas({glassrootcanvas, stencil=true})
 		else
 			love.graphics.setCanvas()
 		end

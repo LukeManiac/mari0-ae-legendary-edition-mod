@@ -850,8 +850,7 @@ local function drawpanel()
 
 	--description, scrolled inside its box
 	local desc = layout.desc
-	love.graphics.setColor(0, 0, 0, 200)
-	love.graphics.rectangle("fill", DESC_X*scale, desc.top*scale, DESC_W*scale, desc.viewh*scale)
+	guiglass.box(DESC_X*scale, desc.top*scale, DESC_W*scale, desc.viewh*scale, 4*scale, 1, {rimstrength = 0.55})
 	love.graphics.setScissor(DESC_X*scale, desc.top*scale, DESC_W*scale, desc.viewh*scale)
 	local offset = minigamepanelscroll.desc.smooth
 	love.graphics.setColor(255, 255, 255)
@@ -870,8 +869,7 @@ local function drawpanel()
 	--(an open dropdown is drawn later by minigame_menu_drawdropdown, on top of the tabs)
 	local optbox = layout.opts
 	if optbox then
-		love.graphics.setColor(0, 0, 0, 200)
-		love.graphics.rectangle("fill", DESC_X*scale, optbox.top*scale, DESC_W*scale, optbox.viewh*scale)
+		guiglass.box(DESC_X*scale, optbox.top*scale, DESC_W*scale, optbox.viewh*scale, 4*scale, 1, {rimstrength = 0.55})
 		love.graphics.setScissor(DESC_X*scale, optbox.top*scale, DESC_W*scale, optbox.viewh*scale)
 		offset = minigamepanelscroll.opts.smooth
 		love.graphics.setColor(200, 200, 200)
@@ -894,8 +892,7 @@ local function drawpanel()
 	local box = scorebox(def, layout)
 
 	--highscores: every score, best first, scrollable with the mouse wheel
-	love.graphics.setColor(0, 0, 0, 200)
-	love.graphics.rectangle("fill", DESC_X*scale, box.y*scale, DESC_W*scale, box.h*scale)
+	guiglass.box(DESC_X*scale, box.y*scale, DESC_W*scale, box.h*scale, 4*scale, 1, {rimstrength = 0.55})
 	love.graphics.setColor(255, 255, 255)
 	properprintF(T("highscores"), (DESC_X+3)*scale, (box.y+2)*scale)
 	love.graphics.setScissor(DESC_X*scale, box.listy*scale, DESC_W*scale, box.listh*scale)
@@ -973,7 +970,9 @@ function minigame_frame_draw(self, x, y)
 		return
 	end
 
+	--the graphic, with round corners that follow the frame's
 	local img = minigame_getgraphic(def)
+	guiglass.beginround((x+4)*scale, (y+4)*scale, GRAPHIC_W*scale, GRAPHIC_H*scale, guiglass.insetradius(self, 4)*scale)
 	if img then
 		love.graphics.setColor(255, 255, 255)
 		love.graphics.draw(img, (x+4)*scale, (y+4)*scale, 0,
@@ -983,6 +982,7 @@ function minigame_frame_draw(self, x, y)
 		love.graphics.setColor(0, 0, 0, 160)
 		love.graphics.rectangle("fill", (x+4)*scale, (y+4)*scale, GRAPHIC_W*scale, GRAPHIC_H*scale)
 	end
+	guiglass.endround()
 	drawgraphicoverlay(def, x+4, y+4, selected)
 	love.graphics.setColor(255, 255, 255)
 end

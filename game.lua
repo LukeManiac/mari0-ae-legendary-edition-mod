@@ -3314,12 +3314,7 @@ function game_draw()
 		love.graphics.translate(winwidth/2, winheight/2)
 		love.graphics.scale(math.max(bettertimer, 0.0001), math.max(bettertimer, 0.0001))
 		love.graphics.translate(-winwidth/2, -winheight/2)
-		love.graphics.setLineWidth(1)
-		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", (width*8*scale)-150*scale, winheight/8, pausewidth, pauseheight, pauseradius)
-		love.graphics.setColor(255, 255, 255)
-		love.graphics.rectangle("line", (width*8*scale)-150*scale, winheight/8, pausewidth, pauseheight, pauseradius)
-		love.graphics.setLineWidth(prevlinewidth)
+		guiglass.box((width*8*scale)-150*scale, winheight/8, pausewidth, pauseheight, pauseradius)
 		
 		for i = 1, #pausemenuoptions do
 			love.graphics.setColor(100, 100, 100, 255)
@@ -3448,12 +3443,8 @@ function drawprompt(timer, duration, open, rows)
     love.graphics.translate(winwidth/2, winheight/2)
     love.graphics.scale(math.max(prompttimer, 0.0001), math.max(prompttimer, 0.0001))
     love.graphics.translate(-winwidth/2, -winheight/2)
-    love.graphics.setLineWidth(1)
-    love.graphics.setColor(0, 0, 0, 255)
-    love.graphics.rectangle("fill", (winwidth-promptwidth)/2, (winheight-promptheight)/2, promptwidth, promptheight, promptradius)
+    guiglass.box((winwidth-promptwidth)/2, (winheight-promptheight)/2, promptwidth, promptheight, promptradius)
     love.graphics.setColor(255, 255, 255, 255)
-    love.graphics.rectangle("line", (winwidth-promptwidth)/2, (winheight-promptheight)/2, promptwidth, promptheight, promptradius)
-    love.graphics.setLineWidth(prevlinewidth)
 end
 
 PROMPT_ROW = 10 --a line of a prompt, in game pixels

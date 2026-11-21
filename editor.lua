@@ -272,6 +272,9 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	
 	--guielements["levelpropertiesdropdown"] = guielement:new("dropdown", 200, 69, 20, function() end, 1, "level properties")
 	guielements["levelpropertiesdropdown"] = guielement:new("button", 200, 69, TEXT["level properties      ↓"], levelpropertiestoggle, 1)
+	--it opens like a dropdown: the button draws the arrow itself (turning over as the panel opens), so it's cut from the text
+	guielements["levelpropertiesdropdown"].text = (guielements["levelpropertiesdropdown"].text:gsub("%s*↓%s*$", ""))
+	guielements["levelpropertiesdropdown"].droparrow = function() return levelpropertiesprogress() end
 	levelpropertiesdropdown = false
 	levelpropertiesvalue = 0 --how far the panel is open (0-1), animated
 	levelpropertiestarget = 0
@@ -2749,17 +2752,17 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 			properprintFbackground(TEXT["toggle minimap with m"], 8*scale, (height*16-16)*scale)
 		end
 	else
+		--the menu's background is one big pane of glass (darker than the elements on it, so they stand out)
+		--it's a base: the glass on top of it reads the level behind it, so it doesn't have to blur again
+		local tint = 0.85
 		if editorstate == "maps" then
-			love.graphics.setColor(0, 0, 0, 100)
-		else
-			love.graphics.setColor(0, 0, 0, 230)
+			tint = 0.35
 		end
-		
+		local menuh = 205+tilemenuy
 		if minimapdragging then
-			love.graphics.rectangle("fill", scale, 18*scale, 398*scale, (18+minimapheight*2)*scale)
-		else
-			love.graphics.rectangle("fill", scale, 18*scale, 398*scale, (205+tilemenuy)*scale)
+			menuh = 18+minimapheight*2
 		end
+		guiglass.panel(scale, 18*scale, 398*scale, menuh*scale, 4*scale, {tintstrength = tint, rimstrength = 0.4, shadow = 0.3, base = true})
 		
 		guielements["tabmain"]:draw()
 		guielements["tabtiles"]:draw()
@@ -3201,51 +3204,22 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 					guielements["backgrounddropdown"]:draw()
 				end
 
+				--the panel opens and closes like a dropdown list (see guielement.drawdroppanel in gui.lua)
 				local lpp = levelpropertiesprogress()
-				if levelpropertiesdropdown or lpp > 0 then
-					local len = 9
-					local lpd = guielements["levelpropertiesdropdown"]
-					local high = guielements["levelpropertiesdropdown"]:inhighlight(love.mouse.getPosition())
-					local panelw, panelh = lpd.width+5, 8*len+1
-					
-					--checkboxes can only be hovered/clicked once the panel is fully open
-					levelpropertiessetnohover(lpp < 1)
-					
-					--slide in/out like a dropdown: clip to the revealed part and slide the panel along
-					local animating = lpp < 1
-					local oldx, oldy, oldw, oldh
-					if animating then
-						oldx, oldy, oldw, oldh = love.graphics.getScissor()
-						love.graphics.intersectScissor(math.floor(lpd.x*scale), math.floor((lpd.y+12)*scale), math.ceil(panelw*scale), math.max(0, math.ceil(panelh*lpp*scale)))
-						love.graphics.push()
-						love.graphics.translate(0, -(1-lpp)*panelh*scale)
-					end
-					
-					--same corner radius as the button above it (11 px tall, 0.15 ratio),
-					--inner radius = outer radius - border width, so the border stays an even thickness on the corners
-					local pw, ph = panelw*scale, panelh*scale
-					local pr = 11*scale * 0.15
-					if high then
-						love.graphics.setColor(255,255,255)
-					else
-						love.graphics.setColor(127,127,127)
-					end
-					love.graphics.rectangle("fill", lpd.x*scale, (lpd.y+12)*scale, pw, ph, pr)
-					love.graphics.setColor(0,0,0)
-					love.graphics.rectangle("fill", (lpd.x+1)*scale, (lpd.y+13)*scale, pw-2*scale, ph-2*scale, math.max(0, pr-scale))
-					guielements["intermissioncheckbox"]:draw()
-					guielements["warpzonecheckbox"]:draw()
-					guielements["underwatercheckbox"]:draw()
-					guielements["bonusstagecheckbox"]:draw()
-					guielements["edgewrappingcheckbox"]:draw()
-					guielements["lightsoutcheckbox"]:draw()
-					guielements["lowgravitycheckbox"]:draw()
-					
-					if animating then
-						love.graphics.pop()
-						love.graphics.setScissor(oldx, oldy, oldw, oldh)
-					end
+				local lpd = guielements["levelpropertiesdropdown"]
+				local panelw, panelh = lpd.width+5, 8*9+1
+				--checkboxes can only be hovered/clicked once the panel is fully open
+				levelpropertiessetnohover(lpp < 1)
+				local rows = {}
+				for _, name in ipairs({"intermissioncheckbox", "warpzonecheckbox", "underwatercheckbox", "bonusstagecheckbox", "edgewrappingcheckbox", "lightsoutcheckbox", "lowgravitycheckbox"}) do
+					local checkbox = guielements[name]
+					table.insert(rows, {y = checkbox.y, h = 9, draw = function() checkbox:draw() end})
 				end
+				local highlight = 0
+				if lpd:inhighlight(love.mouse.getPosition()) then
+					highlight = 1
+				end
+				guielement.drawdroppanel(lpd, levelpropertiesdropdown, lpd.x, lpd.y+12, panelw, panelh, rows, {highlight = highlight})
 			end
 		elseif editorstate == "maps" then
 			love.graphics.setColor(0, 0, 0, 210)
@@ -5686,6 +5660,17 @@ end
 function editor_mousepressed(x, y, button)
 	if editor_overlay_input_blocked() then
 		return
+	end
+
+	--the level properties panel closes like a dropdown: a click anywhere outside it and its button closes it
+	if levelpropertiesdropdown and editormenuopen and editorstate == "main" and button ~= "wu" and button ~= "wd" then
+		local lpd = guielements["levelpropertiesdropdown"]
+		local px0, py0 = lpd.x*scale, (lpd.y+12)*scale
+		local px1, py1 = (lpd.x+lpd.width+5)*scale, (lpd.y+12+8*9+1)*scale
+		local inpanel = x >= px0 and x < px1 and y >= py0 and y < py1
+		if not inpanel and not lpd:inhighlight(x, y) then
+			levelpropertiestoggle()
+		end
 	end
 	
 	if rightclickmenuopen then

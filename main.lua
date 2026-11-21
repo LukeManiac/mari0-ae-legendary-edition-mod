@@ -592,7 +592,6 @@ function love.load()
 	mappacknoicon = love.graphics.newImage("graphics/GUI/mappacknoicon.png")
 	mappackonlineicon = love.graphics.newImage("graphics/GUI/mappackonlineicon.png")
 	mappackloadingicon = love.graphics.newImage("graphics/GUI/mappackloading.png")
-	mappackoverlay = love.graphics.newImage("graphics/GUI/mappackoverlay.png")
 
 	uparrowimg = love.graphics.newImage("graphics/GUI/uparrow.png")
 	downarrowimg = love.graphics.newImage("graphics/GUI/downarrow.png")
@@ -1309,6 +1308,28 @@ function love.draw(donotupdate)
 		if android and not androidLowRes then
 			androidDraw()
 		end
+	elseif guiglass and guiglass.wantscanvas() then
+		--the liquid glass GUI reads what's behind each element, and the window itself can't be read back,
+		--so the frame is drawn into a canvas first and then put on the window
+		local ww, wh = love.graphics.getDimensions()
+		if not glassrootcanvas or glassrootcanvas:getWidth() ~= ww or glassrootcanvas:getHeight() ~= wh then
+			glassrootcanvas = love.graphics.newCanvas(ww, wh)
+			glassrootcanvas:setFilter("nearest", "nearest")
+		end
+		love.graphics.setCanvas({glassrootcanvas, stencil=true})
+		love.graphics.clear(love.graphics.getBackgroundColor())
+		glassrootactive = true
+		lovedraw(donotupdate)
+		glassrootactive = false
+		love.graphics.setCanvas()
+		love.graphics.push("all")
+		love.graphics.origin()
+		love.graphics.setScissor()
+		love.graphics.setShader()
+		love.graphics.setBlendMode("replace", "premultiplied")
+		love.graphics.setColor(255, 255, 255)
+		love.graphics.draw(glassrootcanvas, 0, 0)
+		love.graphics.pop()
 	else
 		lovedraw(donotupdate)
 	end

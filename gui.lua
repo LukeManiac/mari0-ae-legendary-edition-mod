@@ -1,3 +1,5 @@
+require "guiglass"
+
 guielement = class:new()
 
 --GUI animations
@@ -436,158 +438,321 @@ local function drawgraphicalentry(self, i, x, y, w, h, highlighted, header)
 	love.graphics.setColor(r, g, b, a)
 end
 
+--seconds since this element's last frame (each element keeps its own clock, so it works however often it's drawn)
+local function framedt(st, key)
+	local now = love.timer.getTime()
+	local last = st[key] or now
+	st[key] = now
+	return math.min(math.max(now - last, 0), 1/20)
+end
+
+--a 0-1 value that eases towards on (1) or off (0), like the old border fades
+local function hovermix(self, key, on)
+	local target = bool2int(on)
+	local anim = self[key .. "anim"]
+	if self[key .. "target"] == nil then
+		self[key .. "target"] = target
+		self[key] = target
+	elseif target ~= self[key .. "target"] then
+		self[key .. "target"] = target
+		anim = gui_anim_start(self[key], target)
+		self[key .. "anim"] = anim
+	end
+	if anim then
+		local v, done = gui_anim_value(anim)
+		self[key] = v
+		if done then
+			self[key .. "anim"] = nil
+		end
+	end
+	return self[key]
+end
+
+local function lerpcolor(c1, c2, t)
+	return {lerp(c1[1], c2[1], t), lerp(c1[2], c2[2], t), lerp(c1[3], c2[3], t)}
+end
+
+--a highlight pill that glides from option to option and fades in and out (target: {x, y, w, h} or nil)
+local function glidepill(st, key, target, dt)
+	local pill = st[key]
+	if not pill then
+		pill = {a = 0}
+		st[key] = pill
+	end
+	local f = 1 - math.exp(-dt*24)
+	if target then
+		if pill.a < 0.05 or not pill.x then
+			pill.x, pill.y, pill.w, pill.h = target[1], target[2], target[3], target[4]
+		else
+			pill.x = lerp(pill.x, target[1], f)
+			pill.y = lerp(pill.y, target[2], f)
+			pill.w = lerp(pill.w, target[3], f)
+			pill.h = lerp(pill.h, target[4], f)
+		end
+		pill.a = lerp(pill.a, 1, f)
+	else
+		pill.a = lerp(pill.a, 0, f)
+	end
+	return pill
+end
+
+--dropdown lists pop in and out with a jelly. These say how long each part takes
+local DROPDOWN_CLOSE_DELAY = 0.06 --the panel waits this long for its options to start shrinking
+local DROPDOWN_CLOSE_TIME = 0.2   --each option (and the panel) shrinks in this long
+
+local function dropdown_rows(self)
+	return math.max(1, math.ceil(#self.entries/dropdown_columns(self)))
+end
+
+local function drop_stagger(rows)
+	return math.min(0.022, 0.16/rows)
+end
+
+local function drop_closetime(rows)
+	return DROPDOWN_CLOSE_DELAY + DROPDOWN_CLOSE_TIME + drop_stagger(rows)*(rows-1)
+end
+
+--keeps track of when a dropdown-like panel opened and closed (on owner), and says whether any of it is still on screen
+local function drop_timeline(owner, open, rows)
+	local st = guiglass.state(owner)
+	local now = love.timer.getTime()
+	if st.wasext == nil then
+		st.wasext = open
+		if open then
+			st.openat = now
+		end
+	elseif st.wasext ~= open then
+		st.wasext = open
+		if open then
+			st.openat = now
+			st.closeat = nil
+		else
+			st.closeat = now
+		end
+	end
+	if open then
+		return true
+	end
+	if st.closeat and now - st.closeat < drop_closetime(rows) then
+		return true
+	end
+	st.closeat = nil
+	return false
+end
+
+--the panel's jelly: scale x, scale y (it grows out of the header's edge) and opacity
+local function drop_panelscale(owner, open)
+	local st = guiglass.state(owner)
+	local now = love.timer.getTime()
+	local sy, alpha
+	if open then
+		local ot = now - (st.openat or now)
+		sy = guiglass.jellyin(ot*1.15)
+		alpha = math.min(1, ot*12)
+	else
+		local ct = now - (st.closeat or now)
+		sy = guiglass.jellyout((ct - DROPDOWN_CLOSE_DELAY)/DROPDOWN_CLOSE_TIME)
+		alpha = math.max(0, math.min(1, sy*3))
+	end
+	return guiglass.jellywidth(sy, 0.25), sy, alpha
+end
+
+--a row's own jelly. distance: how many rows it is from the header (it pops after the ones nearer the header,
+--and closing, the ones furthest from the header go first)
+local function drop_rowscale(owner, open, distance, rows)
+	local st = guiglass.state(owner)
+	local now = love.timer.getTime()
+	local stagger = drop_stagger(rows)
+	if open then
+		local ot = now - (st.openat or now) - 0.03 - stagger*distance
+		local sy = guiglass.jellyin(ot*1.1)
+		return guiglass.jellywidth(sy), sy, math.max(0, math.min(1, ot*12))
+	end
+	local ct = now - (st.closeat or now) - stagger*(rows - 1 - distance)
+	local sy = guiglass.jellyout(ct/DROPDOWN_CLOSE_TIME)
+	return guiglass.jellywidth(sy), sy, math.max(0, math.min(1, sy*3))
+end
+
+local function dropdown_timeline(self)
+	if drop_timeline(self, self.extended, dropdown_rows(self)) then
+		return true
+	end
+	return (self.listvalue or 0) > 0
+end
+
+--Draws a panel that opens and closes like a dropdown list, for things that aren't a dropdown but open like one
+--(the editor's level properties, say). It pops out of its top edge with a jelly and so does each row, one after
+--another. owner keeps the animation, open says whether it's open, x, y, w, h is the panel (game pixels) and rows are
+--{y = top, h = height, draw = function} in game pixels, nearest the header first.
+--o: highlight (0-1) brightens the rim. Returns whether any of it is on screen.
+function guielement.drawdroppanel(owner, open, x, y, w, h, rows, o)
+	o = o or {}
+	if not drop_timeline(owner, open, #rows) then
+		return false
+	end
+	local psx, psy, palpha = drop_panelscale(owner, open)
+	if psy <= 0.01 or palpha <= 0 then
+		return true
+	end
+	local pcx = (x + w/2)*scale
+	love.graphics.push()
+	love.graphics.translate(pcx, y*scale)
+	love.graphics.scale(psx, psy)
+	love.graphics.translate(-pcx, -y*scale)
+
+	local grey = lerp(127, 255, o.highlight or 0)
+	guiglass.panel(x*scale, y*scale, w*scale, h*scale, math.min(11*scale*0.32, h*scale/2), {rim = {grey, grey, grey}, rimstrength = 0.6, alpha = palpha, tintstrength = 0.5})
+
+	for i, row in ipairs(rows) do
+		local rsx, rsy, ralpha = drop_rowscale(owner, open, i-1, #rows)
+		if rsy > 0.01 and ralpha > 0 then
+			local rcx, rcy = pcx, (row.y + row.h/2)*scale
+			love.graphics.push()
+			love.graphics.translate(rcx, rcy)
+			love.graphics.scale(rsx, rsy)
+			love.graphics.translate(-rcx, -rcy)
+			row.draw()
+			love.graphics.pop()
+		end
+	end
+	love.graphics.pop()
+	love.graphics.setColor(255, 255, 255)
+	return true
+end
+
+local drawingopendropdowns = false
+
+--an open dropdown is drawn later, on top of everything (guielement.drawopendropdowns), so it isn't drawn twice
+local function dropdown_deferred(self)
+	if drawingopendropdowns or not self.active or not guielements then
+		return false
+	end
+	if not dropdown_timeline(self) then
+		return false
+	end
+	for _, v in pairs(guielements) do
+		if v == self then
+			return true
+		end
+	end
+	return false
+end
+
 function guielement:draw(a, offx, offy)
 	love.graphics.setColor(255, 255, 255)
 	if self.type == "checkbox" then
-		local quad = 1
-		if self.var == true then
-			quad = 2
-		end
-		local high = 1
 		local hovering = self:hovered()
-		if hovering then high = 2 end
+		local mx, my = love.mouse.getPosition()
+		local over = self:inhighlight(mx, my)
+		local mix = hovermix(self, "hovermix", hovering)
 
-		--hover pop (1 → 1.12) + existing toggle scale
-		if hovering ~= self.lasthover then
-			self.lasthover = hovering
-			self.hoveranim = gui_anim_start(self.hoverscale or 1, hovering and 1.12 or 1)
-		end
-		local hoverscale = self.hoverscale or 1
-		if self.hoveranim then
-			local v, done = gui_anim_value(self.hoveranim)
-			hoverscale = v
-			self.hoverscale = v
-			if done then self.hoveranim = nil end
-		end
-
+		--the tick pops when it changes
 		if self.lastvar == nil then
 			self.lastvar = self.var
 		elseif self.lastvar ~= self.var then
 			self.lastvar = self.var
 			self.scaleanim = gui_anim_start(0.6, 1)
 		end
-		local s = hoverscale
+		local ticks = 1
 		if self.scaleanim then
 			local v, done = gui_anim_value(self.scaleanim)
 			if done then
 				self.scaleanim = nil
 			else
-				s = hoverscale * math.max(v, 0)
+				ticks = math.max(v, 0)
 			end
 		end
-		
-		local border = high == 2 and 255 or 127
-		local cx, cy = (self.x + 4.5) * scale, (self.y + 4.5) * scale
-		love.graphics.push()
-		love.graphics.translate(cx, cy)
-		love.graphics.scale(s, s)
-		love.graphics.translate(-4.5 * scale, -4.5 * scale)
 
-		-- border (same corner ratio as the buttons: 0.15, inner fill 0.7 of that)
-		local cbr = 9 * scale * 0.15
-		love.graphics.setColor(border, border, border)
-		love.graphics.rectangle("fill", 0, 0, 9 * scale, 9 * scale, cbr)
-		-- fill
-		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", 1 * scale, 1 * scale, 7 * scale, 7 * scale, cbr * 0.7)
+		local size = 9*scale
+		local cx, cy = (self.x + 4.5)*scale, (self.y + 4.5)*scale
+		guiglass.push(self, cx, cy, size, size, over, {hoverscale = 1.12})
 
-		-- tickmark when checked
+		local rim = lerpcolor({127, 127, 127}, {255, 255, 255}, mix)
+		local tint = {0, 0, 0}
 		if self.var then
+			tint = {40, 40, 40}
+		end
+		guiglass.panel(self.x*scale, self.y*scale, size, size, size*0.3, {tint = tint, rim = rim, rimstrength = lerp(0.45, 0.95, mix)})
+
+		--tickmark when checked
+		if self.var then
+			love.graphics.push()
+			love.graphics.translate(cx, cy)
+			love.graphics.scale(ticks, ticks)
+			love.graphics.translate(-4.5*scale, -4.5*scale)
 			love.graphics.setColor(255, 255, 255)
 			love.graphics.setLineWidth(scale)
 			love.graphics.setLineStyle("smooth")
-			-- short leg
-			love.graphics.line(2.2 * scale, 4.5 * scale, 4 * scale, 6.5 * scale)
-			-- long leg
-			love.graphics.line(4 * scale, 6.5 * scale, 7 * scale, 2.5 * scale)
-			-- rounded caps on both ends and the elbow
-			local tr = scale / 2
-			love.graphics.circle("fill", 2.2 * scale, 4.5 * scale, tr, 12)
-			love.graphics.circle("fill", 4 * scale, 6.5 * scale, tr, 12)
-			love.graphics.circle("fill", 7 * scale, 2.5 * scale, tr, 12)
+			love.graphics.line(2.2*scale, 4.5*scale, 4*scale, 6.5*scale)
+			love.graphics.line(4*scale, 6.5*scale, 7*scale, 2.5*scale)
+			local tr = scale/2
+			love.graphics.circle("fill", 2.2*scale, 4.5*scale, tr, 12)
+			love.graphics.circle("fill", 4*scale, 6.5*scale, tr, 12)
+			love.graphics.circle("fill", 7*scale, 2.5*scale, tr, 12)
+			love.graphics.pop()
+			love.graphics.setLineWidth(1)
 		end
 
-		love.graphics.pop()
-		love.graphics.setLineWidth(1)
-		
+		guiglass.pop()
+
 		if self.text then
-			love.graphics.setColor(255, 255, 255) -- was inheriting the black fill colour when unchecked
+			love.graphics.setColor(255, 255, 255)
 			properprintF(self.text, (self.x+10)*scale, (self.y+1)*scale)
 		end
 	elseif self.type == "dropdown" then
+		if dropdown_deferred(self) then
+			love.graphics.setColor(255, 255, 255)
+			return
+		end
+		local listvisible = dropdown_timeline(self)
+		local st = guiglass.state(self)
+		local now = love.timer.getTime()
+		local dt = framedt(st, "listlast")
+
 		local high = self:inhighlight(love.mouse.getPosition())
+		local rawhigh = high
 		if self.extended and self.keycursor then
 			high = self.keycursor --highlight the option picked with the keyboard
 		end
 		if not high and self.forcehover and not self.nohover then
 			high = 0 --looks hovered without a highlighted option
 		end
-		
-		local bordertarget = bool2int(high)
-		if self.bordertarget == nil then
-			self.bordertarget = bordertarget
-			self.bordermix = bordertarget
-		elseif bordertarget ~= self.bordertarget then
-			self.bordertarget = bordertarget
-			self.borderanim = gui_anim_start(self.bordermix, bordertarget)
-		end
-		if self.borderanim then
-			local v, done = gui_anim_value(self.borderanim)
-			self.bordermix = v
-			if done then self.borderanim = nil end
-		end
-		local bordergrey = lerp(127, 255, self.bordermix)
-		
+
+		local mix = hovermix(self, "bordermix", high)
+		local bordergrey = lerp(127, 255, mix)
+
 		local p = self:getlistprogress()
-		local ext = self.extended or p > 0
 		local rowh = dropdown_rowheight(self)
 		local headh = dropdown_headerheight(self)
 		local listheight = dropdown_listheight(self)
 		local listtop = self.y+headh
-		local listr = math.min((3+self.width*8)*scale, 11*scale) * 0.2 --same corner radius as the header
+		local fullw = 13+self.width*8
 
-		if ext and not self.cutoff then
-			love.graphics.setColor(127, 127, 127)
-			local y = self.y
-			if self.dropup then
-				y = (self.y-listheight)
-			end
-			local fullheight = headh+listheight
-			local shadowheight = fullheight - (1-p)*listheight
-			local shadowy = y+2
-			if self.dropup then
-				shadowy = y+2 + (fullheight-shadowheight)
-			end
-			love.graphics.rectangle("fill", (self.x+2)*scale, shadowy*scale, (13+self.width*8)*scale, shadowheight*scale, listr)
+		--the header: one glass capsule with the arrow at its right end
+		local hw, hh = fullw*scale, headh*scale
+		local hr = hh*0.32
+		local headerover = rawhigh == true or rawhigh == 0
+		local hcx, hcy = self.x*scale + hw/2, self.y*scale + hh/2
+		guiglass.push(self, hcx, hcy, hw, hh, headerover, {nomagnet = self.extended})
+		guiglass.panel(self.x*scale, self.y*scale, hw, hh, hr, {rim = {bordergrey, bordergrey, bordergrey}, rimstrength = lerp(0.45, 0.95, mix)})
+
+		--a thin divider before the arrow
+		love.graphics.setColor(255, 255, 255, 45 + 50*mix)
+		love.graphics.rectangle("fill", (self.x + 2 + self.width*8)*scale, (self.y + 2)*scale, math.max(1, scale*0.5), (headh-4)*scale)
+
+		--the arrow turns over as the list opens
+		love.graphics.setColor(bordergrey, bordergrey, bordergrey)
+		local arrowchar = "↓"
+		if self.dropup then
+			arrowchar = "↑"
 		end
-	
-		love.graphics.setColor(bordergrey, bordergrey, bordergrey)
-		
-		local dw = (3+self.width*8)*scale
-		local dh = headh*scale
-		local dr = math.min(dw, 11*scale) * 0.2
-		--outer border for the whole control
-		love.graphics.rectangle("fill", self.x*scale, self.y*scale, dw, dh, dr)
-
-		--text area fill (left side)
-		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", (self.x+1)*scale, (self.y+1)*scale, (1+self.width*8)*scale, (headh-2)*scale, dr*0.7)
-
-		--arrow button strip on the right (same border colour as the outer frame)
-		love.graphics.setColor(bordergrey, bordergrey, bordergrey)
-		local abx = (self.x + 2 + self.width*8)*scale
-		local aby = self.y*scale
-		local abw = 11*scale
-		local abh = headh*scale
-		local abr = math.min(abw, 11*scale) * 0.2
-		love.graphics.rectangle("fill", abx, aby, abw, abh, abr)
-		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", abx+scale, aby+scale, abw-2*scale, abh-2*scale, abr*0.7)
-
-		--↓ from the font, centred in the arrow button
-		love.graphics.setColor(bordergrey, bordergrey, bordergrey)
-		local arrowchar = self.dropup and "↑" or "↓"
-		properprintF(arrowchar, (self.x + 3 + self.width*8)*scale, (self.y + 2 + math.floor((headh-11)/2))*scale)
+		local ax = (self.x + 3 + self.width*8)*scale
+		local ay = (self.y + 2 + math.floor((headh-11)/2))*scale
+		love.graphics.push()
+		love.graphics.translate(ax + 4*scale, ay + 4*scale)
+		love.graphics.rotate(math.pi*p)
+		properprintF(arrowchar, -4*scale, -4*scale)
+		love.graphics.pop()
 
 		--the option shown in the header
 		local function drawheader(var)
@@ -616,7 +781,6 @@ function guielement:draw(a, offx, offy)
 
 		--a new option picked without the mouse (keys, a controller, or something else changing it) slides in sideways and
 		--pushes the old one out, easing out: from the right when it's further down the list, from the left when it's further up
-		local now = love.timer.getTime()
 		if self.headervar == nil or self.headerentries ~= self.entries or not self.entries[self.headervar] then
 			self.headeranim = nil --first draw, or the list itself changed
 		elseif self.var ~= self.headervar then
@@ -646,19 +810,19 @@ function guielement:draw(a, offx, offy)
 			t = (now - anim.start)/GUI_ANIM_TIME
 		end
 		if anim and t < 1 and self.entries[anim.from] then
-			local p = ease_out_quad(t)
+			local ep = ease_out_quad(t)
 			local w = 1+self.width*8
-			--cut to the header's black box, wherever the current transform puts it
+			--cut to the header's text area, wherever the current transform puts it
 			local sx1, sy1 = love.graphics.transformPoint((self.x+1)*scale, (self.y+1)*scale)
 			local sx2, sy2 = love.graphics.transformPoint((self.x+1+w)*scale, (self.y+headh-1)*scale)
 			local ox, oy, ow, oh = love.graphics.getScissor()
-			love.graphics.intersectScissor(math.floor(sx1), math.floor(sy1), math.max(0, math.ceil(sx2-sx1)), math.max(0, math.ceil(sy2-sy1)))
+			love.graphics.intersectScissor(math.floor(math.min(sx1, sx2)), math.floor(math.min(sy1, sy2)), math.max(0, math.ceil(math.abs(sx2-sx1))), math.max(0, math.ceil(math.abs(sy2-sy1))))
 			love.graphics.push()
-			love.graphics.translate(-anim.direction*p*w*scale, 0)
+			love.graphics.translate(-anim.direction*ep*w*scale, 0)
 			drawheader(anim.from)
 			love.graphics.pop()
 			love.graphics.push()
-			love.graphics.translate(anim.direction*(1-p)*w*scale, 0)
+			love.graphics.translate(anim.direction*(1-ep)*w*scale, 0)
 			drawheader(self.var)
 			love.graphics.pop()
 			if ox then
@@ -670,237 +834,221 @@ function guielement:draw(a, offx, offy)
 			self.headeranim = nil
 			drawheader(self.var)
 		end
+		guiglass.pop()
 
-		--one entry of the open list: boxtop is the top of its black box, texttop is where its text goes
-		local function drawlistentry(i, boxtop, texttop)
-			local cx, cw = dropdown_columnspan(self, (dropdown_cell(self, i)))
-			local s = self.entries[i]
-			if high ~= i then
-				love.graphics.setColor(0, 0, 0)
-				love.graphics.rectangle("fill", cx*scale, boxtop*scale, cw*scale, (rowh-1)*scale, listr*0.7)
-				if self.drawentryfunc then
-					drawgraphicalentry(self, i, cx, boxtop, cw, rowh-1, false, false)
-					return
-				end
-				setdropdownentrycolor(self, s, i)
+		if listvisible then
+			--where the list panel sits, and the edge it grows out of
+			local panely, panelh, pivoty
+			if self.cutoff then
+				panely, panelh = -self.scroll, headh+listheight
+				pivoty = self.y + headh/2
+			elseif self.dropup then
+				panely, panelh = self.y-listheight, listheight
+				pivoty = self.y
 			else
-				if self.drawentryfunc then
-					drawgraphicalentry(self, i, cx, boxtop, cw, rowh-1, true, false)
-					return
-				end
-				love.graphics.setColor(0, 0, 0)
+				panely, panelh = listtop, listheight
+				pivoty = listtop
 			end
-			if self.displayentries then s = self.displayentries[i] end
-			drawdropdownentry(s, cx, texttop, self.width+1)
-		end
+			local firstrowtop --top of the first row of options
+			if self.cutoff then
+				firstrowtop = headh - self.scroll
+			else
+				firstrowtop = panely
+			end
+			local rows = dropdown_rows(self)
+			local panelsx, panelsy, panelalpha = drop_panelscale(self, self.extended)
 
-		--a grid's cells after its last entry are black like the others
-		local function drawemptycells(firstrowtop)
-			local columns = dropdown_columns(self)
-			local n = #self.entries
-			if columns > 1 and n%columns ~= 0 then
-				local _, row = dropdown_cell(self, n)
-				love.graphics.setColor(0, 0, 0)
-				for column = n%columns+1, columns do
-					local cx, cw = dropdown_columnspan(self, column)
-					love.graphics.rectangle("fill", cx*scale, (firstrowtop+(row-1)*rowh)*scale, cw*scale, (rowh-1)*scale, listr*0.7)
+			--how far an option is from the header, in rows
+			local function rowdistance(row)
+				if self.dropup then
+					return rows - row
 				end
-			end
-		end
-	
-		if ext then
-			love.graphics.setColor(127, 127, 127)
-			if high then
-				love.graphics.setColor(255, 255, 255)
+				return row - 1
 			end
 
-			local animating = p < 1
-			local oldx, oldy, oldw, oldh
-			if animating then
-				local clipx, clipy, clipw, cliph, slide
-				clipw = (14+self.width*8)*scale
-				if self.cutoff then
-					local fullh = height*16
-					local top = self.y*(1-p)
-					local bottom = (self.y+headh) + (fullh-(self.y+headh))*p
-					clipx, clipy, cliph = self.x*scale, top*scale, (bottom-top)*scale
-					slide = 0
-				elseif self.dropup then
-					clipx, clipy, cliph = self.x*scale, (self.y-listheight*p)*scale, listheight*p*scale
-					slide = (1-p)*listheight*scale
-				else
-					clipx, clipy, cliph = self.x*scale, (self.y+headh)*scale, listheight*p*scale
-					slide = -(1-p)*listheight*scale
-				end
-				oldx, oldy, oldw, oldh = love.graphics.getScissor()
-				love.graphics.intersectScissor(math.floor(clipx), math.floor(clipy), math.ceil(clipw), math.max(0, math.ceil(cliph)))
+			local function optionscale(row)
+				return drop_rowscale(self, self.extended, rowdistance(row), rows)
+			end
+
+			if panelsy > 0.01 and panelalpha > 0 then
+				local pcx = (self.x + fullw/2)*scale
 				love.graphics.push()
-				love.graphics.translate(0, slide)
-			end
-			
-			if self.cutoff then --have a scrollbar
-				love.graphics.rectangle("fill", self.x*scale, -self.scroll*scale, (13+self.width*8)*scale, (headh+listheight)*scale, listr)
-				love.graphics.setColor(127, 127, 127)
-				if high then love.graphics.setColor(255, 255, 255) end
-				local ax = (self.x+2+self.width*8+4)*scale
-				local ay = (-self.scroll+headh/2)*scale
-				love.graphics.polygon("fill", ax-3*scale, ay-2*scale, ax+3*scale, ay-2*scale, ax, ay+3*scale)
-				love.graphics.setColor(0, 0, 0)
-				love.graphics.rectangle("fill", (self.x+1)*scale, (-self.scroll+1)*scale, (1+self.width*8)*scale, (headh-2)*scale)
-				if self.drawentryfunc then
-					drawgraphicalentry(self, self.var, self.x+1, -self.scroll+1, 1+self.width*8, headh-2, false, true)
-				else
-					love.graphics.setColor(127, 127, 127)
-					local selected = self.entries[self.var]
-					if self.displayentries then selected = self.displayentries[self.var] end
-					drawdropdownentry(selected, self.x+1, -self.scroll+2, self.width)
+				love.graphics.translate(pcx, pivoty*scale)
+				love.graphics.scale(panelsx, panelsy)
+				love.graphics.translate(-pcx, -pivoty*scale)
+
+				local pr = math.min(headh*scale*0.32, panelh*scale/2)
+				guiglass.panel(self.x*scale, panely*scale, fullw*scale, panelh*scale, pr, {rim = {bordergrey, bordergrey, bordergrey}, rimstrength = 0.6, alpha = panelalpha, tintstrength = 0.5})
+
+				--a long list repeats the header at its top
+				if self.cutoff then
+					love.graphics.setColor(bordergrey, bordergrey, bordergrey, 255*panelalpha)
+					local cax = (self.x+2+self.width*8+4)*scale
+					local cay = (-self.scroll+headh/2)*scale
+					love.graphics.polygon("fill", cax-3*scale, cay+2*scale, cax+3*scale, cay+2*scale, cax, cay-3*scale)
+					if self.drawentryfunc then
+						drawgraphicalentry(self, self.var, self.x+1, -self.scroll+1, 1+self.width*8, headh-2, false, true)
+					else
+						love.graphics.setColor(127, 127, 127, 255*panelalpha)
+						local selected = self.entries[self.var]
+						if self.displayentries then selected = self.displayentries[self.var] end
+						drawdropdownentry(selected, self.x+1, -self.scroll+2, self.width)
+					end
+					love.graphics.setColor(255, 255, 255, 40*panelalpha)
+					love.graphics.rectangle("fill", (self.x+3)*scale, (headh-self.scroll-1)*scale, (fullw-6)*scale, math.max(1, scale*0.5))
 				end
+
+				--the hovered option's pill glides between options
+				local target
+				if type(high) == "number" and high > 0 and self.entries[high] then
+					local column, row = dropdown_cell(self, high)
+					local cx, cw = dropdown_columnspan(self, column)
+					target = {cx*scale, (firstrowtop+(row-1)*rowh)*scale, cw*scale, (rowh-1)*scale}
+				end
+				local pill = glidepill(st, "pill", target, dt)
+				if pill.a > 0.01 and pill.x then
+					guiglass.pill(pill.x, pill.y, pill.w, pill.h, math.min(pill.h*0.4, pr), {255, 255, 255, 70}, 0.45, pill.a*panelalpha)
+				end
+
 				for i = 1, #self.entries do
-					local _, row = dropdown_cell(self, i)
-					local rowtop = headh+(row-1)*rowh-self.scroll
-					if rowtop+rowh > 0 and rowtop < height*16 then
-						drawlistentry(i, rowtop, rowtop+1)
+					local column, row = dropdown_cell(self, i)
+					local boxtop = firstrowtop+(row-1)*rowh
+					if boxtop+rowh > 0 and boxtop < height*16 then
+						local cx, cw = dropdown_columnspan(self, column)
+						local osx, osy, oalpha = optionscale(row)
+						if osy > 0.01 and oalpha > 0 then
+							local ocx, ocy = (cx + cw/2)*scale, (boxtop + (rowh-1)/2)*scale
+							love.graphics.push()
+							love.graphics.translate(ocx, ocy)
+							love.graphics.scale(osx, osy)
+							love.graphics.translate(-ocx, -ocy)
+							local highlighted = (high == i)
+							if self.drawentryfunc then
+								drawgraphicalentry(self, i, cx, boxtop, cw, rowh-1, highlighted, false)
+							else
+								local s = self.entries[i]
+								setdropdownentrycolor(self, s, i)
+								local r, g, b = love.graphics.getColor()
+								love.graphics.setColor(r, g, b, 255*oalpha*panelalpha)
+								if self.displayentries then s = self.displayentries[i] end
+								drawdropdownentry(s, cx, boxtop+1, self.width+1)
+							end
+							love.graphics.pop()
+						end
 					end
 				end
-				drawemptycells(headh-self.scroll)
 
-				self.scrollbar:draw()
-			elseif self.dropup then
-				local top = self.y-listheight
-				love.graphics.rectangle("fill", self.x*scale, top*scale, (13+self.width*8)*scale, listheight*scale, listr)
-				
-				for i = 1, #self.entries do
-					local _, row = dropdown_cell(self, i)
-					local rowtop = top+(row-1)*rowh
-					drawlistentry(i, rowtop+1, rowtop+2)
+				if self.cutoff and self.scrollbar then
+					self.scrollbar:draw()
 				end
-				drawemptycells(top+1)
-			else
-				love.graphics.rectangle("fill", self.x*scale, listtop*scale, (13+self.width*8)*scale, listheight*scale, listr)
-				
-				for i = 1, #self.entries do
-					local _, row = dropdown_cell(self, i)
-					local rowtop = listtop+(row-1)*rowh
-					drawlistentry(i, rowtop, rowtop+1)
-				end
-				drawemptycells(listtop)
-			end
-			if animating then
 				love.graphics.pop()
-				if oldx then
-					love.graphics.setScissor(oldx, oldy, oldw, oldh)
-				else
-					love.graphics.setScissor()
-				end
 			end
 		end
 	elseif self.type == "rightclick" then
 		local high = self:inhighlight(love.mouse.getPosition())
-	
-		love.graphics.setColor(255, 255, 255)
-		
-		love.graphics.rectangle("fill", self.x*scale, self.y*scale, (3+self.width*8)*scale, 11*scale)
-		
-		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", (self.x+1)*scale, (self.y+1)*scale, (1+self.width*8)*scale, 9*scale)
-		
-		love.graphics.setColor(180, 180, 180)
-			
-		properprint(self.entries[1], (self.x+1)*scale, (self.y+2)*scale)
-	
-		love.graphics.setColor(127, 127, 127)
-		if high then
-			love.graphics.setColor(255, 255, 255)
+		local st = guiglass.state(self)
+		local now = love.timer.getTime()
+		local dt = framedt(st, "listlast")
+		if not st.born then
+			st.born = now
 		end
-		
+		local t = now - st.born
+		local n = #self.entries
+		local w = 3+self.width*8
+
+		local top, bottom, pivoty
 		if self.direction == "down" then
-			love.graphics.rectangle("fill", self.x*scale, (self.y+11)*scale, (3+self.width*8)*scale, (10*(#self.entries-1))*scale)
+			top, bottom = self.y, self.y+11+10*(n-1)
+			pivoty = self.y
 		else
-			love.graphics.rectangle("fill", self.x*scale, (self.y+10-(#self.entries)*10)*scale, (3+self.width*8)*scale, (10*(#self.entries-1))*scale)
+			top, bottom = self.y+10-n*10, self.y+11
+			pivoty = bottom
 		end
-		
-		for i = 2, #self.entries do
-			if high ~= i then
-				if ((not self.trustWhatStartWasSetAs) and self.var == self.entries[i]) or (self.trustWhatStartWasSetAs and i == self.var) then
-					love.graphics.setColor(0, 127, 0)
-				else
-					love.graphics.setColor(0, 0, 0)
-				end
-				if self.direction == "down" then
-					love.graphics.rectangle("fill", (self.x+1)*scale, (self.y+lerp(1, i, 10))*scale, (1+self.width*8)*scale, 9*scale)
-					love.graphics.setColor(255, 255, 255)
-					properprint(self.entries[i], (self.x+1)*scale, (self.y+2+10*(i-1))*scale)
-				else
-					love.graphics.rectangle("fill", (self.x+1)*scale, (self.y+1-(i-1)*10)*scale, (1+self.width*8)*scale, 9*scale)
-					love.graphics.setColor(255, 255, 255)
-					properprint(self.entries[i], (self.x+1)*scale, (self.y+2-10*(i-1))*scale)
-				end
+
+		--pops out of the corner it was opened at, with a jelly
+		local sy = guiglass.jellyin(t*1.2)
+		local sx = guiglass.jellyin(t*1.2 - 0.03)
+		local alpha = math.max(0, math.min(1, t*12))
+		if sx > 0.01 and sy > 0.01 then
+			love.graphics.push()
+			love.graphics.translate(self.x*scale, pivoty*scale)
+			love.graphics.scale(sx, sy)
+			love.graphics.translate(-self.x*scale, -pivoty*scale)
+
+			local r = 11*scale*0.32
+			guiglass.panel(self.x*scale, top*scale, w*scale, (bottom-top)*scale, r, {rim = {255, 255, 255}, rimstrength = 0.6, alpha = alpha, tintstrength = 0.5})
+
+			--title
+			love.graphics.setColor(180, 180, 180, 255*alpha)
+			properprint(self.entries[1], (self.x+1)*scale, (self.y+2)*scale)
+			love.graphics.setColor(255, 255, 255, 40*alpha)
+			if self.direction == "down" then
+				love.graphics.rectangle("fill", (self.x+2)*scale, (self.y+10.5)*scale, (w-4)*scale, math.max(1, scale*0.5))
 			else
-				if self.var == self.entries[i] then
-					love.graphics.setColor(0, 127, 0)
-				else
-					love.graphics.setColor(0, 0, 0)
-				end
-				
+				love.graphics.rectangle("fill", (self.x+2)*scale, self.y*scale, (w-4)*scale, math.max(1, scale*0.5))
+			end
+
+			local function rowtop(i)
 				if self.direction == "down" then
-					properprint(self.entries[i], (self.x+1)*scale, (self.y+2+10*(i-1))*scale)
-				else
-					properprint(self.entries[i], (self.x+1)*scale, (self.y+2-10*(i-1))*scale)
+					return self.y+1+10*(i-1)
+				end
+				return self.y+1-10*(i-1)
+			end
+
+			--the picked one is green, the hovered one has a pill that glides
+			for i = 2, n do
+				if ((not self.trustWhatStartWasSetAs) and self.var == self.entries[i]) or (self.trustWhatStartWasSetAs and i == self.var) then
+					guiglass.pill((self.x+1)*scale, rowtop(i)*scale, (w-2)*scale, 9*scale, 3*scale, {0, 170, 0, 110}, 0.3, alpha)
 				end
 			end
+			local target
+			if type(high) == "number" and high > 1 then
+				target = {(self.x+1)*scale, rowtop(high)*scale, (w-2)*scale, 9*scale}
+			end
+			local pill = glidepill(st, "pill", target, dt)
+			if pill.a > 0.01 and pill.x then
+				guiglass.pill(pill.x, pill.y, pill.w, pill.h, 3*scale, {255, 255, 255, 70}, 0.45, pill.a*alpha)
+			end
+
+			love.graphics.setColor(255, 255, 255, 255*alpha)
+			for i = 2, n do
+				properprint(self.entries[i], (self.x+1)*scale, (rowtop(i)+1)*scale)
+			end
+			love.graphics.pop()
 		end
 	elseif self.type == "button" then
 		local alpha = a or 255
 		local high = self:hovered()
-		
-		--smooth hover scale (1 → 1.04) and press zoom
-		if high ~= self.lasthigh then
-			self.lasthigh = high
-			self.hoveranim = gui_anim_start(self.hoverscale or 1, high and 1.04 or 1)
-		end
-		local hoverscale = self.hoverscale or 1
-		if self.hoveranim then
-			local v, done = gui_anim_value(self.hoveranim)
-			hoverscale = v
-			self.hoverscale = v
-			if done then self.hoveranim = nil end
-		end
+		local over = self:inhighlight(love.mouse.getPosition())
+		local mix = hovermix(self, "hovermix", high)
 
-		local zoom = hoverscale
-		if self.pressanim then
-			local p, done = gui_anim_value(self.pressanim)
-			if done then
-				self.pressanim = nil
-			else
-				zoom = hoverscale * (1 - 0.15*math.sin(math.pi*p))
-			end
-		end
-		if zoom ~= 1 then
-			local cx = (self.x + (3+self.width+self.space*2)/2)*scale
-			local cy = (self.y + (1+self.height*10+self.space*2)/2)*scale
-			love.graphics.push()
-			love.graphics.translate(cx, cy)
-			love.graphics.scale(zoom, zoom)
-			love.graphics.translate(-cx, -cy)
-		end
-
-		--lerp border colour toward highlight
-		local t = (hoverscale - 1) / 0.04
-		if t < 0 then t = 0 elseif t > 1 then t = 1 end
-		love.graphics.setColor(
-			lerp(self.bordercolor[1], self.bordercolorhigh[1], t),
-			lerp(self.bordercolor[2], self.bordercolorhigh[2], t),
-			lerp(self.bordercolor[3], self.bordercolorhigh[3], t),
-			alpha
-		)
-		
 		local bw = (3+self.width+self.space*2)*scale
 		local bh = (1+self.height*10+self.space*2)*scale
-		local br = math.min(bw, bh) * 0.15
-		love.graphics.rectangle("fill", self.x*scale, self.y*scale, bw, bh, br)
-		
-		love.graphics.setColor(self.fillcolor[1], self.fillcolor[2], self.fillcolor[3], alpha)
-		love.graphics.rectangle("fill", (self.x+1)*scale, (self.y+1)*scale, (1+self.width+self.space*2)*scale, (-1+self.height*10+self.space*2)*scale, br * 0.7)
+		local br = math.min(bw, bh)*0.3
+		local cx, cy = self.x*scale + bw/2, self.y*scale + bh/2
+		guiglass.push(self, cx, cy, bw, bh, over, {hoverscale = 1.03})
+
+		guiglass.panel(self.x*scale, self.y*scale, bw, bh, br, {
+			tint = self.fillcolor,
+			rim = lerpcolor(self.bordercolor, self.bordercolorhigh, mix),
+			rimstrength = lerp(0.45, 0.95, mix),
+			alpha = alpha/255,
+		})
+
+		--a button that opens something like a dropdown (droparrow returns how far it's open, 0-1) ends with a divider
+		--and an arrow that turns over as it opens, like a dropdown's header
+		if self.droparrow then
+			local right = self.x + 3 + self.width + self.space*2
+			local grey = lerp(127, 255, mix)
+			love.graphics.setColor(255, 255, 255, (45 + 50*mix)*alpha/255)
+			love.graphics.rectangle("fill", (right-11)*scale, (self.y+2)*scale, math.max(1, scale*0.5), bh-4*scale)
+			love.graphics.setColor(grey, grey, grey, alpha)
+			love.graphics.push()
+			love.graphics.translate((right-5.5)*scale, cy)
+			love.graphics.rotate(math.pi*self.droparrow())
+			properprintF("↓", -4*scale, -4*scale)
+			love.graphics.pop()
+		end
 
 		--a button can draw its own content inside the box (a mappack frame, say): drawcontent(self, x, y, alpha) in game pixels
 		if self.drawcontent then
@@ -915,7 +1063,7 @@ function guielement:draw(a, offx, offy)
 			end
 			love.graphics.draw(self.image, (self.x+self.imageoffsetx)*scale, (self.y+self.imageoffsety)*scale, 0, scale, scale)
 		end
-		
+
 		love.graphics.setColor(self.textcolor[1], self.textcolor[2], self.textcolor[3], alpha)
 		if type(self.text) == "table" then
 			love.graphics.draw(self.text[1], self.text[2], (self.x+2+self.xpadding+self.space)*scale, (self.y+2+self.ypadding+self.space)*scale, 0, scale, scale)
@@ -934,97 +1082,46 @@ function guielement:draw(a, offx, offy)
 				properprintF(self.text, (self.x+1+self.xpadding+self.space)*scale, (self.y+2+self.ypadding+self.space)*scale)
 			end
 		end
-		
-		if zoom ~= 1 then
-			love.graphics.pop()
-		end
-		
+
+		guiglass.pop()
 	elseif self.type == "scrollbar" then
+		local high = self:inhighlight(love.mouse.getPosition())
+		local handleround = 0.5
+		if self.buttonround then
+			handleround = 0.3
+		end
+
 		if self.dir == "ver" then
-			local high = self:inhighlight(love.mouse.getPosition())
-			
 			local tw, th = self.width*scale, (self.yrange+self.height)*scale
-			local tr = self:sliderradius() --the track is rounded like its handle
-			love.graphics.setColor(self.backgroundcolor)
-			love.graphics.rectangle("fill", self.x*scale, self.y*scale, tw, th, tr)
-		
+			guiglass.panel(self.x*scale, self.y*scale, tw, th, math.min(tw, th)*0.5, {tint = self.backgroundcolor, tintstrength = 0.25, rimstrength = 0.25, shadow = false, base = true})
+
 			self:setsliderbordercolor(self.dragging or high or self.inputting or (self.forcehover and not self.nohover))
-			
+			local rimr, rimg, rimb = love.graphics.getColor()
+			local mix = self.bordermix or 0
+
 			local sw, sh = self.width*scale, self.height*scale
-			local sr = math.min(sw, sh) * (self.buttonround and 0.15 or 0.25) -- buttons use 0.15
-
-			--press zoom (push on mouse down, retract on release), pivoting on the handle's centre
-			local pz = self.presszoom or 1
-			if self.presszoomanim then
-				local v, done = gui_anim_value(self.presszoomanim)
-				pz = math.max(v, 0)
-				self.presszoom = pz
-				if done then
-					self.presszoomanim = nil
-					self.presszoom = self.presszoomed and 0.85 or 1
-					pz = self.presszoom
-				end
-			end
-			if pz ~= 1 then
-				local hcx = (self.x+self.width/2)*scale
-				local hcy = (self.y+self.yrange*self.value+self.height/2)*scale
-				love.graphics.push()
-				love.graphics.translate(hcx, hcy)
-				love.graphics.scale(pz, pz)
-				love.graphics.translate(-hcx, -hcy)
-			end
-
-			love.graphics.rectangle("fill", self.x*scale, (self.y+self.yrange*self.value)*scale, sw, sh, sr)
-
-			love.graphics.setColor(self.fillcolor)
-			love.graphics.rectangle("fill", (self.x+1)*scale, (self.y+1+self.yrange*self.value)*scale, (self.width-2)*scale, (self.height-2)*scale, sr * 0.7)
-
-			if pz ~= 1 then
-				love.graphics.pop()
-			end
+			local hx, hy = self.x*scale, (self.y+self.yrange*self.value)*scale
+			guiglass.push(self, hx + sw/2, hy + sh/2, sw, sh, high, {nomagnet = self.dragging})
+			guiglass.panel(hx, hy, sw, sh, math.min(sw, sh)*handleround, {tint = self.fillcolor, rim = {rimr, rimg, rimb}, rimstrength = lerp(0.5, 0.95, mix)})
+			guiglass.pop()
 		else
-			local high = self:inhighlight(love.mouse.getPosition())
-			
 			local tw, th = (self.xrange+self.width)*scale, self.height*scale
 			local tr = self:sliderradius() --the track is rounded like its handle
 			if self.drawtrack then
 				--a slider can paint its own track (a colour gradient, say): drawtrack(self, x, y, w, h, radius) in screen pixels
 				self:drawtrack(self.x*scale, self.y*scale, tw, th, tr)
 			else
-				love.graphics.setColor(self.backgroundcolor)
-				love.graphics.rectangle("fill", self.x*scale, self.y*scale, tw, th, tr)
+				guiglass.panel(self.x*scale, self.y*scale, tw, th, math.min(tw, th)*handleround, {tint = self.backgroundcolor, tintstrength = 0.25, rimstrength = 0.25, shadow = false, base = true})
 			end
 
 			self:setsliderbordercolor(self.dragging or high or self.inputting or (self.forcehover and not self.nohover))
-			
+			local rimr, rimg, rimb = love.graphics.getColor()
+			local mix = self.bordermix or 0
+
 			local sw, sh = self.width*scale, self.height*scale
-			local sr = math.min(sw, sh) * (self.buttonround and 0.15 or 0.25) -- buttons use 0.15
-
-			--press zoom (push on mouse down, retract on release), pivoting on the handle's centre
-			local pz = self.presszoom or 1
-			if self.presszoomanim then
-				local v, done = gui_anim_value(self.presszoomanim)
-				pz = math.max(v, 0)
-				self.presszoom = pz
-				if done then
-					self.presszoomanim = nil
-					self.presszoom = self.presszoomed and 0.85 or 1
-					pz = self.presszoom
-				end
-			end
-			if pz ~= 1 then
-				local hcx = (self.x+self.xrange*self.value+self.width/2)*scale
-				local hcy = (self.y+self.height/2)*scale
-				love.graphics.push()
-				love.graphics.translate(hcx, hcy)
-				love.graphics.scale(pz, pz)
-				love.graphics.translate(-hcx, -hcy)
-			end
-
-			love.graphics.rectangle("fill", (self.x+self.xrange*self.value)*scale, self.y*scale, sw, sh, sr)
-			
-			love.graphics.setColor(self.fillcolor)
-			love.graphics.rectangle("fill", (self.x+1+self.xrange*self.value)*scale, (self.y+1)*scale, (self.width-2)*scale, (self.height-2)*scale, sr * 0.7)
+			local hx, hy = (self.x+self.xrange*self.value)*scale, self.y*scale
+			guiglass.push(self, hx + sw/2, hy + sh/2, sw, sh, high, {nomagnet = self.dragging})
+			guiglass.panel(hx, hy, sw, sh, math.min(sw, sh)*handleround, {tint = self.fillcolor, rim = {rimr, rimg, rimb}, rimstrength = lerp(0.5, 0.95, mix)})
 
 			if self.displayfunction or self.inputting then
 				love.graphics.setColor(self.bordercolorhigh)
@@ -1064,56 +1161,41 @@ function guielement:draw(a, offx, offy)
 				self.cursoranim = nil
 			end
 
-			if pz ~= 1 then
-				love.graphics.pop()
-			end
+			guiglass.pop()
 		end
 	elseif self.type == "input" then
 		if self.width >= self.maxlength or self.height > 1 then
 			self.textoffset = 0
 		end
 		local high = self:inhighlight(love.mouse.getPosition())
-	
-		local bordertarget = bool2int(self.inputting or high)
-		if self.bordertarget == nil then
-			self.bordertarget = bordertarget
-			self.bordermix = bordertarget
-		elseif bordertarget ~= self.bordertarget then
-			self.bordertarget = bordertarget
-			self.borderanim = gui_anim_start(self.bordermix, bordertarget)
-		end
-		if self.borderanim then
-			local v, done = gui_anim_value(self.borderanim)
-			self.bordermix = v
-			if done then self.borderanim = nil end
-		end
+		local mix = hovermix(self, "bordermix", self.inputting or high)
 
-		if (not self.justdisplay) or self.inputting or high or self.bordermix > 0 then
-			local bc, bh, bm = self.bordercolor, self.bordercolorhigh, self.bordermix
-			love.graphics.setColor(
-				lerp(bc[1], bh[1], bm),
-				lerp(bc[2], bh[2], bm),
-				lerp(bc[3], bh[3], bm),
-				lerp(bc[4] or 255, bh[4] or 255, bm)
-			)
+		local iw = (3+self.width*8+2*self.spacing)*scale
+		local ih = (1+self.height*10+2*self.spacing)*scale
+		guiglass.push(self, self.x*scale + iw/2, self.y*scale + ih/2, iw, ih, high, {nomagnet = self.highlighting or self.numdragging})
 
-			local iw = (3+self.width*8+2*self.spacing)*scale
-			local ih = (1+self.height*10+2*self.spacing)*scale
-			local ir = math.min(iw, ih) * 0.15
-			love.graphics.rectangle("fill", self.x*scale, self.y*scale, iw, ih, ir)
-
-			love.graphics.setColor(self.fillcolor)
-			love.graphics.rectangle("fill", (self.x+1)*scale, (self.y+1)*scale, (1+self.width*8+2*self.spacing)*scale, (-1+self.height*10+2*self.spacing)*scale, ir * 0.7)
+		if (not self.justdisplay) or self.inputting or high or mix > 0 then
+			local panelalpha = 1
+			if self.justdisplay then
+				panelalpha = mix
+			end
+			local bc, bh = self.bordercolor, self.bordercolorhigh
+			guiglass.panel(self.x*scale, self.y*scale, iw, ih, math.min(iw, ih)*0.3, {
+				tint = self.fillcolor,
+				rim = lerpcolor(bc, bh, mix),
+				rimstrength = lerp(0.45, 0.95, mix)*lerp(bc[4] or 255, bh[4] or 255, mix)/255,
+				alpha = panelalpha,
+			})
 		end
 		love.graphics.setColor(self.textcolor)
-		
+
 		if self.height == 1 then
 			if self.highlight then
 				local highlight1,highlight2 = math.min(self.highlight,self.cursorpos),math.max(self.highlight,self.cursorpos)
 
 				love.graphics.setColor((self.textcolor[1]-self.fillcolor[1])/2,(self.textcolor[2]-self.fillcolor[2])/2,(self.textcolor[3]-self.fillcolor[3])/2)
 				local x3, x4 = math.max(1, highlight1 - self.textoffset), math.min(self.width+1, highlight2 - self.textoffset)
-				love.graphics.rectangle("fill", (self.x+2+self.spacing+(x3-1)*8)*scale, (self.y+1+self.spacing)*scale, (x4-x3)*8*scale, 9*scale)
+				love.graphics.rectangle("fill", (self.x+2+self.spacing+(x3-1)*8)*scale, (self.y+1+self.spacing)*scale, (x4-x3)*8*scale, 9*scale, scale)
 			end
 			local s = tostring(self.value)
 			love.graphics.setColor(self.textcolor)
@@ -1124,7 +1206,7 @@ function guielement:draw(a, offx, offy)
 			end
 		else
 			--format string for tall text boxes
-			local oldstring = self.value--string.sub(self.value, self.textoffset+1, self.textoffset+self.width)  --old offsets
+			local oldstring = self.value
 			local newstring = {}
 			for i = 1, string.len(oldstring), self.width do
 				if math.ceil(i/self.width) > self.height then
@@ -1143,31 +1225,31 @@ function guielement:draw(a, offx, offy)
 					love.graphics.setColor((self.textcolor[1]-self.fillcolor[1])/2,(self.textcolor[2]-self.fillcolor[2])/2,(self.textcolor[3]-self.fillcolor[3])/2)
 					x3, x4 = math.max(math.ceil(highlight1-1)+1-self.width*(i-1),1), math.min(math.ceil(highlight2-1)+1-self.width*(i-1),self.width+1)
 					if highlight2 >= (i-1)* self.width+1 and highlight1 <= i * self.width then
-						love.graphics.rectangle("fill", (self.x+2+self.spacing+(x3-1)*8)*scale, (self.y+1+self.spacing+(i-1)*10)*scale, (x4-x3)*8*scale, 9*scale)
+						love.graphics.rectangle("fill", (self.x+2+self.spacing+(x3-1)*8)*scale, (self.y+1+self.spacing+(i-1)*10)*scale, (x4-x3)*8*scale, 9*scale, scale)
 					end
 				end
 				love.graphics.setColor(self.textcolor)
 				properprint(newstring[i], (self.x+2)*scale, (self.y+2+self.spacing+(i-1)*10)*scale)
 			end
 		end
-		
+
 		--cursor
 		if self.inputting then
 			local varwidth = self.width
 			if self.height == 1 then varwidth = 999999 end
 			local x = math.ceil((self.cursorpos-1-self.textoffset) % varwidth)+1
 			local y = math.min(math.ceil(self.cursorpos/self.width), self.height)
-			
+
 			if (self.cursorpos == self.maxlength+1) and (self.height > 1 or self.width >= self.maxlength) then
 				x = self.width+1
 			end
-			
+
 			--glide to the new position (0.25 s)
 			x, y = self:smoothcursor(x, y)
-			
+
 			if self.cursoralpha and self.cursoralpha > 0 then
 				love.graphics.setColor(self.textcolor[1], self.textcolor[2], self.textcolor[3], self.cursoralpha * 255)
-				love.graphics.rectangle("fill", (self.x+1+self.spacing+(x-1)*8)*scale, (self.y+1+self.spacing+(y-1)*10)*scale, 2*scale, 9*scale)
+				love.graphics.rectangle("fill", (self.x+1+self.spacing+(x-1)*8)*scale, (self.y+1+self.spacing+(y-1)*10)*scale, 2*scale, 9*scale, scale)
 				love.graphics.setColor(self.textcolor)
 			end
 		else
@@ -1175,6 +1257,8 @@ function guielement:draw(a, offx, offy)
 			self.cursortx = nil
 			self.cursoranim = nil
 		end
+
+		guiglass.pop()
 	elseif self.type == "text" then
 		love.graphics.setColor(self.color)
 		properprint(self.text, self.x*scale, self.y*scale)
@@ -1232,7 +1316,6 @@ function guielement:click(x, y, button)
 			if button ~= "wd" and button ~= "wu" and button ~= "r" then
 				if self:inhighlight(x, y) then
 					self.holding = true
-					self.pressanim = gui_anim_start(0, 1)
 					if self.func then
 						self.func(unpack(self.arguments))
 						return true
@@ -1960,11 +2043,13 @@ end
 -- draw every open / still-animating dropdown on top of the rest of the game
 -- (called from lovedraw after notice.draw, before FPS / battery / time overlays)
 function guielement.drawopendropdowns()
+	drawingopendropdowns = true
 	for _, v in pairs(guielements) do
-		if v.type == "dropdown" and v.active and ((v.listvalue and v.listvalue > 0) or v.extended) then
+		if v.type == "dropdown" and v.active and dropdown_timeline(v) then
 			v:draw()
 		end
 	end
+	drawingopendropdowns = false
 end
 
 function guielement:getlistprogress()
@@ -2310,4 +2395,48 @@ function guielement:updatePos()
 			self.textoffset = self.textoffset + 1
 		end
 	end
+end
+--the mouse in the element's own coordinates (the controls page draws its elements moved, see inhighlight)
+function guielement:mousepos()
+	local x, y = love.mouse.getPosition()
+	if (self.controlbindpage or (self.controlspopup and gamestate == "game")) and optionscontrols_transformmouse then
+		x, y = optionscontrols_transformmouse(x, y)
+	end
+	return x, y
+end
+
+------------------------------------------------------------
+-- liquid glass press and release (see guiglass.lua)
+------------------------------------------------------------
+
+--a click on an element squashes it wide until the mouse button comes up (wherever the mouse is), then it wobbles back
+local guielement_click = guielement.click
+function guielement:click(x, y, button)
+	local pressed = false
+	local wasdragging = self.dragging
+	if self.active and button ~= "wu" and button ~= "wd" then
+		local hit = self:inhighlight(x, y)
+		if self.type == "dropdown" then
+			--the header only: picking an option closes the list, which has its own jelly
+			if hit == true or hit == 0 then
+				pressed = true
+			end
+		elseif self.type ~= "rightclick" and self.type ~= "text" and hit then
+			pressed = true
+		end
+	end
+	local result = guielement_click(self, x, y, button)
+	if self.type == "scrollbar" and self.dragging and not wasdragging then
+		pressed = true --grabbed by clicking its track
+	end
+	if pressed then
+		guiglass.press(self)
+	end
+	return result
+end
+
+local guielement_unclick = guielement.unclick
+function guielement:unclick(x, y, ...)
+	guiglass.release(self)
+	return guielement_unclick(self, x, y, ...)
 end
