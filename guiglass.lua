@@ -12,11 +12,9 @@
 guiglass = {}
 
 guiglass.enabled = true      --false: plain tinted panes, no backdrop blur
-guiglass.quality = "auto"    --"full": the backdrop is blurred again every frame
+guiglass.quality = "full"    --"full": the backdrop is blurred again every frame
                              --"lite": blurred again 4 times a second (the backdrop of a frame or two ago, cheap)
                              --"flat": no backdrop blur at all, tinted panes
-                             --"auto": full, and lite while full can't keep the frame rate up (see the monitor below)
-guiglass.minfps = 240        --auto quality keeps at least this many frames a second (with vsync on: the monitor's rate)
 guiglass.blur = 3            --blur radius (sigma), in game pixels
 guiglass.downsample = nil    --the backdrop is blurred at 1/downsample size. nil: at the game's own resolution
                              --(1/scale), so it costs the same however big the window is
@@ -206,58 +204,8 @@ local LITE_REFRESH = 0.25 --how often lite mode blurs the backdrop again (second
 local FULL_REFRESH = 1/60 --full mode blurs it again at most this often: past 60 frames a second, the frames in
                           --between reuse the last blur (only ever one made before any glass was drawn)
 
---auto quality: watches the frame rate over one second windows. While glass with a blurred backdrop is on screen and the
---game runs below its target for 2 windows in a row, it steps down: full → lite → flat. A step is kept only if it made
---the game faster; if it didn't, the slowness is something else: it steps back and stops trying. Once there are far
---fewer glass panels than when it stepped down (another screen), it goes back to full.
-local automode = "full"
-local STEPS = {full = "lite"} --never down to flat on its own: that swaps the glass for black panes (pick "flat" by hand)
-local monitor = {start = nil, frames = 0, backdropframes = 0, panels = 0, slow = 0}
-local framebackdrop, framepanels = false, 0
+local framebackdrop = false
 local lastbackdropframe = -math.huge --the last frame glass wanted a blurred backdrop
-
-local function targetfps()
-	local _, _, flags = love.window.getMode()
-	if flags and flags.vsync and flags.vsync ~= 0 then
-		local rate = flags.refreshrate or 0
-		if rate <= 0 then
-			rate = 60
-		end
-		return rate*0.95
-	end
-	return guiglass.minfps
-end
-
-local function monitor_window(fps, panels, withbackdrop)
-	local m = monitor
-	if m.trial then
-		--the window after stepping down: keep it only if it helped
-		if fps < m.trialfrom*1.1 then
-			automode = m.trialback
-			m.gaveup = true
-		end
-		m.trial = nil
-		return
-	end
-	if m.slowpanels and panels < m.slowpanels/2 then
-		automode = "full" --another screen, with far less glass
-		m.slowpanels, m.gaveup = nil, nil
-		return
-	end
-	if m.gaveup or not STEPS[automode] then
-		return
-	end
-	if (withbackdrop or automode ~= "full") and panels > 0 and fps < targetfps() then
-		m.slow = m.slow + 1
-		if m.slow >= 2 then
-			m.trial, m.trialfrom, m.trialback, m.slow = true, fps, automode, 0
-			m.slowpanels = m.slowpanels or panels
-			automode = STEPS[automode]
-		end
-	else
-		m.slow = 0
-	end
-end
 
 guiglass.debug = false --true: shows the glass state in the top left corner
 local dbg = {with = 0, without = 0, nosrc = 0, src = "-"}
@@ -266,8 +214,8 @@ local dbgshown = {}
 local present = love.graphics.present
 function love.graphics.present(...)
 	if guiglass.debug then
-		dbgshown.text = string.format("glass: %s (auto %s)  backdrop %d  none %d  nosrc %d  src %s  wantscanvas %s",
-			guiglass.mode(), automode, dbg.with, dbg.without, dbg.nosrc, dbg.src, tostring(guiglass.wantscanvas()))
+		dbgshown.text = string.format("glass: %s  backdrop %d  none %d  nosrc %d  src %s  wantscanvas %s",
+			guiglass.mode(), dbg.with, dbg.without, dbg.nosrc, dbg.src, tostring(guiglass.wantscanvas()))
 		love.graphics.push("all")
 		love.graphics.setCanvas()
 		love.graphics.origin()
@@ -281,22 +229,10 @@ function love.graphics.present(...)
 	end
 	dbg.with, dbg.without, dbg.nosrc, dbg.src = 0, 0, 0, "-"
 	frame = frame + 1
-	local m = monitor
-	local now = love.timer.getTime()
-	m.start = m.start or now
-	m.frames = m.frames + 1
-	m.panels = m.panels + framepanels
 	if framebackdrop then
-		m.backdropframes = m.backdropframes + 1
 		lastbackdropframe = frame
 	end
-	framebackdrop, framepanels = false, 0
-	if now - m.start >= 1 then
-		if guiglass.quality == "auto" then
-			monitor_window(m.frames/(now - m.start), m.panels/m.frames, m.backdropframes > m.frames/2)
-		end
-		m.start, m.frames, m.backdropframes, m.panels = now, 0, 0, 0
-	end
+	framebackdrop = false
 	return present(...)
 end
 
@@ -311,9 +247,6 @@ end
 function guiglass.mode()
 	if not guiglass.enabled then
 		return "flat"
-	end
-	if guiglass.quality == "auto" then
-		return automode
 	end
 	return guiglass.quality
 end
@@ -531,7 +464,6 @@ function guiglass.panel(x, y, w, h, r, o)
 	local backdrop
 	local uvscale, uvclamp = NOSCALE, NOCLAMP
 	local src = backdropsource(love.graphics.getCanvas())
-	framepanels = framepanels + 1
 	local wants = guiglass.mode() ~= "flat" and not o.nobackdrop
 	if wants then
 		framebackdrop = true
