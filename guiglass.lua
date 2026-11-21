@@ -16,7 +16,7 @@ guiglass.quality = "auto"    --"full": the backdrop is blurred again every frame
                              --"lite": blurred again 4 times a second (the backdrop of a frame or two ago, cheap)
                              --"flat": no backdrop blur at all, tinted panes
                              --"auto": full, and lite while full can't keep the frame rate up (see the monitor below)
-guiglass.minfps = 200        --auto quality keeps at least this many frames a second (with vsync on: the monitor's rate)
+guiglass.minfps = 240        --auto quality keeps at least this many frames a second (with vsync on: the monitor's rate)
 guiglass.blur = 3            --blur radius (sigma), in game pixels
 guiglass.downsample = nil    --the backdrop is blurred at 1/downsample size. nil: at the game's own resolution
                              --(1/scale), so it costs the same however big the window is
