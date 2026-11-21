@@ -54,6 +54,9 @@ vec4 effect(vec4 color, Image tex, vec2 uv, vec2 sc)
 		float i2 = i1 + 1.0;
 		float w1 = exp(-0.5*i1*i1/s2);
 		float w2 = exp(-0.5*i2*i2/s2);
+		if (w1 < 0.002) {
+			break; //the rest weigh nothing
+		}
 		float w = w1 + w2;
 		float off = (i1*w1 + i2*w2)/max(w, 0.000001);
 		sum += Texel(tex, clamp(uv + dir*off, region.xy, region.zw))*w;
@@ -105,7 +108,10 @@ vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc)
 
 	//the middle, past the bent edge: just the blurred backdrop, tinted (most of a big panel's pixels)
 	if (depth > bezel) {
-		vec4 sg = Texel(backdrop, clamp(sc*u[0].xy, u[1].xy, u[1].zw));
+		vec4 sg = vec4(0.0);
+		if (u[5].w > 0.0) {
+			sg = Texel(backdrop, clamp(sc*u[0].xy, u[1].xy, u[1].zw));
+		}
 		float bda = sg.a*u[5].w;
 		vec3 bd = sg.rgb/max(sg.a, 0.002);
 		float lum = dot(bd, vec3(0.299, 0.587, 0.114));
@@ -116,8 +122,12 @@ vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc)
 	}
 
 	//near the edge: the lens, the colour split and the rim
-	float ds = sdbox(p - vec2(0.0, margin*0.3), hb, r);
-	float sh = u[5].y*exp(-max(ds, 0.0)/max(margin*0.4, 0.001))*(1.0 - inside);
+	//(only on the antialiased rim: everywhere else inside is 1, so it would be multiplied away)
+	float sh = 0.0;
+	if (inside < 1.0) {
+		float ds = sdbox(p - vec2(0.0, margin*0.3), hb, r);
+		sh = u[5].y*exp(-max(ds, 0.0)/max(margin*0.4, 0.001))*(1.0 - inside);
+	}
 
 	//the edge's direction, straight from the shape
 	vec2 sp = sign(p);
@@ -135,9 +145,14 @@ vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc)
 
 	//blurred backdrop, bent at the edges (with a little colour split there)
 	vec2 off = -n*lens*u[4].w;
-	vec4 sg = Texel(backdrop, clamp((sc + off)*u[0].xy, u[1].xy, u[1].zw));
+	vec4 sg = vec4(0.0);
+	if (u[5].w > 0.0) {
+		sg = Texel(backdrop, clamp((sc + off)*u[0].xy, u[1].xy, u[1].zw));
+	}
 	vec3 bd = sg.rgb;
-	if (lens > 0.02) {
+	//the split moves the red and blue reads under half a pixel of the blurred copy, so it only shows where the lens
+	//is strong (the outer half of the bezel)
+	if (lens > 0.25 && u[5].w > 0.0) {
 		bd.r = Texel(backdrop, clamp((sc + off*1.25)*u[0].xy, u[1].xy, u[1].zw)).r;
 		bd.b = Texel(backdrop, clamp((sc + off*0.75)*u[0].xy, u[1].xy, u[1].zw)).b;
 	}
@@ -157,7 +172,9 @@ vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc)
 	vec4 rim = u[3];
 	vec2 light = vec2(-0.5432, -0.8396);
 	float ld = dot(n, light);
-	float spec = 0.35 + 0.65*pow(max(ld, 0.0), 1.5) + 0.45*max(-ld, 0.0)*max(-ld, 0.0);
+	float lp = max(ld, 0.0);
+	float ln = max(-ld, 0.0);
+	float spec = 0.35 + 0.65*lp*sqrt(lp) + 0.45*ln*ln;
 	float band = 1.0 - smoothstep(0.0, aa*1.6, depth);
 	col = mix(col, rim.rgb, clamp(band*rim.a*spec, 0.0, 1.0));
 	col += rim.rgb*(1.0 - smoothstep(0.0, bezel*0.7, depth))*0.10*rim.a*spec;
