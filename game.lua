@@ -5137,6 +5137,7 @@ local function parsemaptiles(s2, height)
 	local tiles = {} --[(x-1)*height+y] = {values..., n = how many, back = background tile, argument = entity argument}
 	local hasback = false
 	for x = 1, width do
+		overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 		for y = 1, height do
 			local r = tostring(t[(y-1)*width+x]):split("-")
 			local cell = {}
@@ -5225,6 +5226,7 @@ function loadmap(filename)
 	local tiles, height = parsed.tiles, mapheight
 	local enemynames --custom enemy names, gathered the first time a custom enemy needs checking
 	for x = 1, mapwidth do
+		overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 		local column = {}
 		map[x] = column
 		for y = 1, height do
@@ -6081,7 +6083,9 @@ function stoptestinglevel()
 	else
 		startlevel(marioworld .. "-" .. mariolevel)
 	end
-	love.graphics.present()
+	if not overlaytask_canyield() then
+		love.graphics.present()
+	end
 	player_position = nil
 end
 
@@ -6791,6 +6795,18 @@ function warpfadeoutnow(ignorelevelsetting)
 		return
 	end
 	if warpfade then
+		return
+	end
+	if overlaytask_canyield() then
+		--in the background: the main loop keeps drawing the (frozen) game while it fades, a frame at a time
+		local start = love.timer.getTime()
+		local t = 0
+		while t < warpfadetime do
+			t = math.min(love.timer.getTime() - start, warpfadetime)
+			warpfade = {t = t, hold = true}
+			coroutine.yield()
+		end
+		warpfade = {t = warpfadetime, hold = true}
 		return
 	end
 	local t = 0
@@ -11185,22 +11201,41 @@ function drawoverlay(text)
 	love.graphics.setColor(0, 0, 0, 127)
 	love.graphics.rectangle("fill", 0, 0, width*16*scale, height*16*scale)
 	love.graphics.setColor(255, 255, 255, 255)
-	centerprintscreen(text)
+	centerprintscreen(overlay_drawnanimatedtext(text)) --"..." animates (see overlaytask.lua)
 	love.graphics.pop()
 end
 
 function renderoverlay(text, donotpresentgraphics, donotupdate)
-	if not donotpresentgraphics and warpfadetexts and warpfadetexts[text:lower()] then
-		warpfadeoutnow(text:lower() == "returning to menu..." or text:lower() == "saving game...")
-	end
-	if TEXT[text:lower()] then
-		text = TEXT[text:lower()]
-	end
+	local key = text:lower()
+	local translated = TEXT[key] or text
 
 	if donotpresentgraphics then
-		drawoverlay(text)
+		drawoverlay(translated) --drawn from love.draw: no fade
 		return
 	end
+
+	--in a callback: show the overlay, then do the rest of the work in the background (see overlaytask.lua)
+	if overlaytask_canyield() then
+		if overlayfrozen then
+			--already in the background: just the text changes
+			overlayfrozen = {text = translated, start = love.timer.getTime()}
+			overlayyield(true)
+			return
+		end
+		if warpfadetexts and warpfadetexts[key] then
+			warpfadeoutnow(key == "returning to menu..." or key == "saving game...")
+		end
+		overlaytask_snapshot(donotupdate)
+		overlayfrozen = {text = translated, start = love.timer.getTime()}
+		overlayyield(true)
+		return
+	end
+
+	--anywhere else (love.load): one frame with the overlay, then the work carries on straight away like before
+	if warpfadetexts and warpfadetexts[key] then
+		warpfadeoutnow(key == "returning to menu..." or key == "saving game...")
+	end
+	text = translated
 
 	overlaytext = text
 	love.draw(donotupdate)

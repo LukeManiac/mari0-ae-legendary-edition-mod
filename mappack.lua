@@ -616,6 +616,7 @@ function loadanimatedtiles(forcebuiltins) --animated
 	
 	local i = 1
 	while not forcebuiltins and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/animated/" .. i .. ".png") do
+		overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 		local v = mappackfolder .. "/" .. mappack .. "/animated/" .. i .. ".png"
 		if love.filesystem.getInfo(v) and string.sub(v, -4) == ".png" then
 			if love.filesystem.getInfo(string.sub(v, 1, -5) .. ".txt") then
@@ -676,6 +677,7 @@ function loadcustomsounds(forcebuiltins)
 	end
 	if forcebuiltins or love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/sounds", "directory") or customsounds then
 		for i, j in pairs(soundliststring) do
+			overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 			if music.special[j] then
 				--pbutton and megamushroom are loaded above, with their other versions
 			elseif not forcebuiltins and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/sounds/" .. j .. ".ogg") then
@@ -739,6 +741,7 @@ function loadcustommusic()
 		end
 	end
 	for i, s in pairs(custommusiclist) do
+		overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 		custommusics[s] = mappackfolder .. "/" .. mappack .. "/" .. s
 		music:load(custommusics[s])
 		table.insert(musictable, s)

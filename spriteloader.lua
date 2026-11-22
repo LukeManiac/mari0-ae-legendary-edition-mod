@@ -126,6 +126,7 @@ function loadcustomsprites(initial, forcebuiltins) --Sprite loader
 	customsprites = true
 	
 	for i = 1, #imgtable do
+		overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 		if love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/custom/" .. string.gsub(string.gsub(imgtable[i], "img", ""), "image", "") .. ".png") then
 			local imgdata = love.image.newImageData(mappackfolder .. "/" .. mappack .. "/custom/" .. string.gsub(string.gsub(imgtable[i], "img", ""), "image", "") .. ".png")
 			_G[imgtable[i]] = love.graphics.newImage(imgdata)
@@ -1901,6 +1902,7 @@ function loadtiles(i, initial)
 			local width = math.floor(imgwidth/17)
 			local height = math.floor(imgheight/17)
 			for y = 1, height do
+				overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 				for x = 1, width do
 					local q = quad:new(customtilesimg[i], data[i], x, y, imgwidth, imgheight)
 					q.ts = i --tileset number

@@ -511,6 +511,26 @@ Dropping a new tileset onto the window shows "updating tiles..." too, since it r
 * `clearmapparsecache()` lets go of every parsed map. `savemap` forgets the map it saves.
 * `drawanimationcachearrow(self, x, y, alpha)` draws the spinning arrow (it's the button's `drawcontent`), and `drawanimationcachetooltip()` draws its tooltip.
 
+#### ⏳ Background Loading
+
+Everything that shows a loading overlay (loading a level, the Course Maker, a mappack or save data, testing a level, returning to the menu or editor, saving, and every **update** and **refresh data** button) now does its work in the background instead of stopping the whole program until it's done. The new `overlaytask.lua` handles it.
+
+* The game is frozen while the work runs: nothing updates and input is ignored. The window isn't: it keeps drawing frames and handling its own events, so it can be moved or closed and never stops responding.
+* The work runs a piece at a time, about 12 milliseconds a frame (`OVERLAYTASK_BUDGET`). It gives the frame back inside the long loops: map tiles, custom enemies, animations, custom tiles and sprites, animated tiles, sounds, music, the editor's map list and previews, and **refresh data**.
+* The fade to black before an overlay plays frame by frame too, instead of in a loop of its own.
+* Meanwhile, the screen shows a picture of the frame taken when the overlay appeared, dimmed, with the overlay's text on top. The half-loaded game is never drawn.
+* Overlays ending in "..." now animate their dots: "", ".", "..", "...", then back to "", one step every 0.5 seconds (`OVERLAYTASK_DOTTIME`). The animation always starts from "". The text stays where it is while the dots come and go. This also covers the mappack menu's download overlay.
+* This uses coroutines on the main thread rather than `love.thread`. A LÖVE thread has its own Lua state, so it can't see or change the game's tables, and it can't make images or canvases, which is what all of this work does.
+* Overlays shown before the game has finished starting up still work the old way: one frame, then the work runs straight through.
+
+#### 🧱 Background Loading Functions
+
+* `overlayyield(force)` gives the frame back when background work has used up its share of it (always, with `force`). Outside of background work it does nothing, so any long loop can call it.
+* `overlaytask_canyield()` says whether the code running now is background work that can give the frame back.
+* `overlay_animatedtext(text, start)` returns a text with its "..." animated from `start`.
+* `overlaytask_install()` wraps LÖVE's callbacks so they can run in the background. `love.load` runs it last.
+* `quit`, `resize` and `visible` are never run in the background, so quitting always finishes before the window closes.
+
 #### 🗂️ Options Tab Picker
 
 The options menu's row of tab names (**controls**, **skins**, **misc.** and **cheat**) is now a dropdown.

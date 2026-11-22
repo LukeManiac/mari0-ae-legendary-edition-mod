@@ -90,6 +90,7 @@ function animationsystem_load()
 		--animations in the mappack's folder and its subfolders (see the ANIMATION CACHE above)
 		for _, v in ipairs(animationcache_getlist(mappackfolder .. "/" .. mappack .. "/animations", true)) do
 			table.insert(animations, animation:new(v[1], v[2]))
+			overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 		end
 	end
 
@@ -104,6 +105,7 @@ function animationsystem_load()
 					t = animations
 				end
 				table.insert(t, animation:new(v[1], v[2]))
+				overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 			end
 			characterenemiesloaded[mariocharacter[i]] = true
 		end

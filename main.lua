@@ -444,6 +444,7 @@ function love.load()
 	require "netplay"
 	JSON = require "JSON"
 	require "notice"
+	require "overlaytask"
 	require "languages"
 	
 	local luas = {"intro", "menu", "levelscreen", "game", "splitscreen", "editor", "physics", "online", "quad", "animatedquad", "entity", "dailychallenge", "portalwall", "tile", "mario", "mushroom", "hatconfigs", "flower", "star", "coinblockanimation", "scrollingscore", "platform", "platformspawner", "portalparticle", "portalprojectile", "box", "emancipationgrill", "door", "button", "groundlight", "wallindicator", "walltimer", "lightbridge", "faithplate", "laser", "laserdetector", "gel", "geldispenser", "cubedispenser", "pushbutton", "screenboundary", "fireball", "gui", "blockdebris", "firework", "vine", "spring", "seesaw", "seesawplatform", "bubble", "rainboom", "miniblock", "notgate", "musicloader", "smbsitem", "donut", "levelball", "leaf", "mariotail", "windleaf", "energylauncher", "energycatcher", "blocktogglebutton", "squarewave", "delayer", "coin", "funnel", "longfire", "pedestal", "portalent", "text", "regiontrigger", "tiletool",   "enemytool", "randomizer", "yoshi", "musicchanger", "mariohammer", "regiondrag", "flipblock", "characters", "checkpoint", "onlinemenu", "lobby", "magic", "doorsprite", "enemies", "enemy", "itemanimation", "cappy", "emancipationfizzle", "emancipateanimation", "ceilblocker", "belt", "hatloader", "poof", "animationguiline", "animation", "animationsystem", "animationtrigger", "dialogbox", "portal", "orgate", "andgate", "animatedtiletrigger", "rsflipflop", "animatedtimer", "collectable", "powblock", "smallspring", "risingwater", "redseesaw", "snakeblock", "frozencoin", "entitytooltip", "spawnanimation", "camerastop", "clearpipe", "track", "tilemoving", "laserfield", "checkpointflag", "ice", "pipe", "errorwindow", "filebrowser", "minigames", "utilsmenu"}
@@ -1195,6 +1196,9 @@ function love.load()
 
 	intro_load()
 	disablecheats()
+
+	--loading overlays hand their work to the background from now on (see overlaytask.lua)
+	overlaytask_install()
 end
 
 function love.update(dt)
@@ -1352,6 +1356,11 @@ function love.draw(donotupdate)
 end
 
 function lovedraw(donotupdate)
+	--background work is running: the frozen picture with the overlay, never the half-loaded game
+	if overlaytask_draw() then
+		return
+	end
+
 	shaders:predraw()
 	
 	if resizable then

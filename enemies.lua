@@ -102,6 +102,7 @@ function enemies_load()
 		local enemyfile = realfl[i]
 		if string.sub(enemyfile.filename, -4) == "json" then
 			loadenemy(enemyfile.filename, enemyfile.editorFolderCategory)
+			overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 		end
 	end
 	JSONcrashgame = true

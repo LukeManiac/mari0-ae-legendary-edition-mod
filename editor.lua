@@ -5661,6 +5661,7 @@ function getmaps()
 		guielements["world-" .. i].clickswithinyrange = clickablerange
 		
 		createlevelbuttons(i)
+		overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 	end
 	
 	guielements["newworld"] = guielement:new("button", 3, 20+(#mappacklevels*16), TEXT["new world"], addworld, 0, nil, 1.4, 83, true)
@@ -9404,6 +9405,7 @@ function loadeditormapcache()
 	for _, file in ipairs(love.filesystem.getDirectoryItems(folder)) do
 		if editormapcache_ismap(file) then
 			editormapcache.maps[file] = editormapcache_stat(folder .. "/" .. file)
+			overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 		end
 	end
 	loadeditormetadata()
@@ -9439,6 +9441,7 @@ function refresheditormaps()
 	local found = {}
 	for _, file in ipairs(love.filesystem.getDirectoryItems(folder)) do
 		if editormapcache_ismap(file) then
+			overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 			local stat = editormapcache_stat(folder .. "/" .. file)
 			if stat then
 				found[file] = true
@@ -9465,6 +9468,7 @@ function refresheditormaps()
 			if file:sub(-4) == ".png" then
 				local name = file:sub(1, -5)
 				local path = folder .. "/editor/" .. file
+				overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 				local stat = editormapcache_stat(path)
 				if stat then
 					found[name] = true
@@ -9514,6 +9518,7 @@ function loadeditormetadata()
 		local extension = string.sub(v, -4, -1)
 		if extension == ".png" then
 			local name = string.sub(files[i], 1, -5)
+			overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
 			meta_data[name] = {}
 			meta_data[name].img = love.graphics.newImage(v)
 			if editormapcache then

@@ -199,7 +199,8 @@ local function removerecursive(path)
 	end
 	love.filesystem.remove(path)
 	removedcount = removedcount + 1
-	if removedcount % 200 == 0 and coroutine.running() then
+	--only inside a utils job: the game's own callbacks run in coroutines too now (overlaytask.lua), and those mustn't stop here
+	if removedcount % 200 == 0 and coroutine.running() and not overlaytask_canyield() then
 		coroutine.yield()
 	end
 end
