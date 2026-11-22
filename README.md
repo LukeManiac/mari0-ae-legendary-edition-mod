@@ -633,7 +633,7 @@ display:
 
 There are six categories: **motion**, **display**, **gameplay**, **assists**, **controls** and **notices**.
 
-A label too long for its line wraps beside a checkbox. A slider or dropdown that doesn't fit next to its label goes on the line under it. Both pages are taller than the space they have, so they scroll, with a GUI scrollbar at their right edge that can be dragged like any other. The mouse wheel scrolls them too, and the setting the keyboard is on always scrolls into view, with the scrollbar following. Settings scrolled out of view can't be clicked.
+A setting that does nothing because of another one (skip course after ... deaths while never skip automatically is ticked, rapid hold execution while hold to fire is off) is greyed out: its label and widget are dimmed, and it doesn't take clicks or keys until the other setting allows it. A label too long for its line wraps beside a checkbox. A slider or dropdown that doesn't fit next to its label goes on the line under it. Both pages are taller than the space they have, so they scroll, with a GUI scrollbar at their right edge that can be dragged like any other. The mouse wheel scrolls them too, and the setting the keyboard is on always scrolls into view, with the scrollbar following. Settings scrolled out of view can't be clicked.
 
 Every change saves straight away. They're saved in `options.txt` as `a11y_<name>:<value>`, and **Reset All Settings** puts them all back to their defaults.
 
@@ -669,14 +669,16 @@ Every change saves straight away. They're saved in `options.txt` as `a11y_<name>
 * **Respawn where you died:** After everyone dies, the next try starts on the last solid ground you stood on in that course and area, instead of the start or a checkpoint. A new course, or a game over, starts as usual. It doesn't apply in minigames or the daily challenge.
 * **Generous stomps:** Running into an enemy's side while you're coming down with your feet above its middle counts as landing on it, so clipping its edge stomps it instead of hurting you. Enemies that hurt you from above still do.
 * **Infinite lives** and **Infinite time:** The `alwaysinfinitelives` and `alwaysinfinitetime` nitpicks as settings, including what they do in the minigames. The first time the game starts, they're set to whatever the nitpicks say. From then on, the settings decide, and **Reset All Settings** takes them from the nitpicks again. The cheat tab's switches still work for the session.
-* **Skip course after ... deaths:** How many times everyone has to die on a course before it can be skipped, from 5 to 100. 10 by default. The number is a text input like the Course Maker's colour inputs: click it and type a number (Enter sets it), or drag it left and right. A number outside 5 to 100 is moved into it, and anything that isn't a number puts the old one back with a red notice. With the keyboard, Left and Right change it by 1, and Enter selects it to type over. In English it reads "skip level after ... deaths", since English says "level" where Better English says "course".
-* **Never skip automatically:** Ticked by default. While it's ticked, reaching that many deaths puts a **skip course** button next to **accessibility** at the bottom of the pause menu, which goes straight to the next course, the same way finishing it would. Untick it and the course is skipped by itself on the death that reaches the number, with a notice saying so, instead of starting the course again. It isn't skipped by itself on the last life: that's a game over, as usual. The pause menu's button is offered either way. Neither happens while testing a course from the Course Maker, in minigames, in the daily challenge or online.
+* **Never skip automatically:** Ticked by default. While it's ticked, the pause menu always offers a **skip course** button next to **accessibility**, which goes straight to the next course, the same way finishing it would. The number below is greyed out, since only the automatic skip uses it.
+* **Skip course after ... deaths:** Only while never skip automatically is unticked. The course is skipped by itself on the death that reaches this number, with a notice saying so, instead of starting the course again. It's from 5 to 100, 10 by default. It isn't skipped by itself on the last life: that's a game over, as usual, and the pause menu offers **skip course** once that many deaths have been reached. The number is a text input like the Course Maker's colour inputs: click it and type a number (Enter sets it), or drag it left and right. A number outside 5 to 100 is moved into it, and anything that isn't a number puts the old one back with a red notice. With the keyboard, Left and Right change it by 1, and Enter selects it to type over. In English it reads "skip level after ... deaths", since English says "level" where Better English says "course".
+* Skipping never happens, and the button never shows, while testing a course from the Course Maker, in minigames, in the daily challenge or online.
 
 **Controls**
 
 * **Toggle run:** Pressing run starts running, and pressing it again stops. Anything that needs run held (the Tanooki statue, carrying things) acts as if it's held while it's on.
 * **Hold to swim:** Holding jump underwater keeps swimming upwards, a stroke every 0.3 seconds, instead of needing a press for each stroke. Frog Mario is unaffected.
 * **Hold to fire:** Holding run keeps throwing fireballs, iceballs, superballs, hammers, boomerangs and custom power-up projectiles, one every 0.3 seconds, within the usual limit on how many can be out at once. It only repeats throws: tail whips, picking things up, Cappy and Yoshi still need a press each time. With toggle run on, it's the run button itself that has to be held.
+* **Rapid hold execution:** With hold to fire on, a throw is tried every frame instead of every 0.3 seconds, so a new projectile goes out as soon as there's room for one under the usual limit. It's greyed out while hold to fire is off.
 
 **Notices**
 
@@ -690,7 +692,7 @@ Every change saves straight away. They're saved in `options.txt` as `a11y_<name>
 **Pause menu**
 
 * An **accessibility** button sits at the bottom of the pause menu. Pressing it, or pressing Down after the last option on the right (shader2) and then Down again from the button, slides the pause menu up and the accessibility page up from below.
-* When **skip course** is on offer, its button sits next to **accessibility**. On the button row, Left and Right move between the two, and Enter presses the selected one.
+* When **skip course** is on offer (see **Never skip automatically** above), its button sits next to **accessibility**. On the button row, Left and Right move between the two, and Enter presses the selected one.
 * The accessibility page has two columns: motion, gameplay and assists on the left, display, controls and notices on the right. It scrolls, with its scrollbar on the right. Its keys work the same as in the options menu. The button at the bottom says **back** there.
 * Pressing Up from the first setting, Escape (or the pause key), or **back** slides back to the pause menu, with the **accessibility** button selected. The pause menu always opens on its own page.
 * Nothing on either page can be used while they slide.

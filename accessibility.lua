@@ -47,7 +47,22 @@ local ITEMS = {
 	togglerun = {kind = "checkbox", label = "toggle run"},
 	holdtoswim = {kind = "checkbox", label = "hold to swim"},
 	holdtofire = {kind = "checkbox", label = "hold to fire"},
+	rapidhold = {kind = "checkbox", label = "rapid hold execution"},
 }
+
+--settings that can't be changed while another one makes them do nothing: greyed out, and they don't take clicks or keys
+local DISABLEDWHEN = {
+	skipdeaths = function() return accessibility.skipnever end, --only the automatic skip uses the number
+	rapidhold = function() return not accessibility.holdtofire end, --only hold to fire repeats
+}
+
+local function isdisabled(key)
+	local test = DISABLEDWHEN[key]
+	if test and test() then
+		return true
+	end
+	return false
+end
 
 --the categories, in order (label is a TEXT key)
 local CATEGORIES = {
@@ -57,7 +72,7 @@ local CATEGORIES = {
 	{label = "gameplay:", items = {"gamespeed", "halfopaqueblink"}},
 	{label = "assists:", items = {"jumpbuffer", "coyotetime", "pitrescue", "respawnwheredied", "generousstomps",
 		"infinitelives", "infinitetime", "skipdeaths", "skipnever"}},
-	{label = "controls:", items = {"togglerun", "holdtoswim", "holdtofire"}},
+	{label = "controls:", items = {"togglerun", "holdtoswim", "holdtofire", "rapidhold"}},
 	{label = "notices:", items = {"clicknotices"}},
 }
 
@@ -90,6 +105,7 @@ local DEFAULTS = {
 	togglerun = false,
 	holdtoswim = false,
 	holdtofire = false,
+	rapidhold = false, --with hold to fire: a throw every frame instead of every HOLD_REPEAT
 }
 
 accessibility = {}
@@ -429,7 +445,11 @@ function accessibility_playerupdate(p, dt)
 	--hold to fire: another throw every so often while run is held (the run button itself, even with toggle run)
 	if accessibility.holdtofire and controls[n] and checkkey(controls[n]["run"], n, "run") and canautofire(p) then
 		p.a11yfiretimer = (p.a11yfiretimer or 0) + dt
-		if p.a11yfiretimer >= HOLD_REPEAT then
+		local interval = HOLD_REPEAT
+		if accessibility.rapidhold then
+			interval = 0 --rapid hold execution: every frame (still within the limit on how many can be out at once)
+		end
+		if p.a11yfiretimer >= interval then
 			p.a11yfiretimer = 0
 			if p.fireenemy or p.characterdata.fireenemy then
 				p:button("run") --custom power-ups fire from the run button
@@ -557,12 +577,18 @@ function accessibility_countdeath()
 	coursedeaths.count = coursedeaths.count + 1
 end
 
---whether this course can be skipped: everyone has died on it at least as many times as skip course after ... deaths says
+--whether everyone has died on this course at least as many times as skip course after ... deaths says
+local function deathsreached()
+	return coursedeaths.key == coursekey() and coursedeaths.count >= accessibility.skipdeaths
+end
+
+--whether the pause menu offers to skip this course: always while never skip automatically is ticked, otherwise
+--once there have been enough deaths (when the automatic skip didn't happen, on the last life say)
 function accessibility_canskip()
 	if editormode or testlevel or minigameplaying or dcplaying or SERVER or CLIENT then
 		return false
 	end
-	return coursedeaths.key == coursekey() and coursedeaths.count >= accessibility.skipdeaths
+	return accessibility.skipnever or deathsreached()
 end
 
 local function skiptonext()
@@ -586,7 +612,7 @@ end
 --everyone died (after accessibility_countdeath): with never skip automatically unticked, the course is skipped by itself
 --once there have been enough deaths, unless that was the last life. Returns true when it skipped
 function accessibility_autoskip()
-	if accessibility.skipnever or not accessibility_canskip() then
+	if accessibility.skipnever or not accessibility_canskip() or not deathsreached() then
 		return false
 	end
 	local livesleft = infinitelives or mariolivecount == false
@@ -1210,9 +1236,10 @@ local function updatepage(page, active, selected, dt)
 		end
 		--only usable while all of it is in view
 		local inview = row.wy - page.scroll >= -0.5 and row.wy + row.wh - page.scroll <= vp.h + 0.5
-		el.active = active and inview
+		local disabled = isdisabled(key)
+		el.active = active and inview and not disabled
 		el.nohover = not el.active
-		el.forcehover = active and selected == key
+		el.forcehover = el.active and selected == key
 		if item.kind == "checkbox" then
 			el.var = accessibility[key]
 		elseif item.kind == "number" then
@@ -1269,7 +1296,14 @@ local function drawpage(page, selected, offx, offy)
 		properprintF(header.text, header.x*scale, (top + header.y + 1)*scale)
 	end
 	for key, row in pairs(layout.items) do
-		if selected == key then
+		if isdisabled(key) then
+			--greyed out: darker, and only a little lighter when the keyboard is on it
+			if selected == key then
+				lg.setColor(150, 150, 150, 120)
+			else
+				lg.setColor(100, 100, 100, 110)
+			end
+		elseif selected == key then
 			lg.setColor(255, 255, 255, 255)
 		else
 			lg.setColor(100, 100, 100, 255)
@@ -1285,7 +1319,14 @@ local function drawpage(page, selected, offx, offy)
 	for key in pairs(layout.items) do
 		local el = guielements[pagename(page, key)]
 		if el then
-			el:draw()
+			if isdisabled(key) then
+				lg.push()
+				fadeuntilpop(0.4) --greyed out
+				el:draw()
+				lg.pop()
+			else
+				el:draw()
+			end
 		end
 	end
 
@@ -1318,7 +1359,7 @@ end
 --Enter on a setting: ticks a checkbox, opens a dropdown
 local function activate(page, key)
 	local item = ITEMS[key]
-	if not item then
+	if not item or isdisabled(key) then
 		return
 	end
 	if item.kind == "checkbox" then
@@ -1344,7 +1385,7 @@ end
 --Left and Right on a setting: a step of a slider, the next or previous entry of a dropdown, a checkbox flips
 local function adjust(key, dir)
 	local item = ITEMS[key]
-	if not item then
+	if not item or isdisabled(key) then
 		return
 	end
 	if item.kind == "checkbox" then
