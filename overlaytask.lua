@@ -16,7 +16,9 @@
 --LÖVE's own threads (love.thread) can't run this work: they have their own Lua state, so they can't see or change the
 --game's tables, and they can't make images or canvases. Coroutines run on the main thread, where all of that works.
 
-OVERLAYTASK_BUDGET = 0.012 --seconds of work a frame before giving the frame back
+--seconds of work a frame before giving the frame back. The window still gets about 30 frames a second, plenty for it to
+--stay responsive and for the dots, and the work gets nearly all of the time (vsync is off while it runs, see resume)
+OVERLAYTASK_BUDGET = 1/30
 OVERLAYTASK_DOTTIME = 0.5 --seconds between each step of the "..." animation
 
 overlaytask = nil --the work running in the background: {co = coroutine}
@@ -134,10 +136,33 @@ function overlaytask_draw()
 	return true
 end
 
+--vsync is turned off while the work runs: with it on, every frame waits for the monitor, and a frame whose work runs
+--past a refresh waits for a whole extra one, so the work only got about half of the time
+local savedvsync = nil
+
+local function vsyncoff()
+	if savedvsync == nil and love.window and love.window.getVSync then
+		savedvsync = love.window.getVSync()
+		if savedvsync ~= 0 then
+			love.window.setVSync(0)
+		end
+	end
+end
+
+local function vsyncrestore()
+	if savedvsync ~= nil then
+		if savedvsync ~= 0 then
+			love.window.setVSync(savedvsync)
+		end
+		savedvsync = nil
+	end
+end
+
 local function finish()
 	overlaytask = nil
 	overlayfrozen = nil
 	overlaysnapshot = nil
+	vsyncrestore()
 end
 
 local function check(co, ok, err)
@@ -155,6 +180,9 @@ end
 --runs one more piece of the background work (the main loop calls this in place of love.update)
 local function resume()
 	local co = overlaytask.co
+	if overlayfrozen then
+		vsyncoff() --the fade before it still waits for the monitor, so it stays smooth
+	end
 	handlerco = co
 	resumeat = love.timer.getTime()
 	local ok, err = coroutine.resume(co)
