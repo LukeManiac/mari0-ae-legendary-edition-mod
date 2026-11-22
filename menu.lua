@@ -2615,7 +2615,7 @@ function options_tabdropdown_update()
 		return
 	end
 	if not dropdown then
-		dropdown = guielement:new("dropdown", OPTIONS_BOX_X+4, OPTIONS_BOX_Y+4, (205-13)/8, function(i)
+		dropdown = guielement:new("dropdown", OPTIONS_BOX_X+8, OPTIONS_BOX_Y+4, 24, function(i)
 			options_switchtab(i)
 			guielements["optionstabdropdown"].var = optionstab
 		end, optionstab, unpack(OPTIONS_TABNAMES))
