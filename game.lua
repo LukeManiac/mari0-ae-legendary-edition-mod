@@ -5291,8 +5291,10 @@ function loadmap(filename)
 	end
 
 	--CUSTOM ENEMIES
-	if editormode or testlevel then
-		--reload custom enemies everytime level is loaded
+	if (editormode or testlevel) and (AutomaticEnemyReload or enemies_loadkey() ~= enemiesloadedkey) then
+		--a different mappack or character: load the custom enemies again
+		--(changes to the enemy files are picked up with "refresh data" in the editor's custom enemies tab,
+		--or on every map load with the automaticenemyreload nitpick)
 		enemies_load()
 	else
 		--just update spritesets

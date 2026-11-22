@@ -374,6 +374,7 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `dontfreezeonsizechange`: Powering up and down only freezes the player it happens to, like in SMBX2. Everything else keeps moving, and that player can't be touched until the animation is done.
 - `camerasmoothing`: The camera eases after where it's going instead of moving rigidly, so it trails slightly behind.
 - `backwardsmoothing`: The camera leads ahead by as much as `camerasmoothing` would make it trail. Requires `camerasmoothing`.
+- `automaticenemyreload`: The Course Maker loads every custom enemy again whenever a map is loaded or tested, like before v1.3.1, so you don't have to press **refresh data**.
 
 ---
 
@@ -411,6 +412,24 @@ For anyone working with the music code:
 * `music:trackplaying(name)` checks whether any of those four is playing. `music:isplayingwithintro(name)` only checks one version and its intro.
 * `playprioritytrack(name)` plays the star, P-Switch or Mega Mushroom theme: the fast version when the time is low, with its intro first. It does nothing if the right version is already playing.
 
+#### 👾 Refresh Data
+
+A new **refresh data** button in the Course Maker's custom enemies tab (**Custom → Enemies**), bottom left, where the other tabs have **update image** and **update sounds**.
+
+* It loads every custom enemy again, so changes to their `.json` and image files show up without leaving the editor.
+* The entity list and the enemy dropdown update with it. The selected enemy stays selected if it's still there.
+* A notice says "Refreshed enemy data" when it's done.
+* The button is translated into every language the game has.
+
+#### ⚙️ Automatic Enemy Reload
+
+A new nitpick, `automaticenemyreload`. With it on, the Course Maker loads every custom enemy again each time a map is loaded or tested, the way it did before v1.3.1. Changes to enemy files then show up on the next map load, without pressing **refresh data**. Maps load slower with it on, the more custom enemies a mappack has. **Generate Nitpicks File** adds it to an existing file.
+
+#### 🧱 Enemy Functions
+
+* `enemies_loadkey()` returns everything `enemies_load` depends on besides the enemy files: the mappack, whether it uses custom enemies, `donotcategoriseenemyfolders` and the players' characters. `enemies_load` keeps the last one in `enemiesloadedkey`.
+* `refreshcustomenemies()` is what **refresh data** runs.
+
 ### 🐛 Bug Fixes
 
 * `starmusic-intro.ogg` and `princessmusic-intro.ogg` now actually play. Before, built-in music only ever loaded its `-fast` version, and a mappack's star and princess themes were loaded without looking for an intro, so both themes always started without one.
@@ -420,6 +439,11 @@ For anyone working with the music code:
 ### ✨ Improvements
 
 * The music priority only restarts a theme when the right version isn't already playing. If it's checked again partway through an intro (when the low time sound ends, or another player's star runs out), the intro keeps playing and the song still follows it.
+
+#### 🛠️ Course Maker
+
+* Loading a map in the Course Maker, or testing one, is faster. It no longer loads every custom enemy again each time. Enemies are only loaded again when the mappack or the players' characters change, and otherwise they just switch to the map's spriteset, the same as in normal play.
+* Changes to enemy files made while the editor is open are now picked up with **refresh data** instead of by loading a map. Turn on `automaticenemyreload` to load them on every map load like before.
 
 ## v1.3
 

@@ -1,5 +1,31 @@
+--does the mappack use custom enemies (then the default ones in customenemies/ are loaded too)
+local function enemies_exist()
+	local enemiesexist = love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/enemies/")
+	if (not enemiesexist) and (not editormode) then
+		for i = 1, #mariocharacter do
+			if mariocharacter[i] and love.filesystem.getInfo("alesans_entities/characters/" .. mariocharacter[i] .. "/enemies/") then
+				enemiesexist = true
+				break
+			end
+		end
+	end
+	return enemiesexist and true or false
+end
+
+--everything enemies_load depends on besides the enemy files themselves. The editor only loads the enemies again
+--when this changes (another mappack or character, for example), or when "refresh data" is pressed
+function enemies_loadkey()
+	local characters = {}
+	for i = 1, #mariocharacter do
+		characters[i] = tostring(mariocharacter[i])
+	end
+	return table.concat({mappackfolder .. "/" .. mappack, tostring(enemies_exist()),
+		tostring(mappacksettingenabled("donotcategoriseenemyfolders")), table.concat(characters, ",")}, "|")
+end
+
 function enemies_load()
 	defaultvalues = {quadcount=1, quadno=1}
+	enemiesloadedkey = enemies_loadkey()
 
 	enemiesdata = {}
 	customenemies = {}
@@ -17,15 +43,7 @@ function enemies_load()
 	--ENEMIIIIEEES
 	loaddelayed = {}
 	
-	local enemiesexist = love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/enemies/")
-	if (not enemiesexist) and (not editormode) then
-		for i = 1, #mariocharacter do
-			if mariocharacter[i] and love.filesystem.getInfo("alesans_entities/characters/" .. mariocharacter[i] .. "/enemies/") then
-				enemiesexist = true
-				break
-			end
-		end
-	end
+	local enemiesexist = enemies_exist()
 	local fl = {}
 	if enemiesexist then --only load defaults if custom enemies are used
 		fl = love.filesystem.getDirectoryItems("customenemies/")

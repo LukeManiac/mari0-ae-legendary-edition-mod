@@ -459,6 +459,7 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 		--guielements["currentenemydropdown"].scrollbar.scrollstep = 0.11 --how much mousewheel scrolls
 	end
 	guielements["openfolderenemiescustom"] = guielement:new("button", 184, 105, TEXT["open folder"], opencustomimagefolder, 2)
+	guielements["refreshenemiescustom"] = guielement:new("button", 176, 199, TEXT["refresh data"], refreshcustomenemies, 2) --where the other tabs have "update image" and "update sounds"
 	
 	textcolorl = endingtextcolorname
 	textcolorp = hudtextcolorname
@@ -3676,6 +3677,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 				
 				guielements["exportimagetemplate"]:draw()
 				guielements["openfolderenemiescustom"]:draw()
+				guielements["refreshenemiescustom"]:draw()
 				guielements["currentenemydropdown"]:draw()
 			end
 		elseif editorstate == "animations" then
@@ -4361,6 +4363,7 @@ function customtabtab(t)
 		guielements["currentenemydropdown"].active = true
 		guielements["exportimagetemplate"].active = true
 		guielements["openfolderenemiescustom"].active = true
+		guielements["refreshenemiescustom"].active = true
 	end
 	
 	customtabstate = t
@@ -8244,6 +8247,30 @@ function changecurrentenemy(var, initial)
 	if not initial then
 		guielements["currentenemydropdown"].var = var
 	end
+end
+--loads the custom enemies again, for changes made to their files while the editor is open
+--(loading a map in the editor doesn't do this anymore, see enemies_loadkey)
+function refreshcustomenemies()
+	local oldscrollbarheight = tilescrollbarheight
+	enemies_load()
+	if editentities then
+		--the entity list may have grown or shrunk
+		updatetilesscrollbar()
+	else
+		tilescrollbarheight = oldscrollbarheight --enemies_load measured the entity list, which isn't the one showing
+	end
+	--keep the same enemy selected if it's still there
+	local selected = currentcustomenemy and currentcustomenemy[2]
+	local var = 1
+	for i, name in ipairs(customenemies) do
+		if name == selected then
+			var = i
+			break
+		end
+	end
+	guielements["currentenemydropdown"]:setentries(customenemies, var)
+	changecurrentenemy(var)
+	notice.new("Refreshed enemy data", nil, 2)
 end
 function exportcustomimage(arg)
 	if customtabstate == "graphics" then

@@ -261,6 +261,7 @@
 			"image template": "crear imagen",
 			"export template": "crear imagen",
 			"open folder": "abre la carpeta",
+			"refresh data": "actualizar datos",
 			"replace image": "reemplazar imagen",
 			"drag an image file into\nthe square to replace it!": "arrastra una imagen png al\njuego para reemplazarlo!",
 			"or 'open folder' and\nchange the image there!": "o 'abre la carpeta' y\ncambia la imagen allí!",

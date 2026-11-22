@@ -549,6 +549,10 @@ function love.load()
 	--leave overlay timers at 0 so enabled nitpicks (showfps/showbattery/showtime/showplayercoords)
 	--still play their entrance animation on launch instead of snapping in fully visible
 
+	if BackwardSmoothing and not CameraSmoothing then
+		notice.new("backwardsmoothing needs camerasmoothing:\nenable camerasmoothing to use it!", notice.red, 6)
+	end
+
 	loadcustomplayers()
 	
 	editormode = false
@@ -3731,9 +3735,7 @@ function loadnitpicks()
 		DontFreezeOnSizeChange = t.dontfreezeonsizechange
 		CameraSmoothing = t.camerasmoothing
 		BackwardSmoothing = t.backwardsmoothing
-		if BackwardSmoothing and not CameraSmoothing then
-			notice.new("backwardsmoothing needs camerasmoothing:\nenable camerasmoothing to use it!", notice.red, 6)
-		end
+		AutomaticEnemyReload = t.automaticenemyreload
 	end
 end
 
