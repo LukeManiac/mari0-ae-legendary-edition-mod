@@ -300,11 +300,11 @@ end
 
 function levelscreen_draw()
 	local properprintfunc = properprintF
-	if hudoutline then
+	if hudoutlined() then
 		properprintfunc = properprintFbackground
 	end
 	local properprintbasicfunc = properprint
-	if hudoutline then
+	if hudoutlined() then
 		properprintbasicfunc = properprintbackground
 	end
 	if levelscreentimer < blacktime - blacktimesub and levelscreentimer > blacktimesub then

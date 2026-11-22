@@ -329,18 +329,30 @@ function pausemenu_rightrow(name)
 end
 PAUSEMENU_RIGHTROWS = 6
 
+--the "accessibility" button at the bottom of the pause menu, after the right column, for the keyboard
+function pausemenu_a11yrow()
+	return #pausemenuoptions + PAUSEMENU_RIGHTROWS + 1
+end
+
 local function pausemenu_rightx()
 	return (width*8)+5
 end
 
 --the scale dropdown's value: 1 to 4, or 5 for resizable (like options > misc.)
+function pausemenu_scalevalue()
+	if resizable then
+		return 5
+	end
+	return scale
+end
+
 function pausemenu_setscale(i)
 	changescale(i)
 	if gamestate == "game" then
 		updatespritebatch()
 	end
 	if guielements["pause_scale"] then
-		guielements["pause_scale"].var = resizable and 5 or scale
+		guielements["pause_scale"].var = pausemenu_scalevalue()
 	end
 	saveconfig()
 end
@@ -404,7 +416,11 @@ function game_update(dt)
 		end
 
 		--only usable and hoverable once the menu is fully open and no prompt (or the controls popup) is showing
-		local pause_gui_active = (pausemenuopentimer >= pausemenuopenduration and menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 and not controlspopupvisible())
+		local pause_input = (pausemenuopentimer >= pausemenuopenduration and menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 and not controlspopupvisible())
+		--the accessibility page below the pause menu, and the button at the bottom that goes between them
+		accessibility_pauseupdate(pause_input, dt)
+		--the pause menu's own widgets only while its page is up (not while the pages slide)
+		local pause_gui_active = pause_input and pausemenu_pageidle(1)
 		volumeslider.active = pause_gui_active
 		volumeslider.nohover = not volumeslider.active
 
@@ -454,7 +470,7 @@ function game_update(dt)
 		--scale dropdown, at the right end of its label's line
 		local scaledd = guielements["pause_scale"]
 		if not scaledd then
-			scaledd = guielement:new("dropdown", rightedge-(13+9*8), PAUSERIGHT.scale.widgety, 9, pausemenu_setscale, resizable and 5 or scale, 1, 2, 3, 4, 5)
+			scaledd = guielement:new("dropdown", rightedge-(13+9*8), PAUSERIGHT.scale.widgety, 9, pausemenu_setscale, pausemenu_scalevalue(), 1, 2, 3, 4, 5)
 			scaledd.displayentries = {"*1", "*2", "*3", "*4", "resizable"}
 			guielements["pause_scale"] = scaledd
 		end
@@ -464,7 +480,7 @@ function game_update(dt)
 		scaledd.nohover = not pause_gui_active
 		scaledd.forcehover = (pausemenuselected == pausemenu_rightrow("scale"))
 		if not scaledd.extended then
-			scaledd.var = resizable and 5 or scale
+			scaledd.var = pausemenu_scalevalue()
 		end
 
 		--letterbox checkbox, at the right end of its label's line
@@ -524,6 +540,7 @@ function game_update(dt)
 		guielements["pause_deadzone"] = nil
 		guielements["pause_scale"] = nil
 		guielements["pause_letterbox"] = nil
+		accessibility_pauseremove()
 	end
 
 	if pausemenuopen and not (SERVER or CLIENT) then
@@ -573,6 +590,12 @@ function game_update(dt)
 			end
 		end
 		return
+	end
+
+	--accessibility (game speed): gameplay runs slower, from here on (the pause menu and its prompts above don't).
+	--Not in the Course Maker itself, and not online, where everyone has to run at the same speed
+	if not editormode and not (SERVER or CLIENT) then
+		dt = dt*accessibility_gamespeed()
 	end
 	
 	--earthquake reset
@@ -1974,6 +1997,7 @@ function game_draw()
 		if earthquake > 0 and not pausemenuopen then
 			tremorx = (math.random()-.5)*2*earthquake*scale
 			tremory = (math.random()-.5)*2*earthquake*scale
+			tremorx, tremory = accessibility_shake(tremorx, tremory) --accessibility: shake intensity and direction
 			
 			love.graphics.translate(round(tremorx), round(tremory))
 		end
@@ -2883,14 +2907,22 @@ function game_draw()
 		
 		--SCROLLING SCORE
 		for i, v in pairs(scrollingscores) do
-			if type(scrollingscores[i].i) == "number" then
-				properprint2(scrollingscores[i].i, math.floor((scrollingscores[i].x-xscroll-0.4)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale))
-			elseif scrollingscores[i].i == "1up" then
-				love.graphics.draw(oneuptextimage, math.floor((scrollingscores[i].x-xscroll)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale), 0, scale, scale)
-			elseif scrollingscores[i].i == "3up" then
-				love.graphics.draw(threeuptextimage, math.floor((scrollingscores[i].x-xscroll)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale), 0, scale, scale)
-			elseif type(scrollingscores[i].i) == "string" and string.sub(scrollingscores[i].i, 1, 1) == "+" then
-				properprint(scrollingscores[i].i, math.floor((scrollingscores[i].x-xscroll-0.4)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale))
+			--with the hud outlined (the mappack's hudoutline, or accessibility's hud outline), score notes are outlined too
+			local function drawnote()
+				if type(scrollingscores[i].i) == "number" then
+					properprint2(scrollingscores[i].i, math.floor((scrollingscores[i].x-xscroll-0.4)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale))
+				elseif scrollingscores[i].i == "1up" then
+					love.graphics.draw(oneuptextimage, math.floor((scrollingscores[i].x-xscroll)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale), 0, scale, scale)
+				elseif scrollingscores[i].i == "3up" then
+					love.graphics.draw(threeuptextimage, math.floor((scrollingscores[i].x-xscroll)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale), 0, scale, scale)
+				elseif type(scrollingscores[i].i) == "string" and string.sub(scrollingscores[i].i, 1, 1) == "+" then
+					properprint(scrollingscores[i].i, math.floor((scrollingscores[i].x-xscroll-0.4)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale))
+				end
+			end
+			if hudoutlined() then
+				drawoutlined(drawnote)
+			else
+				drawnote()
 			end
 		end
 		
@@ -3420,9 +3452,21 @@ function game_draw()
 		--scale the whole menu from its center
 		love.graphics.push()
 		love.graphics.translate(winwidth/2, winheight/2)
-		love.graphics.scale(math.max(bettertimer, 0.0001), math.max(bettertimer, 0.0001))
+		motion_scale(math.max(bettertimer, 0.0001), math.max(bettertimer, 0.0001))
 		love.graphics.translate(-winwidth/2, -winheight/2)
 		guiglass.box((width*8*scale)-150*scale, winheight/8, pausewidth, pauseheight, pauseradius)
+
+		--two pages: the pause menu, and the accessibility page below it (accessibility.lua). Moving between them
+		--slides them up and down inside the box, cut to it
+		local pageprogress = pausemenu_pageprogress()
+		local boxx, boxy = (width*8*scale)-150*scale, winheight/8
+		local bx0, by0 = love.graphics.transformPoint(boxx, boxy)
+		local bx1, by1 = love.graphics.transformPoint(boxx+pausewidth, boxy+pauseheight)
+		local oldsx, oldsy, oldsw, oldsh = love.graphics.getScissor()
+		love.graphics.intersectScissor(math.min(bx0, bx1), math.min(by0, by1), math.max(1, math.abs(bx1-bx0)), math.max(1, math.abs(by1-by0)))
+		love.graphics.push()
+		love.graphics.translate(0, -pageprogress*pauseheight)
+		if pageprogress < 1 then
 		
 		for i = 1, #pausemenuoptions do
 			love.graphics.setColor(100, 100, 100, 255)
@@ -3496,6 +3540,19 @@ function game_draw()
 			guielements["pause_scale"]:draw()
 		end
 
+		end --page 1
+		love.graphics.pop()
+		if pageprogress > 0 then
+			accessibility_pausedraw((1-pageprogress)*pauseheight/scale)
+		end
+		if oldsx then
+			love.graphics.setScissor(oldsx, oldsy, oldsw, oldsh)
+		else
+			love.graphics.setScissor()
+		end
+		--"accessibility" (or "back" on the accessibility page) at the bottom of the box, on both pages
+		accessibility_pausedrawbutton()
+
 		love.graphics.pop()
 
 		-- Controls overlay (drawn on top, with animated dim of the foreground)
@@ -3565,7 +3622,7 @@ function drawprompt(timer, duration, open, rows)
     --scale the prompt from the center of the screen, the caller draws its text and then calls love.graphics.pop()
     love.graphics.push()
     love.graphics.translate(winwidth/2, winheight/2)
-    love.graphics.scale(math.max(prompttimer, 0.0001), math.max(prompttimer, 0.0001))
+    motion_scale(math.max(prompttimer, 0.0001), math.max(prompttimer, 0.0001))
     love.graphics.translate(-winwidth/2, -winheight/2)
     guiglass.box((winwidth-promptwidth)/2, (winheight-promptheight)/2, promptwidth, promptheight, promptradius)
     love.graphics.setColor(255, 255, 255, 255)
@@ -3790,8 +3847,41 @@ function drawentity(j, w, i, v, currentscissor, drop)
 end
 
 --dontfreezeonsizechange: a size-changing player is drawn the way the animation shows them (see mario:sizefxlook)
+--accessibility (half-opaque blink): a player blinking after a hit is drawn into this canvas, then onto the screen at half
+--opacity, so its layers (colours, hat...) fade together instead of showing through each other
+local blinkcanvas
+
 function drawplayer(i, x, y, r, pad, drop)
 	local v = objects["player"][i]
+	if v and v.animation == "invincible" and accessibility_halfblink() and not v.halfblinkdrawing then
+		local target = love.graphics.getCanvas()
+		local w, h
+		if target then
+			w, h = target:getDimensions()
+		else
+			w, h = love.graphics.getDimensions()
+		end
+		if not blinkcanvas or blinkcanvas:getWidth() ~= w or blinkcanvas:getHeight() ~= h then
+			blinkcanvas = love.graphics.newCanvas(w, h)
+			blinkcanvas:setFilter("nearest", "nearest")
+		end
+		love.graphics.push("all")
+		love.graphics.setCanvas({blinkcanvas, stencil = true})
+		love.graphics.clear()
+		v.halfblinkdrawing = true
+		local result = drawplayer(i, x, y, r, pad, drop)
+		v.halfblinkdrawing = nil
+		love.graphics.pop()
+		love.graphics.push("all")
+		love.graphics.origin()
+		love.graphics.setScissor()
+		love.graphics.setShader()
+		love.graphics.setBlendMode("alpha", "premultiplied")
+		love.graphics.setColor(128, 128, 128, 128)
+		love.graphics.draw(blinkcanvas, 0, 0)
+		love.graphics.pop()
+		return result
+	end
 	local look = v and v.sizefx and v:sizefxlook()
 	if not look then
 		return drawplayer_draw(i, x, y, r, pad, drop)
@@ -4411,7 +4501,7 @@ end
 
 function drawHUD()
 	local properprintfunc = properprintF
-	if hudoutline then
+	if hudoutlined() then
 		properprintfunc = properprintFbackground
 	end
 	love.graphics.setColor(hudtextcolor)
@@ -4441,7 +4531,7 @@ function drawHUD()
 		
 		properprintfunc(addzeros((marioscore or 0), 9), (width*16-56-(9*8))*scale, 12*scale)
 		
-		love.graphics.draw(hudclockimg, hudclockquad[hudoutline], (width*16-49)*scale, 11*scale, 0, scale, scale)
+		love.graphics.draw(hudclockimg, hudclockquad[hudoutlined()], (width*16-49)*scale, 11*scale, 0, scale, scale)
 		if gamestate == "game" then
 			properprintfunc(addzeros(math.ceil(mariotime), 3), (width*16-40)*scale, 12*scale)
 		else
@@ -4479,7 +4569,7 @@ function drawHUD()
 
 	if gamestate == "game" then
 		if neurotoxin then
-			if not hudoutline then
+			if not hudoutlined() then
 				love.graphics.setColor(0, 0, 0)
 				properprintfunc(TEXT["neurotoxin time: "] .. math.floor(toxintime), uispace*.5 - 24*scale, 35*scale)
 			end
@@ -4543,7 +4633,7 @@ end
 function drawmultiHUD()
 	--multiplayer hud
 	local properprintfunc = properprintF
-	if hudoutline then
+	if hudoutlined() then
 		properprintfunc = properprintFbackground
 	end
 	
@@ -4577,7 +4667,7 @@ function drawmultiHUD()
 			--display lives
 			love.graphics.setColor(255, 255, 255, 255)
 			properprintfunc(s, (cx+8)*scale, cy*scale)
-			if hudoutline then
+			if hudoutlined() then
 				love.graphics.setColor(0, 0, 0)
 				love.graphics.rectangle("fill", (cx-1)*scale, (cy-1)*scale, 9*scale, 9*scale)
 			end
@@ -5898,6 +5988,13 @@ function game_keypressed(key, textinput)
 			return
 		end
 
+		--the accessibility page (or the pages sliding) has the keys while no prompt is up (see accessibility.lua)
+		if menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 and pausemenuopentimer >= pausemenuopenduration then
+			if accessibility_pausekeypressed(key) then
+				return
+			end
+		end
+
 		if menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 then
 			-- Allow confirm and pause-key close immediately, even while the open animation is still playing
 			if (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
@@ -5935,6 +6032,8 @@ function game_keypressed(key, textinput)
 					setmenupopupvisible("controls", true)
 				elseif pausemenuselected == pausemenu_rightrow("letterbox") then
 					pausemenu_setletterbox(not letterboxfullscreen)
+				elseif pausemenuselected == pausemenu_a11yrow() then
+					pausemenu_setpage(2) --the accessibility page, below
 				end
 			elseif isPauseKey(key) then
 				pausemenuopen = false
@@ -5950,8 +6049,10 @@ function game_keypressed(key, textinput)
 		if pausemenuopentimer >= pausemenuopenduration and menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 then
 			local shader1row, shader2row = pausemenu_rightrow("shader1"), pausemenu_rightrow("shader2")
 			if (key == "down" or key == "s") then
-				if pausemenuselected < #pausemenuoptions + PAUSEMENU_RIGHTROWS then
+				if pausemenuselected < pausemenu_a11yrow() then
 					pausemenuselected = pausemenuselected + 1
+				else
+					pausemenu_setpage(2) --down from the "accessibility" button: the page below
 				end
 			elseif (key == "up" or key == "w") then
 				if pausemenuselected > 1 then
@@ -5982,8 +6083,11 @@ function game_keypressed(key, textinput)
 				elseif pausemenuselected == pausemenu_rightrow("letterbox") then
 					pausemenu_setletterbox(not letterboxfullscreen)
 				elseif (pausemenuselected == shader1row or pausemenuselected == shader2row) and shaderssupported ~= false then
-					local slot = (pausemenuselected == shader1row) and 1 or 2
-					local i = ((slot == 1) and currentshaderi1 or currentshaderi2) + dir
+					local slot, i = 2, currentshaderi2
+					if pausemenuselected == shader1row then
+						slot, i = 1, currentshaderi1
+					end
+					i = i + dir
 					if i > #shaderlist then
 						i = 1
 					elseif i < 1 then
@@ -6186,6 +6290,7 @@ function pausegame(playpause)
 		end
 
 		pausemenuselected = 1
+		pausemenu_setpage(1, true) --always opens on the pause menu itself, not the accessibility page
 	end
 
 	pausemenuopen = true
@@ -6261,7 +6366,10 @@ local function stoptestingbutton_get()
 end
 
 function stoptestingbutton_update(dt)
-	local target = stoptestingbutton_shown() and 1 or 0
+	local target = 0
+	if stoptestingbutton_shown() then
+		target = 1
+	end
 	if stoptestingbuttonalpha < target then
 		stoptestingbuttonalpha = math.min(target, stoptestingbuttonalpha + dt/STOPTESTINGBUTTON_FADETIME)
 	elseif stoptestingbuttonalpha > target then
@@ -11409,7 +11517,7 @@ function centerprint(text, x, y, scalemult, hudoutlineoverride)
 	local text = tostring(text)
 	local textx = (x-(8*scalemult*#(text))/2)*scale
 	local texty = (y-(10*scalemult*countlines(text))/2)*scale
-	if hudoutline or hudoutlineoverride then
+	if hudoutlined() or hudoutlineoverride then
 		properprintFbackground(text, textx, texty, nil, nil, scalemult)
 	else
 		properprintF(text, textx, texty, scalemult)
@@ -11431,7 +11539,7 @@ function centerprintscreen(text)
 	for i, line in ipairs(lines) do
 		local textwidth = utf8.len(line) or #line
 		local x = math.floor((cw - textwidth*8*scale)/2)
-		if hudoutline then
+		if hudoutlined() then
 			properprintFbackground(line, x, y + (i-1)*lineheight)
 		else
 			properprintF(line, x, y + (i-1)*lineheight)

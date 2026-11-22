@@ -623,7 +623,7 @@ function splitscreen_drawlives(i, view)
 	end
 
 	local properprintfunc = properprintF
-	if hudoutline then
+	if hudoutlined() then
 		properprintfunc = properprintFbackground
 	end
 
@@ -676,7 +676,7 @@ function splitscreen_drawlives(i, view)
 	-- livecounter at centerbottom of its viewport
 	love.graphics.setColor(255, 255, 255, 255)
 	properprintfunc(s, (cx+8)*scale, cy*scale)
-	if hudoutline then
+	if hudoutlined() then
 		love.graphics.setColor(0, 0, 0)
 		love.graphics.rectangle("fill", (cx-1)*scale, (cy-1)*scale, 9*scale, 9*scale)
 	end

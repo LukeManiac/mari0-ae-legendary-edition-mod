@@ -843,7 +843,7 @@ editor_confirm_end = function(progress)
 	end
 
 	local anchorx, anchory = 200*scale, 112*scale --middle of the popup
-	local zoom = 0.9 + 0.1 * progress
+	local zoom = motion_zoom(0.9 + 0.1 * progress)
 	local a = math.floor(255 * progress + 0.5)
 	love.graphics.push("all")
 	love.graphics.setBlendMode("alpha", "premultiplied")
@@ -892,7 +892,7 @@ editor_rc_present = function(progress)
 		return
 	end
 	
-	local zoom = 0.9 + 0.1 * progress
+	local zoom = motion_zoom(0.9 + 0.1 * progress)
 	local a = math.floor(255 * progress + 0.5)
 	love.graphics.push("all")
 	love.graphics.setBlendMode("alpha", "premultiplied")
@@ -3933,7 +3933,7 @@ function editor_draw()
 		
 		editor_draw_cursor_preview((1 - progress) * cursorAlpha)
 		
-		local zoom = 1.1 - 0.1 * progress
+		local zoom = motion_zoom(1.1 - 0.1 * progress)
 		love.graphics.setColor(255, 255, 255, 255 * progress)
 		love.graphics.draw(editorMenuCanvas, canvasWidth/2, canvasHeight/2, 0, zoom, zoom, canvasWidth/2, canvasHeight/2)
 		love.graphics.setColor(255, 255, 255, 255)
@@ -3982,7 +3982,7 @@ function editor_draw()
 		end
 		love.graphics.pop()
 
-		local zoom = 1.1 - 0.1 * minimapProgress
+		local zoom = motion_zoom(1.1 - 0.1 * minimapProgress)
 		love.graphics.setColor(255, 255, 255, 255 * minimapProgress)
 		love.graphics.draw(editorMinimapCanvas, canvasWidth/2, canvasHeight/2, 0, zoom, zoom, canvasWidth/2, canvasHeight/2)
 		love.graphics.setColor(255, 255, 255, 255)
@@ -4016,7 +4016,7 @@ function editor_draw()
 		end
 		love.graphics.pop()
 
-		local zoom = 1.1 - 0.1 * resizeProgress
+		local zoom = motion_zoom(1.1 - 0.1 * resizeProgress)
 		love.graphics.setColor(255, 255, 255, 255 * resizeProgress)
 		love.graphics.draw(editorResizeCanvas, canvasWidth/2, canvasHeight/2, 0, zoom, zoom, canvasWidth/2, canvasHeight/2)
 		love.graphics.setColor(255, 255, 255, 255)
@@ -4571,7 +4571,7 @@ function drawanimationcachetooltip()
 	--grows out of its top edge, under the button
 	love.graphics.push()
 	love.graphics.translate(middle*scale, y*scale)
-	love.graphics.scale(sx, sy)
+	motion_scale(sx, sy)
 	love.graphics.translate(-middle*scale, -y*scale)
 
 	guiglass.box(x*scale, y*scale, w*scale, h*scale, math.min(w, h)*0.3*scale, alpha)

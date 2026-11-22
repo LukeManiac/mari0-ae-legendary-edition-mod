@@ -199,7 +199,7 @@ function overlaytip_draw(tip, typing)
 
 		local x = ww/2 - length/2*8*scale
 		local ly = y + (i-1)*lineheight
-		if hudoutline then
+		if hudoutlined() then
 			properprintFbackground(visibletext, x, ly)
 		else
 			properprintF(visibletext, x, ly)

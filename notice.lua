@@ -12,11 +12,20 @@ function notice.new(text, color, duration)
 	table.insert(notice.notices, {text=text:lower(), color=color, life=duration, duration=duration})
 end
 
+--accessibility (click to dismiss): notices stay until they're clicked, without a duration
+local function clicktodismiss()
+	return accessibility and accessibility.clicknotices
+end
+
 function notice.update(dt)
 	for i = #notice.notices, 1, -1 do
 		local v = notice.notices[i]
 		
 		v.life = v.life - dt
+		if clicktodismiss() and not v.dismissed then
+			--slides in, then stays where it is until it's clicked
+			v.life = math.max(v.life, v.duration - notice.fadetime)
+		end
 		
 		if v.life <= 0 then
 			table.remove(notice.notices, i)
@@ -43,6 +52,7 @@ function notice.draw()
 		actualy = notice.gety(y, v.life, height, v.duration)
 		
 		local targetrect = {width*16 - longest*8-5, actualy, longest*8+5, height}
+		v.rect = targetrect --where it is, for clicking it away
 		local scissor = {(width*16 - longest*8-5)*scale, y*scale, (longest*8+5)*scale, (actualy-y+height)*scale}
 		
 		love.graphics.setScissor(unpack(scissor))
@@ -56,6 +66,24 @@ function notice.draw()
 	end
 	
 	love.graphics.setColor(255, 255, 255)
+end
+
+--a click on a notice slides it away, when notices stay until they're clicked. Returns true when it hit one
+function notice.mousepressed(x, y)
+	if not clicktodismiss() then
+		return false
+	end
+	local gx, gy = x/scale, y/scale
+	for i = #notice.notices, 1, -1 do
+		local v = notice.notices[i]
+		local r = v.rect
+		if r and not v.dismissed and gx >= r[1] and gx < r[1]+r[3] and gy >= r[2] and gy < r[2]+r[4] then
+			v.dismissed = true
+			v.life = math.min(v.life, notice.fadetime)
+			return true
+		end
+	end
+	return false
 end
 
 function notice.gety(y, life, height, duration)

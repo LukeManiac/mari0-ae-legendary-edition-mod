@@ -1949,7 +1949,7 @@ function mario:update(dt)
 		local actualanimtimer = self.animationtimer - (invincibletime - invincibletime2)
 		
 		local invis = math.mod(actualanimtimer, 1) * (((math.min(actualanimtimer, 1) * 9) + 1) * invincibletime)
-		self.drawable = math.floor(math.mod(invis, 2)) == 0 or noupdate
+		self.drawable = math.floor(math.mod(invis, 2)) == 0 or noupdate or accessibility_halfblink() --half-opaque blink: always drawn (see drawplayer)
 		
 		if actualanimtimer - dt < invincibletime2 and actualanimtimer > invincibletime2 then
 			self.animation = false

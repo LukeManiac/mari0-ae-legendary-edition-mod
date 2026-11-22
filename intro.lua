@@ -45,8 +45,10 @@ local function intro_printcolour(text, x, y, scalemult, spacingmult)
 
 	for i, char in utf8.chars(text) do
 		local charscale = scalemult
+		local charalpha = 1
 		if type(scalemult) == "function" then
-			charscale = scalemult(i)
+			charscale, charalpha = scalemult(i)
+			charalpha = charalpha or 1
 		end
 
 		--character is still waiting for its turn, skip it (no colour calculation, no print)
@@ -61,7 +63,7 @@ local function intro_printcolour(text, x, y, scalemult, spacingmult)
 			lerp(authorcolour[1], authorcolour[1] / 2, p),
 			lerp(authorcolour[2], authorcolour[2] / 2, p),
 			lerp(authorcolour[3], authorcolour[3] / 2, p),
-			introalpha
+			introalpha*charalpha
 		)
 
 		--centre of this character's cell (game pixels), spacing stays fixed while the character itself scales
@@ -89,7 +91,12 @@ function intro_draw()
 			return nil --not its turn yet
 		end
 
-		return motion_curve(math.min(chartimer / introscaleduration, 1), introcurve, true, false, true) * 2.5
+		local curve = motion_curve(math.min(chartimer / introscaleduration, 1), introcurve, true, false, true)
+		if accessibility_reducemotion() then
+			--reduce motion: each character fades in at its full size instead of zooming in
+			return 2.5, math.max(0, math.min(1, curve))
+		end
+		return curve * 2.5
 	end
 
 	intro_printcolour(authorname, 200, 112, authorcharscale, 2.5)

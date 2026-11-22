@@ -1469,7 +1469,10 @@ function minigame_drawHUD()
 	if def.hud then
 		def.hud(S, items)
 	end
-	local printfunc = hudoutline and properprintFbackground or properprintF
+	local printfunc = properprintF
+	if hudoutlined() then
+		printfunc = properprintFbackground
+	end
 	for i, item in ipairs(items) do
 		local col = item.column or (i-0.5)
 		love.graphics.setColor(hudtextcolor or {255, 255, 255})
@@ -3291,7 +3294,7 @@ addminigame({
 		--right: clock and time
 		local rx = cx + boxw/2 + gap
 		love.graphics.setColor(255, 255, 255)
-		love.graphics.draw(hudclockimg, hudclockquad[hudoutline], rx*scale, (top+h/2-5)*scale, 0, scale, scale)
+		love.graphics.draw(hudclockimg, hudclockquad[hudoutlined()], rx*scale, (top+h/2-5)*scale, 0, scale, scale)
 		shadowprint(timetext, rx + clockw + clockgap, top+h/2-4)
 	end,
 })

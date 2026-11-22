@@ -459,11 +459,34 @@ function guiglass.panel(x, y, w, h, r, o)
 	local tr, tg, tb = tocolor(o.tint, {0, 0, 0})
 	local rr, rg, rb = tocolor(o.rim, {255, 255, 255})
 
+	--accessibility: reduce transparency takes the blur away from behind panels and makes them solid, and increase
+	--contrast makes panels darker and their rims and highlights stronger (like iOS). Pills (nobackdrop: highlights,
+	--dividers) keep their own see-through look, but get stronger with increase contrast
+	local nobackdrop = o.nobackdrop
+	local glassalpha = o.glassalpha or 0.82
+	local tintstrength = o.tintstrength or guiglass.tintstrength
+	local rimstrength = o.rimstrength or 0.55
+	local pill = o.nobackdrop
+	if accessibility and accessibility.reducetransparency and not pill then
+		nobackdrop = true
+		glassalpha = math.max(glassalpha, 0.94)
+	end
+	if accessibility and accessibility.increasecontrast then
+		rimstrength = math.min(1, rimstrength*1.5 + 0.3)
+		rr, rg, rb = rr + (1-rr)*0.4, rg + (1-rg)*0.4, rb + (1-rb)*0.4
+		if pill then
+			glassalpha = math.min(1, glassalpha*1.6)
+		elseif not o.solid then
+			tintstrength = math.max(tintstrength, 0.75)
+			glassalpha = math.max(glassalpha, 0.92)
+		end
+	end
+
 	if not supported then
 		local cr, cg, cb, ca = love.graphics.getColor()
-		love.graphics.setColor(rr*255, rg*255, rb*255, 255*alpha*(o.rimstrength or 0.55))
+		love.graphics.setColor(rr*255, rg*255, rb*255, 255*alpha*rimstrength)
 		love.graphics.rectangle("fill", x, y, w, h, r)
-		love.graphics.setColor(tr*255, tg*255, tb*255, 255*alpha*(o.glassalpha or 0.8))
+		love.graphics.setColor(tr*255, tg*255, tb*255, 255*alpha*glassalpha)
 		love.graphics.rectangle("fill", x+scale, y+scale, w-2*scale, h-2*scale, r*0.7)
 		love.graphics.setColor(cr, cg, cb, ca)
 		return
@@ -507,7 +530,7 @@ function guiglass.panel(x, y, w, h, r, o)
 	if pushed[1] then
 		recordshape(x, y, w, h, r)
 	end
-	local wants = guiglass.mode() ~= "flat" and not o.nobackdrop
+	local wants = guiglass.mode() ~= "flat" and not nobackdrop
 	if wants then
 		framebackdrop = true
 	end
@@ -531,19 +554,19 @@ function guiglass.panel(x, y, w, h, r, o)
 	end
 
 	--every setting goes in one send (u in the shader), with its tables reused
-	local tint = o.tintstrength or guiglass.tintstrength
+	local tint = tintstrength
 	if not (o.base or o.solid) then
 		tint = tint*guiglass.clarity
 	end
 	setu(1, uvscale[1], uvscale[2], w, h)
 	setu(2, uvclamp[1], uvclamp[2], uvclamp[3], uvclamp[4])
 	setu(3, tr, tg, tb, tint)
-	setu(4, rr, rg, rb, o.rimstrength or 0.55)
+	setu(4, rr, rg, rb, rimstrength)
 	setu(5, margin, r or 0, aa, guiglass.refraction*scale)
 	--the bent edge: about a third of a small panel, but never more than 6 game pixels (a big panel bends at its edge,
 	--and its middle is cheap to draw)
 	local bezel = math.min(math.max(3*scale, math.min(w, h)*0.35), math.min(w, h)*0.5, 6*scale)
-	setu(6, bezel, shadowamount, o.glassalpha or 0.82, hasbackdrop)
+	setu(6, bezel, shadowamount, glassalpha, hasbackdrop)
 	local shader = glassshader
 	local image = dummy
 	if backdrop then
@@ -677,6 +700,11 @@ function guiglass.motion(el, cx, cy, w, h, hovering, o)
 		end
 	end
 
+	--reduce motion (accessibility): the element stays where it is, at its size
+	if accessibility and accessibility.reducemotion then
+		return 0, 0, 1, 1
+	end
+
 	local s = math.max(st.s, 0.2)
 	return st.ox, st.oy, s*st.hs, st.hs/s
 end
@@ -738,12 +766,20 @@ function guiglass.jellyin(t)
 	if t <= 0 then
 		return 0
 	end
+	--reduce motion (accessibility): no bounce. Callers draw this with motion_scale, which fades instead of scaling
+	if accessibility and accessibility.reducemotion then
+		return 1 - math.exp(-t*12)
+	end
 	return 1 - math.exp(-t*8)*math.cos(t*17)
 end
 
 --1 → 0, swelling first (u from 0 to 1)
 function guiglass.jellyout(u)
 	u = math.max(0, math.min(1, u))
+	--reduce motion (accessibility): no swell, just away
+	if accessibility and accessibility.reducemotion then
+		return 1 - u
+	end
 	return 1 - (3.4*u*u*u - 2.4*u*u)
 end
 

@@ -39,7 +39,7 @@ function mappackscroll_ease(list, current, target)
 	return anim.last
 end
 local OPTIONS_BOX_X, OPTIONS_BOX_Y, OPTIONS_BOX_W, OPTIONS_BOX_H = 21, 16, 218, 200 --the options menu's dark box, which the tabs slide inside
-local OPTIONS_TABPREFIXES = {"ctrl_", "skin_", "opt_", "cheat_"} --the start of the names of each tab's widgets
+local OPTIONS_TABPREFIXES = {"ctrl_", "skin_", "opt_", "cheat_", "a11y_"} --the start of the names of each tab's widgets
 --misc. tab: the joystick deadzone row sits above scale, packed in above shader1 (which stays at 63)
 local OPTIONS_MISC_DEADZONE_Y, OPTIONS_MISC_SCALE_Y, OPTIONS_MISC_LETTERBOX_Y = 32, 42, 53
 local keypromptpage = 1
@@ -1026,7 +1026,7 @@ local function resetwarning_draw()
 
 	love.graphics.push()
 	love.graphics.translate(130*scale, 122*scale)
-	love.graphics.scale(popupscale, popupscale)
+	motion_scale(popupscale, popupscale)
 	love.graphics.translate(-130*scale, -122*scale)
 	love.graphics.translate(0, (1 - popupscale) * 8 * scale)
 
@@ -2358,6 +2358,7 @@ function menu_update(dt)
 	optionscontrols_update()
 	optionsmisc_update()
 	optionscheats_update()
+	accessibility_optionsupdate(dt)
 	if utilsmenuopen then
 		utilsmenu_update(dt)
 	end
@@ -2592,6 +2593,11 @@ function menu_update(dt)
 	languagemenu_update(dt, languagemenuopen)
 end
 
+--whether a popup over the options (the language menu or the reset warning) has the input
+function options_popupopen()
+	return languagemenuopen or resetwarningopen
+end
+
 --whether a tab's widgets should exist: the open tab, and the tab sliding out while the menu switches tabs
 function options_tabshown(tab)
 	return optionstab == tab or (optionspageanimation ~= nil and optionspageanimation.from == tab)
@@ -2600,7 +2606,7 @@ end
 --the tab picker: a dropdown at the top left of the options box, where the tab names used to be. It sits 4 pixels in from
 --the box's corner, where the controls tab's highlight was, and is 205 pixels wide (13 for the arrow, 24 characters).
 --Its name has no tab prefix, so it's never frozen by a tab slide
-local OPTIONS_TABNAMES = {"controls", "skins", "misc.", "cheat"}
+local OPTIONS_TABNAMES = {"controls", "skins", "misc.", "cheat", "accessibility"} --(accessibility: see accessibility.lua)
 
 function options_tabdropdown_update()
 	local dropdown = guielements["optionstabdropdown"]
@@ -2628,7 +2634,7 @@ end
 
 --switches to another tab, sliding the old one out and the new one in
 function options_switchtab(tab)
-	if tab == optionstab or tab < 1 or tab > 4 then
+	if tab == optionstab or tab < 1 or tab > #OPTIONS_TABNAMES then
 		return
 	end
 	optionspageanimation = {
@@ -2790,7 +2796,7 @@ local function options_drawtab()
 		if keyprompt or keypromptscale > 0 then
 			love.graphics.push()
 			love.graphics.translate(130*scale, 130*scale)
-			love.graphics.scale(keypromptscale, keypromptscale)
+			motion_scale(keypromptscale, keypromptscale)
 			love.graphics.translate(-130*scale, -130*scale)
 
 			local progress = keypromptscale
@@ -2934,6 +2940,9 @@ local function options_drawtab()
 		end
 
 		optionscheats_draw()
+	elseif optionstab == ACCESSIBILITY_OPTIONSTAB then
+		--ACCESSIBILITY (accessibility.lua): categories, each with its settings
+		accessibility_optionsdraw()
 	end
 end
 
@@ -3740,7 +3749,7 @@ function menu_draw()
 	
 	---UI
 	local properprintfunc = properprintF
-	if hudoutline then
+	if hudoutlined() then
 		properprintfunc = properprintFbackground
 	end
 	if hudvisible then
@@ -3854,7 +3863,7 @@ function menu_draw()
         if newgamewarning or warningpopupscale > 0 then
             love.graphics.push()
             love.graphics.translate(130*scale, 122*scale)
-            love.graphics.scale(warningpopupscale, warningpopupscale)
+            motion_scale(warningpopupscale, warningpopupscale)
             love.graphics.translate(-130*scale, -122*scale)
 
             local warningprogress = warningpopupscale
@@ -3887,7 +3896,7 @@ function menu_draw()
 		if selectworldopen or worldpopupscale > 0 then
 			love.graphics.push()
 			love.graphics.translate(130*scale, 122*scale)
-			love.graphics.scale(worldpopupscale, worldpopupscale)
+			motion_scale(worldpopupscale, worldpopupscale)
 			love.graphics.translate(-130*scale, -122*scale)
 
 			local popupradius = math.min(220, 60) * scale * 0.2
@@ -4887,7 +4896,7 @@ function menu_keypressed(key, unicode)
 			dropdown:close()
 			return
 		end
-		if dropdown and (optionstab == 2 or dropdown == guielements["optionstabdropdown"]) then
+		if dropdown and (optionstab == 2 or optionstab == ACCESSIBILITY_OPTIONSTAB or dropdown == guielements["optionstabdropdown"]) then
 			--the other keys would change what's under the open list
 			return
 		end
@@ -4919,7 +4928,7 @@ function menu_keypressed(key, unicode)
 					options_switchtab(optionstab - 1)
 				end
 			elseif (key == "right" or key == "d") then
-				if optionstab < 4 then
+				if optionstab < #OPTIONS_TABNAMES then
 					options_switchtab(optionstab + 1)
 				end
 			end
@@ -4956,6 +4965,8 @@ function menu_keypressed(key, unicode)
 				optionsmisc_activate(optionsselection)
 			elseif optionstab == 4 and gamefinished then
 				optionscheats_activate(optionsselection)
+			elseif optionstab == ACCESSIBILITY_OPTIONSTAB and optionsselection > 1 then
+				accessibility_optionsactivate(optionsselection)
 			end
 		elseif (key == "down" or key == "s") then
 			if optionstab == 1 then
@@ -4992,8 +5003,18 @@ function menu_keypressed(key, unicode)
 				else
 					optionsselection = 2
 				end
+			elseif optionstab == ACCESSIBILITY_OPTIONSTAB then
+				if optionsselection < accessibility_optionslastselection() then
+					optionsselection = optionsselection + 1
+				else
+					optionsselection = 1
+				end
+				accessibility_optionsfollow()
 			end
 		elseif (key == "up" or key == "w") then
+			if optionstab == ACCESSIBILITY_OPTIONSTAB then
+				accessibility_optionsfollow() --the selected setting scrolls into view
+			end
 			if optionsselection > 1 then
 				if characteri ~= characters.data[mariocharacter[skinningplayer]].i then
 					colorsetedit = 1
@@ -5014,9 +5035,14 @@ function menu_keypressed(key, unicode)
 					optionsselection = 13
 				elseif optionstab == 4 and gamefinished then
 					optionsselection = 11
+				elseif optionstab == ACCESSIBILITY_OPTIONSTAB then
+					optionsselection = accessibility_optionslastselection()
 				end
 			end
 		elseif (key == "right" or key == "d") then
+			if optionstab == ACCESSIBILITY_OPTIONSTAB and optionsselection > 1 then
+				accessibility_optionsadjust(optionsselection, 1) --a step of a slider, the next entry, a checkbox flips
+			end
 			if optionstab == 2 then
 				if mariocharacter[skinningplayer] == nil then --idk
 					setcustomplayer(mariocharacter[skinningplayer], skinningplayer, "initial")
@@ -5153,6 +5179,9 @@ function menu_keypressed(key, unicode)
 				end
 			end				
 		elseif (key == "left" or key == "a") then
+			if optionstab == ACCESSIBILITY_OPTIONSTAB and optionsselection > 1 then
+				accessibility_optionsadjust(optionsselection, -1) --a step of a slider, the previous entry, a checkbox flips
+			end
 			if optionstab == 2 then
 				if mariocharacter[skinningplayer] == nil then
 					setcustomplayer(mariocharacter[skinningplayer], skinningplayer, "initial")
@@ -5966,7 +5995,7 @@ function drawcontrolsoverlay()
 	love.graphics.push()
 	local cx, cy = winwidth / 2, winheight / 2
 	love.graphics.translate(cx, cy)
-	love.graphics.scale(controlspopupscale, controlspopupscale)
+	motion_scale(controlspopupscale, controlspopupscale)
 	love.graphics.translate(-cx, -cy)
 
 	local popupx, popupy, popupw, popuph, offsetx, offsety = controlspopup_geometry()
@@ -6026,7 +6055,7 @@ function drawcontrolsoverlay()
 	if keyprompt or keypromptscale > 0 then
 		love.graphics.push()
 		love.graphics.translate(130*scale, 130*scale)
-		love.graphics.scale(keypromptscale, keypromptscale)
+		motion_scale(keypromptscale, keypromptscale)
 		love.graphics.translate(-130*scale, -130*scale)
 
 		local progress = keypromptscale

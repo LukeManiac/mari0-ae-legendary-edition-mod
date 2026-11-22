@@ -625,7 +625,7 @@ function guielement.drawdroppanel(owner, open, x, y, w, h, rows, o)
 	local pcx = (x + w/2)*scale
 	love.graphics.push()
 	love.graphics.translate(pcx, y*scale)
-	love.graphics.scale(psx, psy)
+	motion_scale(psx, psy)
 	love.graphics.translate(-pcx, -y*scale)
 
 	local grey = lerp(127, 255, o.highlight or 0)
@@ -637,7 +637,7 @@ function guielement.drawdroppanel(owner, open, x, y, w, h, rows, o)
 			local rcx, rcy = pcx, (row.y + row.h/2)*scale
 			love.graphics.push()
 			love.graphics.translate(rcx, rcy)
-			love.graphics.scale(rsx, rsy)
+			motion_scale(rsx, rsy)
 			love.graphics.translate(-rcx, -rcy)
 			row.draw()
 			love.graphics.pop()
@@ -706,7 +706,7 @@ function guielement:draw(a, offx, offy)
 		if self.var then
 			love.graphics.push()
 			love.graphics.translate(cx, cy)
-			love.graphics.scale(ticks, ticks)
+			motion_scale(ticks, ticks)
 			love.graphics.translate(-4.5*scale, -4.5*scale)
 			love.graphics.setColor(255, 255, 255)
 			love.graphics.setLineWidth(scale)
@@ -902,7 +902,7 @@ function guielement:draw(a, offx, offy)
 				local pcx = (self.x + fullw/2)*scale
 				love.graphics.push()
 				love.graphics.translate(pcx, pivoty*scale)
-				love.graphics.scale(panelsx, panelsy)
+				motion_scale(panelsx, panelsy)
 				love.graphics.translate(-pcx, -pivoty*scale)
 
 				local pr = math.min(headh*scale*0.32, panelh*scale/2)
@@ -948,7 +948,7 @@ function guielement:draw(a, offx, offy)
 							local ocx, ocy = (cx + cw/2)*scale, (boxtop + (rowh-1)/2)*scale
 							love.graphics.push()
 							love.graphics.translate(ocx, ocy)
-							love.graphics.scale(osx, osy)
+							motion_scale(osx, osy)
 							love.graphics.translate(-ocx, -ocy)
 							local highlighted = (high == i)
 							if self.drawentryfunc then
@@ -1011,7 +1011,7 @@ function guielement:draw(a, offx, offy)
 		if sx > 0.01 and sy > 0.01 then
 			love.graphics.push()
 			love.graphics.translate(self.x*scale, pivoty*scale)
-			love.graphics.scale(sx, sy)
+			motion_scale(sx, sy)
 			love.graphics.translate(-self.x*scale, -pivoty*scale)
 
 			local r = 11*scale*0.32
@@ -1161,6 +1161,10 @@ function guielement:draw(a, offx, offy)
 			local glassr = math.min(tw, th)*handleround
 			guiglass.panel(self.x*scale, self.y*scale, tw, th, glassr, {tint = self.backgroundcolor, tintstrength = 0.25, rimstrength = 0.25, shadow = false, base = true})
 			if self.drawtrack then
+				--a slider can paint its own colours in the glass (a colour gradient, say):
+				--drawtrack(self, x, y, w, h, radius, alpha) in screen pixels, a game pixel in from the track's edge.
+				--It paints the whole box it's given (no frame of its own) with colours at alpha (0-255); the paint is cut
+				--to the glass's rounded shape, and the glass's rim is laid back over it so it still looks like glass
 				local inset = scale
 				local ix, iy, iw, ih = self.x*scale+inset, self.y*scale+inset, tw-2*inset, th-2*inset
 				local ir = math.max(0, glassr-inset)
@@ -1209,7 +1213,7 @@ function guielement:draw(a, offx, offy)
 				if self.inputting then
 					if self.cursoralpha and self.cursoralpha > 0 then
 						love.graphics.setColor(255, 255, 255, self.cursoralpha * 255)
-						love.graphics.rectangle("fill", (textx+column*8)*scale, (self.y+math.ceil((self.height-8)/2)-1)*scale, 2*scale, 9*scale)
+						love.graphics.rectangle("fill", (textx+column*8)*scale, (self.y+math.ceil((self.height-8)/2)-1)*scale, accessibility_cursorwidth()*scale, 9*scale)
 					end
 				end
 			end
@@ -1307,7 +1311,8 @@ function guielement:draw(a, offx, offy)
 
 			if self.cursoralpha and self.cursoralpha > 0 then
 				love.graphics.setColor(self.textcolor[1], self.textcolor[2], self.textcolor[3], self.cursoralpha * 255)
-				love.graphics.rectangle("fill", (self.x+1+self.spacing+(x-1)*8)*scale, (self.y+1+self.spacing+(y-1)*10)*scale, 2*scale, 9*scale, scale)
+				--its width is the text cursor size (accessibility)
+				love.graphics.rectangle("fill", (self.x+1+self.spacing+(x-1)*8)*scale, (self.y+1+self.spacing+(y-1)*10)*scale, accessibility_cursorwidth()*scale, 9*scale, scale)
 				love.graphics.setColor(self.textcolor)
 			end
 		else
@@ -2544,6 +2549,9 @@ function guielement:setsliderbordercolor(highlighted)
 end
 
 --corner radius of a scrollbar's handle; the track uses the same one
+--how solid a slider's own track colours (drawtrack) are over its glass: a little of the glass shows through
+SLIDER_TRACKPAINTALPHA = 225
+
 function guielement:sliderradius()
 	local roundness = 0.25
 	if self.buttonround then

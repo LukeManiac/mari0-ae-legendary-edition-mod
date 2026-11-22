@@ -601,6 +601,63 @@ The right side of the pause menu now has more of the misc. tab's settings. From 
 
 Every change saves the game straight away, like in options. The row selected with the keyboard looks hovered. The left side of the pause menu hasn't changed.
 
+#### ♿ Accessibility
+
+A new **accessibility** tab in the options menu, after **cheat** in the tab picker, and the same settings on a new page of the pause menu. Both list them in categories, with each setting's label indented under its category and its widget at the end of the line:
+
+```
+motion:
+    reduce motion          [ ]
+    screen shake           [====100%]
+    shake direction
+    [both            v]
+    smooth camera          [ ]
+display:
+    ...
+```
+
+A label too long for its line wraps beside a checkbox. A slider or dropdown that doesn't fit next to its label goes on the line under it. If a page is taller than the space it has (a long translation, say), it scrolls: the mouse wheel scrolls it, the setting the keyboard is on always scrolls into view, and a thin scrollbar shows on its right. Settings scrolled out of view can't be clicked.
+
+Every change saves straight away. They're saved in `options.txt` as `a11y_<name>:<value>`, and **Reset All Settings** puts them all back to their defaults.
+
+**Motion**
+
+* **Reduce motion:** Animations that scale things fade them instead. Popups, the pause menu, prompts, dropdown lists, right-click menus, tooltips, the editor panels, the checkbox tick and the intro's author name all appear at their full size and fade in and out. Buttons and other GUI elements no longer lean towards the mouse, squash when pressed or wobble back with a jelly.
+* **Screen shake:** How strong screen shake is, from 25% to 100% in steps of 5%. 100% by default.
+* **Shake direction:** Which way the screen shakes: vertical, horizontal or both. Both by default.
+* **Smooth camera:** The `camerasmoothing` nitpick as a setting. The first time the game starts, it's set to whatever the nitpick says. From then on, the setting decides, and **Reset All Settings** takes it from the nitpick again.
+
+**Display**
+
+* **Reduce transparency:** Glass panels no longer blur what's behind them. They're drawn as solid panes in their own colour, so menus look plainer and are easier to read over a busy course. Highlights and dividers keep their own look.
+* **Increase contrast:** Like iOS's Increase Contrast: glass panels are darker and more solid, their rims are brighter and stronger, highlights are easier to see, and grey text (unselected options, hints) is drawn much brighter.
+* **Colour filter:** None, protanopia, deuteranopia or tritanopia. The whole frame goes through a daltonisation filter that moves the colours someone with that colour vision deficiency would lose into ones they can tell apart. Everything is filtered, including menus, the HUD, notices and shaders.
+* **HUD outline:** Outlines the HUD in every mappack, the same as a mappack with `hudoutline` on. Score notes (the points and 1-ups that float up) get a black outline too, whenever the HUD is outlined. The mappack's own `hudoutline` setting isn't changed.
+* **Text cursor:** How wide a text input's cursor is: normal (2 pixels), large (3) or extra large (4). This also covers a slider's cursor while you type a value into it.
+
+**Gameplay**
+
+* **Game speed:** How fast gameplay runs, from 25% to 100% in steps of 5%. 100% by default. Everything in a course slows down together, including the timer. The pause menu, its prompts and the menus run at normal speed, and so does the Course Maker while editing. Testing a course uses the setting. Online play always runs at 100%.
+* **Half-opaque blink:** A player blinking after a hit is drawn at half opacity the whole time instead of blinking. The player is drawn as one picture first, so their colours, hat and other layers fade together instead of showing through each other.
+
+**Notices**
+
+* **Click to dismiss:** Notices slide in and stay until you click them, with no time limit. Clicking one slides it away.
+
+**Options menu**
+
+* Pick **accessibility** from the tab picker, or press Right on the tab row from **cheat**. It slides in like the other tabs.
+* Up and Down move through the settings. Left and Right move a slider by 5%, step through a dropdown's options, or tick and untick a checkbox. Enter ticks a checkbox or opens a dropdown.
+
+**Pause menu**
+
+* An **accessibility** button sits at the bottom of the pause menu. Pressing it, or pressing Down after the last option on the right (shader2) and then Down again from the button, slides the pause menu up and the accessibility page up from below.
+* The accessibility page has two columns: motion and gameplay on the left, display and notices on the right. Its keys work the same as in the options menu. The button at the bottom says **back** there.
+* Pressing Up from the first setting, Escape (or the pause key), or **back** slides back to the pause menu, with the **accessibility** button selected. The pause menu always opens on its own page.
+* Nothing on either page can be used while they slide.
+
+All labels, categories and options are translated into every language the game has.
+
 #### ⌨️ Text Input Keys
 
 Every GUI text input now takes the usual editing keys:
@@ -616,10 +673,17 @@ Every GUI text input now takes the usual editing keys:
 #### 🧱 GUI Functions
 
 * `pausemenu_wraplabel(text, maxchars)` splits a pause menu label into lines of at most `maxchars` characters, at spaces.
+* `accessibility.lua` holds the accessibility settings (`accessibility.<name>`), what they do, and the categorised layout both menus use. `accessibility_set(name, value)` changes a setting and saves it.
+* `motion_scale(sx, sy)` is `love.graphics.scale` for an animation: with reduce motion on, it fades everything drawn until the matching `love.graphics.pop` instead of scaling it. `motion_zoom(zoom)` is 1 with reduce motion. Use them for any new pop-in or zoom animation.
+* `graphicsalphamult` fades everything drawn while it's below 1: `love.graphics.setColor` multiplies the alpha by it and `getColor` divides it back out, and it goes back to what it was at the matching `pop`.
+* `hudoutlined()` says whether the HUD is outlined (the mappack's `hudoutline` or the setting). `drawoutlined(fn)` draws something with a black outline a pixel wide.
+* `pausemenu_setpage(page)` slides the pause menu to page 1 (itself) or 2 (accessibility). `pausemenu_a11yrow()` is the keyboard's row for the **accessibility** button.
+* `notice.mousepressed(x, y)` dismisses the notice under the mouse when notices stay until clicked.
 * `PAUSERIGHT` holds the layout of the pause menu's right side, and `pausemenu_rightrow(name)` gives the `pausemenuselected` value of one of its rows (`"controls"`, `"deadzone"`, `"scale"`, `"letterbox"`, `"shader1"` or `"shader2"`).
 * `pausemenu_setscale(i)`, `pausemenu_setletterbox(v)` and `pausemenu_setshader(slot, i)` change those settings from the pause menu and save them.
 
 * `guielement:resetanimation()` starts a right-click menu's opening animation over.
+* A slider's `drawtrack(self, x, y, w, h, radius, alpha)` now paints its colours inside the slider's glass track instead of drawing the whole track. It gets the box a game pixel in from the track's edge, fills all of it with colours at `alpha` (`SLIDER_TRACKPAINTALPHA`, 225), and the slider cuts the paint to the glass's rounded shape and lays the glass's rim back over it.
 * `guielement:closeanimated()` closes a right-click menu with its closing animation, and `guielement:isclosing()` is true until it's finished, so the menu can be drawn while `active` is `false`.
 * A right-click menu with `centerentries` set to `true` draws its title and options in the middle of their rows.
 * `stoptestingbutton_draw()`, `stoptestingbutton_update(dt)`, `stoptestingbutton_mousepressed(x, y, button)` and `stoptestingbutton_mousereleased(x, y, button)` run the **stop testing course** button. `stoptestingbutton_click()` is what it runs when clicked.
@@ -646,6 +710,12 @@ Every GUI text input now takes the usual editing keys:
 * Loading a map, testing one and opening the editor panel no longer check every map file in the mappack. The map list is read when the Course Maker opens from the menu, and changes made outside the game are picked up with the **Maps** tab's **refresh data**. Turn on `automaticmapreload` to read them all again every time like before.
 * **save level** in the **Maps** tab is now one line tall, so **refresh data** fits under it.
 * The **Maps** tab's right-click menu draws its title and options (**copy**, **paste** and **delete**) in the middle of their rows.
+
+#### 🎚️ Slider Tracks
+
+* The skins tab's **coop portal 1 colour** and **coop portal 2 colour** sliders now have the same liquid glass track as every other slider, with the hue bar inside it. Before, the hue bar sat in a plain black box.
+* The skins tab's red, green and blue sliders and the Font Renderer's colour sliders are glass the same way, with their gradients inside.
+* None of these tracks has a black frame behind its colours any more. The glass's rim runs around the colours instead, and a little of the glass shows through them.
 * Loading a map no longer reads and decodes every mappack animation again. Press the **Animations** tab's arrow button to pick up changes made to them outside the game, or turn on `automaticanimationreload` to read them on every map load like before.
 * Loading a map that was already loaded no longer reads and parses its file again, unless the file or the tileset changed.
 

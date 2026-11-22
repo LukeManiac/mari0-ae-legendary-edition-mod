@@ -176,6 +176,7 @@ end
 ----- MAIN -----
 
 require("utils")
+require("accessibility") --settings that have to be there before the config is read (see accessibility.lua)
 hardloadhttps()
 
 local debugconsole = false --debug
@@ -547,6 +548,7 @@ function love.load()
 	
 	--nitpicks
 	loadnitpicks()
+	accessibility_afternitpicks() --smooth camera starts as the camerasmoothing nitpick
 	--leave overlay timers at 0 so enabled nitpicks (showfps/showbattery/showtime/showplayercoords)
 	--still play their entrance animation on launch instead of snapping in fully visible
 
@@ -1199,6 +1201,7 @@ function love.load()
 
 	--loading overlays hand their work to the background from now on (see overlaytask.lua)
 	overlaytask_install()
+	accessibility_install()
 end
 
 function love.update(dt)
@@ -1607,6 +1610,7 @@ function saveconfig()
 	end
 
 	s = s .. "joydeadzone:" .. string.format("%.2f", joystickdeadzone) .. ";"
+	s = s .. accessibility_saveconfig()
 
 	s = s .. "letterbox:" .. tostring(letterboxfullscreen) .. ";"
 	
@@ -1753,6 +1757,8 @@ function loadconfig(nodefaultconfig)
 			if not nodefaultconfig and not android then
 				scale = tonumber(s2[2])
 			end
+		elseif accessibility_loadconfigvalue(s2[1], s2[2]) then
+			--an accessibility setting (a11y_...)
 		elseif s2[1] == "joydeadzone" then
 			local value = tonumber(s2[2])
 			if value then
@@ -1949,6 +1955,7 @@ function defaultconfig()
 	end
 	resizable = true
 	joystickdeadzone = 0.25 --how far a stick has to move to count (0 to 1, see joystickpastdeadzone), saved as joydeadzone
+	accessibility_defaults()
 	letterboxfullscreen = true
 	volume = 1
 	mappack = "smb"
@@ -2489,6 +2496,15 @@ function love.mousepressed(x, y, button, istouch)
 
 	if jsonerrorwindow.opened then
 		jsonerrorwindow:mousepressed(x, y, button)
+		return
+	end
+
+	--a notice that stays until it's clicked (accessibility: click to dismiss)
+	if button == "l" and notice.mousepressed(x, y) then
+		return
+	end
+	--the mouse wheel over a page of accessibility settings that doesn't all fit
+	if accessibility_mousepressed(x, y, button) then
 		return
 	end
 	
@@ -3101,6 +3117,7 @@ end
 function properprintF(s, x, y, size)
 	--UTF-8 CAPITALS
 	if s then
+		local contrast = accessibility_contrasttext() --increase contrast: grey text is drawn brighter
 		local size = size or 1
 		local startx = x
 		for i, char, b in utf8.chars(tostring(s)) do
@@ -3112,6 +3129,7 @@ function properprintF(s, x, y, size)
 				love.graphics.draw(fontimage, fontquads[fontindexCAP[char]], x+((i-1)*(8*size))*scale, y, 0, size*scale, size*scale)
 			end
 		end
+		accessibility_restoretext(contrast)
 	end
 end
 function properprintFbackground(s, x, y, include, color, size)
@@ -3145,6 +3163,7 @@ function properprint(s, x, y, size)
 	local size = size or 1
 	s = tostring(s)
 	local startx = x
+	local contrast = accessibility_contrasttext() --increase contrast: grey text is drawn brighter
 	for i = 1, string.len(s) do
 		local char = string.sub(s, i, i)
 		if char == " " then
@@ -3155,6 +3174,7 @@ function properprint(s, x, y, size)
 			love.graphics.draw(fontimage, fontquads[fontindexOLD[char]], x+((i-1)*(8*size))*scale, y, 0, size*scale, size*scale)
 		end
 	end
+	accessibility_restoretext(contrast)
 end
 function properprintbackground(s, x, y, include, color, size)
 	local size = size or 1
