@@ -4082,11 +4082,9 @@ function loadbackground(background)
 	--a new mappack: nothing kept from the last one is used
 	clearanimationcache()
 	clearmapparsecache()
-	--the font first, so everything shown while the mappack loads (the overlay and its tip) is already in its font
-	loadcustomfont()
 	loadanimatedtiles()
 	enemies_load()
-	loadcustomsprites(false, false, true) --the font is already loaded
+	loadcustomsprites()
 	loadcustomtext()
 	loadcustomsounds()
 	loadcustommusic()

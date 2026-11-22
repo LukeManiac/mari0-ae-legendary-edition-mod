@@ -50,10 +50,7 @@ local updatetilequads, fixsprites --update tilequad self.image
 
 local loadedcustomsprites = {} --lists which graphics have been changed
 
---fontloaded: loadcustomfont already loaded the font for this mappack (loadbackground does that first), so the font's
---images are left alone here
-local FONTSPRITES = {fontimage = true, fontbackimage = true}
-function loadcustomsprites(initial, forcebuiltins, fontloaded) --Sprite loader
+function loadcustomsprites(initial, forcebuiltins) --Sprite loader
 	local imgtable = imagestable
 	local imgdatatable = imagedatatable
 	local customspritesexist = not forcebuiltins and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/custom")
@@ -65,9 +62,7 @@ function loadcustomsprites(initial, forcebuiltins, fontloaded) --Sprite loader
 	end
 	if (not customspritesexist) and customsprites then
 		for i = 1, #imgtable do
-			if fontloaded and FONTSPRITES[imgtable[i]] then
-				--already loaded first, by loadcustomfont
-			elseif initial or loadedcustomsprites[imgtable[i]] then
+			if initial or loadedcustomsprites[imgtable[i]] then
 				local imgdata = love.image.newImageData("graphics/" .. graphicspack .. "/" .. string.gsub(string.gsub(imgtable[i], "img", ""), "image", "") .. ".png")
 				_G[imgtable[i]] = love.graphics.newImage(imgdata)
 				_G[imgdatatable[i]] = imgdata
@@ -132,9 +127,7 @@ function loadcustomsprites(initial, forcebuiltins, fontloaded) --Sprite loader
 	
 	for i = 1, #imgtable do
 		overlayyield() --gives the frame back while this loads in the background (see overlaytask.lua)
-		if fontloaded and FONTSPRITES[imgtable[i]] then
-			--already loaded first, by loadcustomfont
-		elseif love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/custom/" .. string.gsub(string.gsub(imgtable[i], "img", ""), "image", "") .. ".png") then
+		if love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/custom/" .. string.gsub(string.gsub(imgtable[i], "img", ""), "image", "") .. ".png") then
 			local imgdata = love.image.newImageData(mappackfolder .. "/" .. mappack .. "/custom/" .. string.gsub(string.gsub(imgtable[i], "img", ""), "image", "") .. ".png")
 			_G[imgtable[i]] = love.graphics.newImage(imgdata)
 			_G[imgdatatable[i]] = imgdata
@@ -1425,72 +1418,6 @@ end
 
 local SPRITESfixcoin, SPRITESfixcoinblock, SPRITESfixplatform, SPRITESfixseesaw, SPRITESfixpushbutton, SPRITESfixplant, SPRITESfixcheepcheep,
 	SPRITESfixyoshi, SPRITESfixsquid, SPRITESfixcheepcheep, SPRITESfixsquidbaby, SPRITESfixkoopaling, SPRITESfixfont, SPRITESfixredseesaw, SPRITESfixgrinder, SPRITESfixaxe
---a font in the old format (one 512x8 row) is converted to the current layout, on the game's own font
-function convertoldfont(reset)
-	if (not reset) and fontimage:getWidth() == 512 and fontimage:getHeight() == 8 then
-		SPRITESfixfont = true
-		local d3, d4
-		local d1 = love.image.newImageData(mappackfolder .. "/" .. mappack .. "/custom/font.png")
-		local d2 = love.image.newImageData("graphics/" .. graphicspack .. "/font.png")
-		if loadedcustomsprites["fontbackimage"] then
-			d3 = love.image.newImageData(mappackfolder .. "/" .. mappack .. "/custom/fontback.png")
-			d4 = love.image.newImageData("graphics/" .. graphicspack .. "/fontback.png")
-		end
-		local oldglyphs = "0123456789abcdefghijklmnopqrstuvwxyz.:/,\"©-_>* !{}?+'()=><#%  "
-		--local locations = ""
-		local s = fontglyphs:split("\n")
-		
-		for i1, c1, b1 in utf8.chars(oldglyphs) do
-			local upperc = c1:upper()
-
-			--find position
-			for line = 1, #s do
-				for i2, c2, b2 in utf8.chars(s[line]) do
-					if c1 == c2 or upperc == c2 then
-						--locations = locations .. line .. "," .. i2 .. ","
-						--paste where the letter is
-						d2:paste(d1,(i2-1)*10+1,(line-1)*10+1,(i1-1)*8,0,8,8)
-						if loadedcustomsprites["fontbackimage"] then
-							d4:paste(d3,(i2-1)*10+1,(line-1)*10,(i1-1)*10,0,10,10)
-						end
-						break
-					end
-				end
-			end
-		end
-		--love.system.setClipboardText(locations)
-		fontimage = love.graphics.newImage(d2)
-		--fix outlines too
-		if loadedcustomsprites["fontbackimage"] then
-			fontbackimage = love.graphics.newImage(d4)
-		end
-	elseif SPRITESfixfont then
-		SPRITESfixfont = false
-	end
-end
-
---loads the mappack's font (and its outline), or the game's if the mappack doesn't have one, and converts an old one.
---loadbackground runs it before anything else when a mappack loads, so everything shown while it loads (the loading
---overlay and its tip) is already in the mappack's font. initial and forcebuiltins work like loadcustomsprites'
-function loadcustomfont(initial, forcebuiltins)
-	for name in pairs(FONTSPRITES) do
-		local file = string.gsub(string.gsub(name, "img", ""), "image", "") .. ".png" --font.png, fontback.png
-		local custom = mappackfolder .. "/" .. mappack .. "/custom/" .. file
-		if (not forcebuiltins) and love.filesystem.getInfo(custom) then
-			local imgdata = love.image.newImageData(custom)
-			_G[name] = love.graphics.newImage(imgdata)
-			_G[name .. "_data"] = imgdata
-			loadedcustomsprites[name] = true
-		elseif initial or loadedcustomsprites[name] then
-			local imgdata = love.image.newImageData("graphics/" .. graphicspack .. "/" .. file)
-			_G[name] = love.graphics.newImage(imgdata)
-			_G[name .. "_data"] = imgdata
-			loadedcustomsprites[name] = nil
-		end
-	end
-	convertoldfont()
-end
-
 function fixsprites(reset)
 	--BAD. Should be re-coded later.
 	if coinimage:getWidth() == 64 and (not reset) then
@@ -1794,7 +1721,8 @@ function fixsprites(reset)
 	end
 
 	--Convert Font
-	convertoldfont(reset)
+	if (not reset) and fontimage:getWidth() == 512 and fontimage:getHeight() == 8 then
+		SPRITESfixfont = true
 		local d3, d4
 		local d1 = love.image.newImageData(mappackfolder .. "/" .. mappack .. "/custom/font.png")
 		local d2 = love.image.newImageData("graphics/" .. graphicspack .. "/font.png")
