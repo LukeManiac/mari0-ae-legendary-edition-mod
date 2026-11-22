@@ -756,12 +756,10 @@ local function drawpage(page, selected, offx, offy)
 		end
 	end
 
-	--a scrollbar shows when it doesn't all fit
-	local maxscroll = layout.height - vp.h
-	if maxscroll > 0 then
-		local barh = math.max(10, vp.h*vp.h/layout.height)
-		local bary = vp.y + (vp.h - barh)*(page.scroll/maxscroll)
-		guiglass.pill((vp.x + vp.w - 3)*scale, bary*scale, 2*scale, barh*scale, scale, {255, 255, 255, 110}, 0.3, 1)
+	--the scrollbar, when it doesn't all fit
+	local bar = guielements[scrollbarname(page)]
+	if bar then
+		bar:draw()
 	end
 
 	if sx then
@@ -919,7 +917,7 @@ pausea11yselected = 1 --the setting the keyboard is on (its index), or count+1 f
 
 local pausepage = {
 	prefix = "pa11y_",
-	columns = {{x = 58, w = 138}, {x = 204, w = 138}},
+	columns = {{x = 58, w = 138}, {x = 204, w = 134}}, --(the scrollbar goes right of the second)
 	catcolumns = {1, 2, 1, 2},
 	viewport = {x = 52, y = 32, w = 296, h = 143},
 }
