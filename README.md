@@ -375,6 +375,7 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `camerasmoothing`: The camera eases after where it's going instead of moving rigidly, so it trails slightly behind.
 - `backwardsmoothing`: The camera leads ahead by as much as `camerasmoothing` would make it trail. Requires `camerasmoothing`.
 - `automaticenemyreload`: The Course Maker loads every custom enemy again whenever a map is loaded or tested, like before v1.3.1, so you don't have to press **refresh data**.
+- `automaticbackgroundreload`: The Course Maker decodes custom backgrounds and foregrounds again whenever a map is loaded or tested, like before v1.3.1, so you don't have to press **refresh data** in the backgrounds tab.
 
 ---
 
@@ -425,10 +426,24 @@ A new **refresh data** button in the Course Maker's custom enemies tab (**Custom
 
 A new nitpick, `automaticenemyreload`. With it on, the Course Maker loads every custom enemy again each time a map is loaded or tested, the way it did before v1.3.1. Changes to enemy files then show up on the next map load, without pressing **refresh data**. Maps load slower with it on, the more custom enemies a mappack has. **Generate Nitpicks File** adds it to an existing file.
 
+#### 🖼️ Background Refresh Data
+
+The custom backgrounds tab (**Custom → Backgrounds**) has a **refresh data** button too, under the animated backgrounds text.
+
+* In the Course Maker, and while testing a map from it, background and foreground pictures are now only decoded once. Loading another map that uses the same picture reuses it instead of decoding it again.
+* **refresh data** decodes them all again, so changes to a picture show up without leaving the editor. It also picks up pictures added to the `backgrounds` folder since, and shows a "Refreshed background data" notice.
+* New picture files are still found on every map load. Only changes to a picture that's already been loaded need **refresh data**.
+* Outside the Course Maker, nothing is kept: backgrounds load the same way as before. The kept pictures are let go when you leave the editor or open another mappack.
+
+#### ⚙️ Automatic Background Reload
+
+A new nitpick, `automaticbackgroundreload`. With it on, the Course Maker decodes backgrounds and foregrounds again on every map load, the way it did before v1.3.1, so you never need **refresh data** for them. **Generate Nitpicks File** adds it to an existing file.
+
 #### 🧱 Enemy Functions
 
 * `enemies_loadkey()` returns everything `enemies_load` depends on besides the enemy files: the mappack, whether it uses custom enemies, `donotcategoriseenemyfolders` and the players' characters. `enemies_load` keeps the last one in `enemiesloadedkey`.
 * `refreshcustomenemies()` is what **refresh data** runs.
+* `refreshcustombackgrounds()` is what the backgrounds tab's **refresh data** runs. `clearbackgroundcache()` lets go of the kept background and foreground pictures, so the next load decodes them again.
 
 ### 🐛 Bug Fixes
 
@@ -444,6 +459,7 @@ A new nitpick, `automaticenemyreload`. With it on, the Course Maker loads every 
 
 * Loading a map in the Course Maker, or testing one, is faster. It no longer loads every custom enemy again each time. Enemies are only loaded again when the mappack or the players' characters change, and otherwise they just switch to the map's spriteset, the same as in normal play.
 * Changes to enemy files made while the editor is open are now picked up with **refresh data** instead of by loading a map. Turn on `automaticenemyreload` to load them on every map load like before.
+* Loading a map in the Course Maker no longer decodes its background and foreground pictures again when an earlier map already used them. Turn on `automaticbackgroundreload` to decode them on every map load like before.
 
 ## v1.3
 

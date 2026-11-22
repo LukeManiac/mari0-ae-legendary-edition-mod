@@ -1269,7 +1269,8 @@ local nitpickkeys = {
 	"dontfreezeonsizechange",
 	"camerasmoothing",
 	"backwardsmoothing",
-	"automaticenemyreload"
+	"automaticenemyreload",
+	"automaticbackgroundreload"
 }
 
 function generatenitpicksfile()

@@ -441,6 +441,7 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	changecurrentbackground(1, true)
 	guielements["currentbackgrounddropdown"] = guielement:new("dropdown", 184, 63, 10, changecurrentbackground, 1, "background", "foreground")
 	guielements["openfolderbackgroundscustom"] = guielement:new("button", 184, 131, TEXT["open folder"], opencustomimagefolder, 2, {"backgrounds"})
+	guielements["refreshbackgroundscustom"] = guielement:new("button", 184, 182, TEXT["refresh data"], refreshcustombackgrounds, 2) --under the animated backgrounds text (next to "update image" is too wide in some languages)
 	
 	--custom sounds
 	changecurrentsound(1, true)
@@ -3482,6 +3483,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 
 				guielements["openfolderbackgroundscustom"]:draw()
 				guielements["currentbackgrounddropdown"]:draw()
+				guielements["refreshbackgroundscustom"]:draw()
 				guielements["saveimage"]:draw()
 			elseif customtabstate == "sounds" then
 				love.graphics.setColor(255, 255, 255)
@@ -4349,6 +4351,7 @@ function customtabtab(t)
 		guielements["saveimage"].active = true
 		guielements["openfolderbackgroundscustom"].active = true
 		guielements["currentbackgrounddropdown"].active = true
+		guielements["refreshbackgroundscustom"].active = true
 	elseif t == "sounds" then
 		guielements["currentsounddropdown"].active = true
 		guielements["soundscustomtab"].textcolor = {255, 255, 255}
@@ -8247,6 +8250,20 @@ function changecurrentenemy(var, initial)
 	if not initial then
 		guielements["currentenemydropdown"].var = var
 	end
+end
+--decodes the custom backgrounds and foregrounds again, for changes made to their pictures while the editor is open
+--(loading a map in the editor reuses the pictures it already has, see loadbackgroundimage in mappack.lua)
+function refreshcustombackgrounds()
+	clearbackgroundcache()
+	loadcustombackgrounds() --pictures added since, for the background lists
+	if custombackground then
+		loadcustombackground(custombackground)
+	end
+	if customforeground then
+		loadcustomforeground(customforeground)
+	end
+	collectgarbage()
+	notice.new("Refreshed background data", nil, 2)
 end
 --loads the custom enemies again, for changes made to their files while the editor is open
 --(loading a map in the editor doesn't do this anymore, see enemies_loadkey)

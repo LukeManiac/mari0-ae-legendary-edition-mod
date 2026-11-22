@@ -259,6 +259,43 @@ function savecustomtext()
 	notice.new("Saved custom text!", nil, 2)
 end
 
+--decoded background and foreground pictures, by path. Only used in the editor (and when testing a map from it), so
+--loading another map doesn't decode the same pictures again. "refresh data" in the editor's backgrounds tab clears it
+--(clearbackgroundcache), and the automaticbackgroundreload nitpick turns it off
+local backgroundcache = {}
+local backgroundcachemappack = false
+
+function clearbackgroundcache()
+	backgroundcache = {}
+	backgroundcachemappack = false
+end
+
+local function backgroundcacheactive()
+	if AutomaticBackgroundReload or not (editormode or testlevel) then
+		if backgroundcachemappack then
+			clearbackgroundcache() --let go of the pictures outside the editor
+		end
+		return false
+	end
+	local key = mappackfolder .. "/" .. mappack
+	if backgroundcachemappack ~= key then
+		backgroundcache = {}
+		backgroundcachemappack = key
+	end
+	return true
+end
+
+--a background or foreground picture, from the cache when it's in there
+local function loadbackgroundimage(path)
+	if not backgroundcacheactive() then
+		return love.graphics.newImage(path)
+	end
+	if not backgroundcache[path] then
+		backgroundcache[path] = love.graphics.newImage(path)
+	end
+	return backgroundcache[path]
+end
+
 function loadcustombackground(filename, defaultonly)
 	local i = 1
 	custombackgroundimg = {}
@@ -306,7 +343,7 @@ function loadcustombackground(filename, defaultonly)
 
 	-- function for making BG's
 	local loadbg = function(i, path, path2)
-		custombackgroundimg[i] = love.graphics.newImage(path .. ".png")
+		custombackgroundimg[i] = loadbackgroundimage(path .. ".png")
 		custombackgroundwidth[i] = custombackgroundimg[i]:getWidth()/16
 		custombackgroundheight[i] = custombackgroundimg[i]:getHeight()/16
 		if love.filesystem.getInfo(path .. ".json") or (path2 and love.filesystem.getInfo(path2 .. ".json")) then -- load animation
@@ -418,7 +455,7 @@ function loadcustomforeground(filename)
 
 	-- function for making BG's
 	local loadbg = function(i, path, path2)
-		customforegroundimg[i] = love.graphics.newImage(path .. ".png")
+		customforegroundimg[i] = loadbackgroundimage(path .. ".png")
 		customforegroundwidth[i] = customforegroundimg[i]:getWidth()/16
 		customforegroundheight[i] = customforegroundimg[i]:getHeight()/16
 		if love.filesystem.getInfo(path .. ".json") or (path2 and love.filesystem.getInfo(path2 .. ".json")) then -- load animation
