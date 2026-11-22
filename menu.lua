@@ -1270,7 +1270,8 @@ local nitpickkeys = {
 	"camerasmoothing",
 	"backwardsmoothing",
 	"automaticenemyreload",
-	"automaticbackgroundreload"
+	"automaticbackgroundreload",
+	"automaticmapreload"
 }
 
 function generatenitpicksfile()
@@ -4663,7 +4664,7 @@ function menu_keypressed(key, unicode)
 				playertype = "portal"
 				playertypei = 1
 				disablecheats()
-				loadeditormetadata()
+				loadeditormapcache()
 				game_load()
 			elseif selection == 3 then
 				gamestate = "mappackmenu"
@@ -5447,7 +5448,7 @@ function menu_mousereleased(x, y, button)
 				playertype = "portal"
 				playertypei = 1
 				disablecheats()
-				loadeditormetadata()
+				loadeditormapcache()
 				game_load()
 				return
 			elseif mouseonselect == 3 then

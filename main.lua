@@ -3737,6 +3737,7 @@ function loadnitpicks()
 		BackwardSmoothing = t.backwardsmoothing
 		AutomaticEnemyReload = t.automaticenemyreload
 		AutomaticBackgroundReload = t.automaticbackgroundreload
+		AutomaticMapReload = t.automaticmapreload
 	end
 end
 

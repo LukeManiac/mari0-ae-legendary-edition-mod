@@ -376,6 +376,7 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `backwardsmoothing`: The camera leads ahead by as much as `camerasmoothing` would make it trail. Requires `camerasmoothing`.
 - `automaticenemyreload`: The Course Maker loads every custom enemy again whenever a map is loaded or tested, like before v1.3.1, so you don't have to press **refresh data**.
 - `automaticbackgroundreload`: The Course Maker decodes custom backgrounds and foregrounds again whenever a map is loaded or tested, like before v1.3.1, so you don't have to press **refresh data** in the backgrounds tab.
+- `automaticmapreload`: The Course Maker reads every map and preview again whenever a map is loaded or tested, or the editor panel is opened, so you don't have to press **refresh data** in the **Maps** tab.
 
 ---
 
@@ -439,17 +440,42 @@ The custom backgrounds tab (**Custom → Backgrounds**) has a **refresh data** b
 
 A new nitpick, `automaticbackgroundreload`. With it on, the Course Maker decodes backgrounds and foregrounds again on every map load, the way it did before v1.3.1, so you never need **refresh data** for them. **Generate Nitpicks File** adds it to an existing file.
 
+#### 🗺️ Map Refresh Data
+
+The Course Maker now reads the mappack's maps once, when you open it from the menu, instead of every time a map loads or the editor panel opens.
+
+* Opening the Course Maker from the menu reads which maps exist and decodes their previews (the pictures in the mappack's `editor` folder). Loading a map, testing one and opening the editor panel all use what was read then.
+* Saving a map in the Course Maker only changes that map's entry, and its preview if it gets a new one. Pasting or deleting a map from the maps tab's right-click menu does the same. Nothing else is read again.
+* The **Maps** tab has a **refresh data** button, right under **save level**. It reads again every map and preview that was changed outside the game since: edited, added or deleted. Only those are read again, and only changed previews are decoded again.
+* A map added outside the game shows up after **refresh data**, with new worlds, levels and sublevels added for it if it needs them. Worlds and levels are never taken away.
+* A notice says "Refreshed map data" when it's done.
+* **refresh data** doesn't reload the map you have open. Load it again from the **Maps** tab to see changes made to it outside the game.
+* With `noeditorpreviews` on, the previews aren't decoded at all, since they aren't shown.
+
+#### ⚙️ Automatic Map Reload
+
+A new nitpick, `automaticmapreload`. With it on, the Course Maker reads every map and decodes every preview again each time a map is loaded or tested, or the editor panel is opened, whether anything changed or not. Changes made outside the game then show up without pressing **refresh data**. Maps load slower with it on, the more maps and previews a mappack has. **Generate Nitpicks File** adds it to an existing file.
+
 #### 🧱 Enemy Functions
 
 * `enemies_loadkey()` returns everything `enemies_load` depends on besides the enemy files: the mappack, whether it uses custom enemies, `donotcategoriseenemyfolders` and the players' characters. `enemies_load` keeps the last one in `enemiesloadedkey`.
 * `refreshcustomenemies()` is what **refresh data** runs.
 * `refreshcustombackgrounds()` is what the backgrounds tab's **refresh data** runs. `clearbackgroundcache()` lets go of the kept background and foreground pictures, so the next load decodes them again.
 
+#### 🧱 Map Functions
+
+* `loadeditormapcache()` reads which maps exist and loads their previews. Opening the Course Maker from the menu runs it, in place of `loadeditormetadata()`, which it now runs itself.
+* `editormapcache_updatemap(filename)` reads one map's entry again (`filename` without `.txt`, like `"1-2_3"`). `savemap` runs it after writing the map.
+* `editormapcache_updatepreview(levelstring)` does the same for one preview (`levelstring` like `"1~2~3"`).
+* `refresheditormaps()` is what the maps tab's **refresh data** runs.
+* `getmaps()` builds the map buttons from the cache instead of checking every map file. With `automaticmapreload` on, it runs `loadeditormapcache()` first every time.
+
 ### 🐛 Bug Fixes
 
 * `starmusic-intro.ogg` and `princessmusic-intro.ogg` now actually play. Before, built-in music only ever loaded its `-fast` version, and a mappack's star and princess themes were loaded without looking for an intro, so both themes always started without one.
 * A mappack star theme with `starmusic-intro.ogg` but no `starmusic-fast.ogg` no longer plays an intro before the fast star theme only. Now the intro plays before the normal one as well.
 * With **Continue subzone music** on, going into a subzone while the fast star theme was playing kept it playing as the course music. Now any version of the star theme counts, so the course's own music starts.
+* Deleting a map from the **Maps** tab's right-click menu now takes its preview off the button straight away. Before, the deleted map's preview stayed on its button until the Course Maker was opened from the menu again.
 
 ### ✨ Improvements
 
@@ -460,6 +486,8 @@ A new nitpick, `automaticbackgroundreload`. With it on, the Course Maker decodes
 * Loading a map in the Course Maker, or testing one, is faster. It no longer loads every custom enemy again each time. Enemies are only loaded again when the mappack or the players' characters change, and otherwise they just switch to the map's spriteset, the same as in normal play.
 * Changes to enemy files made while the editor is open are now picked up with **refresh data** instead of by loading a map. Turn on `automaticenemyreload` to load them on every map load like before.
 * Loading a map in the Course Maker no longer decodes its background and foreground pictures again when an earlier map already used them. Turn on `automaticbackgroundreload` to decode them on every map load like before.
+* Loading a map, testing one and opening the editor panel no longer check every map file in the mappack. The map list is read when the Course Maker opens from the menu, and changes made outside the game are picked up with the **Maps** tab's **refresh data**. Turn on `automaticmapreload` to read them all again every time like before.
+* **save level** in the **Maps** tab is now one line tall, so **refresh data** fits under it.
 
 ## v1.3
 

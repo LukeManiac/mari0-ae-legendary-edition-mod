@@ -7101,6 +7101,7 @@ function savemap(filename)
 	love.filesystem.createDirectory( mappackfolder .. "/" .. mappack )
 	
 	local success, message = love.filesystem.write(mappackfolder .. "/" .. mappack .. "/" .. filename .. ".txt", s)
+	editormapcache_updatemap(filename) --only this map's entry in the editor's map cache changes
 	
 	--don't create a map height file if it's 15 (default) (Update: no more map files cause they're bad)
 	if mapheight ~= 15 then

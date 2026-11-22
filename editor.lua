@@ -1,6 +1,7 @@
 --i figured i should start using local functions despite 1.6 using like none
 local undo_clear, undo_store, undo_stopstore--[[, undo_undo]]
 local meta_data, promptedmetadatasave
+local editormapcache --which maps and previews are on the disk, read when the editor is opened from the menu (see loadeditormapcache)
 local updatetilesscrollbar, updatelevelscrollbar
 local worldscrollbarheight, levelscrollbarheight
 local tilehotkeys = {
@@ -394,10 +395,14 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	guielements["disabletransitioncheckbox"] = guielement:new("checkbox", 294, guielements["usesuspendcheckbox"].y+11+10*count, toggledisabletransition, disabletransition, TEXT["skip trans."])
 
 	--MAPS
-	guielements["savebutton2"] = guielement:new("button", 300, 196, TEXT["save level"], guielements["savebutton"].func, 0, nil, 2.4, 94, true)
+	--save level and refresh data share a column on the right of the bottom bar, as wide as the longer of the two (94 at least)
+	local mapbuttonwidth = math.max(94, utf8.len(TEXT["save level"])*8, utf8.len(TEXT["refresh data"])*8)
+	local mapbuttonx = 397-3-mapbuttonwidth
+	guielements["savebutton2"] = guielement:new("button", mapbuttonx, 197, TEXT["save level"], guielements["savebutton"].func, 0, nil, 1, mapbuttonwidth, true)
 	--guielements["autosavecheckbox"] = guielement:new("checkbox", 300, guielements["savebutton2"].y+16, function() autosave = not autosave; guielements["autosavecheckbox"].var = autosave end, autosave, TEXT["autosave"])
 	guielements["savebutton2"].bordercolor = {255, 0, 0}
 	guielements["savebutton2"].bordercolorhigh = {255, 127, 127}
+	guielements["refreshmapsbutton"] = guielement:new("button", mapbuttonx, 210, TEXT["refresh data"], refresheditormaps, 0, nil, 1, mapbuttonwidth, true)
 	
 	guielements["worldscrollbar"] = guielement:new("scrollbar", 90, 20, 201, 11, 75, 0, "ver")
 	guielements["levelscrollbar"] = guielement:new("scrollbar", 383, 20, 173, 14, 60, oldlevelscrollbar or 0, "ver")
@@ -3271,6 +3276,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 			love.graphics.setColor(255, 255, 255)
 			properprintF(TEXT["do not forget to save\nyour current level!"], 108*scale, 200*scale)
 			guielements["savebutton2"]:draw()
+			guielements["refreshmapsbutton"]:draw()
 			--guielements["autosavecheckbox"]:draw()
 			
 			if levelrightclickmenu.active then
@@ -4279,6 +4285,7 @@ function mapstab()
 	end
 	guielements["newworld"].active = true
 	guielements["savebutton2"].active = true
+	guielements["refreshmapsbutton"].active = true
 	--guielements["autosavecheckbox"].active = true
 	
 	switchworldselection(marioworld)
@@ -5488,6 +5495,11 @@ end
 function getmaps()
 	local clickablerange = {20, 20+201}
 	existingmaps = {}
+	if AutomaticMapReload or not editormapcache then
+		--automaticmapreload: read every map and preview again each time, like before v1.3.1
+		--otherwise: the editor was opened some other way than from the menu
+		loadeditormapcache()
+	end
 	for i = 1, #mappacklevels do --world
 		local world = i
 		if hudworldletter and world > 9 and world <= 9+#alphabet then
@@ -5530,7 +5542,7 @@ function createlevelbuttons(i)
 				s = s .. "_" .. k
 			end
 			s = s .. ".txt"
-			if love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/" .. s) then
+			if editormapcache.maps[s] then
 				existingmaps[i][j][k] = true
 				guielements[name].textcolor = {255, 255, 255}
 
@@ -9079,11 +9091,18 @@ function levelrightclickmenuclick(i)
 				--delete editormetadata
 				local levelstring = levelrightclickmenu.level[1] .. "~" .. levelrightclickmenu.level[2] .. "~" .. levelrightclickmenu.level[3]
 				love.filesystem.remove(mappackfolder .. "/" .. mappack .. "/editor/" .. levelstring .. ".png")
+				editormapcache_updatepreview(levelstring)
+				if meta_data then
+					meta_data[levelstring] = nil
+				end
+				levelrightclickmenu.button.image = false
 				notice.new("Level Deleted", notice.red, 3)
 			end
 		end
 	end
-	if love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/" .. filename .. ".txt") then
+	--only this map's entry in the cache changes
+	editormapcache_updatemap(filename)
+	if editormapcache.maps[filename .. ".txt"] then
 		existingmaps[levelrightclickmenu.level[1]][levelrightclickmenu.level[2]][levelrightclickmenu.level[3]] = true
 		levelrightclickmenu.button.textcolor = {255, 255, 255}
 	else
@@ -9182,9 +9201,153 @@ function undo_undo() --actual undo
 	end
 end
 
+--MAP CACHE
+--The maps tab's list of which maps exist, and the level previews, are only read from the disk when the editor is opened
+--from the menu. Saving, pasting or deleting a map in the editor only changes that map's entry. "refresh data" in the maps
+--tab reads again every map and preview that changed outside the game since (anything whose size or modtime doesn't match).
+local function editormapcache_stat(path)
+	local info = love.filesystem.getInfo(path, "file")
+	if info then
+		return {modtime = info.modtime, size = info.size}
+	end
+end
+
+local function editormapcache_same(a, b)
+	return a.modtime == b.modtime and a.size == b.size
+end
+
+local function editormapcache_ismap(file)
+	return file:sub(-4) == ".txt" and file:find("-") ~= nil --same check as getmappacklevels
+end
+
+--adds the worlds, levels and sublevels a map file needs to mappacklevels (never removes any)
+local function editormapcache_growlevels(file)
+	local w, l, sl = file:match("^(%d+)%-(%d+)_?(%d*)%.txt$")
+	w, l, sl = tonumber(w), tonumber(l), tonumber(sl) or 0
+	if not (w and l) or w < 1 or l < 1 or w > maxworlds or l > maxlevels or sl > maxsublevels then
+		return false
+	end
+	while #mappacklevels < w do
+		table.insert(mappacklevels, {defaultsublevels, defaultsublevels, defaultsublevels, defaultsublevels})
+	end
+	while #mappacklevels[w] < l do
+		table.insert(mappacklevels[w], defaultsublevels)
+	end
+	if sl > mappacklevels[w][l] then
+		mappacklevels[w][l] = sl
+	end
+	return true
+end
+
+function loadeditormapcache()
+	local folder = mappackfolder .. "/" .. mappack
+	editormapcache = {maps = {}, previews = {}}
+	for _, file in ipairs(love.filesystem.getDirectoryItems(folder)) do
+		if editormapcache_ismap(file) then
+			editormapcache.maps[file] = editormapcache_stat(folder .. "/" .. file)
+		end
+	end
+	loadeditormetadata()
+end
+
+--filename without ".txt", like "1-2" or "1-2_3"
+function editormapcache_updatemap(filename)
+	if not editormapcache then
+		return
+	end
+	local file = filename .. ".txt"
+	editormapcache.maps[file] = editormapcache_stat(mappackfolder .. "/" .. mappack .. "/" .. file)
+end
+
+--levelstring like "1~2~3"
+function editormapcache_updatepreview(levelstring)
+	if not editormapcache then
+		return
+	end
+	editormapcache.previews[levelstring] = editormapcache_stat(mappackfolder .. "/" .. mappack .. "/editor/" .. levelstring .. ".png")
+end
+
+--what the maps tab's "refresh data" runs
+function refresheditormaps()
+	if not editormapcache then
+		loadeditormapcache()
+	end
+	local folder = mappackfolder .. "/" .. mappack
+	local changed = 0
+
+	--maps: new, edited and deleted files
+	local found = {}
+	for _, file in ipairs(love.filesystem.getDirectoryItems(folder)) do
+		if editormapcache_ismap(file) then
+			local stat = editormapcache_stat(folder .. "/" .. file)
+			if stat then
+				found[file] = true
+				local old = editormapcache.maps[file]
+				if not (old and editormapcache_same(old, stat)) then
+					editormapcache.maps[file] = stat
+					editormapcache_growlevels(file)
+					changed = changed + 1
+				end
+			end
+		end
+	end
+	for file in pairs(editormapcache.maps) do
+		if not found[file] then
+			editormapcache.maps[file] = nil
+			changed = changed + 1
+		end
+	end
+
+	--previews: only the changed ones are decoded again
+	if meta_data and not NoEditorPreviews then
+		local found = {}
+		for _, file in ipairs(love.filesystem.getDirectoryItems(folder .. "/editor")) do
+			if file:sub(-4) == ".png" then
+				local name = file:sub(1, -5)
+				local path = folder .. "/editor/" .. file
+				local stat = editormapcache_stat(path)
+				if stat then
+					found[name] = true
+					local old = editormapcache.previews[name]
+					if not (old and meta_data[name] and editormapcache_same(old, stat)) then
+						local ok, img = pcall(love.graphics.newImage, path)
+						meta_data[name] = ok and {img = img} or nil
+						editormapcache.previews[name] = stat
+						changed = changed + 1
+					end
+				end
+			end
+		end
+		for name in pairs(editormapcache.previews) do
+			if not found[name] then
+				editormapcache.previews[name] = nil
+				meta_data[name] = nil
+				changed = changed + 1
+			end
+		end
+	end
+
+	--rebuild the map buttons from the cache, staying on the same world
+	if changed > 0 then
+		local world = currentworldselection
+		getmaps()
+		if editorstate == "maps" then
+			mapstab()
+			if world and mappacklevels[world] then
+				switchworldselection(world)
+			end
+		end
+		collectgarbage()
+	end
+	notice.new("Refreshed map data", nil, 2)
+end
+
 function loadeditormetadata()
 	--save background colors for level buttons
 	meta_data = {}
+	if NoEditorPreviews then
+		return --the previews aren't shown, so they aren't decoded
+	end
 	local files = love.filesystem.getDirectoryItems(mappackfolder .. "/" .. mappack .. "/editor")
 	for i = 1, #files do
 		local v = mappackfolder .. "/" .. mappack .. "/editor/" .. files[i]
@@ -9193,6 +9356,9 @@ function loadeditormetadata()
 			local name = string.sub(files[i], 1, -5)
 			meta_data[name] = {}
 			meta_data[name].img = love.graphics.newImage(v)
+			if editormapcache then
+				editormapcache.previews[name] = editormapcache_stat(v)
+			end
 		end
 	end
 	--[[
@@ -9239,6 +9405,7 @@ function saveeditormetadata()
 		meta_data[levelstring] = {}
 	end
 	meta_data[levelstring].img = love.graphics.newImage(imgdata)
+	editormapcache_updatepreview(levelstring)
 	--[[meta_data[marioworld .. "~" .. mariolevel .. "~" .. mariosublevel] = backgroundcolor[background]
 	print("saving metadata " .. marioworld .. "~" .. mariolevel .. "~" .. mariosublevel)
 	local s = ""
