@@ -525,11 +525,22 @@ Everything that shows a loading overlay (loading a level, the Course Maker, a ma
 * This uses coroutines on the main thread rather than `love.thread`. A LÖVE thread has its own Lua state, so it can't see or change the game's tables, and it can't make images or canvases, which is what all of this work does.
 * Overlays shown before the game has finished starting up still work the old way: one frame, then the work runs straight through.
 
+#### 💡 Loading Tips
+
+Every loading overlay now shows a tip under its text, picked at random when the overlay appears (never the same as either of the last two tips) and kept until it's gone.
+
+* The tip is typed out like the intro's loading text: its characters appear one after another at an even pace, and the whole tip is written after 1 second (`OVERLAYTIP_TYPEDURATION`). The lines are wrapped for the whole tip first, so words never jump to the next line while they're typed, and each line stays centred on what's written of it so far. A tip keeps typing when the overlay's text changes partway through loading.
+* The tip's middle sits three quarters of the way down the screen (`OVERLAYTIP_CENTERY` in `overlaytask.lua`). It's centred across the screen and word-wrapped to fit, in a lighter grey than the overlay's text.
+* There are 100 tips. They cover hotkeys (F7 to F12, LCtrl+0, LCtrl+LShift+L, Alt+Enter), movement and power-ups, enemies (Chain Chomps, Thwomps, icicles, donut blocks, Monty Moles), multiplayer, music, the options menu and controllers, the Course Maker's **refresh data** buttons and right-click menus, custom enemy properties, Utils, nitpicks, and every minigame.
+* The tips are the `loadingtips` list in `variables.lua`. Add a line there to add a tip. A language file can translate one by using its English text as the key.
+* The picture taken for background loading is taken without the text or tip, so neither is ever drawn twice.
+
 #### 🧱 Background Loading Functions
 
 * `overlayyield(force)` gives the frame back when background work has used up its share of it (always, with `force`). Outside of background work it does nothing, so any long loop can call it.
 * `overlaytask_canyield()` says whether the code running now is background work that can give the frame back.
 * `overlay_animatedtext(text, start)` returns a text with its "..." animated from `start`.
+* `overlaytip_pick()` picks a tip and `overlaytip_draw(tip)` draws one.
 * `overlaytask_install()` wraps LÖVE's callbacks so they can run in the background. `love.load` runs it last.
 * `quit`, `resize` and `visible` are never run in the background, so quitting always finishes before the window closes.
 

@@ -73,6 +73,7 @@ end
 --a tip from loadingtips (variables.lua) is shown under every loading overlay, with its middle at three quarters of the
 --way down the screen. It's picked when the overlay shows and stays the same until it's gone
 OVERLAYTIP_CENTERY = 0.75 --of the height of what's drawn on
+OVERLAYTIP_TYPEDURATION = 1 --seconds the typewriter takes to write the whole tip (like the intro's loading text)
 
 local recenttips = {} --the last two tips shown, newest first
 function overlaytip_pick()
@@ -106,8 +107,9 @@ function overlaytip_pick()
 end
 
 --draws a tip in the middle of the screen's width, word-wrapped to fit, its middle at OVERLAYTIP_CENTERY of the height
---(call it with the transform at its origin)
-function overlaytip_draw(tip)
+--(call it with the transform at its origin). It's typed out like the intro's loading text: start is when it began, and
+--the whole tip is written after OVERLAYTIP_TYPEDURATION seconds, at an even pace
+function overlaytip_draw(tip, start)
 	if not tip then
 		return
 	end
@@ -127,11 +129,31 @@ function overlaytip_draw(tip)
 	if line ~= "" then
 		table.insert(lines, line)
 	end
+	--how many characters are written so far, counted across the lines in order (the wrapping is worked out for the whole
+	--tip, so words never jump to the next line as they're typed)
+	local charcount = 0
+	for _, l in ipairs(lines) do
+		charcount = charcount + utf8.len(l)
+	end
+	local visible = charcount
+	if start then
+		visible = math.floor(charcount * math.min((love.timer.getTime() - start)/OVERLAYTIP_TYPEDURATION, 1))
+	end
+
+	--the block's place stays put; each line is centred on what's written of it, like the intro's text
 	local lineheight = 10*scale
 	local totalheight = (#lines-1)*lineheight + 8*scale
 	local y = math.floor(wh*OVERLAYTIP_CENTERY - totalheight/2)
 	love.graphics.setColor(200, 200, 200, 255)
 	for i, l in ipairs(lines) do
+		local len = utf8.len(l)
+		if visible <= 0 then
+			break
+		elseif visible < len then
+			local byteend = utf8.offset(l, visible + 1)
+			l = l:sub(1, (byteend or (#l + 1)) - 1)
+		end
+		visible = visible - len
 		local x = math.floor((ww - utf8.len(l)*8*scale)/2)
 		if hudoutline then
 			properprintFbackground(l, x, y + (i-1)*lineheight)
@@ -151,14 +173,15 @@ function overlay_drawnanimatedtext(text)
 		drawnoverlay.text = text
 		drawnoverlay.start = now
 		drawnoverlay.tip = overlaytip_pick()
+		drawnoverlay.tipstart = now
 	end
 	drawnoverlay.last = now
 	return overlay_animatedtext(text, drawnoverlay.start)
 end
 
---the tip that goes with the overlay overlay_drawnanimatedtext is drawing
+--the tip that goes with the overlay overlay_drawnanimatedtext is drawing, and when its typewriter started
 function overlay_drawntip()
-	return drawnoverlay.tip
+	return drawnoverlay.tip, drawnoverlay.tipstart
 end
 
 --takes the picture that's shown while the work runs: the frame as it is now, dimmed like the overlay, without its text
@@ -211,7 +234,7 @@ function overlaytask_draw()
 	end
 	love.graphics.setColor(255, 255, 255, 255)
 	centerprintscreen(overlay_animatedtext(overlayfrozen.text, overlayfrozen.start))
-	overlaytip_draw(overlayfrozen.tip)
+	overlaytip_draw(overlayfrozen.tip, overlayfrozen.tipstart)
 	love.graphics.pop()
 	return true
 end

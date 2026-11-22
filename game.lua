@@ -11227,7 +11227,7 @@ function renderoverlay(text, donotpresentgraphics, donotupdate)
 	if overlaytask_canyield() then
 		if overlayfrozen then
 			--already in the background: just the text changes (the tip stays)
-			overlayfrozen = {text = translated, start = love.timer.getTime(), tip = overlayfrozen.tip}
+			overlayfrozen = {text = translated, start = love.timer.getTime(), tip = overlayfrozen.tip, tipstart = overlayfrozen.tipstart}
 			overlayyield(true)
 			return
 		end
@@ -11235,7 +11235,8 @@ function renderoverlay(text, donotpresentgraphics, donotupdate)
 			warpfadeoutnow(key == "returning to menu..." or key == "saving game...")
 		end
 		overlaytask_snapshot(donotupdate)
-		overlayfrozen = {text = translated, start = love.timer.getTime(), tip = overlaytip_pick()}
+		local now = love.timer.getTime()
+		overlayfrozen = {text = translated, start = now, tip = overlaytip_pick(), tipstart = now}
 		overlayyield(true)
 		return
 	end
