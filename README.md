@@ -519,7 +519,8 @@ Everything that shows a loading overlay (loading a level, the Course Maker, a ma
 * The work runs a piece at a time, about 12 milliseconds a frame (`OVERLAYTASK_BUDGET`). It gives the frame back inside the long loops: map tiles, custom enemies, animations, custom tiles and sprites, animated tiles, sounds, music, the editor's map list and previews, and **refresh data**.
 * The fade to black before an overlay plays frame by frame too, instead of in a loop of its own.
 * Meanwhile, the screen shows a picture of the frame taken when the overlay appeared, dimmed, with the overlay's text on top. The half-loaded game is never drawn.
-* Overlays ending in "..." now animate their dots: "", ".", "..", "...", then back to "", one step every 0.5 seconds (`OVERLAYTASK_DOTTIME`). The animation always starts from "". The text stays where it is while the dots come and go. This also covers the mappack menu's download overlay.
+* Overlays ending in "..." now animate their dots: "", ".", "..", "...", then back to "", one step every 0.5 seconds (`OVERLAYTASK_DOTTIME`). The animation always starts from "". Only the dots that are showing are part of the text, so it's centred as it is at every step. This also covers the mappack menu's download overlay.
+* The overlay's text is now in the middle of the screen. It used to be centred in a box worked out from the game's size and scale, which is off-centre whenever the window is bigger than that (fullscreen without the resizable scale). `centerprintscreen` now measures what it's drawn on (`getproperwindowsize`), and the overlay dims all of it.
 * This uses coroutines on the main thread rather than `love.thread`. A LÖVE thread has its own Lua state, so it can't see or change the game's tables, and it can't make images or canvases, which is what all of this work does.
 * Overlays shown before the game has finished starting up still work the old way: one frame, then the work runs straight through.
 

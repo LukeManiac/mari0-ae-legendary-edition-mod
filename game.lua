@@ -11175,8 +11175,11 @@ function centerprint(text, x, y, scalemult, hudoutlineoverride)
 	end
 end
 
+--prints text in the middle of what's being drawn on (call it with the transform at its origin). That's measured, not
+--worked out from width, height and scale: the game's canvas when the window can be resized, otherwise the window, which
+--can be bigger than the game (fullscreen without the resizable scale)
 function centerprintscreen(text)
-	local cw, ch = width*16*scale, height*16*scale
+	local cw, ch = getproperwindowsize()
 	local lines = {}
 	for line in (tostring(text) .. "\n"):gmatch("(.-)\n") do
 		table.insert(lines, line)
@@ -11199,7 +11202,8 @@ function drawoverlay(text)
 	love.graphics.push()
 	love.graphics.origin()
 	love.graphics.setColor(0, 0, 0, 127)
-	love.graphics.rectangle("fill", 0, 0, width*16*scale, height*16*scale)
+	local ww, wh = getproperwindowsize()
+	love.graphics.rectangle("fill", 0, 0, ww, wh) --all of it, whatever its size
 	love.graphics.setColor(255, 255, 255, 255)
 	centerprintscreen(overlay_drawnanimatedtext(text)) --"..." animates (see overlaytask.lua)
 	love.graphics.pop()

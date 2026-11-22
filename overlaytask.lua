@@ -51,8 +51,8 @@ function overlayyield(force)
 	end
 end
 
---a text ending in "..." with its dots animated: "", ".", "..", "..." (start: when the animation began). The missing dots
---are spaces, so the text doesn't move as they come in
+--a text ending in "..." with its dots animated: "", ".", "..", "..." (start: when the animation began). Only the dots
+--that are showing are in the text, so it's centred as it is
 function overlay_animatedtext(text, start)
 	text = tostring(text)
 	local base
@@ -64,7 +64,7 @@ function overlay_animatedtext(text, start)
 		return text
 	end
 	local n = math.floor((love.timer.getTime() - start)/OVERLAYTASK_DOTTIME) % 4
-	return base .. string.rep(".", n) .. string.rep(" ", 3-n)
+	return base .. string.rep(".", n)
 end
 
 --the overlay drawn from love.draw (donotpresentgraphics): its dots start over whenever the text changes, or when it
@@ -125,7 +125,8 @@ function overlaytask_draw()
 		love.graphics.draw(overlaysnapshot, 0, 0)
 	else
 		love.graphics.setColor(0, 0, 0, 255)
-		love.graphics.rectangle("fill", 0, 0, width*16*scale, height*16*scale)
+		local ww, wh = getproperwindowsize()
+		love.graphics.rectangle("fill", 0, 0, ww, wh)
 	end
 	love.graphics.setColor(255, 255, 255, 255)
 	centerprintscreen(overlay_animatedtext(overlayfrozen.text, overlayfrozen.start))
