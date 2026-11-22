@@ -374,9 +374,9 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `dontfreezeonsizechange`: Powering up and down only freezes the player it happens to, like in SMBX2. Everything else keeps moving, and that player can't be touched until the animation is done.
 - `camerasmoothing`: The camera eases after where it's going instead of moving rigidly, so it trails slightly behind.
 - `backwardsmoothing`: The camera leads ahead by as much as `camerasmoothing` would make it trail. Requires `camerasmoothing`.
-- `automaticenemyreload`: The Course Maker loads every custom enemy again whenever a map is loaded or tested, like before v1.3.1, so you don't have to press **refresh data**.
-- `automaticbackgroundreload`: The Course Maker decodes custom backgrounds and foregrounds again whenever a map is loaded or tested, like before v1.3.1, so you don't have to press **refresh data** in the backgrounds tab.
-- `automaticanimationreload`: The Course Maker reads every animation again whenever a map is loaded or tested, like before v1.3.1, so you don't have to press the **Animations** tab's arrow button.
+- `automaticenemyreload`: The Course Maker loads every custom enemy again whenever a map is loaded or tested, like before v1.4, so you don't have to press **refresh data**.
+- `automaticbackgroundreload`: The Course Maker decodes custom backgrounds and foregrounds again whenever a map is loaded or tested, like before v1.4, so you don't have to press **refresh data** in the backgrounds tab.
+- `automaticanimationreload`: The Course Maker reads every animation again whenever a map is loaded or tested, like before v1.4, so you don't have to press the **Animations** tab's arrow button.
 - `automaticmapreload`: The Course Maker reads every map and preview again whenever a map is loaded or tested, or the editor panel is opened, so you don't have to press **refresh data** in the **Maps** tab.
 
 ---
@@ -385,7 +385,7 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
-## v1.3.1
+## v1.4
 
 ### 🧩 New Features
 
@@ -426,7 +426,7 @@ A new **refresh data** button in the Course Maker's custom enemies tab (**Custom
 
 #### ⚙️ Automatic Enemy Reload
 
-A new nitpick, `automaticenemyreload`. With it on, the Course Maker loads every custom enemy again each time a map is loaded or tested, the way it did before v1.3.1. Changes to enemy files then show up on the next map load, without pressing **refresh data**. Maps load slower with it on, the more custom enemies a mappack has. **Generate Nitpicks File** adds it to an existing file.
+A new nitpick, `automaticenemyreload`. With it on, the Course Maker loads every custom enemy again each time a map is loaded or tested, the way it did before v1.4. Changes to enemy files then show up on the next map load, without pressing **refresh data**. Maps load slower with it on, the more custom enemies a mappack has. **Generate Nitpicks File** adds it to an existing file.
 
 #### 🖼️ Background Refresh Data
 
@@ -439,7 +439,7 @@ The custom backgrounds tab (**Custom → Backgrounds**) has a **refresh data** b
 
 #### ⚙️ Automatic Background Reload
 
-A new nitpick, `automaticbackgroundreload`. With it on, the Course Maker decodes backgrounds and foregrounds again on every map load, the way it did before v1.3.1, so you never need **refresh data** for them. **Generate Nitpicks File** adds it to an existing file.
+A new nitpick, `automaticbackgroundreload`. With it on, the Course Maker decodes backgrounds and foregrounds again on every map load, the way it did before v1.4, so you never need **refresh data** for them. **Generate Nitpicks File** adds it to an existing file.
 
 #### 🗺️ Map Refresh Data
 
@@ -477,7 +477,7 @@ The **Animations** tab has a new button between **save** and **x**: an arrow the
 
 #### ⚙️ Automatic Animation Reload
 
-A new nitpick, `automaticanimationreload`. With it on, the animation cache is reset every time a map is loaded or tested in the Course Maker, so every animation is read and decoded again, the way it was before v1.3.1. Changes made to animation files outside the game then show up on the next map load, without pressing the arrow button. Normal play still uses the cache. Maps load slower with it on, the more animations a mappack has. **Generate Nitpicks File** adds it to an existing file.
+A new nitpick, `automaticanimationreload`. With it on, the animation cache is reset every time a map is loaded or tested in the Course Maker, so every animation is read and decoded again, the way it was before v1.4. Changes made to animation files outside the game then show up on the next map load, without pressing the arrow button. Normal play still uses the cache. Maps load slower with it on, the more animations a mappack has. **Generate Nitpicks File** adds it to an existing file.
 
 #### 🧩 Map Parse Cache
 
@@ -534,13 +534,6 @@ Every loading overlay now shows a tip under its text, picked at random when the 
 * There are 100 tips. They cover hotkeys (F7 to F12, LCtrl+0, LCtrl+LShift+L, Alt+Enter), movement and power-ups, enemies (Chain Chomps, Thwomps, icicles, donut blocks, Monty Moles), multiplayer, music, the options menu and controllers, the Course Maker's **refresh data** buttons and right-click menus, custom enemy properties, Utils, nitpicks, and every minigame.
 * The tips are the `loadingtips` list in `variables.lua`. Add a line there to add a tip. A language file can translate one by using its English text as the key.
 * The picture taken for background loading is taken without the text or tip, so neither is ever drawn twice.
-
-#### 🔤 Mappack Font First
-
-Loading a mappack now loads its font before anything else, so the loading overlay and its tip switch to the mappack's font straight away instead of showing the last mappack's font until the sprites load.
-
-* `loadcustomfont(initial, forcebuiltins)` loads the mappack's `font.png` and `fontback.png` from its `custom` folder, or puts the game's own back if the mappack doesn't have them. A font in the old one-row format is converted the same way as before (`convertoldfont`).
-* `loadcustomsprites` takes a new third argument, `fontloaded`. When it's `true`, the font's images are left alone, so they aren't loaded twice. Loading a mappack passes it. **update image** in the graphics tab and everything else still loads the font along with the other sprites.
 
 #### 🧱 Background Loading Functions
 
