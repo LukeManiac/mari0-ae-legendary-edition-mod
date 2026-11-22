@@ -1250,7 +1250,7 @@ function mario:update(dt)
 			if not levelfinished then
 				if self.size == 8 then
 					--mega mushroom
-					megamushroomsound:stop()
+					music:stoptrack("megamushroom")
 				end
 				updatemusicpriority()
 			end

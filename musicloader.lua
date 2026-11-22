@@ -43,13 +43,103 @@ function music:init()
 	intromusic = false --music that is currently in it's intro phase
 end
 
+--songs that can be replaced by a mappack (sounds/x.ogg) and bring their own versions from the same folder:
+--"-fast", "-intro" and "-fastintro" ("x-fastintro.ogg" or "x-introfast.ogg").
+--sound: the song is also a sound (pbuttonsound, megamushroomsound) for the editor, animations and custom sounds
+music.special = {
+	starmusic = {variants = {"-fast", "-intro", "-fastintro"}},
+	princessmusic = {variants = {"-intro"}},
+	pbutton = {variants = {"-fast", "-intro", "-fastintro"}, sound = true},
+	megamushroom = {variants = {"-fast", "-intro", "-fastintro"}, sound = true},
+}
+
+--takes a song away (stopping it first)
+function music:unload(name)
+	local source = self.loaded[name]
+	if source then
+		source:stop()
+	end
+	if intromusic and (intromusic[1] == name or intromusic[2] == name) then
+		intromusic = false
+	end
+	self.loaded[name] = nil
+	self.pitchmul[name] = nil
+end
+
+--loads a special song (see music.special) from file, and its versions from the same folder.
+--versions that folder doesn't have are taken away, so one mappack's intro doesn't stay around for the next
+function music:loadspecial(name, file)
+	local special = self.special[name]
+	self:unload(name)
+	for _, suffix in ipairs(special.variants) do
+		self:unload(name .. suffix)
+	end
+	self:preload(file, name)
+	for _, suffix in ipairs(special.variants) do
+		if suffix == "-fast" then
+			local fastfile = self:variant(file, "-fast")
+			if love.filesystem.getInfo(fastfile) then
+				self:preload(fastfile, name .. "-fast")
+			end
+		elseif suffix == "-intro" then
+			local introfile = self:variant(file, "-intro")
+			if love.filesystem.getInfo(introfile) then
+				self:preloadintro(introfile, name .. "-intro")
+			end
+		elseif suffix == "-fastintro" then
+			local fastintro = self:fastintrofile(file)
+			if fastintro then
+				self:preloadintro(fastintro, name .. "-fastintro")
+			end
+		end
+	end
+	if special.sound then
+		_G[name .. "sound"] = self.loaded[name]
+	end
+end
+
+--stops a song and its intro (even an intro that isn't being followed anymore)
+function music:stopwithintro(name)
+	self:stop(name)
+	local intro = self.loaded[self:introname(name)]
+	if intro then
+		intro:stop()
+	end
+end
+
+--stops a song, its fast version and both their intros
+function music:stoptrack(name)
+	self:stopwithintro(name)
+	self:stopwithintro(self:variant(name, "-fast"))
+end
+
+--is a song or its intro playing
+function music:isplayingwithintro(name)
+	for _, n in ipairs({name, self:introname(name)}) do
+		local source = self.loaded[n]
+		if source and isActive(source) then
+			return true
+		end
+	end
+	return false
+end
+
+--is any version of a song playing (normal, fast or one of their intros)
+function music:trackplaying(name)
+	return self:isplayingwithintro(name) or self:isplayingwithintro(self:variant(name, "-fast"))
+end
+
 function music:load(musicfile) -- can take a single file string or an array of file strings
 	if type(musicfile) == "table" then
 		for i, v in ipairs(musicfile) do
-			self:preload(musicpath:format(v), v)
-			--load fast music
-			if love.filesystem.getInfo(musicpath:format(v .. "-fast")) then
-				self:preload(musicpath:format(v .. "-fast"), v .. "-fast")
+			if self.special[v] then
+				self:loadspecial(v, musicpath:format(v))
+			else
+				self:preload(musicpath:format(v), v)
+				--load fast music
+				if love.filesystem.getInfo(musicpath:format(v .. "-fast")) then
+					self:preload(musicpath:format(v .. "-fast"), v .. "-fast")
+				end
 			end
 		end
 	else --custom music

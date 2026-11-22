@@ -606,44 +606,42 @@ end
 function loadcustomsounds(forcebuiltins)
 	local starmusicexists = not forcebuiltins and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/sounds/starmusic.ogg")
 	local starmusicfastexists = not forcebuiltins and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/sounds/starmusic-fast.ogg")
-	if starmusicexists then
-		local starpath = mappackfolder .. "/" .. mappack .. "/sounds/starmusic.ogg"
-		music:preload(starpath, "starmusic")
-		if starmusicfastexists then
-			music:unfakefast("starmusic")
-			music:preload(mappackfolder .. "/" .. mappack .. "/sounds/starmusic-fast.ogg", "starmusic-fast")
-		else
-			--no starmusic-fast.ogg: starmusic.ogg sped up (see music:fakefast)
-			music:fakefaststar(starpath)
+	--the special songs (see music.special) and their -fast/-intro/-fastintro versions, from the mappack or built-in
+	local function specialpath(name)
+		local path = mappackfolder .. "/" .. mappack .. "/sounds/" .. name .. ".ogg"
+		if not forcebuiltins and love.filesystem.getInfo(path) then
+			return path, true
 		end
-		customstarmusic = true
-	else
-		if starmusicfastexists then
-			notice.new("can't load custom starmusic-fast.ogg\nstarmusic.ogg is missing!", notice.red, 6)
-		end
-		if customstarmusic then
-			music:unfakefast("starmusic")
-			music:preload("sounds/starmusic.ogg", "starmusic")
-			music:preload("sounds/starmusic-fast.ogg", "starmusic-fast")
-		end
-		customstarmusic = false
+		return "sounds/" .. name .. ".ogg", false
 	end
-	if love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/sounds/princessmusic.ogg") and not forcebuiltins then
-		music:preload(mappackfolder .. "/" .. mappack .. "/sounds/princessmusic.ogg", "princessmusic")
-		customprincessmusic = true
-	else
-		if customprincessmusic then
-			music:preload("sounds/princessmusic.ogg", "princessmusic")
-		end
-		customprincessmusic = false
+
+	local starpath
+	starpath, customstarmusic = specialpath("starmusic")
+	music:loadspecial("starmusic", starpath)
+	if customstarmusic and not starmusicfastexists then
+		--no starmusic-fast.ogg: starmusic.ogg sped up (see music:fakefast), with starmusic-intro.ogg sped up too if there's no starmusic-fastintro.ogg
+		music:fakefaststar(starpath)
 	end
+	if starmusicfastexists and not starmusicexists then
+		notice.new("can't load custom starmusic-fast.ogg\nstarmusic.ogg is missing!", notice.red, 6)
+	end
+
+	local princesspath
+	princesspath, customprincessmusic = specialpath("princessmusic")
+	music:loadspecial("princessmusic", princesspath)
+
+	music:loadspecial("pbutton", (specialpath("pbutton")))
+	music:loadspecial("megamushroom", (specialpath("megamushroom")))
+	updatesoundlist()
 	
 	if forcebuiltins and not customsounds then
 		customsounds = {}
 	end
 	if forcebuiltins or love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/sounds", "directory") or customsounds then
 		for i, j in pairs(soundliststring) do
-			if not forcebuiltins and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/sounds/" .. j .. ".ogg") then
+			if music.special[j] then
+				--pbutton and megamushroom are loaded above, with their other versions
+			elseif not forcebuiltins and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/sounds/" .. j .. ".ogg") then
 				local method = "static"
 				if j == "pbutton" or j == "megamushroom" or j == "glados1" then
 					method = "stream"

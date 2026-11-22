@@ -134,7 +134,7 @@ function blocktogglebutton:update(dt)
 				end
 				if yespls then
 					self:changeblocks(true)
-					pbuttonsound:stop()
+					music:stoptrack("pbutton")
 					if not levelfinished then
 						updatemusicpriority()
 					end
@@ -333,7 +333,7 @@ function blocktogglebutton:press(a, b)
 				stopmusic()
 			end
 			if not (lowtimesound:isPlaying() or higherpriority) then
-				playsound(pbuttonsound)
+				playprioritytrack("pbutton")
 			end
 			--playsound(pbuttonpushsound) i didn't find a sound :(
 		else

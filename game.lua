@@ -4498,12 +4498,13 @@ function startlevel(level, reason)
 	love.keyboard.setKeyRepeat(false)
 	local oldmusici, oldcustommusic
 	if continuesublevelmusic and reason and reason == "sublevel" then
-		if pbuttonsound:isPlaying() then
+		if music:trackplaying("pbutton") then
 			love.audio.stop()
 		else
 			for i, v in pairs(soundlist) do
 				v:stop()
 			end
+			music:stoptrack("megamushroom") --its -fast and -intro versions aren't in soundlist
 			oldmusici, oldcustommusic = musici, custommusic
 		end
 	else
@@ -5044,7 +5045,7 @@ function startlevel(level, reason)
 	if continuesublevelmusic then
 		if (not intermission) and musici == oldmusici and custommusic == oldcustommusic then
 			local playing, source = music:getPlaying()
-			if (not (musici ~= 6 and playing == "starmusic")) then
+			if (not (musici ~= 6 and music:trackplaying("starmusic"))) then
 				doplaymusic = false
 			end
 		end
@@ -9417,9 +9418,8 @@ function stopmusic()
 		music:stopIndex(musici-1)
 		music:stopIndex(musici-1, true)
 	end
-	pbuttonsound:stop()
-	music:stop("starmusic")
-	music:stop("starmusic-fast")
+	music:stoptrack("pbutton")
+	music:stoptrack("starmusic")
 	music:disableintromusic()
 end
 
@@ -9505,6 +9505,20 @@ function pbuttonactive()
 	return false
 end
 
+--plays megamushroom, starmusic or pbutton: its -fast version when the time is low (if it has one), with its intro first.
+--nothing happens if the right version is already playing (or in its intro), so the intro isn't cut off
+function playprioritytrack(name)
+	local wanted, unwanted = name, music:variant(name, "-fast")
+	if starmusicfast() and music.loaded[unwanted] then
+		wanted, unwanted = unwanted, wanted
+	end
+	music:stopwithintro(unwanted)
+	if not music:isplayingwithintro(wanted) then
+		stopmusic()
+		music:play(wanted)
+	end
+end
+
 --priority: 1. megamushroom, 2. starmusic, 3. pbutton, 4. level music
 function updatemusicpriority()
 	if queuelowtime then
@@ -9512,34 +9526,19 @@ function updatemusicpriority()
 	end
 	
 	if megamushroomactive() then
-		stopmusic()
-		if not megamushroomsound:isPlaying() then
-			playsound(megamushroomsound)
-		end
+		playprioritytrack("megamushroom")
 	elseif starmusicactive() then
-		megamushroomsound:stop()
-		local wanted, unwanted = "starmusic", "starmusic-fast"
-		if starmusicfast() then
-			wanted, unwanted = unwanted, wanted
-		end
-		music:stop(unwanted)
-		if not (music.loaded[wanted] and music.loaded[wanted]:isPlaying()) then
-			stopmusic()
-			music:play(wanted)
-		end
-		pbuttonsound:stop()
+		music:stoptrack("megamushroom")
+		playprioritytrack("starmusic")
+		music:stoptrack("pbutton")
 	elseif pbuttonactive() then
-		megamushroomsound:stop()
-		music:stop("starmusic")
-		music:stop("starmusic-fast")
-		if not pbuttonsound:isPlaying() then
-			playsound(pbuttonsound)
-		end
+		music:stoptrack("megamushroom")
+		music:stoptrack("starmusic")
+		playprioritytrack("pbutton")
 	else
-		local faststarmusicwasplaying = music.loaded["starmusic-fast"] and isActive(music.loaded["starmusic-fast"])
-		megamushroomsound:stop()
-		music:stop("starmusic")
-		music:stop("starmusic-fast")
+		local faststarmusicwasplaying = music:isplayingwithintro("starmusic-fast")
+		music:stoptrack("megamushroom")
+		music:stoptrack("starmusic")
 		if (not levelfinished) and (faststarmusicwasplaying or not music:playingmusic()) then
 			playmusic()
 		end
