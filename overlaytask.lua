@@ -19,6 +19,9 @@
 --seconds of work a frame before giving the frame back. The window still gets about 30 frames a second, plenty for it to
 --stay responsive and for the dots, and the work gets nearly all of the time (vsync is off while it runs, see resume)
 OVERLAYTASK_BUDGET = 1/30
+--while the loading tip is still being typed, frames come far more often, so the typewriter shows every character as it's
+--written instead of jumping ahead a few at a time between frames (see overlayyield)
+OVERLAYTASK_TYPINGBUDGET = 1/240
 OVERLAYTASK_DOTTIME = 0.5 --seconds between each step of the "..." animation
 
 overlaytask = nil --the work running in the background: {co = coroutine}
@@ -47,7 +50,12 @@ function overlayyield(force)
 	if not force and not overlayfrozen then
 		return --no overlay shown: the work isn't in the background, so it runs straight through like before
 	end
-	if force or love.timer.getTime() - resumeat >= OVERLAYTASK_BUDGET then
+	local now = love.timer.getTime()
+	local budget = OVERLAYTASK_BUDGET
+	if overlayfrozen and overlayfrozen.tipstart and now - overlayfrozen.tipstart < OVERLAYTIP_TYPEDURATION then
+		budget = OVERLAYTASK_TYPINGBUDGET
+	end
+	if force or now - resumeat >= budget then
 		coroutine.yield()
 		resumeat = love.timer.getTime()
 	end
@@ -135,30 +143,51 @@ function overlaytip_draw(tip, start)
 	for _, l in ipairs(lines) do
 		charcount = charcount + utf8.len(l)
 	end
+	--not rounded: the character being typed fades in by however far along it is, and the line glides to stay centred
 	local visible = charcount
 	if start then
-		visible = math.floor(charcount * math.min((love.timer.getTime() - start)/OVERLAYTIP_TYPEDURATION, 1))
+		visible = charcount * math.min((love.timer.getTime() - start)/OVERLAYTIP_TYPEDURATION, 1)
+	end
+
+	local function printtip(s, x, y)
+		if hudoutline then
+			properprintFbackground(s, x, y)
+		else
+			properprintF(s, x, y)
+		end
 	end
 
 	--the block's place stays put; each line is centred on what's written of it, like the intro's text
 	local lineheight = 10*scale
 	local totalheight = (#lines-1)*lineheight + 8*scale
-	local y = math.floor(wh*OVERLAYTIP_CENTERY - totalheight/2)
-	love.graphics.setColor(200, 200, 200, 255)
+	local y = wh*OVERLAYTIP_CENTERY - totalheight/2
 	for i, l in ipairs(lines) do
 		local len = utf8.len(l)
 		if visible <= 0 then
 			break
-		elseif visible < len then
-			local byteend = utf8.offset(l, visible + 1)
-			l = l:sub(1, (byteend or (#l + 1)) - 1)
 		end
+		local shown = math.min(visible, len) --characters written of this line, part of the last one included
 		visible = visible - len
-		local x = math.floor((ww - utf8.len(l)*8*scale)/2)
-		if hudoutline then
-			properprintFbackground(l, x, y + (i-1)*lineheight)
-		else
-			properprintF(l, x, y + (i-1)*lineheight)
+		local partial = shown % 1 --how far the character being typed is
+		local whole = shown - partial
+
+		local written, typing = l, nil
+		if whole < len then
+			local typingstart = utf8.offset(l, whole + 1)
+			local typingend = utf8.offset(l, whole + 2) or (#l + 1)
+			written = l:sub(1, typingstart - 1)
+			if partial > 0 then
+				typing = l:sub(typingstart, typingend - 1)
+			end
+		end
+
+		local x = (ww - shown*8*scale)/2
+		local ly = y + (i-1)*lineheight
+		love.graphics.setColor(200, 200, 200, 255)
+		printtip(written, x, ly)
+		if typing then
+			love.graphics.setColor(200, 200, 200, 255*partial)
+			printtip(typing, x + whole*8*scale, ly)
 		end
 	end
 	love.graphics.setColor(255, 255, 255, 255)

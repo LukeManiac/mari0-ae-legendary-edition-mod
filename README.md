@@ -529,11 +529,18 @@ Everything that shows a loading overlay (loading a level, the Course Maker, a ma
 
 Every loading overlay now shows a tip under its text, picked at random when the overlay appears (never the same as either of the last two tips) and kept until it's gone.
 
-* The tip is typed out like the intro's loading text: its characters appear one after another at an even pace, and the whole tip is written after 1 second (`OVERLAYTIP_TYPEDURATION`). The lines are wrapped for the whole tip first, so words never jump to the next line while they're typed, and each line stays centred on what's written of it so far. A tip keeps typing when the overlay's text changes partway through loading.
+* The tip is typed out like the intro's loading text: its characters appear one after another at an even pace, and the whole tip is written after 1 second (`OVERLAYTIP_TYPEDURATION`). Nothing is rounded: the character being typed fades in by however far along it is, and each line glides smoothly to stay centred instead of jumping half a character at a time. The lines are wrapped for the whole tip first, so words never jump to the next line while they're typed, and each line stays centred on what's written of it so far. A tip keeps typing when the overlay's text changes partway through loading. While a tip is being typed, background loading gives the frame back far more often (`OVERLAYTASK_TYPINGBUDGET`, about 4 milliseconds of work a frame instead of 33), so every character shows as it's typed instead of several turning up at once between frames.
 * The tip's middle sits three quarters of the way down the screen (`OVERLAYTIP_CENTERY` in `overlaytask.lua`). It's centred across the screen and word-wrapped to fit, in a lighter grey than the overlay's text.
 * There are 100 tips. They cover hotkeys (F7 to F12, LCtrl+0, LCtrl+LShift+L, Alt+Enter), movement and power-ups, enemies (Chain Chomps, Thwomps, icicles, donut blocks, Monty Moles), multiplayer, music, the options menu and controllers, the Course Maker's **refresh data** buttons and right-click menus, custom enemy properties, Utils, nitpicks, and every minigame.
 * The tips are the `loadingtips` list in `variables.lua`. Add a line there to add a tip. A language file can translate one by using its English text as the key.
 * The picture taken for background loading is taken without the text or tip, so neither is ever drawn twice.
+
+#### 🔤 Mappack Font First
+
+Loading a mappack now loads its font before anything else, so the loading overlay and its tip switch to the mappack's font straight away instead of showing the last mappack's font until the sprites load.
+
+* `loadcustomfont(initial, forcebuiltins)` loads the mappack's `font.png` and `fontback.png` from its `custom` folder, or puts the game's own back if the mappack doesn't have them. A font in the old one-row format is converted the same way as before (`convertoldfont`).
+* `loadcustomsprites` takes a new third argument, `fontloaded`. When it's `true`, the font's images are left alone, so they aren't loaded twice. Loading a mappack passes it. **update image** in the graphics tab and everything else still loads the font along with the other sprites.
 
 #### 🧱 Background Loading Functions
 
