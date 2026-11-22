@@ -3765,9 +3765,6 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 				end
 				
 				love.graphics.setScissor()
-				
-				love.graphics.setColor(90, 90, 90)
-				drawrectangle(animationguiarea[1]-10, animationguiarea[4], 10, 10)
 			end
 			
 			--GUI not priority
