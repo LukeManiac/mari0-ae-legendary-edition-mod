@@ -1007,8 +1007,17 @@ function guielement:draw(a, offx, offy)
 			guiglass.panel(self.x*scale, top*scale, w*scale, (bottom-top)*scale, r, {rim = {255, 255, 255}, rimstrength = 0.6, alpha = alpha, tintstrength = 0.5})
 
 			--title
+			--a centred menu (centerentries) draws its title and options in the middle of their rows
+			local function entryx(text)
+				if self.centerentries then
+					local len = utf8.len(tostring(text)) or string.len(tostring(text))
+					return self.x + (w - len*8)/2
+				end
+				return self.x+1
+			end
+
 			love.graphics.setColor(180, 180, 180, 255*alpha)
-			properprint(self.entries[1], (self.x+1)*scale, (self.y+2)*scale)
+			properprint(self.entries[1], entryx(self.entries[1])*scale, (self.y+2)*scale)
 			love.graphics.setColor(255, 255, 255, 40*alpha)
 			if self.direction == "down" then
 				love.graphics.rectangle("fill", (self.x+2)*scale, (self.y+10.5)*scale, (w-4)*scale, math.max(1, scale*0.5))
@@ -1040,7 +1049,7 @@ function guielement:draw(a, offx, offy)
 
 			love.graphics.setColor(255, 255, 255, 255*alpha)
 			for i = 2, n do
-				properprint(self.entries[i], (self.x+1)*scale, (rowtop(i)+1)*scale)
+				properprint(self.entries[i], entryx(self.entries[i])*scale, (rowtop(i)+1)*scale)
 			end
 			love.graphics.pop()
 		end
@@ -1448,6 +1457,153 @@ function guielement:click(x, y, button)
 	end
 end
 
+------------------------------------------------------------
+-- text input editing keys
+------------------------------------------------------------
+--Ctrl+Left/Right, Ctrl+Backspace/Delete, Delete, Home/End and Ctrl+Home/End for inputs.
+--Holding Shift with a movement key selects, the same as Shift+Left and Shift+Right.
+
+--what kind of character this is for word jumps: spaces, word characters, or anything else
+local function input_charclass(c)
+	if c == "" or c:match("%s") then
+		return 0
+	elseif c:match("[%w_]") then
+		return 1
+	end
+	return 2
+end
+
+--the position a word jump to the left lands on: skips spaces, then the word (or run of symbols) before them
+local function input_wordleft(value, pos)
+	local p = pos
+	while p > 1 and input_charclass(value:sub(p-1, p-1)) == 0 do
+		p = p - 1
+	end
+	if p > 1 then
+		local class = input_charclass(value:sub(p-1, p-1))
+		while p > 1 and input_charclass(value:sub(p-1, p-1)) == class do
+			p = p - 1
+		end
+	end
+	return p
+end
+
+--the position a word jump to the right lands on: skips the word (or run of symbols), then the spaces after it
+local function input_wordright(value, pos)
+	local len = string.len(value)
+	local p = pos
+	if p <= len then
+		local class = input_charclass(value:sub(p, p))
+		if class ~= 0 then
+			while p <= len and input_charclass(value:sub(p, p)) == class do
+				p = p + 1
+			end
+		end
+	end
+	while p <= len and input_charclass(value:sub(p, p)) == 0 do
+		p = p + 1
+	end
+	return p
+end
+
+--keeps a one-line input scrolled so the cursor can be seen, and never past the end of the text
+local function input_keepcursorvisible(self)
+	if self.height > 1 then
+		return
+	end
+	local len = string.len(self.value)
+	self.textoffset = math.max(math.min(self.cursorpos-1, self.textoffset), 0)
+	self.textoffset = math.max(self.textoffset, self.cursorpos-self.width)
+	self.textoffset = math.max(0, math.min(self.textoffset, len+1-self.width))
+	if self.maxlength > 0 then
+		self.textoffset = math.max(0, math.min(self.textoffset, self.maxlength-self.width))
+	end
+end
+
+--moves the cursor to pos; with Shift held, the selection grows from where it was
+local function input_movecursor(self, pos)
+	if self.shift then
+		self.highlight = self.highlight or self.cursorpos
+	else
+		self.highlight = false
+	end
+	self.cursorpos = math.max(1, math.min(string.len(self.value)+1, pos))
+	if self.highlight == self.cursorpos then
+		self.highlight = false
+	end
+	input_keepcursorvisible(self)
+	self.timer = 0
+	self.cursoralpha = 1
+end
+
+--removes the characters from a up to (not including) b
+local function input_deleterange(self, a, b)
+	if b <= a then
+		return
+	end
+	self.value = string.sub(self.value, 1, a-1) .. string.sub(self.value, b)
+	self.cursorpos = a
+	self.highlight = false
+	input_keepcursorvisible(self)
+	self.timer = 0
+	self.cursoralpha = 1
+end
+
+--removes the selected text, if there is any; returns true when it did
+local function input_deleteselection(self)
+	if self.highlight and self.highlight ~= self.cursorpos then
+		input_deleterange(self, math.min(self.highlight, self.cursorpos), math.max(self.highlight, self.cursorpos))
+		return true
+	end
+	self.highlight = false
+	return false
+end
+
+--handles the editing keys; returns true when the key was one of them
+local function input_editkey(self, key)
+	local len = string.len(self.value)
+	if key == "left" and self.ctrl then
+		input_movecursor(self, input_wordleft(self.value, self.cursorpos))
+	elseif key == "right" and self.ctrl then
+		input_movecursor(self, input_wordright(self.value, self.cursorpos))
+	elseif key == "home" then
+		if self.ctrl or self.height == 1 then
+			input_movecursor(self, 1)
+		else
+			--a tall input: the start of the row the cursor is on
+			local row = math.floor((self.cursorpos-1)/self.width)
+			input_movecursor(self, row*self.width+1)
+		end
+	elseif key == "end" then
+		if self.ctrl or self.height == 1 then
+			input_movecursor(self, len+1)
+		else
+			--a tall input: the end of the row the cursor is on (the next row starts one further)
+			local row = math.min(math.floor((self.cursorpos-1)/self.width), math.max(0, math.floor(len/self.width)))
+			local rowend = (row+1)*self.width
+			if len+1 <= rowend then
+				rowend = len+1
+			end
+			input_movecursor(self, rowend)
+		end
+	elseif key == "backspace" and self.ctrl then
+		if not input_deleteselection(self) then
+			input_deleterange(self, input_wordleft(self.value, self.cursorpos), self.cursorpos)
+		end
+	elseif key == "delete" then
+		if not input_deleteselection(self) then
+			if self.ctrl then
+				input_deleterange(self, self.cursorpos, input_wordright(self.value, self.cursorpos))
+			else
+				input_deleterange(self, self.cursorpos, self.cursorpos+1)
+			end
+		end
+	else
+		return false
+	end
+	return true
+end
+
 function guielement:keypress(key,textinput)
 	if self.active then
 		if self.type == "dropdown" then
@@ -1602,6 +1758,8 @@ function guielement:keypress(key,textinput)
 							love.keyboard.setTextInput(false)--[DROID]
 						end
 					end
+				elseif input_editkey(self, key) then
+					--Ctrl+Left/Right, Ctrl+Backspace/Delete, Delete, Home/End, Ctrl+Home/End (see input_editkey)
 				elseif key == "left" then
 					if self.shift then
 						self.highlight = self.highlight or self.cursorpos
@@ -1831,6 +1989,15 @@ function guielement:unclick(x, y)
 end
 
 --true when the mouse is over the element, or when it is made to look hovered (forcehover, e.g. selected with the keyboard)
+--starts a right-click menu's opening animation over (its jelly pop and the hover pill), so a menu
+--that is kept and opened again, like the Course Maker's maps tab menu, animates every time it opens
+function guielement:resetanimation()
+	local st = guiglass.state(self)
+	st.born = nil
+	st.listlast = nil
+	st.pill = nil
+end
+
 function guielement:hovered()
 	local dropdown_open = opened_dropdown and opened_dropdown.active and opened_dropdown.extended
 	local hover_only = editormode and dropdown_open and opened_dropdown ~= self and editor_gui_hover_enabled(self)

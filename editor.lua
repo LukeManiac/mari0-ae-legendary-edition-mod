@@ -412,6 +412,7 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	
 	levelrightclickmenu = guielement:new("rightclick", 0, 0, 6, levelrightclickmenuclick, false, "action", "copy", "paste", "delete")
 	levelrightclickmenu.active = false
+	levelrightclickmenu.centerentries = true --title and options are drawn in the middle of their rows
 	
 	--CUSTOM TAB
 	guielements["graphicscustomtab"] = guielement:new("button", 5, 20, TEXT["graphics"], customtabtab, 2, {"graphics"})
@@ -6410,6 +6411,7 @@ function editor_mousepressed(x, y, button)
 							levelrightclickmenu.x = x/scale
 							levelrightclickmenu.y = y/scale
 							levelrightclickmenu:updatePos()
+							levelrightclickmenu:resetanimation() --pop out again from this corner, every time
 							levelrightclickmenu.level = {currentworldselection, j, k}
 							levelrightclickmenu.button = guielements[name]
 							return

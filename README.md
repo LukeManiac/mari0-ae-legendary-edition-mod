@@ -568,12 +568,50 @@ Every dropdown's options are now drawn in the middle of their row instead of at 
 * `refresheditormaps()` is what the maps tab's **refresh data** runs.
 * `getmaps()` builds the map buttons from the cache instead of checking every map file. With `automaticmapreload` on, it runs `loadeditormapcache()` first every time.
 
+#### ⏸️ Pausing While Testing
+
+Testing a course from the Course Maker now pauses like normal play.
+
+* The pause key (Escape, or whatever pause is bound to, on a keyboard or a controller) opens the pause menu instead of going straight back to the Course Maker. Pressing it again closes the menu.
+* The game also pauses when its window loses focus while testing, unless `dontpauseonunfocus` is on.
+* **Quit to menu** in the pause menu goes back to the Course Maker while testing, instead of the main menu.
+* **Save game** doesn't save while testing, since the save would load as normal play. A red notice says "cannot save while testing!" instead.
+
+#### ⏹️ Stop Testing Course
+
+The "TESTING COURSE - PRESS ESC TO RETURN" text at the bottom of the screen is now a **stop testing level** button ("stop testing course" in Better English). Its text comes from the `"stop testing level"` key in the language files.
+
+* It sits in the middle of the bottom of the screen, with its bottom edge 4 pixels above the bottom of the game.
+* Clicking it goes back to the Course Maker, the same way Escape used to.
+* It works while playing and while the pause menu is open. It fades out while a pause menu prompt or the controls popup is showing, and fades back in once they close.
+* Clicking it doesn't shoot a portal, and the click doesn't reach anything in the Course Maker once it opens.
+* Its label is translated into every language the game has.
+
+#### ⌨️ Text Input Keys
+
+Every GUI text input now takes the usual editing keys:
+
+* **Ctrl+←** and **Ctrl+→** jump a word at a time. A word is a run of letters, numbers and underscores, or a run of symbols, and spaces are skipped.
+* **Ctrl+Backspace** deletes back to the start of the word before the cursor, and **Ctrl+Delete** deletes up to the start of the next one.
+* **Delete** deletes the character after the cursor.
+* **Home** and **End** go to the start and end of the text. In a text input with more than one row, they go to the start and end of the row the cursor is on.
+* **Ctrl+Home** and **Ctrl+End** always go to the start and end of the whole text.
+* With text selected, **Delete**, **Ctrl+Backspace** and **Ctrl+Delete** delete the selection.
+* Holding **Shift** with any of the movement keys selects text, the same as **Shift+←** and **Shift+→**.
+
+#### 🧱 GUI Functions
+
+* `guielement:resetanimation()` starts a right-click menu's opening animation over.
+* A right-click menu with `centerentries` set to `true` draws its title and options in the middle of their rows.
+* `stoptestingbutton_draw()`, `stoptestingbutton_update(dt)`, `stoptestingbutton_mousepressed(x, y, button)` and `stoptestingbutton_mousereleased(x, y, button)` run the **stop testing course** button. `stoptestingbutton_click()` is what it runs when clicked.
+
 ### 🐛 Bug Fixes
 
 * `starmusic-intro.ogg` and `princessmusic-intro.ogg` now actually play. Before, built-in music only ever loaded its `-fast` version, and a mappack's star and princess themes were loaded without looking for an intro, so both themes always started without one.
 * A mappack star theme with `starmusic-intro.ogg` but no `starmusic-fast.ogg` no longer plays an intro before the fast star theme only. Now the intro plays before the normal one as well.
 * With **Continue subzone music** on, going into a subzone while the fast star theme was playing kept it playing as the course music. Now any version of the star theme counts, so the course's own music starts.
 * Deleting a map from the **Maps** tab's right-click menu now takes its preview off the button straight away. Before, the deleted map's preview stayed on its button until the Course Maker was opened from the menu again.
+* The **Maps** tab's right-click menu now pops out with its jelly every time it opens. Before, the animation only played the first time, and every menu after that appeared straight away.
 
 ### ✨ Improvements
 
@@ -586,6 +624,7 @@ Every dropdown's options are now drawn in the middle of their row instead of at 
 * Loading a map in the Course Maker no longer decodes its background and foreground pictures again when an earlier map already used them. Turn on `automaticbackgroundreload` to decode them on every map load like before.
 * Loading a map, testing one and opening the editor panel no longer check every map file in the mappack. The map list is read when the Course Maker opens from the menu, and changes made outside the game are picked up with the **Maps** tab's **refresh data**. Turn on `automaticmapreload` to read them all again every time like before.
 * **save level** in the **Maps** tab is now one line tall, so **refresh data** fits under it.
+* The **Maps** tab's right-click menu draws its title and options (**copy**, **paste** and **delete**) in the middle of their rows.
 * Loading a map no longer reads and decodes every mappack animation again. Press the **Animations** tab's arrow button to pick up changes made to them outside the game, or turn on `automaticanimationreload` to read them on every map load like before.
 * Loading a map that was already loaded no longer reads and parses its file again, unless the file or the tileset changed.
 

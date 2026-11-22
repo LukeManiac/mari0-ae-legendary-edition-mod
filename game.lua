@@ -322,6 +322,9 @@ function game_update(dt)
 	suspendprompttimer = math.max(0, math.min(suspendprompttimer + (dt * (suspendprompt and 1 or -1)), suspendpromptduration))
 	highscoreprompttimer = math.max(0, math.min(highscoreprompttimer + (dt * (highscoreprompt and 1 or -1)), highscorepromptduration))
 
+	--"stop testing course" button (testing a course from the Course Maker)
+	stoptestingbutton_update(dt)
+
 	--controls popup of the pause menu
 	controlspopup_update()
 
@@ -3294,11 +3297,6 @@ function game_draw()
 	love.graphics.translate(0, yoffset*scale)
 	local winwidth, winheight = getproperwindowsize()
 
-	if testlevel then
-		love.graphics.setColor(255, 255, 255, 255)
-		centerprint("TESTING COURSE - PRESS ESC TO RETURN", winwidth/scale/2, (winheight*2-10)/scale/2)
-	end
-	
 	--pause menu
 	if pausemenuopentimer > 0 then
 		bettertimer = ease_in_out_quad(pausemenuopentimer / pausemenuopenduration)
@@ -3415,7 +3413,10 @@ function game_draw()
 			love.graphics.pop()
 		end
 	end
-	
+
+	--the "stop testing course" button: drawn over the pause menu, so it can be used while paused too
+	stoptestingbutton_draw()
+
 	--chat
 	if chatentrytoggle then
 		lobby_drawchat()
@@ -5710,6 +5711,10 @@ function game_keypressed(key, textinput)
 						mappacktype = "daily_challenge"
 						mappackhorscroll = 2
 						mappackhorscrollsmooth = 2
+					elseif testlevel and not editormode then
+						--testing a course: quitting goes back to the Course Maker
+						menuprompt = false
+						stoptestingbutton_click()
 					else
 						stopmusic()
 						love.audio.stop()
@@ -5790,6 +5795,9 @@ function game_keypressed(key, textinput)
 						updatesizes("reset")
 						levelscreen_load("dc")
 						updatesizes("reset")
+					elseif testlevel and not editormode then
+						--a course being tested isn't a save: it would load as normal play
+						notice.new("cannot save while testing!", notice.red, 2)
 					else
 						suspendprompt = true
 						pausemenuselected2 = 1
@@ -6038,10 +6046,8 @@ function game_keypressed(key, textinput)
 	end
 	
 	if isPauseKey(key) then
-		if not editormode and testlevel then
-			stoptestinglevel()
-			return
-		elseif not (editormode or everyonedead) and (pausemenuopentimer == 0 or pausemenuopentimer >= pausemenuopenduration) then
+		--testing a course pauses like normal play; the "stop testing course" button goes back to the editor
+		if not (editormode or everyonedead) and (pausemenuopentimer == 0 or pausemenuopentimer >= pausemenuopenduration) then
 			pausegame()
 		end
 	end
@@ -6067,6 +6073,107 @@ function pausegame(playpause)
 	end
 
 	pausemenuopen = true
+end
+
+------------------------------------------------------------
+-- "stop testing course" button
+------------------------------------------------------------
+--shown at the bottom of the screen while a course is tested from the Course Maker (its bottom edge
+--is 4 pixels above the bottom of the game). It works while playing and while paused, and hides itself
+--while a pause menu prompt or the controls popup is up.
+
+local STOPTESTINGBUTTON_FADETIME = 0.15
+stoptestingbuttonalpha = 0
+
+--true while the button should be on screen and take clicks
+local function stoptestingbutton_shown()
+	if not testlevel or editormode or gamestate ~= "game" then
+		return false
+	end
+	if menuprompt or desktopprompt or suspendprompt or highscoreprompt then
+		return false
+	end
+	if menuprompttimer > 0 or desktopprompttimer > 0 or suspendprompttimer > 0 or highscoreprompttimer > 0 then
+		return false
+	end
+	if controlspopupvisible() then
+		return false
+	end
+	return true
+end
+
+function stoptestingbutton_click()
+	if not testlevel or editormode then
+		return
+	end
+	--leave the pause menu behind: the editor starts unpaused
+	if pausemenuopen or pausemenuopentimer > 0 then
+		pausemenuopen = false
+		pausemenuopentimer = 0
+		pausedaudio = nil
+		menuprompt, desktopprompt, suspendprompt, highscoreprompt = false, false, false, false
+	end
+	stoptestingbuttonalpha = 0
+	stoptestinglevel()
+end
+
+--builds the button (again when the language changes) and keeps it centred at the bottom
+local function stoptestingbutton_get()
+	local label = TEXT["stop testing level"]
+	local b = stoptestingbutton
+	if not b or b.label ~= label then
+		b = guielement:new("button", 0, 0, label, stoptestingbutton_click, 2, nil, 1, utf8.len(label)*8)
+		b.label = label
+		stoptestingbutton = b
+	end
+	local bw = 3 + b.width + b.space*2
+	local bh = 1 + b.height*10 + b.space*2
+	b.x = math.floor((width*16 - bw)/2)
+	b.y = height*16 - 4 - bh --bottom edge (y + height) is 4 pixels above the bottom of the game
+	return b
+end
+
+function stoptestingbutton_update(dt)
+	local target = stoptestingbutton_shown() and 1 or 0
+	if stoptestingbuttonalpha < target then
+		stoptestingbuttonalpha = math.min(target, stoptestingbuttonalpha + dt/STOPTESTINGBUTTON_FADETIME)
+	elseif stoptestingbuttonalpha > target then
+		stoptestingbuttonalpha = math.max(target, stoptestingbuttonalpha - dt/STOPTESTINGBUTTON_FADETIME)
+	end
+	if stoptestingbutton then
+		stoptestingbutton.active = (target == 1)
+	end
+end
+
+function stoptestingbutton_draw()
+	if not testlevel or editormode or stoptestingbuttonalpha <= 0 then
+		return
+	end
+	local b = stoptestingbutton_get()
+	b:draw(255*stoptestingbuttonalpha)
+end
+
+--returns true when the click was on the button (so it doesn't also shoot a portal or reach the pause menu)
+function stoptestingbutton_mousepressed(x, y, button)
+	if not stoptestingbutton_shown() or stoptestingbuttonalpha <= 0 then
+		return false
+	end
+	if button ~= "l" then
+		return false
+	end
+	local b = stoptestingbutton_get()
+	b.active = true
+	if b:inhighlight(x, y) then
+		b:click(x, y, button)
+		return true
+	end
+	return false
+end
+
+function stoptestingbutton_mousereleased(x, y, button)
+	if stoptestingbutton then
+		stoptestingbutton:unclick(x, y, button)
+	end
 end
 
 function stoptestinglevel()
@@ -6188,6 +6295,10 @@ end
 function game_mousepressed(x, y, button)
 	local s = ""
 	if minigameplaying and (warpfade or minigame_hardfrozen()) then
+		return
+	end
+	if stoptestingbutton_mousepressed(x, y, button) then
+		ignoregui = true --the click belongs to the button, not to any other gui element
 		return
 	end
 	if pausemenuopen then
@@ -7051,6 +7162,7 @@ function game_mousereleased(x, y, button)
 	if minigameplaying and minigame_hardfrozen() then
 		return --frozen before the results screen (see minigame_finish)
 	end
+	stoptestingbutton_mousereleased(x, y, button)
 	if button == "l" then
 		if playertype == "minecraft" then
 			breakingblockX = false

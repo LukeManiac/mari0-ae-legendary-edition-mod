@@ -2946,7 +2946,7 @@ function print_r (t, indent) --Not by me
 end
 
 function love.focus(f)
-	if (not f) and gamestate == "game"and (not editormode) and (not testlevel) and (not levelfinished) and (not everyonedead) and (not CLIENT) and (not SERVER) and (not dontPauseOnUnfocus) then
+	if (not f) and gamestate == "game" and (not editormode) and (not levelfinished) and (not everyonedead) and (not CLIENT) and (not SERVER) and (not dontPauseOnUnfocus) then
 		pausegame(false)
 	end
 end
