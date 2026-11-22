@@ -451,6 +451,7 @@ end
 ------------------------------------------------------------
 
 local INDENT = 8 --labels sit this far in from their category
+local SCROLLBAR_W = 6 --the page's scrollbar, at the right edge of its viewport
 local SLIDER_W = 80 --a slider next to its label
 local HEADER_COLOR = {140, 200, 255}
 
@@ -642,7 +643,12 @@ local function createwidget(page, key, row)
 	return el
 end
 
+local function scrollbarname(page)
+	return page.prefix .. "scrollbar"
+end
+
 local function removewidgets(page)
+	guielements[scrollbarname(page)] = nil
 	for key in pairs(ITEMS) do
 		local name = pagename(page, key)
 		local el = guielements[name]
@@ -680,10 +686,42 @@ local function updatepage(page, active, selected, dt)
 		end
 	end
 	page.followselection = false
+
+	--the scrollbar: a gui scrollbar at the right edge of the viewport, only when it doesn't all fit.
+	--Dragging it scrolls the page, and otherwise it follows the page (the wheel and the keyboard scroll it)
+	local barname = scrollbarname(page)
+	local bar = guielements[barname]
+	if maxscroll > 0 then
+		local handle = math.max(10, math.floor(vp.h*vp.h/layout.height))
+		local x = vp.x + vp.w - SCROLLBAR_W
+		local sig = x .. "," .. vp.y .. "," .. vp.h .. "," .. handle
+		if not (bar and bar.sig == sig) then
+			bar = guielement:new("scrollbar", x, vp.y, vp.h, SCROLLBAR_W, handle, page.scroll/maxscroll, "ver")
+			bar.sig = sig
+			bar.scrollstepdisabled = true --the mouse wheel is handled by the page (see wheelpage)
+			guielements[barname] = bar
+		end
+		bar.active = active
+		bar.nohover = not active
+		if not active then
+			bar.dragging = false
+		end
+		if bar.dragging then
+			page.scrolltarget = bar.value*maxscroll
+			page.scroll = page.scrolltarget
+		end
+	elseif bar then
+		guielements[barname] = nil
+		bar = nil
+	end
+
 	page.scrolltarget = math.max(0, math.min(maxscroll, page.scrolltarget))
 	page.scroll = lerp(page.scroll, page.scrolltarget, math.min(1, (dt or 0)*14))
 	if math.abs(page.scroll - page.scrolltarget) < 0.05 then
 		page.scroll = page.scrolltarget
+	end
+	if bar and not bar.dragging then
+		bar.value = page.scroll/maxscroll
 	end
 
 	for key, row in pairs(layout.items) do
