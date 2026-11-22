@@ -16,9 +16,13 @@
 --LÖVE's own threads (love.thread) can't run this work: they have their own Lua state, so they can't see or change the
 --game's tables, and they can't make images or canvases. Coroutines run on the main thread, where all of that works.
 
---seconds of work a frame before giving the frame back. The window still gets about 30 frames a second, plenty for it to
---stay responsive and for the dots, and the work gets nearly all of the time (vsync is off while it runs, see resume)
+--seconds of work a frame before giving the frame back: at least OVERLAYTASK_BUDGET (about 30 frames a second), and more
+--when frames are slow to draw, so the work always gets about OVERLAYTASK_WORKSHARE of the time (see resume). A frame
+--costs the same however much work came before it, so with a fixed budget a slow frame (a big window, software drawing,
+--vsync) could take as long as the work itself, and loading took up to twice as long
 OVERLAYTASK_BUDGET = 1/30
+OVERLAYTASK_MAXBUDGET = 0.25 --never longer than this between frames, so the window keeps handling its events
+OVERLAYTASK_WORKSHARE = 0.9 --the share of the time the work gets
 OVERLAYTASK_DOTTIME = 0.5 --seconds between each step of the "..." animation
 
 overlaytask = nil --the work running in the background: {co = coroutine}
@@ -27,6 +31,9 @@ overlaysnapshot = nil --the frozen picture
 
 local handlerco = nil --the callback coroutine running right now (nil outside of one)
 local resumeat = 0 --when the running coroutine was last resumed
+local yieldedat = nil --when the work last gave the frame back
+local frametime = nil --how long a frame takes between two pieces of work (smoothed)
+local budget = OVERLAYTASK_BUDGET --seconds of work before the next frame
 
 --whether the code running now can hand the rest of its work to the main loop
 function overlaytask_canyield()
@@ -47,7 +54,8 @@ function overlayyield(force)
 	if not force and not overlayfrozen then
 		return --no overlay shown: the work isn't in the background, so it runs straight through like before
 	end
-	if force or love.timer.getTime() - resumeat >= OVERLAYTASK_BUDGET then
+	if force or love.timer.getTime() - resumeat >= budget then
+		yieldedat = overlayfrozen and love.timer.getTime() or nil
 		coroutine.yield()
 		resumeat = love.timer.getTime()
 	end
@@ -290,6 +298,7 @@ local function vsyncrestore()
 end
 
 local function finish()
+	yieldedat, frametime, budget = nil, nil, OVERLAYTASK_BUDGET
 	overlaytask = nil
 	overlayfrozen = nil
 	overlaysnapshot = nil
@@ -314,8 +323,16 @@ local function resume()
 	if overlayfrozen then
 		vsyncoff() --the fade before it still waits for the monitor, so it stays smooth
 	end
+	--how long the frame in between took, and from that how much work to do before the next one
+	local now = love.timer.getTime()
+	if yieldedat then
+		local gap = now - yieldedat
+		frametime = frametime and (frametime*0.7 + gap*0.3) or gap
+		budget = math.max(OVERLAYTASK_BUDGET, math.min(OVERLAYTASK_MAXBUDGET, frametime*OVERLAYTASK_WORKSHARE/(1 - OVERLAYTASK_WORKSHARE)))
+		yieldedat = nil
+	end
 	handlerco = co
-	resumeat = love.timer.getTime()
+	resumeat = now
 	local ok, err = coroutine.resume(co)
 	handlerco = nil
 	check(co, ok, err)
