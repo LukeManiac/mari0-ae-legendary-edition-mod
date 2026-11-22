@@ -519,9 +519,9 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	end
 	guielements["animationnewbutton"] = guielement:new("button", 3, 20, "+", createnewanimation, nil)
 	guielements["animationsavebutton"] = guielement:new("button", 16, 20, TEXT["save"], saveanimation, nil)
-	--resets the animation cache: a refresh arrow drawn by the game, between save and x (see drawanimationcachearrow)
-	guielements["animationcachebutton"] = guielement:new("button", guielements["animationsavebutton"].x+guielements["animationsavebutton"].width+5, 20, "", resetanimationcache, nil, nil, nil, 8)
-	guielements["animationcachebutton"].drawcontent = drawanimationcachearrow
+	--resets the animation cache: the counterclockwise arrow from graphics/GUI/directions.png (like the boo circle's
+	--right-click menu), between save and x
+	guielements["animationcachebutton"] = guielement:new("button", guielements["animationsavebutton"].x+guielements["animationsavebutton"].width+5, 20, {directionsimg, directionsquad["ccw"]}, resetanimationcache, nil, nil, nil, 8)
 	guielements["animationdelbutton"] = guielement:new("button", guielements["animationcachebutton"].x+guielements["animationcachebutton"].width+5, 20, "x", removeanimation, nil)
 	guielements["animationnameinput"] = guielement:new("input", 282, 20, 14, function() animationsaveas = guielements["animationnameinput"].value; guielements["animationnameinput"].inputting = false end, "", math.huge, nil, nil, 0)
 	guielements["animationselectdrop"] = guielement:new("dropdown", guielements["animationdelbutton"].x+guielements["animationdelbutton"].width+5, 20, 2, selectanimation, nil, unpack(args))
@@ -4505,34 +4505,6 @@ function animationstab()
 end
 
 --ANIMATION CACHE BUTTON
---the arrow on the animations tab's reset button: three quarters of a circle with its head pointing counterclockwise,
---standing still like a browser's refresh button. Drawn by the game instead of an image (drawcontent of the button, in game pixels)
-local ANIMATIONCACHE_ARROWHEAD = -math.pi*0.75 --where the head sits: the top left, with the gap down the left side
-function drawanimationcachearrow(self, x, y, alpha)
-	local cx, cy = (x+5.5)*scale, (y+5.5)*scale --the middle of the button's 11x11 box
-	local r = 3*scale
-	--angles grow clockwise on the screen, so counterclockwise is a falling angle: the head points into the gap
-	local front = ANIMATIONCACHE_ARROWHEAD
-	local back = front + math.pi*1.5
-
-	local c = self.textcolor
-	love.graphics.setColor(c[1], c[2], c[3], alpha or 255)
-	local oldwidth = love.graphics.getLineWidth()
-	love.graphics.setLineWidth(math.max(1, scale*0.75))
-	love.graphics.arc("line", "open", cx, cy, r, front, back, 16)
-	love.graphics.setLineWidth(oldwidth)
-
-	--the head, at the front end and pointing counterclockwise
-	local hx, hy = cx + math.cos(front)*r, cy + math.sin(front)*r
-	local tx, ty = math.sin(front), -math.cos(front) --along the circle, counterclockwise
-	local nx, ny = math.cos(front), math.sin(front) --away from the middle
-	local s = 1.8*scale
-	love.graphics.polygon("fill",
-		hx + tx*s, hy + ty*s,
-		hx + nx*s - tx*s*0.4, hy + ny*s - ty*s*0.4,
-		hx - nx*s - tx*s*0.4, hy - ny*s - ty*s*0.4)
-end
-
 --its tooltip: shows under the button once it's been hovered for a second, as a glass box that pops in and out with
 --a jelly like a dropdown list
 local ANIMATIONCACHE_TOOLTIPDELAY = 1

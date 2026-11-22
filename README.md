@@ -467,7 +467,7 @@ Mappack animations are now read and decoded once, instead of on every map load. 
 * Creating, saving, renaming or deleting an animation in the Course Maker updates the cache for that file only. Saving an animation without renaming it doesn't even list the folder again.
 * What's kept belongs to one mappack. Loading another mappack, or opening the Course Maker from the menu, starts it over.
 
-The **Animations** tab has a new button between **save** and **x**: an arrow the game draws itself, three quarters of a circle with its head at the front, always spinning counterclockwise.
+The **Animations** tab has a new button between **save** and **x**, showing the counterclockwise arrow from `graphics/GUI/directions.png` (the same icon as the boo circle's right-click menu).
 
 * Pressing it lets go of every kept animation and reads them all again, so changes made to animation files outside the game show up. The animation you had open stays open if it's still there.
 * Changes to the open animation that weren't saved are dropped, so its file's own contents show.
@@ -509,7 +509,7 @@ Dropping a new tileset onto the window shows "updating tiles..." too, since it r
 * `animationcache_changed(path, samefiles)` forgets one file, and the lists of files too unless `samefiles` is `true` (only its contents changed). The editor runs it whenever it writes or removes an animation.
 * `clearanimationcache()` lets go of every kept animation. `resetanimationcache()` is what the **Animations** tab's arrow button runs.
 * `clearmapparsecache()` lets go of every parsed map. `savemap` forgets the map it saves.
-* `drawanimationcachearrow(self, x, y, alpha)` draws the spinning arrow (it's the button's `drawcontent`), and `drawanimationcachetooltip()` draws its tooltip.
+* `drawanimationcachetooltip()` draws the arrow button's tooltip.
 
 #### ⏳ Background Loading
 
