@@ -5109,15 +5109,93 @@ function startlevel(level, reason)
 	end
 end
 
-function loadmap(filename)
-	print("Loading " .. mappackfolder .. "/" .. mappack .. "/" .. filename .. ".txt")
-	
-	if not love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/" .. filename .. ".txt") then
-		print(mappackfolder .. "/" .. mappack .. "/" .. filename .. ".txt not found!")
+--MAP PARSE CACHE
+--A map file's tiles are split up and turned into numbers once, and loading that map again builds it from what was
+--kept instead of parsing the file again. On every load the file's size and modtime (loadmap already asks for them) and
+--the tile counts are checked against the ones it was parsed with, so a map that was saved, changed outside the game, or
+--parsed with other tiles is parsed again. "update image" in the editor's tiles tab and loading a mappack let go of it
+--all (clearmapparsecache).
+mapparsecache = {}
+
+function clearmapparsecache()
+	mapparsecache = {}
+end
+
+--the checks for tiles that don't exist depend on these
+local function mapparsecache_tilecounts()
+	return tostring(smbtilecount) .. ":" .. tostring(portaltilecount) .. ":" .. tostring(customtilecount) .. ":" .. tostring(animatedtilecount)
+end
+
+--splits and converts every tile of a map, the same way loadmap always has. false if the map has the wrong number of tiles
+local function parsemaptiles(s2, height)
+	local t = s2[1]:split(",")
+	if math.fmod(#t, height) ~= 0 then
+		print("Incorrect number of entries: " .. #t)
 		return false
 	end
-	local s = love.filesystem.read( mappackfolder .. "/" .. mappack .. "/" .. filename .. ".txt" )
-	local s2 = s:split(";")
+	local width = #t/height
+	local tiles = {} --[(x-1)*height+y] = {values..., n = how many, back = background tile, argument = entity argument}
+	local hasback = false
+	for x = 1, width do
+		for y = 1, height do
+			local r = tostring(t[(y-1)*width+x]):split("-")
+			local cell = {}
+			local nr = tonumber(r[1])
+			if not nr then
+				--background tile
+				hasback = true
+				local tl = r[1]:split("~")
+				r[1] = tl[1]
+				cell.back = tonumber(tl[2])
+			elseif (nr > smbtilecount+portaltilecount+customtilecount and nr <= 90000) or nr > 90000+animatedtilecount then
+				--tile doesn't exist
+				r[1] = 1
+			end
+
+			--entity argument
+			if r[2] and (not tonumber(r[2])) and r[2]:find(":") then
+				local values = r[2]:split(":")
+				r[2] = tonumber(values[1]) or values[1] --enemy
+				cell.argument = values[2]
+			end
+
+			for i = 1, #r do
+				local n = tonumber(r[i])
+				if n ~= nil then
+					cell[i] = n
+				else
+					cell[i] = r[i]
+				end
+			end
+			cell.n = #r
+			tiles[(x-1)*height+y] = cell
+		end
+	end
+	return {width = width, height = height, tiles = tiles, hasback = hasback}
+end
+
+function loadmap(filename)
+	local path = mappackfolder .. "/" .. mappack .. "/" .. filename .. ".txt"
+	print("Loading " .. path)
+	
+	local info = love.filesystem.getInfo(path)
+	if not info then
+		print(path .. " not found!")
+		return false
+	end
+
+	local tilecounts = mapparsecache_tilecounts()
+	local cached = mapparsecache[path]
+	if not (cached and cached.modtime == info.modtime and cached.size == info.size and cached.tilecounts == tilecounts) then
+		cached = nil
+	end
+	local s2
+	if cached then
+		s2 = cached.s2
+	else
+		local s = love.filesystem.read(path)
+		s2 = s:split(";")
+	end
 	
 	if s2[2] and s2[2]:sub(1,7) == "height=" then
 		mapheight = tonumber(s2[2]:sub(8,-1)) or 15
@@ -5128,67 +5206,51 @@ function loadmap(filename)
 		mapheight = 15
 	end
 	
-	--MAP ITSELF
-	local t = s2[1]:split(",")
-	
-	if math.fmod(#t, mapheight) ~= 0 then
-		print("Incorrect number of entries: " .. #t)
-		return false
+	--MAP ITSELF (parsed once and kept, see the MAP PARSE CACHE above)
+	local parsed = cached and cached.parsed.height == mapheight and cached.parsed
+	if not parsed then
+		parsed = parsemaptiles(s2, mapheight)
+		if not parsed then
+			return false
+		end
+		mapparsecache[path] = {modtime = info.modtime, size = info.size, tilecounts = tilecounts, s2 = s2, parsed = parsed}
 	end
 	
-	mapwidth = #t/mapheight
+	mapwidth = parsed.width
 	originalmapwidth = mapwidth
 	
 	map = {} --foreground map
-	bmap_on = false --background map on?
-	local nr, nr2 --map[x][y][1], map[x][y][2]
+	bmap_on = parsed.hasback --background map on?
 
+	local tiles, height = parsed.tiles, mapheight
+	local enemynames --custom enemy names, gathered the first time a custom enemy needs checking
 	for x = 1, mapwidth do
-		map[x] = {}
-		for y = 1, mapheight do
-			map[x][y] = {}
-			map[x][y]["gels"] = {}
-			map[x][y]["portaloverride"] = nil
-			
-			local r = tostring(t[(y-1)*(#t/mapheight)+x]):split("-")
-			
-			nr = tonumber(r[1])
-			if not nr then
-				--background tile
-				if not bmap_on then
-					bmap_on = true
-				end
-				local tiles = r[1]:split("~")
-				r[1] = tiles[1]
-				nr = tonumber(r[1])
-				map[x][y]["back"] = tonumber(tiles[2])
-			elseif (nr > smbtilecount+portaltilecount+customtilecount and nr <= 90000) or nr > 90000+animatedtilecount then
-				--tile doesn't exist
-				r[1] = 1
-			end
-
-			--entity argument
-			if r[2] and (not tonumber(r[2])) and r[2]:find(":") then
-				local values = r[2]:split(":")
-				r[2] = tonumber(values[1]) or values[1] --enemy
-				map[x][y]["argument"] = values[2]
-			end
-			
-			for i = 1, #r do
-				if tonumber(r[i]) ~= nil then
-					map[x][y][i] = tonumber(r[i])
-				else
-					map[x][y][i] = r[i]
-					--check if custom enemy doesn't exist
-					if editormode and i == 2 and not tablecontains(customenemies, r[i]) then
-						print("custom enemy " .. r[i] .. " does not exist")
-						map[x][y][i] = 1
+		local column = {}
+		map[x] = column
+		for y = 1, height do
+			local cell = tiles[(x-1)*height+y]
+			local m = {gels = {}, back = cell.back, argument = cell.argument}
+			for i = 1, cell.n do
+				local v = cell[i]
+				--check if custom enemy doesn't exist
+				if editormode and i == 2 and type(v) == "string" then
+					if not enemynames then
+						enemynames = {}
+						for _, name in pairs(customenemies or {}) do
+							enemynames[name] = true
+						end
+					end
+					if not enemynames[v] then
+						print("custom enemy " .. v .. " does not exist")
+						v = 1
 					end
 				end
+				m[i] = v
 			end
+			column[y] = m
 			
 			--create object for block
-			if tilequads[tonumber(r[1])].collision == true then
+			if tilequads[tonumber(cell[1])].collision == true then
 				objects["tile"][tilemap(x, y)] = tile:new(x-1, y-1, 1, 1, true)
 			end
 		end
@@ -7102,6 +7164,7 @@ function savemap(filename)
 	
 	local success, message = love.filesystem.write(mappackfolder .. "/" .. mappack .. "/" .. filename .. ".txt", s)
 	editormapcache_updatemap(filename) --only this map's entry in the editor's map cache changes
+	mapparsecache[mappackfolder .. "/" .. mappack .. "/" .. filename .. ".txt"] = nil --parsed again next time it's loaded
 	
 	--don't create a map height file if it's 15 (default) (Update: no more map files cause they're bad)
 	if mapheight ~= 15 then

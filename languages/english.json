@@ -367,9 +367,18 @@
 		"selection tool": "selection tool",
 		"power line draw": "power line draw",
 		"loading level...": "loading level...",
+		"refreshing map data...": "refreshing map data...",
 
 "^_Notices":"",
 	"Map saved!": "Map saved!",
+	"Press this button to\nreset animations cache": "Press this button to\nreset animations cache",
+	"resetting animations cache...": "resetting animations cache...",
+	"refreshing enemy data...": "refreshing enemy data...",
+	"refreshing background data...": "refreshing background data...",
+	"updating graphics...": "updating graphics...",
+	"updating tiles...": "updating tiles...",
+	"updating backgrounds...": "updating backgrounds...",
+	"updating sounds...": "updating sounds...",
 	"game saved!": "game saved!",
 	"game suspended!": "game suspended!",
 

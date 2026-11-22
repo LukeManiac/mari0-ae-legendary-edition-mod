@@ -3738,6 +3738,7 @@ function loadnitpicks()
 		AutomaticEnemyReload = t.automaticenemyreload
 		AutomaticBackgroundReload = t.automaticbackgroundreload
 		AutomaticMapReload = t.automaticmapreload
+		AutomaticAnimationReload = t.automaticanimationreload
 	end
 end
 

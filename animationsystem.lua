@@ -1,3 +1,72 @@
+--ANIMATION CACHE
+--The animation files are read and decoded once, and every map load after that builds its animations from what was
+--kept, instead of listing the folders and decoding every file again. What's kept belongs to one mappack: another
+--mappack (or opening the editor from the menu) starts it over. The editor keeps it up to date when it creates, saves,
+--renames or deletes an animation, and the reset button in the animations tab (resetanimationcache) lets go of it all.
+animationcache = {}
+
+function clearanimationcache()
+	animationcache = {}
+end
+
+--a list of {path, name} for the .json animations in folder (and one level of subfolders when subfolders is true)
+local function animationcache_list(folder, subfolders)
+	local list = {}
+	local fl = love.filesystem.getDirectoryItems(folder)
+	for i = 1, #fl do
+		if subfolders and love.filesystem.getInfo(folder .. "/" .. fl[i], "directory") then
+			local fl2 = love.filesystem.getDirectoryItems(folder .. "/" .. fl[i])
+			for i2 = 1, #fl2 do
+				if string.sub(fl2[i2], -4) == "json" then
+					table.insert(list, {folder .. "/" .. fl[i] .. "/" .. fl2[i2], fl2[i2]})
+				end
+			end
+		elseif string.sub(fl[i], -4) == "json" then
+			table.insert(list, {folder .. "/" .. fl[i], fl[i]})
+		end
+	end
+	return list
+end
+
+--makes sure the cache belongs to the open mappack
+local function animationcache_check()
+	local key = mappackfolder .. "/" .. mappack
+	if animationcache.key ~= key then
+		animationcache = {key = key, lists = {}, files = {}}
+	end
+end
+
+--the decoded contents of an animation file (false if it couldn't be read), read from the disk only the first time
+function animationcache_get(path)
+	animationcache_check()
+	local data = animationcache.files[path]
+	if data == nil then
+		local raw = love.filesystem.read(path)
+		data = raw and JSON:decode(raw) or false
+		animationcache.files[path] = data
+	end
+	return data
+end
+
+--the editor wrote or removed path: forget its contents, and the lists of files unless samefiles (only its contents changed)
+function animationcache_changed(path, samefiles)
+	animationcache_check()
+	animationcache.files[path] = nil
+	if not samefiles then
+		animationcache.lists = {}
+	end
+end
+
+local function animationcache_getlist(folder, subfolders)
+	animationcache_check()
+	local list = animationcache.lists[folder]
+	if not list then
+		list = animationcache_list(folder, subfolders)
+		animationcache.lists[folder] = list
+	end
+	return list
+end
+
 function animationsystem_load()
 	animationtriggerfuncs = {}
 	animationbuttontriggerfuncs = {}
@@ -11,37 +80,30 @@ function animationsystem_load()
 	animationbuttonsheld = {}
 	--buttons released while paused or frozen, triggered once the game goes on ([player][button] = true)
 	animationbuttonspendingrelease = {}
+
+	if AutomaticAnimationReload and (editormode or testlevel) then
+		--automaticanimationreload: every map loaded or tested in the editor reads the animations again, like before v1.3.1
+		clearanimationcache()
+	end
 	
 	if not dcplaying and not minigameplaying then
-		local fl = love.filesystem.getDirectoryItems(mappackfolder .. "/" .. mappack .. "/animations")
-		for i = 1, #fl do
-			if love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/animations/" .. fl[i], "directory") then
-				--load animations from folder
-				local fl2 = love.filesystem.getDirectoryItems(mappackfolder .. "/" .. mappack .. "/animations/" .. fl[i])
-				for i2 = 1, #fl2 do
-					if string.sub(fl2[i2], -4) == "json" then
-						table.insert(animations, animation:new(mappackfolder .. "/" .. mappack .. "/animations/" .. fl[i] .. "/" .. fl2[i2], fl2[i2]))
-					end
-				end
-			elseif string.sub(fl[i], -4) == "json" then
-				table.insert(animations, animation:new(mappackfolder .. "/" .. mappack .. "/animations/" .. fl[i], fl[i]))
-			end
+		--animations in the mappack's folder and its subfolders (see the ANIMATION CACHE above)
+		for _, v in ipairs(animationcache_getlist(mappackfolder .. "/" .. mappack .. "/animations", true)) do
+			table.insert(animations, animation:new(v[1], v[2]))
 		end
 	end
 
 	--custom chracters animations
 	local characterenemiesloaded = {} --don't load the same enemy multiple times
 	for i = 1, #mariocharacter do
-		if mariocharacter[i] and (not characterenemiesloaded[mariocharacter[i]]) and love.filesystem.getInfo("alesans_entities/characters/" .. mariocharacter[i] .. "/animations/") then
-			local dir = love.filesystem.getDirectoryItems("alesans_entities/characters/" .. mariocharacter[i] .. "/animations/")
-			for i2 = 1, #dir do
-				if dir[i2] and string.sub(dir[i2], -4) == "json" then
-					local t = animationschar
-					if editormode and (characters.data[mariocharacter[i]] and not characters.data[mariocharacter[i]].hideanimations) then
-						t = animations
-					end
-					table.insert(t, animation:new("alesans_entities/characters/" .. mariocharacter[i] .. "/animations/" .. dir[i2], dir[i2]))
+		if mariocharacter[i] and (not characterenemiesloaded[mariocharacter[i]]) then
+			--an empty list when the character has no animations folder
+			for _, v in ipairs(animationcache_getlist("alesans_entities/characters/" .. mariocharacter[i] .. "/animations", false)) do
+				local t = animationschar
+				if editormode and (characters.data[mariocharacter[i]] and not characters.data[mariocharacter[i]].hideanimations) then
+					t = animations
 				end
+				table.insert(t, animation:new(v[1], v[2]))
 			end
 			characterenemiesloaded[mariocharacter[i]] = true
 		end

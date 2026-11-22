@@ -118,9 +118,8 @@ changeswitchstate:i					trigger switchblocks
 function animation:init(path, name)
 	self.filepath = path
 	self.name = name
-	self.raw = love.filesystem.read(self.filepath)
-	
-	self:decode(self.raw)
+	--decoded once and kept (animationcache_get in animationsystem.lua), so this doesn't touch the disk after the first time
+	self:decode(animationcache_get(self.filepath))
 	
 	self.queue = {}
 	self.firstupdate = true
@@ -136,7 +135,9 @@ function animation:decode(s)
 	self.actions = {}
 	
 	local animationjson
-	if s then
+	if type(s) == "table" then
+		animationjson = s --already decoded (the animation cache): every entry is copied below, so it's never changed
+	elseif s then
 		animationjson = JSON:decode(s)
 	else
 		animationjson = {}

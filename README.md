@@ -376,6 +376,7 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `backwardsmoothing`: The camera leads ahead by as much as `camerasmoothing` would make it trail. Requires `camerasmoothing`.
 - `automaticenemyreload`: The Course Maker loads every custom enemy again whenever a map is loaded or tested, like before v1.3.1, so you don't have to press **refresh data**.
 - `automaticbackgroundreload`: The Course Maker decodes custom backgrounds and foregrounds again whenever a map is loaded or tested, like before v1.3.1, so you don't have to press **refresh data** in the backgrounds tab.
+- `automaticanimationreload`: The Course Maker reads every animation again whenever a map is loaded or tested, like before v1.3.1, so you don't have to press the **Animations** tab's arrow button.
 - `automaticmapreload`: The Course Maker reads every map and preview again whenever a map is loaded or tested, or the editor panel is opened, so you don't have to press **refresh data** in the **Maps** tab.
 
 ---
@@ -448,6 +449,7 @@ The Course Maker now reads the mappack's maps once, when you open it from the me
 * Saving a map in the Course Maker only changes that map's entry, and its preview if it gets a new one. Pasting or deleting a map from the maps tab's right-click menu does the same. Nothing else is read again.
 * The **Maps** tab has a **refresh data** button, right under **save level**. It reads again every map and preview that was changed outside the game since: edited, added or deleted. Only those are read again, and only changed previews are decoded again.
 * A map added outside the game shows up after **refresh data**, with new worlds, levels and sublevels added for it if it needs them. Worlds and levels are never taken away.
+* Pressing it fades the screen to black and shows a "refreshing map data..." overlay ("refreshing course data..." in Better English) while it reads, then fades back in. The fade plays even with the mappack's **Skip trans.** setting on, the same as selecting a map in the Course Maker. Only the `disabletransitions` nitpick skips it.
 * A notice says "Refreshed map data" when it's done.
 * **refresh data** doesn't reload the map you have open. Load it again from the **Maps** tab to see changes made to it outside the game.
 * With `noeditorpreviews` on, the previews aren't decoded at all, since they aren't shown.
@@ -455,6 +457,78 @@ The Course Maker now reads the mappack's maps once, when you open it from the me
 #### ⚙️ Automatic Map Reload
 
 A new nitpick, `automaticmapreload`. With it on, the Course Maker reads every map and decodes every preview again each time a map is loaded or tested, or the editor panel is opened, whether anything changed or not. Changes made outside the game then show up without pressing **refresh data**. Maps load slower with it on, the more maps and previews a mappack has. **Generate Nitpicks File** adds it to an existing file.
+
+#### 🎞️ Animation Cache
+
+Mappack animations are now read and decoded once, instead of on every map load. This also speeds up going into subzones in normal play.
+
+* The first map load lists the mappack's `animations` folder (and its subfolders) and decodes every animation file. Every load after that builds the animations from what was kept, without touching the disk. Character animations (`alesans_entities/characters/<name>/animations`) are kept the same way.
+* Every load still makes its own animations from what was kept, so nothing that happens to an animation during a course carries over to the next load.
+* Creating, saving, renaming or deleting an animation in the Course Maker updates the cache for that file only. Saving an animation without renaming it doesn't even list the folder again.
+* What's kept belongs to one mappack. Loading another mappack, or opening the Course Maker from the menu, starts it over.
+
+The **Animations** tab has a new button between **save** and **x**: an arrow the game draws itself, three quarters of a circle with its head at the front, always spinning counterclockwise.
+
+* Pressing it lets go of every kept animation and reads them all again, so changes made to animation files outside the game show up. The animation you had open stays open if it's still there.
+* Changes to the open animation that weren't saved are dropped, so its file's own contents show.
+* Hovering over it for a second shows a tooltip under it: "Press this button to reset animations cache". The tooltip is a liquid glass box that pops in with a jelly, like a dropdown list, and pops back out with one when the mouse leaves the button.
+* The tooltip is translated into every language the game has. Its lines are split so it fits under the button.
+* A notice says "Reset animations cache" when it's done.
+
+#### ⚙️ Automatic Animation Reload
+
+A new nitpick, `automaticanimationreload`. With it on, the animation cache is reset every time a map is loaded or tested in the Course Maker, so every animation is read and decoded again, the way it was before v1.3.1. Changes made to animation files outside the game then show up on the next map load, without pressing the arrow button. Normal play still uses the cache. Maps load slower with it on, the more animations a mappack has. **Generate Nitpicks File** adds it to an existing file.
+
+#### 🧩 Map Parse Cache
+
+Loading a map now splits up its tiles and turns them into numbers once, then keeps the result.
+
+* Loading the same map again builds it from what was kept, without reading or parsing the file again.
+* Every load still checks the file's size and modtime, and the tile counts the map was parsed with. A map that was saved, changed outside the game, or parsed before the tiles changed is parsed again.
+* The check for custom enemies that don't exist still runs on every load, against the enemies loaded at the time. It now looks names up in a set instead of going through the whole enemy list for every tile.
+* **update image** in the Course Maker's tiles tab (**Custom → Tiles**) lets go of every parsed map, since the checks for tiles that don't exist depend on the tileset. Loading another mappack, or opening the Course Maker from the menu, does too.
+* This works in normal play as well as in the Course Maker.
+
+#### 📢 Update Overlays
+
+Every button in the Course Maker's **Custom** tab that loads something again now fades the screen to black and shows an overlay first, the same way **refresh data** in the **Maps** tab does:
+
+* **update image** in the graphics tab: "updating graphics..."
+* **update image** in the tiles tab: "updating tiles..."
+* **update image** in the backgrounds tab: "updating backgrounds..."
+* **update sounds** in the sounds tab: "updating sounds..."
+* **refresh data** in the enemies tab: "refreshing enemy data..."
+* **refresh data** in the backgrounds tab: "refreshing background data..."
+* The **Animations** tab's reset button: "resetting animations cache..."
+
+Dropping a new tileset onto the window shows "updating tiles..." too, since it runs **update image**. Each overlay is translated into every language the game has, and so is "refreshing map data..." now. Only the `disabletransitions` nitpick skips the fade.
+
+#### 🧱 Animation and Map Parse Functions
+
+* `animationcache_get(path)` returns an animation file's decoded contents, reading it only the first time. `animation:init` uses it, and `animation:decode` now also takes an already decoded table.
+* `animationcache_changed(path, samefiles)` forgets one file, and the lists of files too unless `samefiles` is `true` (only its contents changed). The editor runs it whenever it writes or removes an animation.
+* `clearanimationcache()` lets go of every kept animation. `resetanimationcache()` is what the **Animations** tab's arrow button runs.
+* `clearmapparsecache()` lets go of every parsed map. `savemap` forgets the map it saves.
+* `drawanimationcachearrow(self, x, y, alpha)` draws the spinning arrow (it's the button's `drawcontent`), and `drawanimationcachetooltip()` draws its tooltip.
+
+#### 🗂️ Options Tab Picker
+
+The options menu's row of tab names (**controls**, **skins**, **misc.** and **cheat**) is now a dropdown.
+
+* It's 205 pixels wide and sits 4 pixels in from the top left corner of the options box, where the controls tab's highlight used to start.
+* Picking a tab from it switches to that tab with the usual slide.
+* With the keyboard on the tab row, the dropdown looks hovered. Left and Right (or A and D) still switch tabs, and the new tab's name slides into the header like any dropdown changed without the mouse. Enter (or Space) opens it, Up and Down move through it, Enter picks and Escape closes it.
+* While it's open, the other keys don't change anything under it.
+* Its list opens over the tab below it, and it can still be used while the tabs are sliding.
+
+#### 🎯 Centred Dropdowns
+
+Every dropdown's options are now drawn in the middle of their row instead of at its left edge.
+
+* This includes the option shown in the header, which is centred in the part left of the divider, and the copy of the header at the top of a list too long for the screen.
+* An option too long for its row still starts at the left edge, the same as before.
+* Custom enemy options keep their icon right before their name.
+* Graphical dropdowns (like the skins tab's characters, hats and colours) draw their own options and aren't changed. Neither are right-click menus.
 
 #### 🧱 Enemy Functions
 
@@ -488,6 +562,8 @@ A new nitpick, `automaticmapreload`. With it on, the Course Maker reads every ma
 * Loading a map in the Course Maker no longer decodes its background and foreground pictures again when an earlier map already used them. Turn on `automaticbackgroundreload` to decode them on every map load like before.
 * Loading a map, testing one and opening the editor panel no longer check every map file in the mappack. The map list is read when the Course Maker opens from the menu, and changes made outside the game are picked up with the **Maps** tab's **refresh data**. Turn on `automaticmapreload` to read them all again every time like before.
 * **save level** in the **Maps** tab is now one line tall, so **refresh data** fits under it.
+* Loading a map no longer reads and decodes every mappack animation again. Press the **Animations** tab's arrow button to pick up changes made to them outside the game, or turn on `automaticanimationreload` to read them on every map load like before.
+* Loading a map that was already loaded no longer reads and parses its file again, unless the file or the tileset changed.
 
 ## v1.3
 

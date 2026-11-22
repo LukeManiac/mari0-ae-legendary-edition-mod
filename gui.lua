@@ -393,29 +393,44 @@ function guielement:update(dt)
 	end
 end
 
-local function drawdropdownentry(entry, x, y, maxchars)
+--areaw (game pixels): the width of the area the entry sits in; the entry is drawn in the middle of it
+local function drawdropdownentry(entry, x, y, maxchars, areaw)
 	local customenemy = type(entry) == "string" and entry:sub(1, 6) == "_ENEMY"
 	if customenemy then
-		entry = " " .. entry:sub(7)
+		entry = " " .. entry:sub(7) --the space is where the icon goes
+	end
+	local utf = false
+	if type(entry) == "string" then
+		local length = utf8.len(entry)
+		if length and length ~= string.len(entry) then
+			--accents, cyrillic...: cut by character and print with the utf-8 printer
+			utf = true
+			local stop = utf8.offset(entry, maxchars + 1)
+			if stop then
+				entry = entry:sub(1, stop - 1)
+			end
+		else
+			entry = entry:sub(1, maxchars)
+		end
+	end
+
+	--in the middle of its area (an entry too long for it starts at the left, like before)
+	if areaw then
+		local chars = utf8.len(tostring(entry)) or string.len(tostring(entry))
+		x = x + math.max(0, math.floor((areaw - chars*8)/2))
+	end
+
+	if customenemy then
 		local r, g, b, a = love.graphics.getColor()
 		love.graphics.setColor(255, 255, 255, 255)
 		love.graphics.draw(customenemyiconimg, x*scale, y*scale, 0, scale, scale)
 		love.graphics.setColor(r, g, b, a)
 	end
-	if type(entry) == "string" then
-		local length = utf8.len(entry)
-		if length and length ~= string.len(entry) then
-			--accents, cyrillic...: cut by character and print with the utf-8 printer
-			local stop = utf8.offset(entry, maxchars + 1)
-			if stop then
-				entry = entry:sub(1, stop - 1)
-			end
-			properprintF(entry, x*scale, y*scale)
-			return
-		end
-		entry = entry:sub(1, maxchars)
+	if utf then
+		properprintF(entry, x*scale, y*scale)
+	else
+		properprint(entry, x*scale, y*scale)
 	end
-	properprint(entry, x*scale, y*scale)
 end
 
 --a dropdown can colour its entries: dropdown.entrycolors = {[entry number] = {r, g, b}, ...}
@@ -788,7 +803,7 @@ function guielement:draw(a, offx, offy)
 				end
 
 				if self.displayentries then s = self.displayentries[var] end
-				drawdropdownentry(s, self.x+1, self.y+2, self.width)
+				drawdropdownentry(s, self.x+1, self.y+2, self.width, self.width*8) --in the middle of the part left of the divider
 			end
 		end
 
@@ -905,7 +920,7 @@ function guielement:draw(a, offx, offy)
 						love.graphics.setColor(127, 127, 127, 255*panelalpha)
 						local selected = self.entries[self.var]
 						if self.displayentries then selected = self.displayentries[self.var] end
-						drawdropdownentry(selected, self.x+1, -self.scroll+2, self.width)
+						drawdropdownentry(selected, self.x+1, -self.scroll+2, self.width, self.width*8)
 					end
 					love.graphics.setColor(255, 255, 255, 40*panelalpha)
 					love.graphics.rectangle("fill", (self.x+3)*scale, (headh-self.scroll-1)*scale, (fullw-6)*scale, math.max(1, scale*0.5))
@@ -944,7 +959,7 @@ function guielement:draw(a, offx, offy)
 								local r, g, b = love.graphics.getColor()
 								love.graphics.setColor(r, g, b, 255*oalpha*panelalpha)
 								if self.displayentries then s = self.displayentries[i] end
-								drawdropdownentry(s, cx, boxtop+1, self.width+1)
+								drawdropdownentry(s, cx, boxtop+1, self.width+1, cw)
 							end
 							love.graphics.pop()
 						end

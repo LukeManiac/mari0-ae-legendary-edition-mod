@@ -718,6 +718,14 @@ warpfadetexts = {
 	["returning to menu..."] = true,
 	["testing level..."] = true,
 	["returning to editor..."] = true,
+	["refreshing map data..."] = true,
+	["refreshing enemy data..."] = true,
+	["refreshing background data..."] = true,
+	["resetting animations cache..."] = true,
+	["updating graphics..."] = true,
+	["updating tiles..."] = true,
+	["updating backgrounds..."] = true,
+	["updating sounds..."] = true,
 	["saving game..."] = true
 }
 

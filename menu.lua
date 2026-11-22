@@ -1271,7 +1271,8 @@ local nitpickkeys = {
 	"backwardsmoothing",
 	"automaticenemyreload",
 	"automaticbackgroundreload",
-	"automaticmapreload"
+	"automaticmapreload",
+	"automaticanimationreload"
 }
 
 function generatenitpicksfile()
@@ -2354,6 +2355,7 @@ function menu_update(dt)
 
 	updatecustombackgrounds(dt)
 	options_updatepageanimation()
+	options_tabdropdown_update()
 	optionscontrols_update()
 	optionsmisc_update()
 	optionscheats_update()
@@ -2594,6 +2596,35 @@ end
 --whether a tab's widgets should exist: the open tab, and the tab sliding out while the menu switches tabs
 function options_tabshown(tab)
 	return optionstab == tab or (optionspageanimation ~= nil and optionspageanimation.from == tab)
+end
+
+--the tab picker: a dropdown at the top left of the options box, where the tab names used to be. It sits 4 pixels in from
+--the box's corner, where the controls tab's highlight was, and is 205 pixels wide (13 for the arrow, 24 characters).
+--Its name has no tab prefix, so it's never frozen by a tab slide
+local OPTIONS_TABNAMES = {"controls", "skins", "misc.", "cheat"}
+
+function options_tabdropdown_update()
+	local dropdown = guielements["optionstabdropdown"]
+	if gamestate ~= "options" then
+		if dropdown then
+			if dropdown.extended then
+				dropdown:close()
+			end
+			guielements["optionstabdropdown"] = nil
+		end
+		return
+	end
+	if not dropdown then
+		dropdown = guielement:new("dropdown", OPTIONS_BOX_X+4, OPTIONS_BOX_Y+4, (205-13)/8, function(i)
+			options_switchtab(i)
+			guielements["optionstabdropdown"].var = optionstab
+		end, optionstab, unpack(OPTIONS_TABNAMES))
+		guielements["optionstabdropdown"] = dropdown
+	end
+	dropdown.var = optionstab --keys switch tabs too: the new name slides into the header
+	dropdown.forcehover = (optionsselection == 1) --looks selected while the keyboard is on the tab row
+	dropdown.active = not (languagemenuopen or resetwarningopen)
+	dropdown.nohover = languagemenuopen or resetwarningopen
 end
 
 --switches to another tab, sliding the old one out and the new one in
@@ -4030,26 +4061,13 @@ function menu_draw()
 		love.graphics.setColor(0, 0, 0, 200)
 		love.graphics.rectangle("fill", 21*scale, 16*scale, 218*scale, 200*scale)
 
-		--Settings tab heads
-		local tabX = 26
-		local tabs = {"controls", "skins", "misc.", "cheat"}
-		for i = 1, #tabs do
-			local s = tabs[i]
-			if optionstab == i then
-				love.graphics.setColor(100, 100, 100, 100)
-				love.graphics.rectangle("fill", (tabX-1)*scale, 20*scale, (utf8.len(s)*8+3)*scale, 11*scale)
-			end
-			if optionstab == i and optionsselection == 1 then
-				love.graphics.setColor(255, 255, 255, 255)
-			else
-				love.graphics.setColor(100, 100, 100, 255)
-			end
-			properprint(s, tabX*scale, 22*scale)
-			tabX = tabX + utf8.len(s)*8+6
-		end
-		
 		--the open tab, or the two tabs sliding past each other
 		options_drawpages()
+
+		--Settings tab picker (see options_tabdropdown_update), drawn after the pages so its list opens over them
+		if guielements["optionstabdropdown"] then
+			guielements["optionstabdropdown"]:draw()
+		end
 		optionscontrols_drawresetnote()
 	end
 	resetwarning_draw()
@@ -4061,6 +4079,9 @@ function menu_draw()
 end
 
 function loadbackground(background)
+	--a new mappack: nothing kept from the last one is used
+	clearanimationcache()
+	clearmapparsecache()
 	loadanimatedtiles()
 	enemies_load()
 	loadcustomsprites()
@@ -4664,6 +4685,8 @@ function menu_keypressed(key, unicode)
 				playertype = "portal"
 				playertypei = 1
 				disablecheats()
+				clearanimationcache() --opened from the menu: the animations and parsed maps are read again too
+				clearmapparsecache()
 				loadeditormapcache()
 				game_load()
 			elseif selection == 3 then
@@ -4865,7 +4888,7 @@ function menu_keypressed(key, unicode)
 			dropdown:close()
 			return
 		end
-		if dropdown and optionstab == 2 then
+		if dropdown and (optionstab == 2 or dropdown == guielements["optionstabdropdown"]) then
 			--the other keys would change what's under the open list
 			return
 		end
@@ -4923,7 +4946,10 @@ function menu_keypressed(key, unicode)
 		end
 		
 		if (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
-			if optionstab == 1 then
+			local tabdropdown = guielements["optionstabdropdown"]
+			if optionsselection == 1 and tabdropdown and tabdropdown.active and not tabdropdown.extended then
+				tabdropdown:open(true) --the tab row: open the tab picker
+			elseif optionstab == 1 then
 				optionscontrols_activate(optionsselection)
 			elseif optionstab == 2 then
 				optionsskins_activate(optionsselection)

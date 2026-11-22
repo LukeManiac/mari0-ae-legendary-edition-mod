@@ -518,7 +518,10 @@ function editor_load(player_position) --{x, y, xscroll, yscroll}
 	end
 	guielements["animationnewbutton"] = guielement:new("button", 3, 20, "+", createnewanimation, nil)
 	guielements["animationsavebutton"] = guielement:new("button", 16, 20, TEXT["save"], saveanimation, nil)
-	guielements["animationdelbutton"] = guielement:new("button", guielements["animationsavebutton"].x+guielements["animationsavebutton"].width+5, 20, "x", removeanimation, nil)
+	--resets the animation cache: a spinning arrow drawn by the game, between save and x (see drawanimationcachearrow)
+	guielements["animationcachebutton"] = guielement:new("button", guielements["animationsavebutton"].x+guielements["animationsavebutton"].width+5, 20, "", resetanimationcache, nil, nil, nil, 8)
+	guielements["animationcachebutton"].drawcontent = drawanimationcachearrow
+	guielements["animationdelbutton"] = guielement:new("button", guielements["animationcachebutton"].x+guielements["animationcachebutton"].width+5, 20, "x", removeanimation, nil)
 	guielements["animationnameinput"] = guielement:new("input", 282, 20, 14, function() animationsaveas = guielements["animationnameinput"].value; guielements["animationnameinput"].inputting = false end, "", math.huge, nil, nil, 0)
 	guielements["animationselectdrop"] = guielement:new("dropdown", guielements["animationdelbutton"].x+guielements["animationdelbutton"].width+5, 20, 2, selectanimation, nil, unpack(args))
 	guielements["animationselectdrop"].width = math.min((guielements["animationnameinput"].x-guielements["animationselectdrop"].x-15)/8, getlongeststring(args))
@@ -3793,6 +3796,8 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 					v:draw()
 				end
 			end
+
+			drawanimationcachetooltip()
 		end
 		
 		local confirmprogress = editor_confirm_progress()
@@ -4494,15 +4499,151 @@ function animationstab()
 	guielements["tabcustom"].active = true
 	guielements["tabanimations"].active = true
 	
+	animationcachetooltip_reset()
 	guielements["animationsscrollbarver"].active = true
 	guielements["animationsscrollbarhor"].active = true
 	guielements["animationsavebutton"].active = true
+	guielements["animationcachebutton"].active = true
 	guielements["animationdelbutton"].active = true
 	guielements["animationselectdrop"].active = true
 	guielements["animationnewbutton"].active = true
 	guielements["animationnameinput"].active = true
 	
 	generateanimationgui()
+end
+
+--ANIMATION CACHE BUTTON
+--the arrow on the animations tab's reset button: three quarters of a circle with its head at the front, always
+--spinning counterclockwise. Drawn by the game instead of an image (drawcontent of the button, in game pixels)
+local ANIMATIONCACHE_SPINSPEED = math.pi*1.5 --radians a second
+function drawanimationcachearrow(self, x, y, alpha)
+	local cx, cy = (x+5.5)*scale, (y+5.5)*scale --the middle of the button's 11x11 box
+	local r = 3*scale
+	--angles grow clockwise on the screen, so counterclockwise is a falling angle
+	local front = -love.timer.getTime()*ANIMATIONCACHE_SPINSPEED
+	local back = front + math.pi*1.5
+
+	local c = self.textcolor
+	love.graphics.setColor(c[1], c[2], c[3], alpha or 255)
+	local oldwidth = love.graphics.getLineWidth()
+	love.graphics.setLineWidth(math.max(1, scale*0.75))
+	love.graphics.arc("line", "open", cx, cy, r, front, back, 16)
+	love.graphics.setLineWidth(oldwidth)
+
+	--the head, at the front end and pointing the way it spins
+	local hx, hy = cx + math.cos(front)*r, cy + math.sin(front)*r
+	local tx, ty = math.sin(front), -math.cos(front) --along the circle, counterclockwise
+	local nx, ny = math.cos(front), math.sin(front) --away from the middle
+	local s = 1.8*scale
+	love.graphics.polygon("fill",
+		hx + tx*s, hy + ty*s,
+		hx + nx*s - tx*s*0.4, hy + ny*s - ty*s*0.4,
+		hx - nx*s - tx*s*0.4, hy - ny*s - ty*s*0.4)
+end
+
+--its tooltip: shows under the button once it's been hovered for a second, as a glass box that pops in and out with
+--a jelly like a dropdown list
+local ANIMATIONCACHE_TOOLTIPDELAY = 1
+local ANIMATIONCACHE_TOOLTIPCLOSE = 0.2
+local animationcachetooltip = {}
+
+function animationcachetooltip_reset()
+	animationcachetooltip = {}
+end
+
+function drawanimationcachetooltip()
+	local button = guielements["animationcachebutton"]
+	if not button then
+		return
+	end
+	local tip = animationcachetooltip
+	local now = love.timer.getTime()
+
+	if button.active and button:hovered() then
+		tip.hoverat = tip.hoverat or now
+		if not tip.openat and now - tip.hoverat >= ANIMATIONCACHE_TOOLTIPDELAY then
+			tip.openat = now
+			tip.closeat = nil
+		end
+	else
+		tip.hoverat = nil
+		if tip.openat then
+			tip.openat = nil
+			tip.closeat = now
+		end
+	end
+
+	local sy, alpha
+	if tip.openat then
+		local t = now - tip.openat
+		sy = guiglass.jellyin(t*1.15)
+		alpha = math.min(1, t*12)
+	elseif tip.closeat then
+		local u = (now - tip.closeat)/ANIMATIONCACHE_TOOLTIPCLOSE
+		if u >= 1 then
+			tip.closeat = nil
+			return
+		end
+		sy = guiglass.jellyout(u)
+		alpha = math.max(0, math.min(1, sy*3))
+	else
+		return
+	end
+	if sy <= 0.01 then
+		return
+	end
+	local sx = guiglass.jellywidth(sy, 0.25)
+
+	local lines = tostring(TEXT["Press this button to\nreset animations cache"]):split("\n")
+	local longest = 0
+	for _, line in ipairs(lines) do
+		longest = math.max(longest, utf8.len(line))
+	end
+	local w, h = longest*8+6, #lines*10+3
+	local middle = button.x + (3+button.width)/2
+	local x = math.max(2, math.min(width*16-w-2, middle-w/2))
+	local y = button.y + 11 + 3
+
+	--grows out of its top edge, under the button
+	love.graphics.push()
+	love.graphics.translate(middle*scale, y*scale)
+	love.graphics.scale(sx, sy)
+	love.graphics.translate(-middle*scale, -y*scale)
+
+	guiglass.box(x*scale, y*scale, w*scale, h*scale, math.min(w, h)*0.3*scale, alpha)
+	love.graphics.setColor(255, 255, 255, 255*alpha)
+	for i, line in ipairs(lines) do
+		local lx = x + 3 + (longest - utf8.len(line))*4 --each line in the middle
+		properprintF(line, lx*scale, (y+2+(i-1)*10)*scale)
+	end
+
+	love.graphics.pop()
+end
+
+--what the animations tab's arrow button runs: lets go of the cached animations and reads them all again
+--(unsaved changes to the open animation are dropped, so changes made to its file outside the game show up)
+function resetanimationcache()
+	renderoverlay("resetting animations cache...")
+	local selected = animations[currentanimation] and animations[currentanimation].filepath
+	clearanimationcache()
+	animationsystem_load()
+
+	currentanimation = 1
+	for i, v in ipairs(animations) do
+		if v.filepath == selected then
+			currentanimation = i
+			break
+		end
+	end
+	generateanimationgui() --makes a new animation if there aren't any
+	updateanimationdropdown()
+	guielements["animationselectdrop"].var = currentanimation
+	guielements["animationselectdrop"].active = (editorstate == "animations")
+	guielements["animationnameinput"].value = string.sub(animations[currentanimation].name, 1, -6)
+	guielements["animationnameinput"]:updatePos()
+	animationsaveas = false
+	collectgarbage()
+	notice.new("Reset animations cache", nil, 2)
 end
 
 function fromanimationstab()
@@ -4659,6 +4800,7 @@ function createnewanimation(name,dont_generate_gui)
 
 	love.filesystem.createDirectory(mappackfolder .. "/" .. mappack .. "/animations/")
 	love.filesystem.write(mappackfolder .. "/" .. mappack .. "/animations/" .. name .. ".json", JSON:encode_pretty(s))
+	animationcache_changed(mappackfolder .. "/" .. mappack .. "/animations/" .. name .. ".json")
 	
 	table.insert(animations, animation:new(mappackfolder .. "/" .. mappack .. "/animations/" .. name .. ".json", name .. ".json"))
 	
@@ -4768,6 +4910,8 @@ function saveanimation()
 	if animationsaveas then
 		love.filesystem.write(mappackfolder .. "/" .. mappack .. "/animations/" .. animationsaveas .. ".json", json)
 		love.filesystem.remove(animations[currentanimation].filepath)
+		animationcache_changed(animations[currentanimation].filepath)
+		animationcache_changed(mappackfolder .. "/" .. mappack .. "/animations/" .. animationsaveas .. ".json")
 		table.remove(animations, currentanimation)
 		table.insert(animations, animation:new(mappackfolder .. "/" .. mappack .. "/animations/" .. animationsaveas .. ".json", animationsaveas .. ".json"))
 		updateanimationdropdown()
@@ -4776,6 +4920,7 @@ function saveanimation()
 		animationsaveas = false
 	else
 		love.filesystem.write(animations[currentanimation].filepath, json)
+		animationcache_changed(animations[currentanimation].filepath, true)
 	end
 	animationsaveas = false
 end
@@ -4790,6 +4935,7 @@ function removeanimation()
 		return false
 	end
 	love.filesystem.remove(animations[i or currentanimation].filepath)
+	animationcache_changed(animations[i or currentanimation].filepath)
 	table.remove(animations, currentanimation)
 	if #animations <= 0 then
 		createnewanimation()
@@ -8266,6 +8412,7 @@ end
 --decodes the custom backgrounds and foregrounds again, for changes made to their pictures while the editor is open
 --(loading a map in the editor reuses the pictures it already has, see loadbackgroundimage in mappack.lua)
 function refreshcustombackgrounds()
+	renderoverlay("refreshing background data...")
 	clearbackgroundcache()
 	loadcustombackgrounds() --pictures added since, for the background lists
 	if custombackground then
@@ -8280,6 +8427,7 @@ end
 --loads the custom enemies again, for changes made to their files while the editor is open
 --(loading a map in the editor doesn't do this anymore, see enemies_loadkey)
 function refreshcustomenemies()
+	renderoverlay("refreshing enemy data...")
 	local oldscrollbarheight = tilescrollbarheight
 	enemies_load()
 	if editentities then
@@ -8394,7 +8542,17 @@ function opencustomimagefolder(f)
 		openfile(mappackfolder .. "/" .. mappack .. "/enemies")
 	end
 end
+--the overlay shown while a custom tab's "update image" or "update sounds" runs (it fades to black first, see warpfadetexts)
+local customupdateoverlays = {
+	graphics = "updating graphics...",
+	tiles = "updating tiles...",
+	backgrounds = "updating backgrounds...",
+	sounds = "updating sounds...",
+}
 function savecustomimage()
+	if customupdateoverlays[customtabstate] then
+		renderoverlay(customupdateoverlays[customtabstate])
+	end
 	if customtabstate == "graphics" then
 		loadcustomsprites()
 		for i = 1, #smbspritebatch do
@@ -8404,6 +8562,7 @@ function savecustomimage()
 		collectgarbage()
 		notice.new("Updated sprites", nil, 2)
 	elseif customtabstate == "tiles" then
+		clearmapparsecache() --maps are parsed against the tiles, so they're parsed again on their next load
 		if love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/tiles.png") then
 			--remove custom sprites
 			for i = smbtilecount+portaltilecount+1, #tilequads do
@@ -9269,6 +9428,7 @@ end
 
 --what the maps tab's "refresh data" runs
 function refresheditormaps()
+	renderoverlay("refreshing map data...") --fades to black first (see warpfadetexts), and fades back in on the next update
 	if not editormapcache then
 		loadeditormapcache()
 	end
