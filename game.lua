@@ -3320,7 +3320,12 @@ function game_draw()
 				love.graphics.setColor(255, 255, 255, 255)
 				properprint(">", (width*8*scale)-145*scale, (112*scale)-60*scale+(i-1)*25*scale)
 			end
-			if (dcplaying or minigameplaying) and pausemenuoptions[i] == "save game" then --restart instead of suspend
+			if testlevel and not editormode and pausemenuoptions[i] == "save game" then --testing a course: stop testing instead of saving
+				local lines = pausemenu_wraplabel(TEXT["stop testing level"], 16)
+				for l = 1, #lines do
+					properprintF(lines[l], (width*8*scale)-135*scale, (112*scale)-60*scale+(i-1)*25*scale+(l-1)*10*scale)
+				end
+			elseif (dcplaying or minigameplaying) and pausemenuoptions[i] == "save game" then --restart instead of suspend
 				properprintF(TEXT["restart"], (width*8*scale)-135*scale, (112*scale)-60*scale+(i-1)*25*scale)
 			elseif alwaysdeletesuspend and pausemenuoptions[i] == "save game" then
 				properprintF(TEXT["suspend"], (width*8*scale)-135*scale, (112*scale)-60*scale+(i-1)*25*scale)
@@ -5796,8 +5801,8 @@ function game_keypressed(key, textinput)
 						levelscreen_load("dc")
 						updatesizes("reset")
 					elseif testlevel and not editormode then
-						--a course being tested isn't a save: it would load as normal play
-						notice.new("cannot save while testing!", notice.red, 2)
+						--testing a course: this is "stop testing level", straight back to the Course Maker without a prompt
+						stoptestingbutton_click()
 					else
 						suspendprompt = true
 						pausemenuselected2 = 1
@@ -6057,6 +6062,25 @@ function game_keypressed(key, textinput)
 	end
 end
 
+function pausemenu_wraplabel(text, maxchars)
+	local lines = {}
+	local line = ""
+	for word in tostring(text):gmatch("%S+") do
+		if line == "" then
+			line = word
+		elseif utf8.len(line) + 1 + utf8.len(word) <= maxchars then
+			line = line .. " " .. word
+		else
+			table.insert(lines, line)
+			line = word
+		end
+	end
+	if line ~= "" or #lines == 0 then
+		table.insert(lines, line)
+	end
+	return lines
+end
+
 function pausegame(playpause)
 	if playpause == nil then playpause = true end
 
@@ -6106,15 +6130,23 @@ function stoptestingbutton_click()
 	if not testlevel or editormode then
 		return
 	end
-	--leave the pause menu behind: the editor starts unpaused
-	if pausemenuopen or pausemenuopentimer > 0 then
+	--the pause menu closes, but stays on screen (like the button) while the screen fades out: nothing updates
+	--until the Course Maker has loaded
+	local paused = pausemenuopen or pausemenuopentimer > 0
+	if paused then
 		pausemenuopen = false
-		pausemenuopentimer = 0
 		pausedaudio = nil
 		menuprompt, desktopprompt, suspendprompt, highscoreprompt = false, false, false, false
 	end
-	stoptestingbuttonalpha = 0
 	stoptestinglevel()
+	--the transition is over and the Course Maker is up: it starts unpaused, and the button lets go
+	if paused then
+		pausemenuopentimer = 0
+	end
+	if stoptestingbutton then
+		guiglass.release(stoptestingbutton)
+	end
+	stoptestingbuttonalpha = 0
 end
 
 --builds the button (again when the language changes) and keeps it centred at the bottom
@@ -6164,7 +6196,9 @@ function stoptestingbutton_mousepressed(x, y, button)
 	local b = stoptestingbutton_get()
 	b.active = true
 	if b:inhighlight(x, y) then
-		b:click(x, y, button)
+		--squash it now: the click runs the whole transition back to the Course Maker before it returns
+		guiglass.press(b)
+		b.func()
 		return true
 	end
 	return false
