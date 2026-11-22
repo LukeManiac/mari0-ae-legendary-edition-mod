@@ -1790,14 +1790,14 @@ local function skins_drawcolorableentry(self, i, x, y, w, h, highlighted, header
 	properprintF(s, (x+10)*scale, (y+1)*scale)
 end
 
---a slider's track painted by stepcolor(t) along it (t from 0 to 1), inside the usual dark frame
-local function skins_drawgradienttrack(x, y, w, h, r, stepcolor)
-	love.graphics.setColor(0, 0, 0)
-	love.graphics.rectangle("fill", x, y, w, h, r)
-	local steps = math.max(1, math.floor(w/scale)-2)
+--a slider's track painted by stepcolor(t) along it (t from 0 to 1), a game pixel wide each step. It fills the whole
+--box it's given: the slider draws the glass around it and cuts it to the glass's rounded shape (see drawtrack in gui.lua)
+local function skins_drawgradienttrack(x, y, w, h, r, alpha, stepcolor)
+	local steps = math.max(1, math.ceil(w/scale))
 	for i = 0, steps-1 do
-		love.graphics.setColor(stepcolor(i/math.max(1, steps-1)))
-		love.graphics.rectangle("fill", x+(1+i)*scale, y+scale, scale, h-2*scale)
+		local c = stepcolor(i/math.max(1, steps-1))
+		love.graphics.setColor(c[1], c[2], c[3], alpha or 255)
+		love.graphics.rectangle("fill", x+i*scale, y, math.min(scale, w-i*scale), h)
 	end
 end
 
@@ -1831,9 +1831,9 @@ local function skins_rgbslider(channel, y)
 		saveconfig()
 	end
 	--the track shows what the colour would be along it, with the other two channels as their sliders show them (gliding too)
-	slider.drawtrack = function(self, x, y, w, h, r)
+	slider.drawtrack = function(self, x, y, w, h, r, alpha)
 		local color = skins_shownrgb() or {0, 0, 0}
-		skins_drawgradienttrack(x, y, w, h, r, function(t)
+		skins_drawgradienttrack(x, y, w, h, r, alpha, function(t)
 			local c = {color[1], color[2], color[3]}
 			c[channel] = t*255
 			return c
@@ -1853,11 +1853,10 @@ local function skins_portalslider(portal, y)
 	slider.releasefunc = function(self, v)
 		saveconfig()
 	end
-	slider.drawtrack = function(self, x, y, w, h, r)
-		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", x, y, w, h, r)
-		love.graphics.setColor(255, 255, 255)
-		love.graphics.draw(huebarimg, x+scale, y+scale, 0, (w-2*scale)/huebarimg:getWidth(), (h-2*scale)/huebarimg:getHeight())
+	--the hue bar fills the glass track (see drawtrack in gui.lua)
+	slider.drawtrack = function(self, x, y, w, h, r, alpha)
+		love.graphics.setColor(255, 255, 255, alpha or 255)
+		love.graphics.draw(huebarimg, x, y, 0, w/huebarimg:getWidth(), h/huebarimg:getHeight())
 	end
 	return slider
 end

@@ -1367,15 +1367,14 @@ local function fr_slider(c, y)
 	local slider = newslider(36, y, 280, 0, 255, 1, fr.color[c])
 	slider.backgroundcolor = {0, 0, 0}
 	--the track shows what the colour would be along it, with the other two channels as they are, like the skins tab's sliders
-	slider.drawtrack = function(self, x, y, w, h, r)
-		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", x, y, w, h, r)
-		local steps = math.max(1, math.floor(w/scale)-2)
-		local color = {fr.color[1], fr.color[2], fr.color[3]}
+	--(it fills the box it's given: the slider draws the glass around it, see drawtrack in gui.lua)
+	slider.drawtrack = function(self, x, y, w, h, r, alpha)
+		local steps = math.max(1, math.ceil(w/scale))
+		local color = {fr.color[1], fr.color[2], fr.color[3], alpha or 255}
 		for i = 0, steps-1 do
 			color[c] = i/math.max(1, steps-1)*255
 			love.graphics.setColor(color)
-			love.graphics.rectangle("fill", x+(1+i)*scale, y+scale, scale, h-2*scale)
+			love.graphics.rectangle("fill", x+i*scale, y, math.min(scale, w-i*scale), h)
 		end
 	end
 	return slider

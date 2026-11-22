@@ -1157,11 +1157,19 @@ function guielement:draw(a, offx, offy)
 		else
 			local tw, th = (self.xrange+self.width)*scale, self.height*scale
 			local tr = self:sliderradius() --the track is rounded like its handle
+			--the track is always the same liquid glass as a plain slider's
+			local glassr = math.min(tw, th)*handleround
+			guiglass.panel(self.x*scale, self.y*scale, tw, th, glassr, {tint = self.backgroundcolor, tintstrength = 0.25, rimstrength = 0.25, shadow = false, base = true})
 			if self.drawtrack then
-				--a slider can paint its own track (a colour gradient, say): drawtrack(self, x, y, w, h, radius) in screen pixels
-				self:drawtrack(self.x*scale, self.y*scale, tw, th, tr)
-			else
-				guiglass.panel(self.x*scale, self.y*scale, tw, th, math.min(tw, th)*handleround, {tint = self.backgroundcolor, tintstrength = 0.25, rimstrength = 0.25, shadow = false, base = true})
+				local inset = scale
+				local ix, iy, iw, ih = self.x*scale+inset, self.y*scale+inset, tw-2*inset, th-2*inset
+				local ir = math.max(0, glassr-inset)
+				if iw > 0 and ih > 0 then
+					guiglass.beginround(ix, iy, iw, ih, ir)
+					self:drawtrack(ix, iy, iw, ih, ir, SLIDER_TRACKPAINTALPHA)
+					guiglass.endround()
+				end
+				guiglass.panel(self.x*scale, self.y*scale, tw, th, glassr, {nobackdrop = true, shadow = false, tint = {255, 255, 255}, glassalpha = 0.06, rimstrength = 0.45})
 			end
 
 			self:setsliderbordercolor(self.dragging or high or self.inputting or (self.forcehover and not self.nohover))
