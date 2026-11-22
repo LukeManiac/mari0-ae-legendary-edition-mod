@@ -1141,7 +1141,21 @@ local function updatepage(page, active, selected, dt)
 		local name = pagename(page, key)
 		local el = guielements[name] or createwidget(page, key, row)
 		el.x = row.wx
-		el.y = vp.y + row.wy - page.scroll
+		if item.kind == "dropdown" and el.multiy and (el.extended or el:getlistprogress() > 0) then
+			--an open list that didn't fit under its header opened upwards: it stays where it opened
+		else
+			el.y = vp.y + row.wy - page.scroll
+		end
+		--a dropdown puts itself back where it was made every frame (multiy, for lists that open upwards when they don't
+		--fit under the header), so that has to follow the scrolled spot, like the minigame settings' dropdowns
+		if item.kind == "dropdown" and not el.extended and el:getlistprogress() == 0 and not el.cutoff then
+			local listbottom = el.y + 10*(#el.entries + 1)
+			if listbottom > height*16 then
+				el.multiy = {el.y, height*16 - 10*(#el.entries + 1)}
+			else
+				el.multiy = false
+			end
+		end
 		--only usable while all of it is in view
 		local inview = row.wy - page.scroll >= -0.5 and row.wy + row.wh - page.scroll <= vp.h + 0.5
 		el.active = active and inview
