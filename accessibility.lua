@@ -42,8 +42,8 @@ local ITEMS = {
 	generousstomps = {kind = "checkbox", label = "generous stomps"},
 	infinitelives = {kind = "checkbox", label = "infinite lives"},
 	infinitetime = {kind = "checkbox", label = "infinite time"},
-	skipcourse = {kind = "dropdown", label = "skip course", entries = {"off", "5", "10"},
-		display = {"skip off", "after 5 deaths", "after 10 deaths"}},
+	skipdeaths = {kind = "number", label = "skip course after", suffix = "deaths", min = 5, max = 100, step = 1},
+	skipnever = {kind = "checkbox", label = "never skip automatically"},
 	togglerun = {kind = "checkbox", label = "toggle run"},
 	holdtoswim = {kind = "checkbox", label = "hold to swim"},
 	holdtofire = {kind = "checkbox", label = "hold to fire"},
@@ -56,7 +56,7 @@ local CATEGORIES = {
 		"reduceflashing", "playerindicator", "aimline", "lowtimewarning"}},
 	{label = "gameplay:", items = {"gamespeed", "halfopaqueblink"}},
 	{label = "assists:", items = {"jumpbuffer", "coyotetime", "pitrescue", "respawnwheredied", "generousstomps",
-		"infinitelives", "infinitetime", "skipcourse"}},
+		"infinitelives", "infinitetime", "skipdeaths", "skipnever"}},
 	{label = "controls:", items = {"togglerun", "holdtoswim", "holdtofire"}},
 	{label = "notices:", items = {"clicknotices"}},
 }
@@ -85,7 +85,8 @@ local DEFAULTS = {
 	generousstomps = false,
 	infinitelives = nil, --nil until the nitpicks are read: it starts as the alwaysinfinitelives nitpick
 	infinitetime = nil, --nil until the nitpicks are read: it starts as the alwaysinfinitetime nitpick
-	skipcourse = "off",
+	skipdeaths = 10, --skip course after this many deaths (5 to 100)
+	skipnever = true, --true: the pause menu offers to skip; false: the course is skipped by itself
 	togglerun = false,
 	holdtoswim = false,
 	holdtofire = false,
@@ -191,7 +192,7 @@ function accessibility_loadconfigvalue(name, value)
 	end
 	if item.kind == "checkbox" then
 		accessibility[key] = (value == "true")
-	elseif item.kind == "slider" then
+	elseif item.kind == "slider" or item.kind == "number" then
 		accessibility[key] = snap(item, value)
 	elseif item.kind == "dropdown" and validentry(item, value) then
 		accessibility[key] = value
@@ -206,7 +207,7 @@ function accessibility_set(key, value, nosave)
 	if not item then
 		return
 	end
-	if item.kind == "slider" then
+	if item.kind == "slider" or item.kind == "number" then
 		value = snap(item, value)
 	elseif item.kind == "checkbox" then
 		if value then
@@ -556,27 +557,50 @@ function accessibility_countdeath()
 	coursedeaths.count = coursedeaths.count + 1
 end
 
---whether the pause menu offers to skip this course
+--whether this course can be skipped: everyone has died on it at least as many times as skip course after ... deaths says
 function accessibility_canskip()
-	local limit = tonumber(accessibility.skipcourse)
-	if not limit or gamestate ~= "game" or editormode or testlevel or minigameplaying or dcplaying or SERVER or CLIENT then
+	if editormode or testlevel or minigameplaying or dcplaying or SERVER or CLIENT then
 		return false
 	end
-	return coursedeaths.key == coursekey() and coursedeaths.count >= limit
+	return coursedeaths.key == coursekey() and coursedeaths.count >= accessibility.skipdeaths
+end
+
+local function skiptonext()
+	coursedeaths.key, coursedeaths.count = nil, 0
+	accessibilityrespawn = nil
+	mariosublevel = 0
+	prevsublevel = false
+	nextlevel()
 end
 
 --skips to the next course, from the pause menu
 function accessibility_skipcourse()
-	if not accessibility_canskip() then
+	if gamestate ~= "game" or not accessibility_canskip() then
 		return
 	end
-	coursedeaths.key, coursedeaths.count = nil, 0
-	accessibilityrespawn = nil
 	pausemenuopen = false
 	pausedaudio = nil
-	mariosublevel = 0
-	prevsublevel = false
-	nextlevel()
+	skiptonext()
+end
+
+--everyone died (after accessibility_countdeath): with never skip automatically unticked, the course is skipped by itself
+--once there have been enough deaths, unless that was the last life. Returns true when it skipped
+function accessibility_autoskip()
+	if accessibility.skipnever or not accessibility_canskip() then
+		return false
+	end
+	local livesleft = infinitelives or mariolivecount == false
+	for i = 1, players do
+		if mariolives[i] and mariolives[i] > 0 then
+			livesleft = true
+		end
+	end
+	if not livesleft then
+		return false --game over, as usual
+	end
+	notice.new("skipped the course after " .. coursedeaths.count .. " deaths", nil, 4)
+	skiptonext()
+	return true
 end
 
 ------------------------------------------------------------
@@ -917,9 +941,13 @@ local function dropdownchars(item)
 	return chars
 end
 
+local NUMBER_CHARS = 3 --a number input is 3 characters wide (5 to 100)
+
 local function widgetsize(item)
 	if item.kind == "checkbox" then
 		return 9, 9
+	elseif item.kind == "number" then
+		return 3 + NUMBER_CHARS*8 + 2, 13
 	elseif item.kind == "slider" then
 		return SLIDER_W, 9
 	end
@@ -952,7 +980,16 @@ local function buildlayout(columns, catcolumns)
 					if ii == 1 then
 						row.top = headery --scrolling to the first item shows its category too
 					end
-					if textw(label) <= avail then
+					if item.kind == "number" then
+						--"<label>" on its own line(s), then "[number] <suffix>" under it
+						row.lines = wraptext(label, math.floor((col.w - INDENT)/8))
+						row.wx, row.ww, row.wh = col.x + INDENT, ww, wh
+						row.labely, row.wy = y + 1, y + #row.lines*10
+						row.suffix = T(item.suffix)
+						row.suffixx = row.wx + ww + 4
+						row.suffixy = row.wy + 3
+						row.h = #row.lines*10 + wh + 2
+					elseif textw(label) <= avail then
 						--label and widget on one line
 						row.lines = {label}
 						row.wx, row.ww, row.wh = col.x + col.w - ww, ww, wh
@@ -1032,6 +1069,21 @@ local function createwidget(page, key, row)
 			end
 		end, start, unpack(item.entries))
 		el.displayentries = entrytexts(item)
+	elseif item.kind == "number" then
+		--a number input like the editor's colour inputs: type a number (Enter sets it), or drag it left and right
+		el = guielement:new("input", row.wx, row.wy, NUMBER_CHARS, function(self)
+			local n = tonumber(self.value)
+			if n then
+				accessibility_set(key, n, self.numdragging) --(dragging: saved when it's let go, see updatepage)
+			elseif not self.numdragging then
+				notice.new("that has to be a number!", notice.red, 3)
+			end
+			self.value = tostring(accessibility[key])
+			if not self.numdragging then
+				self.inputting = false
+			end
+		end, tostring(accessibility[key]), NUMBER_CHARS + 1) --(one more than shows, so a selected 3 digit number can be typed over)
+		el.numdrag = {item.min, item.max}
 	else
 		el = guielement:new("scrollbar", row.wx, row.wy, row.ww, 33, 9, slidervalue(item, accessibility[key]), "hor")
 		el.backgroundcolor = {0, 0, 0}
@@ -1163,6 +1215,20 @@ local function updatepage(page, active, selected, dt)
 		el.forcehover = active and selected == key
 		if item.kind == "checkbox" then
 			el.var = accessibility[key]
+		elseif item.kind == "number" then
+			if el.numdragging then
+				el.a11ydragged = true
+			elseif el.a11ydragged then
+				el.a11ydragged = nil
+				accessibility_set(key, tonumber(el.value) or accessibility[key]) --let go after dragging: save it
+			end
+			if not (el.inputting or el.numdragging) then
+				el.value = tostring(accessibility[key])
+			end
+			if not el.active and el.inputting then
+				el.inputting = false
+				typingintextinput = false
+			end
 		elseif item.kind == "dropdown" then
 			if not el.extended then
 				for i, entry in ipairs(item.entries) do
@@ -1210,6 +1276,9 @@ local function drawpage(page, selected, offx, offy)
 		end
 		for i, line in ipairs(row.lines) do
 			properprintF(line, row.labelx*scale, (top + row.labely + (i-1)*10)*scale)
+		end
+		if row.suffix then
+			properprintF(row.suffix, row.suffixx*scale, (top + row.suffixy)*scale)
 		end
 	end
 	--widgets: open lists are drawn later, on top of everything (guielement.drawopendropdowns)
@@ -1259,6 +1328,16 @@ local function activate(page, key)
 		if el and el.active and not el.extended then
 			el:open(true)
 		end
+	elseif item.kind == "number" then
+		--start typing, with the whole number selected so typing replaces it
+		local el = guielements[pagename(page, key)]
+		if el and el.active then
+			el.inputting = true
+			typingintextinput = true
+			el.highlight = 1
+			el.cursorpos = string.len(tostring(el.value)) + 1
+			el.textoffset = 0
+		end
 	end
 end
 
@@ -1270,7 +1349,7 @@ local function adjust(key, dir)
 	end
 	if item.kind == "checkbox" then
 		accessibility_set(key, not accessibility[key])
-	elseif item.kind == "slider" then
+	elseif item.kind == "slider" or item.kind == "number" then
 		accessibility_set(key, accessibility[key] + dir*item.step)
 	else
 		local index = 1

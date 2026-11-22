@@ -1809,7 +1809,9 @@ function mario:update(dt)
 				if accessibility_respawnsublevel() ~= nil then
 					sub = accessibility_respawnsublevel()
 				end
-				if testlevel and not editormode then
+				if accessibility_autoskip() then
+					--skip course after ... deaths, with never skip automatically unticked: on to the next course instead
+				elseif testlevel and not editormode then
 					stoptestinglevel()
 				else
 					--fade to black when everyone is dead
