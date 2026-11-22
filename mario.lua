@@ -1602,19 +1602,16 @@ function mario:update(dt)
 		
 		if subtractscore == true and mariotime >= 0 then
 			subtracttimer = subtracttimer + dt
-			while subtracttimer > scoresubtractspeed do
-				subtracttimer = subtracttimer - scoresubtractspeed
-				if mariotime > 0 then
-					mariotime = math.ceil(mariotime - 1)
-					marioscore = marioscore + 50
-				end
-				
-				if mariotime <= 0 then
-					subtractscore = false
-					scoreringsound:stop()
-					castleflagmove = true
-					mariotime = 0
-				end
+			if mariotime > 0 then
+				mariotime = math.ceil(mariotime - 1)
+				marioscore = marioscore + 50
+			end
+			
+			if mariotime <= 0 then
+				subtractscore = false
+				scoreringsound:stop()
+				castleflagmove = true
+				mariotime = 0
 			end
 		end
 		
