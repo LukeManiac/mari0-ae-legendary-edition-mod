@@ -549,6 +549,13 @@ function love.load()
 	--nitpicks
 	loadnitpicks()
 	accessibility_afternitpicks() --smooth camera starts as the camerasmoothing nitpick
+
+	--the settings came from legendary edition's backup (Mari0 AE saved options.txt last): put them back in options.txt
+	if optionsbackuprestored then
+		optionsbackuprestored = false
+		saveconfig()
+		notice.new("mari0 ae changed your settings.\nrestored them from the\nlegendary edition backup!", notice.white, 6)
+	end
 	--leave overlay timers at 0 so enabled nitpicks (showfps/showbattery/showtime/showplayercoords)
 	--still play their entrance animation on launch instead of snapping in fully visible
 
@@ -1666,7 +1673,43 @@ function saveconfig()
 	if localnick then
 		s = s .. "localnick:" .. localnick .. ";"
 	end
+	--marked as saved by legendary edition, with the same copy in the backup (see readoptionsfile)
+	s = OPTIONS_LE_MARKER .. s
 	love.filesystem.write("alesans_entities/options.txt", s)
+	love.filesystem.write(OPTIONS_LE_BACKUP, s)
+end
+
+--SETTINGS BACKUP
+--Mari0 AE and legendary edition share options.txt, and Mari0 AE saving it drops everything it doesn't know (the extra
+--keybind pages, the accessibility settings...). So legendary edition starts the file with a marker, and writes the
+--same file to a backup Mari0 AE never touches. If options.txt doesn't start with the marker (Mari0 AE saved it last)
+--and the backup does (legendary edition saved it), the backup is read instead.
+OPTIONS_LE_MARKER = "savedby:mari0_le;"
+OPTIONS_LE_BACKUP = "alesans_entities/options_le_backup.txt"
+optionsbackuprestored = false --true once the settings came from the backup, until love.load says so and saves
+
+local function savedbylegendary(s)
+	return type(s) == "string" and s:sub(1, #OPTIONS_LE_MARKER) == OPTIONS_LE_MARKER
+end
+
+--what loadconfig reads: options.txt, or the backup when Mari0 AE saved options.txt last. nil when there's neither
+function readoptionsfile()
+	local s
+	if love.filesystem.getInfo("alesans_entities/options.txt") then
+		s = love.filesystem.read("alesans_entities/options.txt")
+	elseif love.filesystem.getInfo("options.txt") then
+		s = love.filesystem.read("options.txt")
+	else
+		return nil
+	end
+	if s and not savedbylegendary(s) and love.filesystem.getInfo(OPTIONS_LE_BACKUP) then
+		local backup = love.filesystem.read(OPTIONS_LE_BACKUP)
+		if savedbylegendary(backup) then
+			optionsbackuprestored = true
+			return backup
+		end
+	end
+	return s
 end
 
 function loadconfig(nodefaultconfig)
@@ -1675,12 +1718,8 @@ function loadconfig(nodefaultconfig)
 		defaultconfig()
 	end
 	
-	local s
-	if love.filesystem.getInfo("alesans_entities/options.txt") then
-		s = love.filesystem.read("alesans_entities/options.txt")
-	elseif love.filesystem.getInfo("options.txt") then
-		s = love.filesystem.read("options.txt")
-	else
+	local s = readoptionsfile() --(or legendary edition's backup of it, see readoptionsfile)
+	if not s then
 		return
 	end
 	

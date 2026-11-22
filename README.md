@@ -299,7 +299,7 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 * Removed the annoying `"pipe not found"` spam that could repeatedly appear during character debugging.
 * The dropdown arrow and the checkbox are now drawn with LÖVE's native graphics instead of image files.
 
-**Note:** The four-keybind system remains compatible with original Mari0 AE save data and does not negatively affect it. Running Mari0 AE may remove the secondary, tertiary, and quaternary keybinds from your save data so make sure to backup your data.
+**Note:** The four-keybind system remains compatible with original Mari0 AE save data and does not negatively affect it. Running Mari0 AE may remove the secondary, tertiary, and quaternary keybinds from your save data so make sure to backup your data. Since v1.4, Legendary Edition keeps a backup of its own settings and puts them back after Mari0 AE (see **Settings Backup** under v1.4).
 
 **Mod Production Note:** These changes were made with Claude, Grok, and GitHub Copilot.
 
@@ -601,6 +601,21 @@ The right side of the pause menu now has more of the misc. tab's settings. From 
 
 Every change saves the game straight away, like in options. The row selected with the keyboard looks hovered. The left side of the pause menu hasn't changed.
 
+#### 💾 Settings Backup
+
+Mari0 AE and Legendary Edition share `alesans_entities/options.txt`. When Mari0 AE saves it, everything it doesn't know is lost: the second, third and fourth keybind pages, the accessibility settings and the other Legendary Edition settings. Legendary Edition now keeps a backup that Mari0 AE never touches.
+
+* Every time Legendary Edition saves `options.txt`, it starts the file with `savedby:mari0_le;`, and writes the same file to `alesans_entities/options_le_backup.txt`. Mari0 AE ignores the marker when it reads the file, and leaves it out when it saves.
+* When the game starts, the backup is only used if both of these are true:
+  * `options.txt` doesn't start with the marker, so Mari0 AE saved it last.
+  * The backup does start with it, so Legendary Edition saved it.
+* Then the settings are read from the backup instead, a notice says "mari0 ae changed your settings. restored them from the legendary edition backup!", and `options.txt` is saved again straight away, with the marker.
+* If Legendary Edition saved `options.txt` last, the backup isn't used, even if it's different.
+* Coming from Mari0 AE for the first time, there's no backup yet, so `options.txt` is read as it is. Legendary Edition then marks it and makes the backup.
+* Settings changed in Mari0 AE after that aren't carried over: the backup's settings are used instead.
+
+For anyone working with the settings code: `readoptionsfile()` is what `loadconfig` reads, `OPTIONS_LE_MARKER` is the marker and `OPTIONS_LE_BACKUP` is the backup's path.
+
 #### ♿ Accessibility
 
 A new **accessibility** tab in the options menu, after **cheat** in the tab picker, and the same settings on a new page of the pause menu. Both list them in categories, with each setting's label indented under its category and its widget at the end of the line:
@@ -616,7 +631,7 @@ display:
     ...
 ```
 
-A label too long for its line wraps beside a checkbox. A slider or dropdown that doesn't fit next to its label goes on the line under it. If a page is taller than the space it has (a long translation, say), it scrolls: the mouse wheel scrolls it, the setting the keyboard is on always scrolls into view, and a thin scrollbar shows on its right. Settings scrolled out of view can't be clicked.
+A label too long for its line wraps beside a checkbox. A slider or dropdown that doesn't fit next to its label goes on the line under it. If a page is taller than the space it has (a long translation, say), it scrolls, with a GUI scrollbar at its right edge that can be dragged like any other. The mouse wheel scrolls it too, and the setting the keyboard is on always scrolls into view, with the scrollbar following. The scrollbar only shows when the page doesn't fit. Settings scrolled out of view can't be clicked.
 
 Every change saves straight away. They're saved in `options.txt` as `a11y_<name>:<value>`, and **Reset All Settings** puts them all back to their defaults.
 
