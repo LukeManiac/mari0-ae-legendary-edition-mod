@@ -67,4 +67,149 @@ function overlay_animatedtext(text, start)
 	return base .. string.rep(".", n) .. string.rep(" ", 3-n)
 end
 
---the overlay drawn from love.draw
+--the overlay drawn from love.draw (donotpresentgraphics): its dots start over whenever the text changes, or when it
+--hasn't been drawn for a moment
+local drawnoverlay = {text = nil, start = 0, last = 0}
+function overlay_drawnanimatedtext(text)
+	local now = love.timer.getTime()
+	if drawnoverlay.text ~= text or now - drawnoverlay.last > 0.25 then
+		drawnoverlay.text = text
+		drawnoverlay.start = now
+	end
+	drawnoverlay.last = now
+	return overlay_animatedtext(text, drawnoverlay.start)
+end
+
+--takes the picture that's shown while the work runs: the frame as it is now, dimmed like the overlay, without its text
+function overlaytask_snapshot(donotupdate)
+	overlaysnapshot = nil
+	overlaytext = "" --dims the screen, no text
+	love.draw(donotupdate)
+	overlaytext = nil
+	if (resizable or android) and canvas then
+		--love.draw drew the frame into the game's canvas first: keep a copy of it
+		local w, h = canvas:getDimensions()
+		local copy = love.graphics.newCanvas(w, h)
+		copy:setFilter("nearest", "nearest")
+		love.graphics.push("all")
+		love.graphics.setCanvas(copy)
+		love.graphics.origin()
+		love.graphics.setScissor()
+		love.graphics.setShader()
+		love.graphics.setBlendMode("replace", "premultiplied")
+		love.graphics.setColor(255, 255, 255)
+		love.graphics.draw(canvas, 0, 0)
+		love.graphics.pop()
+		overlaysnapshot = copy
+		love.graphics.present()
+	else
+		--drawn straight onto the window: take a screenshot of it when it's shown
+		love.graphics.captureScreenshot(function(imagedata)
+			overlaysnapshot = love.graphics.newImage(imagedata)
+		end)
+		love.graphics.present()
+	end
+end
+
+--drawn by lovedraw in place of the game while the work runs. Returns true if it drew
+function overlaytask_draw()
+	if not overlayfrozen then
+		return false
+	end
+	love.graphics.push("all")
+	love.graphics.origin()
+	love.graphics.setScissor()
+	love.graphics.setShader()
+	if overlaysnapshot then
+		love.graphics.setColor(255, 255, 255)
+		love.graphics.draw(overlaysnapshot, 0, 0)
+	else
+		love.graphics.setColor(0, 0, 0, 255)
+		love.graphics.rectangle("fill", 0, 0, width*16*scale, height*16*scale)
+	end
+	love.graphics.setColor(255, 255, 255, 255)
+	centerprintscreen(overlay_animatedtext(overlayfrozen.text, overlayfrozen.start))
+	love.graphics.pop()
+	return true
+end
+
+local function finish()
+	overlaytask = nil
+	overlayfrozen = nil
+	overlaysnapshot = nil
+end
+
+local function check(co, ok, err)
+	if not ok then
+		finish()
+		error(debug.traceback(co, tostring(err)), 0)
+	end
+	if coroutine.status(co) == "dead" then
+		finish()
+		return false
+	end
+	return true
+end
+
+--runs one more piece of the background work (the main loop calls this in place of love.update)
+local function resume()
+	local co = overlaytask.co
+	handlerco = co
+	resumeat = love.timer.getTime()
+	local ok, err = coroutine.resume(co)
+	handlerco = nil
+	check(co, ok, err)
+end
+
+--callbacks that keep working while the game is frozen: the window's own events
+local PASSTHROUGH = {quit = true, resize = true, visible = true}
+
+local function wrap(name)
+	local f = love[name]
+	if type(f) ~= "function" then
+		return
+	end
+	love[name] = function(...)
+		if PASSTHROUGH[name] then
+			return f(...) --never in the background: quit has to finish before the window closes
+		end
+		if overlaytask then
+			if name == "update" then
+				resume()
+			end
+			return --frozen: input is ignored
+		end
+		if handlerco then
+			return f(...) --called from inside another callback (android buttons, the mouse wheel...): part of that one
+		end
+		local co = coroutine.create(f)
+		handlerco = co
+		resumeat = love.timer.getTime()
+		local results = {coroutine.resume(co, ...)}
+		handlerco = nil
+		if check(co, results[1], results[2]) then
+			--renderoverlay handed the rest of this callback to the main loop
+			overlaytask = {co = co}
+			return
+		end
+		return unpack(results, 2)
+	end
+end
+
+local CALLBACKS = {
+	"update", "keypressed", "keyreleased", "textinput", "mousepressed", "mousereleased", "mousemoved", "wheelmoved",
+	"filedropped", "directorydropped", "focus", "joystickpressed", "joystickreleased", "joystickaxis", "joystickhat",
+	"gamepadpressed", "gamepadreleased", "gamepadaxis", "joystickadded", "joystickremoved",
+	"touchpressed", "touchreleased", "touchmoved", "resize", "visible", "quit",
+}
+
+--wraps love's callbacks (once love.load has set them all up)
+function overlaytask_install()
+	if overlaytask_installed then
+		return
+	end
+	overlaytask_installed = true
+	for _, name in ipairs(CALLBACKS) do
+		wrap(name)
+	end
+end
