@@ -19,9 +19,6 @@
 --seconds of work a frame before giving the frame back. The window still gets about 30 frames a second, plenty for it to
 --stay responsive and for the dots, and the work gets nearly all of the time (vsync is off while it runs, see resume)
 OVERLAYTASK_BUDGET = 1/30
---while the loading tip is still being typed, frames come far more often, so the typewriter shows every character as it's
---written instead of jumping ahead a few at a time between frames (see overlayyield)
-OVERLAYTASK_TYPINGBUDGET = 1/240
 OVERLAYTASK_DOTTIME = 0.5 --seconds between each step of the "..." animation
 
 overlaytask = nil --the work running in the background: {co = coroutine}
@@ -50,12 +47,7 @@ function overlayyield(force)
 	if not force and not overlayfrozen then
 		return --no overlay shown: the work isn't in the background, so it runs straight through like before
 	end
-	local now = love.timer.getTime()
-	local budget = OVERLAYTASK_BUDGET
-	if overlayfrozen and overlayfrozen.tipstart and now - overlayfrozen.tipstart < OVERLAYTIP_TYPEDURATION then
-		budget = OVERLAYTASK_TYPINGBUDGET
-	end
-	if force or now - resumeat >= budget then
+	if force or love.timer.getTime() - resumeat >= OVERLAYTASK_BUDGET then
 		coroutine.yield()
 		resumeat = love.timer.getTime()
 	end
@@ -82,6 +74,11 @@ end
 --way down the screen. It's picked when the overlay shows and stays the same until it's gone
 OVERLAYTIP_CENTERY = 0.75 --of the height of what's drawn on
 OVERLAYTIP_TYPEDURATION = 1 --seconds the typewriter takes to write the whole tip (like the intro's loading text)
+--a typewriter's state, like the intro's introtypewritetimer: progress is the seconds it's been typing (it stops at
+--OVERLAYTIP_TYPEDURATION), last is when it was last drawn
+function overlaytip_newtyping()
+	return {progress = 0, last = nil}
+end
 
 local recenttips = {} --the last two tips shown, newest first
 function overlaytip_pick()
@@ -115,13 +112,16 @@ function overlaytip_pick()
 end
 
 --draws a tip in the middle of the screen's width, word-wrapped to fit, its middle at OVERLAYTIP_CENTERY of the height
---(call it with the transform at its origin). It's typed out like the intro's loading text: start is when it began, and
---the whole tip is written after OVERLAYTIP_TYPEDURATION seconds, at an even pace
-function overlaytip_draw(tip, start)
-	if not tip then
-		return
+--(call it with the transform at its origin). It's typed out exactly like the intro's loading text (intro_draw): typing
+--(overlaytip_newtyping) is its timer, the whole tip is written after OVERLAYTIP_TYPEDURATION seconds, and the characters
+--shown are the whole ones the timer has reached
+--the tip's lines, worked out once for each tip and screen width and kept: {lines, lengths, charcount}
+local tiplayout = {key = nil}
+local function overlaytip_layout(tip, ww)
+	local key = tostring(tip) .. "|" .. ww .. "|" .. scale
+	if tiplayout.key == key then
+		return tiplayout
 	end
-	local ww, wh = getproperwindowsize()
 	local maxchars = math.max(8, math.floor(ww/(8*scale)) - 4) --two characters of room on each side
 	local lines, line = {}, ""
 	for word in tostring(tip):gmatch("%S+") do
@@ -137,80 +137,80 @@ function overlaytip_draw(tip, start)
 	if line ~= "" then
 		table.insert(lines, line)
 	end
-	--how many characters are written so far, counted across the lines in order (the wrapping is worked out for the whole
-	--tip, so words never jump to the next line as they're typed)
-	local charcount = 0
-	for _, l in ipairs(lines) do
-		charcount = charcount + utf8.len(l)
+	local lengths, charcount = {}, 0
+	for i, l in ipairs(lines) do
+		lengths[i] = utf8.len(l)
+		charcount = charcount + lengths[i]
 	end
-	--not rounded: the character being typed fades in by however far along it is, and the line glides to stay centred
-	local visible = charcount
-	if start then
-		visible = charcount * math.min((love.timer.getTime() - start)/OVERLAYTIP_TYPEDURATION, 1)
-	end
+	tiplayout = {key = key, lines = lines, lengths = lengths, charcount = charcount}
+	return tiplayout
+end
 
-	local function printtip(s, x, y)
-		if hudoutline then
-			properprintFbackground(s, x, y)
-		else
-			properprintF(s, x, y)
+function overlaytip_draw(tip, typing)
+	if not tip then
+		return
+	end
+	local ww, wh = getproperwindowsize()
+	--the wrapping is worked out once for the whole tip, so words never jump to the next line as they're typed
+	local layout = overlaytip_layout(tip, ww)
+	local lines, lengths = layout.lines, layout.lengths
+
+	--the intro's typewriter: the timer goes up by the time since the last frame and stops at the duration, and the
+	--characters shown are math.floor(charcount * timer/duration), counted across the lines in order
+	local visiblechars = layout.charcount
+	if typing then
+		local now = love.timer.getTime()
+		if typing.last then
+			typing.progress = math.min(typing.progress + (now - typing.last), OVERLAYTIP_TYPEDURATION)
 		end
+		typing.last = now
+		visiblechars = math.floor(layout.charcount * math.min(typing.progress / OVERLAYTIP_TYPEDURATION, 1))
 	end
 
 	--the block's place stays put; each line is centred on what's written of it, like the intro's text
 	local lineheight = 10*scale
 	local totalheight = (#lines-1)*lineheight + 8*scale
 	local y = wh*OVERLAYTIP_CENTERY - totalheight/2
+	love.graphics.setColor(200, 200, 200, 255)
 	for i, l in ipairs(lines) do
-		local len = utf8.len(l)
-		if visible <= 0 then
+		if visiblechars <= 0 then
 			break
 		end
-		local shown = math.min(visible, len) --characters written of this line, part of the last one included
-		visible = visible - len
-		local partial = shown % 1 --how far the character being typed is
-		local whole = shown - partial
-
-		local written, typing = l, nil
-		if whole < len then
-			local typingstart = utf8.offset(l, whole + 1)
-			local typingend = utf8.offset(l, whole + 2) or (#l + 1)
-			written = l:sub(1, typingstart - 1)
-			if partial > 0 then
-				typing = l:sub(typingstart, typingend - 1)
-			end
+		local len = lengths[i]
+		local visibletext, length
+		if visiblechars >= len then
+			--fully printed: drawn as it is, without working anything out
+			visibletext, length = l, len
+		else
+			--only the line being typed is cut
+			local byteend = utf8.offset(l, visiblechars + 1)
+			visibletext = l:sub(1, (byteend or (#l + 1)) - 1)
+			length = visiblechars
 		end
+		visiblechars = visiblechars - len
 
-		local x = (ww - shown*8*scale)/2
+		local x = ww/2 - length/2*8*scale
 		local ly = y + (i-1)*lineheight
-		love.graphics.setColor(200, 200, 200, 255)
-		printtip(written, x, ly)
-		if typing then
-			love.graphics.setColor(200, 200, 200, 255*partial)
-			printtip(typing, x + whole*8*scale, ly)
+		if hudoutline then
+			properprintFbackground(visibletext, x, ly)
+		else
+			properprintF(visibletext, x, ly)
 		end
 	end
 	love.graphics.setColor(255, 255, 255, 255)
 end
 
---the overlay drawn from love.draw (donotpresentgraphics): its dots start over (and it gets a new tip) whenever the
---text changes, or when it hasn't been drawn for a moment
-local drawnoverlay = {text = nil, start = 0, last = 0, tip = nil}
+--the overlay drawn from love.draw (donotpresentgraphics): its dots start over whenever the text changes, or when it
+--hasn't been drawn for a moment
+local drawnoverlay = {text = nil, start = 0, last = 0}
 function overlay_drawnanimatedtext(text)
 	local now = love.timer.getTime()
 	if drawnoverlay.text ~= text or now - drawnoverlay.last > 0.25 then
 		drawnoverlay.text = text
 		drawnoverlay.start = now
-		drawnoverlay.tip = overlaytip_pick()
-		drawnoverlay.tipstart = now
 	end
 	drawnoverlay.last = now
 	return overlay_animatedtext(text, drawnoverlay.start)
-end
-
---the tip that goes with the overlay overlay_drawnanimatedtext is drawing, and when its typewriter started
-function overlay_drawntip()
-	return drawnoverlay.tip, drawnoverlay.tipstart
 end
 
 --takes the picture that's shown while the work runs: the frame as it is now, dimmed like the overlay, without its text
@@ -263,7 +263,6 @@ function overlaytask_draw()
 	end
 	love.graphics.setColor(255, 255, 255, 255)
 	centerprintscreen(overlay_animatedtext(overlayfrozen.text, overlayfrozen.start))
-	overlaytip_draw(overlayfrozen.tip, overlayfrozen.tipstart)
 	love.graphics.pop()
 	return true
 end
