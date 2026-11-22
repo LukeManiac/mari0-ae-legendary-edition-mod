@@ -1863,9 +1863,6 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 		end
 		if rightclickmenuopen then
 			local linking = customrcopen == "link"
-			if editorRCAnimation and not linking then
-				editor_draw_cursor_preview((1 - editor_rc_progress()) * cursorAlpha)
-			end
 			if not linking then
 				editor_rc_begin()
 			end
@@ -3283,7 +3280,7 @@ local function editor_draw_content(menuVisible, minimapOverlay, resizeOverlay, c
 			guielements["refreshmapsbutton"]:draw()
 			--guielements["autosavecheckbox"]:draw()
 			
-			if levelrightclickmenu.active then
+			if levelrightclickmenu.active or levelrightclickmenu:isclosing() then
 				levelrightclickmenu:draw()
 			end
 		elseif editorstate == "tools" then
@@ -4029,9 +4026,6 @@ function editor_draw()
 		editorResizeAnimation = nil
 	end
 
-	if editorRCAnimation and not rightclickmenuopen and not editormenuopen then
-		editor_draw_cursor_preview((1 - editor_rc_progress()) * cursorAlpha)
-	end
 	editor_rc_draw_closing()
 	editor_draw_dropdown_overlays()
 	if editorRCClosingDropdown then
@@ -5991,7 +5985,7 @@ function editor_mousepressed(x, y, button)
 	
 	if levelrightclickmenu.active then
 		levelrightclickmenu:click(x, y, button)
-		levelrightclickmenu.active = false
+		levelrightclickmenu:closeanimated()
 		ignoregui = true
 		return
 	end
@@ -9268,7 +9262,7 @@ function levelrightclickmenuclick(i)
 		existingmaps[levelrightclickmenu.level[1]][levelrightclickmenu.level[2]][levelrightclickmenu.level[3]] = false
 		levelrightclickmenu.button.textcolor = {80, 80, 80}
 	end
-	levelrightclickmenu.active = false
+	levelrightclickmenu:closeanimated()
 end
 
 function paintbucket(tx, ty, ontile, onlyonscreen)

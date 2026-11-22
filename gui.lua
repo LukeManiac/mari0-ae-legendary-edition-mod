@@ -997,6 +997,17 @@ function guielement:draw(a, offx, offy)
 		local sy = guiglass.jellyin(t*1.2)
 		local sx = guiglass.jellyin(t*1.2 - 0.03)
 		local alpha = math.max(0, math.min(1, t*12))
+		if st.closing then
+			--closing (see closeanimated): swells a little, then shrinks back into the same corner, the width a moment after
+			--the height, the way it came out
+			local u = (now - st.closing)/RIGHTCLICK_CLOSETIME
+			local closesy = guiglass.jellyout(u)
+			local closesx = guiglass.jellyout(u - 0.15)
+			sy = math.min(sy, closesy)
+			sx = math.min(sx, closesx)
+			alpha = alpha*math.max(0, math.min(1, (1-u)*3))
+			high = nil --nothing is hovered on the way out
+		end
 		if sx > 0.01 and sy > 0.01 then
 			love.graphics.push()
 			love.graphics.translate(self.x*scale, pivoty*scale)
@@ -1989,6 +2000,33 @@ function guielement:unclick(x, y)
 end
 
 --true when the mouse is over the element, or when it is made to look hovered (forcehover, e.g. selected with the keyboard)
+--how long a right-click menu takes to shrink away when closed with closeanimated (like a dropdown's options)
+RIGHTCLICK_CLOSETIME = 0.2
+
+--closes a right-click menu with an animation: it stops taking clicks straight away, but keeps being drawn
+--(draw it while isclosing() is true) until it has shrunk back into the corner it opened from
+function guielement:closeanimated()
+	self.active = false
+	local st = guiglass.state(self)
+	if st.born and not st.closing then
+		st.closing = love.timer.getTime()
+	end
+end
+
+--true while a right-click menu closed with closeanimated is still shrinking away
+function guielement:isclosing()
+	local st = guiglass.state(self)
+	if not st.closing then
+		return false
+	end
+	if love.timer.getTime() - st.closing >= RIGHTCLICK_CLOSETIME then
+		st.closing = nil
+		st.born = nil
+		return false
+	end
+	return true
+end
+
 --starts a right-click menu's opening animation over (its jelly pop and the hover pill), so a menu
 --that is kept and opened again, like the Course Maker's maps tab menu, animates every time it opens
 function guielement:resetanimation()
@@ -1996,6 +2034,7 @@ function guielement:resetanimation()
 	st.born = nil
 	st.listlast = nil
 	st.pill = nil
+	st.closing = nil
 end
 
 function guielement:hovered()

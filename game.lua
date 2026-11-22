@@ -320,7 +320,6 @@ PAUSERIGHT = {
 	letterbox = {labely = 96, widgety = 95},
 	shader1 = {labely = 109, widgety = 119},
 	shader2 = {labely = 134, widgety = 144},
-	warning = {y = 160, maxchars = 17},
 }
 
 --pausemenuselected for each row of the right column (the left column is 1 to #pausemenuoptions)
@@ -3450,7 +3449,7 @@ function game_draw()
 			end
 		end
 
-		--right column: controls, joystick deadzone, scale, letterbox, shader1, shader2 and the shaders warning
+		--right column: controls, joystick deadzone, scale, letterbox, shader1 and shader2
 		local rx = pausemenu_rightx()
 		local function rightlabel(name, text, y)
 			love.graphics.setColor(100, 100, 100, 255)
@@ -3482,15 +3481,6 @@ function game_draw()
 		rightlabel("shader2", TEXT["shader2:"], PAUSERIGHT.shader2.labely)
 		if shaderssupported == false then
 			properprintF(TEXT["unsupported"], rx*scale, PAUSERIGHT.shader2.widgety*scale)
-		end
-
-		--the shaders warning, wrapped to the column
-		love.graphics.setColor(100, 100, 100, 255)
-		--a word split with a hyphen at the line break is joined back up, then the text is wrapped again
-		local warning = (TEXT["shaders will really\nreduce performance!"] or ""):gsub("%-\n", ""):gsub("\n", " ")
-		local warninglines = pausemenu_wraplabel(warning, PAUSERIGHT.warning.maxchars)
-		for l = 1, #warninglines do
-			properprintF(warninglines[l], rx*scale, (PAUSERIGHT.warning.y+(l-1)*10)*scale)
 		end
 
 		--dropdowns last, so an open list sits over the rows under it (shader2 before shader1 for the same reason)

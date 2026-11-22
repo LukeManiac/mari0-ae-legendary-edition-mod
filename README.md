@@ -598,7 +598,6 @@ The right side of the pause menu now has more of the misc. tab's settings. From 
 * **scale:** with a dropdown at the end of its line: *1 to *4, or resizable. Left and Right step through them the same way as in options.
 * **letterbox:** with a checkbox at the end of its line. Left, Right and Enter toggle it.
 * **shader1:** and **shader2:**, which were already there, now come after letterbox.
-* The "shaders will really reduce performance!" warning from options, under shader2. It's wrapped to fit the column, and a word split with a hyphen in the translation is joined back up first.
 
 Every change saves the game straight away, like in options. The row selected with the keyboard looks hovered. The left side of the pause menu hasn't changed.
 
@@ -621,6 +620,7 @@ Every GUI text input now takes the usual editing keys:
 * `pausemenu_setscale(i)`, `pausemenu_setletterbox(v)` and `pausemenu_setshader(slot, i)` change those settings from the pause menu and save them.
 
 * `guielement:resetanimation()` starts a right-click menu's opening animation over.
+* `guielement:closeanimated()` closes a right-click menu with its closing animation, and `guielement:isclosing()` is true until it's finished, so the menu can be drawn while `active` is `false`.
 * A right-click menu with `centerentries` set to `true` draws its title and options in the middle of their rows.
 * `stoptestingbutton_draw()`, `stoptestingbutton_update(dt)`, `stoptestingbutton_mousepressed(x, y, button)` and `stoptestingbutton_mousereleased(x, y, button)` run the **stop testing course** button. `stoptestingbutton_click()` is what it runs when clicked.
 
@@ -631,6 +631,8 @@ Every GUI text input now takes the usual editing keys:
 * With **Continue subzone music** on, going into a subzone while the fast star theme was playing kept it playing as the course music. Now any version of the star theme counts, so the course's own music starts.
 * Deleting a map from the **Maps** tab's right-click menu now takes its preview off the button straight away. Before, the deleted map's preview stayed on its button until the Course Maker was opened from the menu again.
 * The **Maps** tab's right-click menu now pops out with its jelly every time it opens. Before, the animation only played the first time, and every menu after that appeared straight away.
+* The **Maps** tab's right-click menu now animates closing too, instead of vanishing. Like a dropdown's options, it swells a little, then shrinks back into the corner it opened from over 0.2 seconds (`RIGHTCLICK_CLOSETIME`), with its width following its height. It stops taking clicks as soon as it starts closing, and right-clicking another map while it closes opens the new one straight away.
+* While a right-click menu on an entity opens and closes in the Course Maker, the selected tile or entity is no longer drawn at the cursor, fading out and back in with the menu. It shows again once the menu has finished closing.
 
 ### ✨ Improvements
 
