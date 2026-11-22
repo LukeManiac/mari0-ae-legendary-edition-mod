@@ -4515,7 +4515,7 @@ end
 --ANIMATION CACHE BUTTON
 --the arrow on the animations tab's reset button: three quarters of a circle with its head pointing counterclockwise,
 --standing still like a browser's refresh button. Drawn by the game instead of an image (drawcontent of the button, in game pixels)
-local ANIMATIONCACHE_ARROWHEAD = -math.pi*0.25 --where the head sits: the top right, with the gap across the top
+local ANIMATIONCACHE_ARROWHEAD = -math.pi*0.75 --where the head sits: the top left, with the gap down the left side
 function drawanimationcachearrow(self, x, y, alpha)
 	local cx, cy = (x+5.5)*scale, (y+5.5)*scale --the middle of the button's 11x11 box
 	local r = 3*scale
