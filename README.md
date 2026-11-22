@@ -575,7 +575,8 @@ Testing a course from the Course Maker now pauses like normal play.
 * The pause key (Escape, or whatever pause is bound to, on a keyboard or a controller) opens the pause menu instead of going straight back to the Course Maker. Pressing it again closes the menu.
 * The game also pauses when its window loses focus while testing, unless `dontpauseonunfocus` is on.
 * **Quit to menu** in the pause menu goes back to the Course Maker while testing, instead of the main menu.
-* **Save game** doesn't save while testing, since the save would load as normal play. A red notice says "cannot save while testing!" instead.
+* While testing, the pause menu shows **stop testing level** where **save game** (or **suspend**) usually is. Picking it goes straight back to the Course Maker, without a prompt. A label too long for the menu's left column is split over two lines at a space, so it doesn't run into **controls**. Testing a course never saves the game.
+* The pause menu stays on screen through the fade back to the Course Maker, whichever way testing is stopped. After **yes** in the **quit to menu?** prompt, the prompt stays up through the fade, so the pause menu under it doesn't look usable again before the Course Maker loads.
 
 #### ⏹️ Stop Testing Course
 
@@ -583,9 +584,23 @@ The "TESTING COURSE - PRESS ESC TO RETURN" text at the bottom of the screen is n
 
 * It sits in the middle of the bottom of the screen, with its bottom edge 4 pixels above the bottom of the game.
 * Clicking it goes back to the Course Maker, the same way Escape used to.
+* It stays on screen after it's clicked, squashed, and fades to black with the rest of the screen. It only goes once the Course Maker has loaded. If the game was paused, the pause menu stays up through the fade too.
 * It works while playing and while the pause menu is open. It fades out while a pause menu prompt or the controls popup is showing, and fades back in once they close.
 * Clicking it doesn't shoot a portal, and the click doesn't reach anything in the Course Maker once it opens.
 * Its label is translated into every language the game has.
+
+#### ⚙️ Pause Menu Settings
+
+The right side of the pause menu now has more of the misc. tab's settings. From top to bottom:
+
+* **controls:** with **edit** under it, as before.
+* **joy deadzone:** with the same slider as in options, under its label. Left and Right change it by 5%, and a red notice warns when it goes below 10%.
+* **scale:** with a dropdown at the end of its line: *1 to *4, or resizable. Left and Right step through them the same way as in options.
+* **letterbox:** with a checkbox at the end of its line. Left, Right and Enter toggle it.
+* **shader1:** and **shader2:**, which were already there, now come after letterbox.
+* The "shaders will really reduce performance!" warning from options, under shader2. It's wrapped to fit the column, and a word split with a hyphen in the translation is joined back up first.
+
+Every change saves the game straight away, like in options. The row selected with the keyboard looks hovered. The left side of the pause menu hasn't changed.
 
 #### ⌨️ Text Input Keys
 
@@ -600,6 +615,10 @@ Every GUI text input now takes the usual editing keys:
 * Holding **Shift** with any of the movement keys selects text, the same as **Shift+←** and **Shift+→**.
 
 #### 🧱 GUI Functions
+
+* `pausemenu_wraplabel(text, maxchars)` splits a pause menu label into lines of at most `maxchars` characters, at spaces.
+* `PAUSERIGHT` holds the layout of the pause menu's right side, and `pausemenu_rightrow(name)` gives the `pausemenuselected` value of one of its rows (`"controls"`, `"deadzone"`, `"scale"`, `"letterbox"`, `"shader1"` or `"shader2"`).
+* `pausemenu_setscale(i)`, `pausemenu_setletterbox(v)` and `pausemenu_setshader(slot, i)` change those settings from the pause menu and save them.
 
 * `guielement:resetanimation()` starts a right-click menu's opening animation over.
 * A right-click menu with `centerentries` set to `true` draws its title and options in the middle of their rows.

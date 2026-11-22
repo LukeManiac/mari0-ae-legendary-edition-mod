@@ -310,6 +310,67 @@ function registercameraportaltransition()
 	end
 end
 
+--the pause menu's right column, top to bottom (game pixels). Every row has its label at labely; a widget
+--either sits under it (widgety) or at the right end of the label's line (scale and letterbox)
+PAUSERIGHT = {
+	width = 142, --from the column's left edge (width*8+5) to the right edge of its widgets (the box ends 3 further)
+	controls = {labely = 34, edity = 44},
+	deadzone = {labely = 58, widgety = 68},
+	scale = {labely = 82, widgety = 81},
+	letterbox = {labely = 96, widgety = 95},
+	shader1 = {labely = 109, widgety = 119},
+	shader2 = {labely = 134, widgety = 144},
+	warning = {y = 160, maxchars = 17},
+}
+
+--pausemenuselected for each row of the right column (the left column is 1 to #pausemenuoptions)
+function pausemenu_rightrow(name)
+	local order = {controls = 1, deadzone = 2, scale = 3, letterbox = 4, shader1 = 5, shader2 = 6}
+	return #pausemenuoptions + order[name]
+end
+PAUSEMENU_RIGHTROWS = 6
+
+local function pausemenu_rightx()
+	return (width*8)+5
+end
+
+--the scale dropdown's value: 1 to 4, or 5 for resizable (like options > misc.)
+function pausemenu_setscale(i)
+	changescale(i)
+	if gamestate == "game" then
+		updatespritebatch()
+	end
+	if guielements["pause_scale"] then
+		guielements["pause_scale"].var = resizable and 5 or scale
+	end
+	saveconfig()
+end
+
+function pausemenu_setletterbox(v)
+	letterboxfullscreen = v
+	if guielements["pause_letterbox"] then
+		guielements["pause_letterbox"].var = v
+	end
+	saveconfig()
+end
+
+function pausemenu_setshader(slot, i)
+	if slot == 1 then
+		currentshaderi1 = i
+	else
+		currentshaderi2 = i
+	end
+	if shaderlist[i] == "none" then
+		shaders:set(slot, nil)
+	else
+		shaders:set(slot, shaderlist[i])
+	end
+	if guielements["pause_shader" .. slot] then
+		guielements["pause_shader" .. slot].var = i
+	end
+	saveconfig()
+end
+
 function game_update(dt)
 	--------
 	--GAME--
@@ -364,6 +425,62 @@ function game_update(dt)
 			volumeslider.savedvalue = volume
 		end
 
+		local rightx = pausemenu_rightx()
+		local rightedge = rightx + PAUSERIGHT.width
+
+		--joystick deadzone slider (the same one as options > misc.)
+		local deadzoneslider = guielements["pause_deadzone"]
+		if not deadzoneslider then
+			deadzoneslider = deadzoneslider_new(rightx, PAUSERIGHT.deadzone.widgety, PAUSERIGHT.width)
+			guielements["pause_deadzone"] = deadzoneslider
+		end
+		deadzoneslider.x = rightx
+		deadzoneslider.y = PAUSERIGHT.deadzone.widgety
+		deadzoneslider.active = pause_gui_active
+		deadzoneslider.nohover = not pause_gui_active
+		deadzoneslider.forcehover = (pausemenuselected == pausemenu_rightrow("deadzone"))
+		if deadzoneslider.dragging and not deadzoneslider.active then
+			deadzoneslider.dragging = false
+			deadzoneslider.presszoomed = false
+			deadzoneslider.presszoomanim = nil
+			deadzoneslider.presszoom = 1
+			deadzoneslider_commit(deadzoneslider)
+		end
+		volumeslider_animate(deadzoneslider)
+		if not deadzoneslider.dragging and not deadzoneslider.valueanim and not deadzoneslider.inputting and deadzoneslider.value ~= joystickdeadzone then
+			deadzoneslider.value = joystickdeadzone
+			deadzoneslider.savedvalue = joystickdeadzone
+		end
+
+		--scale dropdown, at the right end of its label's line
+		local scaledd = guielements["pause_scale"]
+		if not scaledd then
+			scaledd = guielement:new("dropdown", rightedge-(13+9*8), PAUSERIGHT.scale.widgety, 9, pausemenu_setscale, resizable and 5 or scale, 1, 2, 3, 4, 5)
+			scaledd.displayentries = {"*1", "*2", "*3", "*4", "resizable"}
+			guielements["pause_scale"] = scaledd
+		end
+		scaledd.x = rightedge-(13+9*8)
+		scaledd.y = PAUSERIGHT.scale.widgety
+		scaledd.active = pause_gui_active
+		scaledd.nohover = not pause_gui_active
+		scaledd.forcehover = (pausemenuselected == pausemenu_rightrow("scale"))
+		if not scaledd.extended then
+			scaledd.var = resizable and 5 or scale
+		end
+
+		--letterbox checkbox, at the right end of its label's line
+		local letterboxcb = guielements["pause_letterbox"]
+		if not letterboxcb then
+			letterboxcb = guielement:new("checkbox", rightedge-9, PAUSERIGHT.letterbox.widgety, pausemenu_setletterbox, letterboxfullscreen)
+			guielements["pause_letterbox"] = letterboxcb
+		end
+		letterboxcb.x = rightedge-9
+		letterboxcb.y = PAUSERIGHT.letterbox.widgety
+		letterboxcb.var = letterboxfullscreen
+		letterboxcb.active = pause_gui_active
+		letterboxcb.nohover = not pause_gui_active
+		letterboxcb.forcehover = (pausemenuselected == pausemenu_rightrow("letterbox"))
+
 		--shader dropdowns (same pattern as options menu)
 		if shaderssupported ~= false then
 			local shaderwidth = 1
@@ -373,30 +490,21 @@ function game_update(dt)
 
 			for slot = 1, 2 do
 				local name = "pause_shader" .. slot
+				local row = PAUSERIGHT["shader" .. slot]
 				local dd = guielements[name]
 				if not dd then
 					local start = (slot == 1) and currentshaderi1 or currentshaderi2
-					dd = guielement:new("dropdown", (width*8)+5, 112 + (slot == 1 and 5 or 35), shaderwidth, function(i)
-						if slot == 1 then
-							currentshaderi1 = i
-						else
-							currentshaderi2 = i
-						end
-						if shaderlist[i] == "none" then
-							shaders:set(slot, nil)
-						else
-							shaders:set(slot, shaderlist[i])
-						end
-						guielements[name].var = i
-						saveconfig()
+					dd = guielement:new("dropdown", rightx, row.widgety, shaderwidth, function(i)
+						pausemenu_setshader(slot, i)
 					end, start, unpack(shaderlist))
 					guielements[name] = dd
 				end
-				dd.x = (width*8)+5
-				dd.y = 112 + (slot == 1 and 5 or 35)
+				dd.x = rightx
+				dd.y = row.widgety
 				dd.width = shaderwidth
 				dd.active = pause_gui_active
 				dd.nohover = not pause_gui_active
+				dd.forcehover = (pausemenuselected == pausemenu_rightrow("shader" .. slot))
 				--keep selection in sync if it changed via keypress
 				local want = (slot == 1) and currentshaderi1 or currentshaderi2
 				if dd.var ~= want and not dd.extended then
@@ -414,6 +522,9 @@ function game_update(dt)
 		if guielements["pause_shader2"] then
 			guielements["pause_shader2"] = nil
 		end
+		guielements["pause_deadzone"] = nil
+		guielements["pause_scale"] = nil
+		guielements["pause_letterbox"] = nil
 	end
 
 	if pausemenuopen and not (SERVER or CLIENT) then
@@ -3339,43 +3450,60 @@ function game_draw()
 			end
 		end
 
-		-- Controls, Shader1, Shader2 (vertically centered as a group)
-		-- Spacing of 30 between labels; group centered around 112
-		love.graphics.setColor(100, 100, 100, 255)
-		if pausemenuselected == #pausemenuoptions + 1 then
-			love.graphics.setColor(255, 255, 255, 255)
-			properprint(">", (width*8*scale)-5*scale, (112*scale)-35*scale)
+		--right column: controls, joystick deadzone, scale, letterbox, shader1, shader2 and the shaders warning
+		local rx = pausemenu_rightx()
+		local function rightlabel(name, text, y)
+			love.graphics.setColor(100, 100, 100, 255)
+			if pausemenuselected == pausemenu_rightrow(name) then
+				love.graphics.setColor(255, 255, 255, 255)
+				properprint(">", (rx-10)*scale, y*scale)
+			end
+			properprintF(text, rx*scale, y*scale)
 		end
 
-		properprintF("controls:", (width*8*scale)+5*scale, (112*scale)-35*scale)
-		properprintF("edit", (width*8*scale)+5*scale, (112*scale)-25*scale)
+		rightlabel("controls", "controls:", PAUSERIGHT.controls.labely)
+		properprintF("edit", rx*scale, PAUSERIGHT.controls.edity*scale)
 
-		love.graphics.setColor(100, 100, 100, 255)
-		if pausemenuselected == #pausemenuoptions + 2 then
-			love.graphics.setColor(255, 255, 255, 255)
-			properprint(">", (width*8*scale)-5*scale, (112*scale)-5*scale)
+		rightlabel("deadzone", TEXT["joy deadzone:"], PAUSERIGHT.deadzone.labely)
+		if guielements["pause_deadzone"] then
+			guielements["pause_deadzone"]:draw()
 		end
 
-		properprintF(TEXT["shader1:"], (width*8*scale)+5*scale, (112*scale)-5*scale)
+		rightlabel("scale", TEXT["scale:"], PAUSERIGHT.scale.labely)
+		rightlabel("letterbox", TEXT["letterbox:"], PAUSERIGHT.letterbox.labely)
+		if guielements["pause_letterbox"] then
+			guielements["pause_letterbox"]:draw()
+		end
 
+		rightlabel("shader1", TEXT["shader1:"], PAUSERIGHT.shader1.labely)
 		if shaderssupported == false then
-			properprintF(TEXT["unsupported"], (width*8*scale)+5*scale, (112*scale)+5*scale)
-		elseif guielements["pause_shader1"] then
-			guielements["pause_shader1"]:draw()
+			properprintF(TEXT["unsupported"], rx*scale, PAUSERIGHT.shader1.widgety*scale)
 		end
-
-		love.graphics.setColor(100, 100, 100, 255)
-		if pausemenuselected == #pausemenuoptions + 3 then
-			love.graphics.setColor(255, 255, 255, 255)
-			properprint(">", (width*8*scale)-5*scale, (112*scale)+25*scale)
-		end
-
-		properprintF(TEXT["shader2:"], (width*8*scale)+5*scale, (112*scale)+25*scale)
-
+		rightlabel("shader2", TEXT["shader2:"], PAUSERIGHT.shader2.labely)
 		if shaderssupported == false then
-			properprintF(TEXT["unsupported"], (width*8*scale)+5*scale, (112*scale)+35*scale)
-		elseif guielements["pause_shader2"] then
-			guielements["pause_shader2"]:draw()
+			properprintF(TEXT["unsupported"], rx*scale, PAUSERIGHT.shader2.widgety*scale)
+		end
+
+		--the shaders warning, wrapped to the column
+		love.graphics.setColor(100, 100, 100, 255)
+		--a word split with a hyphen at the line break is joined back up, then the text is wrapped again
+		local warning = (TEXT["shaders will really\nreduce performance!"] or ""):gsub("%-\n", ""):gsub("\n", " ")
+		local warninglines = pausemenu_wraplabel(warning, PAUSERIGHT.warning.maxchars)
+		for l = 1, #warninglines do
+			properprintF(warninglines[l], rx*scale, (PAUSERIGHT.warning.y+(l-1)*10)*scale)
+		end
+
+		--dropdowns last, so an open list sits over the rows under it (shader2 before shader1 for the same reason)
+		if shaderssupported ~= false then
+			if guielements["pause_shader2"] then
+				guielements["pause_shader2"]:draw()
+			end
+			if guielements["pause_shader1"] then
+				guielements["pause_shader1"]:draw()
+			end
+		end
+		if guielements["pause_scale"] then
+			guielements["pause_scale"]:draw()
 		end
 
 		love.graphics.pop()
@@ -5717,8 +5845,8 @@ function game_keypressed(key, textinput)
 						mappackhorscroll = 2
 						mappackhorscrollsmooth = 2
 					elseif testlevel and not editormode then
-						--testing a course: quitting goes back to the Course Maker
-						menuprompt = false
+						--testing a course: quitting goes back to the Course Maker. The prompt stays up (and the
+						--pause menu under it stays unselectable) through the fade; stoptestingbutton_click closes both after it
 						stoptestingbutton_click()
 					else
 						stopmusic()
@@ -5813,8 +5941,10 @@ function game_keypressed(key, textinput)
 				elseif pausemenuoptions2[pausemenuselected] == "desktop" then
 					desktopprompt = true
 					pausemenuselected2 = 1
-				elseif pausemenuselected == #pausemenuoptions + 1 then
+				elseif pausemenuselected == pausemenu_rightrow("controls") then
 					setmenupopupvisible("controls", true)
+				elseif pausemenuselected == pausemenu_rightrow("letterbox") then
+					pausemenu_setletterbox(not letterboxfullscreen)
 				end
 			elseif isPauseKey(key) then
 				pausemenuopen = false
@@ -5828,78 +5958,48 @@ function game_keypressed(key, textinput)
 		end
 
 		if pausemenuopentimer >= pausemenuopenduration and menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 then
+			local shader1row, shader2row = pausemenu_rightrow("shader1"), pausemenu_rightrow("shader2")
 			if (key == "down" or key == "s") then
-				if pausemenuselected < #pausemenuoptions + 3 then
+				if pausemenuselected < #pausemenuoptions + PAUSEMENU_RIGHTROWS then
 					pausemenuselected = pausemenuselected + 1
 				end
 			elseif (key == "up" or key == "w") then
 				if pausemenuselected > 1 then
 					pausemenuselected = pausemenuselected - 1
 				end
-			elseif (key == "right" or key == "d") then
-				if pausemenuoptions[pausemenuselected] == "volume" then
-					volumeslider_step(guielements["pause_volume"], 0.1)
-				elseif pausemenuselected == #pausemenuoptions + 2 then
-					currentshaderi1 = currentshaderi1 + 1
-					if currentshaderi1 > #shaderlist then
-						currentshaderi1 = 1
-					end
-					if shaderlist[currentshaderi1] == "none" then
-						shaders:set(1, nil)
-					else
-						shaders:set(1, shaderlist[currentshaderi1])
-					end
-					if guielements["pause_shader1"] then
-						guielements["pause_shader1"].var = currentshaderi1
-					end
-					saveconfig()
-				elseif pausemenuselected == #pausemenuoptions + 3 then
-					currentshaderi2 = currentshaderi2 + 1
-					if currentshaderi2 > #shaderlist then
-						currentshaderi2 = 1
-					end
-					if shaderlist[currentshaderi2] == "none" then
-						shaders:set(2, nil)
-					else
-						shaders:set(2, shaderlist[currentshaderi2])
-					end
-					if guielements["pause_shader2"] then
-						guielements["pause_shader2"].var = currentshaderi2
-					end
-					saveconfig()
+			elseif (key == "right" or key == "d") or (key == "left" or key == "a") then
+				local dir = 1
+				if key == "left" or key == "a" then
+					dir = -1
 				end
-				
-			elseif (key == "left" or key == "a") then
 				if pausemenuoptions[pausemenuselected] == "volume" then
-					volumeslider_step(guielements["pause_volume"], -0.1)
-				elseif pausemenuselected == #pausemenuoptions + 2 then
-					currentshaderi1 = currentshaderi1 - 1
-					if currentshaderi1 < 1 then
-						currentshaderi1 = #shaderlist
-					end
-					if shaderlist[currentshaderi1] == "none" then
-						shaders:set(1, nil)
+					volumeslider_step(guielements["pause_volume"], 0.1*dir)
+				elseif pausemenuselected == pausemenu_rightrow("deadzone") then
+					volumeslider_step(guielements["pause_deadzone"], 0.05*dir)
+				elseif pausemenuselected == pausemenu_rightrow("scale") then
+					--the same steps as options > misc.: 1 to 4, then resizable
+					if dir == 1 then
+						if not resizable and scale < 5 then
+							pausemenu_setscale(scale+1)
+						end
 					else
-						shaders:set(1, shaderlist[currentshaderi1])
+						if resizable then
+							pausemenu_setscale(4)
+						elseif scale > 1 then
+							pausemenu_setscale(scale-1)
+						end
 					end
-					if guielements["pause_shader1"] then
-						guielements["pause_shader1"].var = currentshaderi1
+				elseif pausemenuselected == pausemenu_rightrow("letterbox") then
+					pausemenu_setletterbox(not letterboxfullscreen)
+				elseif (pausemenuselected == shader1row or pausemenuselected == shader2row) and shaderssupported ~= false then
+					local slot = (pausemenuselected == shader1row) and 1 or 2
+					local i = ((slot == 1) and currentshaderi1 or currentshaderi2) + dir
+					if i > #shaderlist then
+						i = 1
+					elseif i < 1 then
+						i = #shaderlist
 					end
-					saveconfig()
-				elseif pausemenuselected == #pausemenuoptions + 3 then
-					currentshaderi2 = currentshaderi2 - 1
-					if currentshaderi2 < 1 then
-						currentshaderi2 = #shaderlist
-					end
-					if shaderlist[currentshaderi2] == "none" then
-						shaders:set(2, nil)
-					else
-						shaders:set(2, shaderlist[currentshaderi2])
-					end
-					if guielements["pause_shader2"] then
-						guielements["pause_shader2"].var = currentshaderi2
-					end
-					saveconfig()
+					pausemenu_setshader(slot, i)
 				end
 			end
 		end
@@ -6062,6 +6162,8 @@ function game_keypressed(key, textinput)
 	end
 end
 
+--splits a pause menu label into lines of at most maxchars characters, at spaces (a word longer than that keeps its own line),
+--so a long label doesn't run into the column on the right
 function pausemenu_wraplabel(text, maxchars)
 	local lines = {}
 	local line = ""
@@ -6132,16 +6234,19 @@ function stoptestingbutton_click()
 	end
 	--the pause menu closes, but stays on screen (like the button) while the screen fades out: nothing updates
 	--until the Course Maker has loaded
+	--only pausemenuopen changes now (loading checks it, e.g. map-load animations): the prompts keep their state,
+	--so the frozen picture shows the prompt that was confirmed instead of a pause menu that looks usable again
 	local paused = pausemenuopen or pausemenuopentimer > 0
 	if paused then
 		pausemenuopen = false
 		pausedaudio = nil
-		menuprompt, desktopprompt, suspendprompt, highscoreprompt = false, false, false, false
 	end
 	stoptestinglevel()
-	--the transition is over and the Course Maker is up: it starts unpaused, and the button lets go
+	--the transition is over and the Course Maker is up: it starts unpaused, with every prompt closed, and the button lets go
 	if paused then
 		pausemenuopentimer = 0
+		menuprompt, desktopprompt, suspendprompt, highscoreprompt = false, false, false, false
+		menuprompttimer, desktopprompttimer, suspendprompttimer, highscoreprompttimer = 0, 0, 0, 0
 	end
 	if stoptestingbutton then
 		guiglass.release(stoptestingbutton)
@@ -6151,7 +6256,7 @@ end
 
 --builds the button (again when the language changes) and keeps it centred at the bottom
 local function stoptestingbutton_get()
-	local label = TEXT["stop testing level"]
+	local label = TEXT["stop testing level"] or "stop testing level"
 	local b = stoptestingbutton
 	if not b or b.label ~= label then
 		b = guielement:new("button", 0, 0, label, stoptestingbutton_click, 2, nil, 1, utf8.len(label)*8)
