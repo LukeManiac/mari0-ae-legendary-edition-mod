@@ -729,6 +729,38 @@ warpfadetexts = {
 	["saving game..."] = true
 }
 
+--tips shown under loading overlays (see overlaytask.lua), one picked at random each time an overlay shows
+loadingtips = {
+	"press f9 to show every player's coordinates.",
+	"press f7 to show the time and f8 to show your battery.",
+	"press f10 to see hitboxes and f11 to see your fps.",
+	"press lctrl+0 to see animation numbers.",
+	"press f12 to keep the mouse inside the window.",
+	"alt+enter switches fullscreen on and off.",
+	"lctrl+lshift+l dumps the logs to alesans_entities/logs.",
+	"hold lctrl+lshift while opening the editor to edit a mappack that has it turned off.",
+	"type the konami code in the menus to unlock cheats and every world.",
+	"tanooki mario turns into a statue when you press run while holding down.",
+	"at full p-speed, raccoon and tanooki mario fly by tapping jump.",
+	"stomp enemies in a row without landing for more points, and then 1ups.",
+	"in the controls tab, press f6 on a keybind to reset it. ctrl+f6 resets the whole page.",
+	"every control has four keybind pages, so you can mix keyboard and controller binds.",
+	"right-click any slider to type a number into it.",
+	"right-click a level in the maps tab to copy, paste or delete it.",
+	"changed an enemy's files? press refresh data in custom > enemies.",
+	"changed a map outside the game? press refresh data in the maps tab.",
+	"the spinning arrow in the animations tab reloads your animations.",
+	"generate nitpicks file in the misc. tab writes every nitpick for you.",
+	"nitpicks live in alesans_entities/nitpicks.json.",
+	"drop an image onto the mappack creator to use it as the mappack's icon.",
+	"in rival rumble royale, type the konami code with your controls to come back once.",
+	"in rival rumble royale, the rare block in the middle has the best items.",
+	"in snake slither scramble, a starman lets you pass through walls and yourself.",
+	"in boo baffler bash, finding the boo quickly wins time back.",
+	"in block beat bonanza, every 10 points pays for a revive.",
+	"custom enemies can be sorted into editor categories by putting them in folders.",
+}
+
 --flag animation
 flagclimbframedelay = 0.07
 scoredelay = 2

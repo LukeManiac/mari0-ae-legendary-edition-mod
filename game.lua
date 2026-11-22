@@ -11205,7 +11205,12 @@ function drawoverlay(text)
 	local ww, wh = getproperwindowsize()
 	love.graphics.rectangle("fill", 0, 0, ww, wh) --all of it, whatever its size
 	love.graphics.setColor(255, 255, 255, 255)
-	centerprintscreen(overlay_drawnanimatedtext(text)) --"..." animates (see overlaytask.lua)
+	if text == "" then
+		love.graphics.pop()
+		return --just the dimming (the picture taken for background work): no text or tip
+	end
+	centerprintscreen(overlay_drawnanimatedtext(text))
+	overlaytip_draw(overlay_drawntip()) --"..." animates (see overlaytask.lua)
 	love.graphics.pop()
 end
 
@@ -11221,8 +11226,8 @@ function renderoverlay(text, donotpresentgraphics, donotupdate)
 	--in a callback: show the overlay, then do the rest of the work in the background (see overlaytask.lua)
 	if overlaytask_canyield() then
 		if overlayfrozen then
-			--already in the background: just the text changes
-			overlayfrozen = {text = translated, start = love.timer.getTime()}
+			--already in the background: just the text changes (the tip stays)
+			overlayfrozen = {text = translated, start = love.timer.getTime(), tip = overlayfrozen.tip}
 			overlayyield(true)
 			return
 		end
@@ -11230,7 +11235,7 @@ function renderoverlay(text, donotpresentgraphics, donotupdate)
 			warpfadeoutnow(key == "returning to menu..." or key == "saving game...")
 		end
 		overlaytask_snapshot(donotupdate)
-		overlayfrozen = {text = translated, start = love.timer.getTime()}
+		overlayfrozen = {text = translated, start = love.timer.getTime(), tip = overlaytip_pick()}
 		overlayyield(true)
 		return
 	end

@@ -69,17 +69,96 @@ function overlay_animatedtext(text, start)
 	return base .. string.rep(".", n)
 end
 
---the overlay drawn from love.draw (donotpresentgraphics): its dots start over whenever the text changes, or when it
---hasn't been drawn for a moment
-local drawnoverlay = {text = nil, start = 0, last = 0}
+--LOADING TIPS
+--a tip from loadingtips (variables.lua) is shown under every loading overlay, with its middle at three quarters of the
+--way down the screen. It's picked when the overlay shows and stays the same until it's gone
+OVERLAYTIP_CENTERY = 0.75 --of the height of what's drawn on
+
+local recenttips = {} --the last two tips shown, newest first
+function overlaytip_pick()
+	if not loadingtips or #loadingtips == 0 then
+		return nil
+	end
+	--not the previous tip or the one before it (as long as there are enough tips to choose from)
+	local choices = {}
+	for i = 1, #loadingtips do
+		if i ~= recenttips[1] and i ~= recenttips[2] then
+			table.insert(choices, i)
+		end
+	end
+	if #choices == 0 then
+		for i = 1, #loadingtips do
+			if i ~= recenttips[1] then
+				table.insert(choices, i)
+			end
+		end
+	end
+	if #choices == 0 then
+		choices = {1}
+	end
+	local i = choices[math.random(#choices)]
+	recenttips = {i, recenttips[1]}
+	local tip = loadingtips[i]
+	if TEXT and TEXT[tip] then
+		tip = TEXT[tip] --a language file can translate a tip by using it as a key
+	end
+	return "tip: " .. tip
+end
+
+--draws a tip in the middle of the screen's width, word-wrapped to fit, its middle at OVERLAYTIP_CENTERY of the height
+--(call it with the transform at its origin)
+function overlaytip_draw(tip)
+	if not tip then
+		return
+	end
+	local ww, wh = getproperwindowsize()
+	local maxchars = math.max(8, math.floor(ww/(8*scale)) - 4) --two characters of room on each side
+	local lines, line = {}, ""
+	for word in tostring(tip):gmatch("%S+") do
+		if line == "" then
+			line = word
+		elseif utf8.len(line) + 1 + utf8.len(word) <= maxchars then
+			line = line .. " " .. word
+		else
+			table.insert(lines, line)
+			line = word
+		end
+	end
+	if line ~= "" then
+		table.insert(lines, line)
+	end
+	local lineheight = 10*scale
+	local totalheight = (#lines-1)*lineheight + 8*scale
+	local y = math.floor(wh*OVERLAYTIP_CENTERY - totalheight/2)
+	love.graphics.setColor(200, 200, 200, 255)
+	for i, l in ipairs(lines) do
+		local x = math.floor((ww - utf8.len(l)*8*scale)/2)
+		if hudoutline then
+			properprintFbackground(l, x, y + (i-1)*lineheight)
+		else
+			properprintF(l, x, y + (i-1)*lineheight)
+		end
+	end
+	love.graphics.setColor(255, 255, 255, 255)
+end
+
+--the overlay drawn from love.draw (donotpresentgraphics): its dots start over (and it gets a new tip) whenever the
+--text changes, or when it hasn't been drawn for a moment
+local drawnoverlay = {text = nil, start = 0, last = 0, tip = nil}
 function overlay_drawnanimatedtext(text)
 	local now = love.timer.getTime()
 	if drawnoverlay.text ~= text or now - drawnoverlay.last > 0.25 then
 		drawnoverlay.text = text
 		drawnoverlay.start = now
+		drawnoverlay.tip = overlaytip_pick()
 	end
 	drawnoverlay.last = now
 	return overlay_animatedtext(text, drawnoverlay.start)
+end
+
+--the tip that goes with the overlay overlay_drawnanimatedtext is drawing
+function overlay_drawntip()
+	return drawnoverlay.tip
 end
 
 --takes the picture that's shown while the work runs: the frame as it is now, dimmed like the overlay, without its text
@@ -132,6 +211,7 @@ function overlaytask_draw()
 	end
 	love.graphics.setColor(255, 255, 255, 255)
 	centerprintscreen(overlay_animatedtext(overlayfrozen.text, overlayfrozen.start))
+	overlaytip_draw(overlayfrozen.tip)
 	love.graphics.pop()
 	return true
 end
