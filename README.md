@@ -381,6 +381,46 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.3.1
+
+### 🧩 New Features
+
+#### 🎵 Music
+
+The star theme, the princess theme, the P-Switch theme and the Mega Mushroom theme can now have their own intros and fast versions, the same way course music can.
+
+* `starmusic`, `pbutton` and `megamushroom` take all three extra versions:
+  * `-intro` plays once before the song.
+  * `-fast` plays instead of the song when the time is low.
+  * `-fastintro` (or `-introfast`) plays once before the fast version.
+* `princessmusic` takes `-intro`.
+* Put them next to the song they belong to: in `sounds` in the game, or in a mappack's `sounds` folder. For example, `pbutton-intro.ogg` goes next to `pbutton.ogg`.
+* A song's versions only come from its own folder. A mappack's `pbutton.ogg` doesn't pick up the game's `pbutton-intro.ogg`, and switching to a mappack without an intro doesn't keep the last mappack's one.
+* When the time runs low, the P-Switch and Mega Mushroom themes switch to their `-fast` versions, the same way the star theme does. Without a `-fast` file, the normal version keeps playing. Unlike the star theme, they don't get a made-up sped-up version.
+* A mappack's star theme without `starmusic-fast.ogg` is still sped up for low time. If the mappack has `starmusic-fastintro.ogg`, that plays first instead of a sped-up copy of `starmusic-intro.ogg`.
+* In Rival Rumble Royale, a music pack's star theme can have its own fast intro too (`star-fastintro.ogg` or `star-introfast.ogg` next to `star.ogg`). The mappack's star theme, with all its versions, comes back when the battle ends.
+* `pbuttonsound` and `megamushroomsound` still work in the Course Maker's custom sounds and in animations. They play the main song, without its intro.
+
+#### 🧱 Music Functions
+
+For anyone working with the music code:
+
+* `music.special` lists the songs that load their versions from their own folder, and which versions each one takes.
+* `music:loadspecial(name, file)` loads one of those songs and the versions next to it, and takes away any versions that folder doesn't have.
+* `music:stoptrack(name)` stops a song, its fast version and both their intros.
+* `music:trackplaying(name)` checks whether any of those four is playing. `music:isplayingwithintro(name)` only checks one version and its intro.
+* `playprioritytrack(name)` plays the star, P-Switch or Mega Mushroom theme: the fast version when the time is low, with its intro first. It does nothing if the right version is already playing.
+
+### 🐛 Bug Fixes
+
+* `starmusic-intro.ogg` and `princessmusic-intro.ogg` now actually play. Before, built-in music only ever loaded its `-fast` version, and a mappack's star and princess themes were loaded without looking for an intro, so both themes always started without one.
+* A mappack star theme with `starmusic-intro.ogg` but no `starmusic-fast.ogg` no longer plays an intro before the fast star theme only. Now the intro plays before the normal one as well.
+* With **Continue subzone music** on, going into a subzone while the fast star theme was playing kept it playing as the course music. Now any version of the star theme counts, so the course's own music starts.
+
+### ✨ Improvements
+
+* The music priority only restarts a theme when the right version isn't already playing. If it's checked again partway through an intro (when the low time sound ends, or another player's star runs out), the intro keeps playing and the song still follows it.
+
 ## v1.3
 
 ### 🧩 New Features
