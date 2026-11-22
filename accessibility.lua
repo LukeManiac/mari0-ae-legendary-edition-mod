@@ -31,13 +31,33 @@ local ITEMS = {
 	gamespeed = {kind = "slider", label = "game speed", min = 25, max = 100, step = 5},
 	halfopaqueblink = {kind = "checkbox", label = "half-opaque blink"},
 	clicknotices = {kind = "checkbox", label = "click to dismiss"},
+	reduceflashing = {kind = "checkbox", label = "reduce flashing"},
+	playerindicator = {kind = "checkbox", label = "player indicator"},
+	aimline = {kind = "checkbox", label = "aim line"},
+	lowtimewarning = {kind = "checkbox", label = "low time warning"},
+	jumpbuffer = {kind = "checkbox", label = "jump buffer"},
+	coyotetime = {kind = "checkbox", label = "coyote time"},
+	pitrescue = {kind = "checkbox", label = "pit rescue"},
+	respawnwheredied = {kind = "checkbox", label = "respawn where you died"},
+	generousstomps = {kind = "checkbox", label = "generous stomps"},
+	infinitelives = {kind = "checkbox", label = "infinite lives"},
+	infinitetime = {kind = "checkbox", label = "infinite time"},
+	skipcourse = {kind = "dropdown", label = "skip course", entries = {"off", "5", "10"},
+		display = {"skip off", "after 5 deaths", "after 10 deaths"}},
+	togglerun = {kind = "checkbox", label = "toggle run"},
+	holdtoswim = {kind = "checkbox", label = "hold to swim"},
+	holdtofire = {kind = "checkbox", label = "hold to fire"},
 }
 
 --the categories, in order (label is a TEXT key)
 local CATEGORIES = {
 	{label = "motion:", items = {"reducemotion", "shakeintensity", "shakedirection", "camerasmoothing"}},
-	{label = "display:", items = {"reducetransparency", "increasecontrast", "colourfilter", "hudoutline", "cursorsize"}},
+	{label = "display:", items = {"reducetransparency", "increasecontrast", "colourfilter", "hudoutline", "cursorsize",
+		"reduceflashing", "playerindicator", "aimline", "lowtimewarning"}},
 	{label = "gameplay:", items = {"gamespeed", "halfopaqueblink"}},
+	{label = "assists:", items = {"jumpbuffer", "coyotetime", "pitrescue", "respawnwheredied", "generousstomps",
+		"infinitelives", "infinitetime", "skipcourse"}},
+	{label = "controls:", items = {"togglerun", "holdtoswim", "holdtofire"}},
 	{label = "notices:", items = {"clicknotices"}},
 }
 
@@ -54,6 +74,21 @@ local DEFAULTS = {
 	gamespeed = 100, --percent, 25 to 100 in steps of 5
 	halfopaqueblink = false,
 	clicknotices = false,
+	reduceflashing = false,
+	playerindicator = false,
+	aimline = false,
+	lowtimewarning = false,
+	jumpbuffer = false,
+	coyotetime = false,
+	pitrescue = false,
+	respawnwheredied = false,
+	generousstomps = false,
+	infinitelives = nil, --nil until the nitpicks are read: it starts as the alwaysinfinitelives nitpick
+	infinitetime = nil, --nil until the nitpicks are read: it starts as the alwaysinfinitetime nitpick
+	skipcourse = "off",
+	togglerun = false,
+	holdtoswim = false,
+	holdtofire = false,
 }
 
 accessibility = {}
@@ -66,26 +101,53 @@ function accessibility_defaults()
 		accessibility[key] = value
 	end
 	accessibility.camerasmoothing = nil
+	accessibility.infinitelives = nil
+	accessibility.infinitetime = nil
 	accessibility_resolve()
+end
+
+--the settings that start as a nitpick, and the global the game reads them from:
+--smooth camera (camerasmoothing), infinite lives (alwaysinfinitelives) and infinite time (alwaysinfinitetime)
+local FROMNITPICKS = {
+	camerasmoothing = "CameraSmoothing",
+	infinitelives = "AlwaysInfiniteLives",
+	infinitetime = "AlwaysInfiniteTime",
+}
+local nitpickvalues = {}
+
+--puts a setting that comes from a nitpick where the game reads it
+local function applynitpicksetting(key)
+	local value = accessibility[key]
+	if value == nil then
+		return
+	end
+	_G[FROMNITPICKS[key]] = value
+	if key == "infinitelives" then
+		infinitelives = value --(the cheat tab's switch, for this session)
+	elseif key == "infinitetime" then
+		infinitetime = value
+	end
 end
 
 --settings that start from something else once it's known
 function accessibility_resolve()
-	if accessibility.camerasmoothing == nil and nitpicksread then
-		if CameraSmoothingNitpick then
-			accessibility.camerasmoothing = true
-		else
-			accessibility.camerasmoothing = false
+	for key in pairs(FROMNITPICKS) do
+		if accessibility[key] == nil and nitpicksread then
+			if nitpickvalues[key] then
+				accessibility[key] = true
+			else
+				accessibility[key] = false
+			end
 		end
-	end
-	if accessibility.camerasmoothing ~= nil then
-		CameraSmoothing = accessibility.camerasmoothing
+		applynitpicksetting(key)
 	end
 end
 
---after loadnitpicks: smooth camera starts as the camerasmoothing nitpick, unless options.txt already has it
+--after loadnitpicks: these settings start as their nitpicks, unless options.txt already has them
 function accessibility_afternitpicks()
-	CameraSmoothingNitpick = CameraSmoothing
+	for key, global in pairs(FROMNITPICKS) do
+		nitpickvalues[key] = _G[global]
+	end
 	nitpicksread = true
 	accessibility_resolve()
 end
@@ -156,8 +218,8 @@ function accessibility_set(key, value, nosave)
 		return
 	end
 	accessibility[key] = value
-	if key == "camerasmoothing" then
-		CameraSmoothing = value
+	if FROMNITPICKS[key] then
+		applynitpicksetting(key)
 	end
 	if not nosave and saveconfig then
 		saveconfig()
@@ -248,6 +310,356 @@ function accessibility_restoretext(saved)
 	if saved then
 		lg.setColor(saved[1], saved[2], saved[3], saved[4])
 	end
+end
+
+------------------------------------------------------------
+-- assists and controls
+------------------------------------------------------------
+
+local JUMPBUFFER_TIME = 0.15 --a jump pressed this long before landing still happens
+local COYOTE_TIME = 0.1 --how long after walking off a ledge a jump still works
+local HOLD_REPEAT = 0.3 --hold to swim and hold to fire: seconds between strokes and throws
+
+--coyote time: whether the player walked off a ledge (not jumped) a moment ago, so a jump still counts as from the ground
+function accessibility_coyote(p)
+	if not accessibility.coyotetime then
+		return false
+	end
+	if not p.falling or p.jumping or p.a11yleftbyjump or not p.a11yairtime then
+		return false
+	end
+	if p.gravitydir ~= "down" or p.water or p.vine or p.fence then
+		return false
+	end
+	return p.a11yairtime <= COYOTE_TIME
+end
+
+--jump buffer: a jump pressed in the air that didn't do anything is remembered for a moment
+function accessibility_bufferjump(p)
+	if accessibility.jumpbuffer and p.gravitydir == "down" and not p.water then
+		p.a11yjumpbuffer = love.timer.getTime()
+	end
+end
+
+--the player just landed: a remembered jump happens next frame (see accessibility_playerupdate)
+function accessibility_landed(p)
+	if p.a11yjumpbuffer then
+		if accessibility.jumpbuffer and love.timer.getTime() - p.a11yjumpbuffer <= JUMPBUFFER_TIME then
+			p.a11ypendingjump = true
+		end
+		p.a11yjumpbuffer = nil
+	end
+end
+
+--the last solid ground a player stood on (pit rescue and respawn where you died): where their feet were, in which course
+function accessibility_safeground(p)
+	if p.gravitydir ~= "down" or p.dead then
+		return
+	end
+	local safe = p.a11ysafe
+	if not safe then
+		safe = {}
+		p.a11ysafe = safe
+	end
+	safe.x = p.x + p.width/2
+	safe.y = p.y + p.height
+	safe.course = tostring(marioworld) .. "-" .. tostring(mariolevel)
+	safe.sub = mariosublevel
+end
+
+--whether a safe ground is in the course and area that's loaded
+local function safehere(safe)
+	return safe and safe.course == tostring(marioworld) .. "-" .. tostring(mariolevel) and safe.sub == mariosublevel
+end
+
+--whether a projectile power-up's throw can repeat (hold to fire): not a tail whip, pick up, Cappy or Yoshi
+local THROWSIZES = {[3] = true, [4] = true, [7] = true, [13] = true, [15] = true}
+local function canautofire(p)
+	if p.yoshi or p.shoe or p.pickup or p.pickupready or p.fence or p.vine or p.statue or p.ducking then
+		return false
+	end
+	if p.cappy and not UseButtonCappy then
+		return false
+	end
+	return THROWSIZES[p.size] or p.fireenemy or p.characterdata.fireenemy
+end
+
+--every frame for every player (mario:update)
+function accessibility_playerupdate(p, dt)
+	if p.dead or not p.controlsenabled then
+		p.a11ypendingjump = false
+		return
+	end
+	local n = p.playernumber
+
+	--on the ground, or how long in the air (coyote time)
+	if p.falling == false and not p.jumping then
+		p.a11yairtime = 0
+		p.a11yleftbyjump = false
+	else
+		p.a11yairtime = (p.a11yairtime or 0) + dt
+		if p.jumping then
+			p.a11yleftbyjump = true
+		end
+	end
+
+	--jump buffer: the jump pressed just before landing
+	if p.a11ypendingjump then
+		p.a11ypendingjump = false
+		if accessibility.jumpbuffer and p.falling == false and not p.jumping then
+			p:jump()
+			if not jumpkey(n) then
+				p:stopjump() --let go already: a short hop
+			end
+		end
+	end
+
+	--hold to swim: another stroke every so often while jump is held
+	if accessibility.holdtoswim and p.water and not p.frog and jumpkey(n) then
+		p.a11yswimtimer = (p.a11yswimtimer or 0) + dt
+		if p.a11yswimtimer >= HOLD_REPEAT then
+			p.a11yswimtimer = 0
+			p:jump()
+		end
+	else
+		p.a11yswimtimer = 0
+	end
+
+	--hold to fire: another throw every so often while run is held (the run button itself, even with toggle run)
+	if accessibility.holdtofire and controls[n] and checkkey(controls[n]["run"], n, "run") and canautofire(p) then
+		p.a11yfiretimer = (p.a11yfiretimer or 0) + dt
+		if p.a11yfiretimer >= HOLD_REPEAT then
+			p.a11yfiretimer = 0
+			if p.fireenemy or p.characterdata.fireenemy then
+				p:button("run") --custom power-ups fire from the run button
+			end
+			p:fire()
+		end
+	else
+		p.a11yfiretimer = 0
+	end
+end
+
+--toggle run: whether run counts as held for a player
+function accessibility_runlatched(i)
+	local p = objects and objects["player"] and objects["player"][i]
+	if p and p.a11yrunlatched then
+		return true
+	end
+	return false
+end
+
+--toggle run: a press of run turns it on or off
+function accessibility_runpressed(i)
+	if not accessibility.togglerun or gamestate ~= "game" then
+		return
+	end
+	local p = objects and objects["player"] and objects["player"][i]
+	if p then
+		p.a11yrunlatched = not p.a11yrunlatched
+	end
+end
+
+--pit rescue: a player falling out of the level goes back to the last solid ground they stood on, and it counts as a
+--hit (a small player just blinks). Returns true when it caught them
+function accessibility_pitrescue(p)
+	if not accessibility.pitrescue or editormode or minigameplaying or autoscrolling or levelfinished or p.dead then
+		return false
+	end
+	if bigmario or p.gravitydir ~= "down" or not safehere(p.a11ysafe) then
+		return false
+	end
+	local safe = p.a11ysafe
+	p.x = safe.x - p.width/2
+	p.y = safe.y - p.height
+	p.speedx, p.speedy = 0, 0
+	p.a11yairtime = 0
+	p.a11yjumpbuffer = nil
+
+	if p.invincible or p.starred then
+		--already can't be hurt: just put back
+	elseif p.characterdata.health and p.health and p.health > 1 then
+		p:die("Enemy (pit rescue)")
+	elseif p.size > 1 and not p.characterdata.health then
+		p:die("Enemy (pit rescue)") --drops a size, or loses a shoe, helmet or Yoshi, like any hit
+	else
+		playsound(shrinksound)
+		p.invincible = true
+		p.animationtimer = invincibletime - invincibletime2
+		p.animation = "invincible"
+	end
+	if players == 1 then
+		camerasnap(nil, nil, true)
+	end
+	return true
+end
+
+--respawn where you died: where the next try starts after everyone died, or nil
+accessibilityrespawn = nil
+
+--a player died for real: remember where they last stood
+function accessibility_playerdied(p)
+	if accessibility.respawnwheredied and not editormode and not minigameplaying and not dcplaying and safehere(p.a11ysafe) then
+		local safe = p.a11ysafe
+		accessibilityrespawn = {x = safe.x, y = safe.y, course = safe.course, sub = safe.sub}
+	end
+end
+
+--the area to load after everyone died, when respawning where they died (nil: as usual)
+function accessibility_respawnsublevel()
+	if accessibility.respawnwheredied and accessibilityrespawn then
+		return accessibilityrespawn.sub
+	end
+	return nil
+end
+
+--startlevel: where to put the players instead of the start or a checkpoint (and forgets it), or nil
+function accessibility_takerespawn()
+	local point = accessibilityrespawn
+	accessibilityrespawn = nil
+	if point and accessibility.respawnwheredied and safehere(point) then
+		return point
+	end
+	return nil
+end
+
+--generous stomps: a side hit counts as landing on the enemy when the player is coming down with their feet above its middle
+function accessibility_generousstomp(p, a, b)
+	if not accessibility.generousstomps or a == "tile" or type(b) ~= "table" then
+		return false
+	end
+	if p.gravitydir ~= "down" or p.speedy <= 0 or p.water then
+		return false
+	end
+	if not (b.stompable or type(b.stomp) == "function") then
+		return false
+	end
+	if not (b.y and b.height) then
+		return false
+	end
+	return p.y + p.height <= b.y + b.height/2
+end
+
+--skip course: deaths on the course being played
+local coursedeaths = {key = nil, count = 0}
+
+local function coursekey()
+	return tostring(mappack) .. ":" .. tostring(marioworld) .. "-" .. tostring(mariolevel)
+end
+
+--everyone died on this course
+function accessibility_countdeath()
+	if coursedeaths.key ~= coursekey() then
+		coursedeaths.key = coursekey()
+		coursedeaths.count = 0
+	end
+	coursedeaths.count = coursedeaths.count + 1
+end
+
+--whether the pause menu offers to skip this course
+function accessibility_canskip()
+	local limit = tonumber(accessibility.skipcourse)
+	if not limit or gamestate ~= "game" or editormode or testlevel or minigameplaying or dcplaying or SERVER or CLIENT then
+		return false
+	end
+	return coursedeaths.key == coursekey() and coursedeaths.count >= limit
+end
+
+--skips to the next course, from the pause menu
+function accessibility_skipcourse()
+	if not accessibility_canskip() then
+		return
+	end
+	coursedeaths.key, coursedeaths.count = nil, 0
+	accessibilityrespawn = nil
+	pausemenuopen = false
+	pausedaudio = nil
+	mariosublevel = 0
+	prevsublevel = false
+	nextlevel()
+end
+
+------------------------------------------------------------
+-- display
+------------------------------------------------------------
+
+--reduce flashing: a Starman doesn't flash the player's colours
+function accessibility_reduceflashing()
+	return accessibility.reduceflashing
+end
+
+--low time warning: the colour of the timer (nil: the HUD's own)
+function accessibility_timecolour()
+	if not accessibility.lowtimewarning or gamestate ~= "game" or editormode or infinitetime or notime then
+		return nil
+	end
+	if not mariotime or mariotime <= 0 or mariotime >= 100 then
+		return nil
+	end
+	local pulse = (math.sin(love.timer.getTime()*8) + 1)/2
+	return {255, lerp(40, 140, pulse), lerp(40, 140, pulse)}
+end
+
+--player indicator: "P<n>" with an arrow under it above every player (game pixels on screen, in the level's draw)
+function accessibility_drawplayerindicators(xscroll, yscroll)
+	if not accessibility.playerindicator or not objects or not objects["player"] then
+		return
+	end
+	for i = 1, players do
+		local p = objects["player"][i]
+		if p and not p.dead and p.active ~= false then
+			local colour = {255, 255, 255}
+			if mariocolors[i] and mariocolors[i][1] then
+				colour = mariocolors[i][1]
+			end
+			local cx = (p.x + p.width/2 - xscroll)*16
+			local top = (p.y - yscroll)*16 - 8
+			local lines = {"p" .. i, "↓"}
+			for l, line in ipairs(lines) do
+				local y = top - 2 - (#lines - l + 1)*10
+				properprintFbackground(line, math.floor((cx - utf8.len(line)*4)*scale), math.floor(y*scale), true, colour)
+			end
+		end
+	end
+	lg.setColor(255, 255, 255, 255)
+end
+
+--aim line: a solid line from the portal gun to where the portal would open, in the portal's colour
+--(red with a cross where it can't open)
+function accessibility_drawaimline(player, sourcex, sourcey, x, y, possible, xscroll, yscroll)
+	local x1, y1 = (sourcex - xscroll)*16*scale, (sourcey - .5 - yscroll)*16*scale
+	local x2, y2 = (x - xscroll)*16*scale, (y - .5 - yscroll)*16*scale
+	local colour = {255, 60, 60}
+	if possible then
+		colour = {0, 255, 0}
+		local pc = portalcolor and portalcolor[player.playernumber]
+		if pc and pc[1] then
+			colour = pc[1]
+		end
+	end
+	local oldwidth = lg.getLineWidth()
+	local oldstyle = lg.getLineStyle()
+	lg.setLineStyle("rough")
+	lg.setColor(0, 0, 0, 255)
+	lg.setLineWidth(3*scale)
+	lg.line(x1, y1, x2, y2)
+	lg.setColor(colour[1], colour[2], colour[3], 255)
+	lg.setLineWidth(scale)
+	lg.line(x1, y1, x2, y2)
+	if not possible then
+		local c = 3*scale
+		lg.setColor(0, 0, 0, 255)
+		lg.setLineWidth(3*scale)
+		lg.line(x2-c, y2-c, x2+c, y2+c)
+		lg.line(x2-c, y2+c, x2+c, y2-c)
+		lg.setColor(255, 60, 60, 255)
+		lg.setLineWidth(scale)
+		lg.line(x2-c, y2-c, x2+c, y2+c)
+		lg.line(x2-c, y2+c, x2+c, y2-c)
+	end
+	lg.setLineWidth(oldwidth)
+	lg.setLineStyle(oldstyle)
+	lg.setColor(255, 255, 255, 255)
 end
 
 ------------------------------------------------------------
@@ -901,7 +1313,7 @@ ACCESSIBILITY_OPTIONSTAB = 5
 local optionspage = {
 	prefix = "a11y_",
 	columns = {{x = 30, w = 199}}, --(the scrollbar goes right of it)
-	catcolumns = {1, 1, 1, 1},
+	catcolumns = {1, 1, 1, 1, 1, 1},
 	viewport = {x = 23, y = 33, w = 214, h = 181},
 }
 
@@ -956,7 +1368,7 @@ pausea11yselected = 1 --the setting the keyboard is on (its index), or count+1 f
 local pausepage = {
 	prefix = "pa11y_",
 	columns = {{x = 58, w = 138}, {x = 204, w = 134}}, --(the scrollbar goes right of the second)
-	catcolumns = {1, 2, 1, 2},
+	catcolumns = {1, 2, 1, 1, 2, 2}, --motion, gameplay and assists on the left; display, controls and notices on the right
 	viewport = {x = 52, y = 32, w = 296, h = 143},
 }
 
@@ -1022,31 +1434,80 @@ function pausemenu_setpage(page, instant)
 		if pausemenu_a11yrow then
 			pausemenuselected = pausemenu_a11yrow()
 		end
+		pausemenubuttoncol = 1
 	end
 end
 
---the button at the bottom of the pause box: "accessibility" on the pause menu, "back" on the accessibility page
-local function pausebutton()
+--the buttons at the bottom of the pause box: "accessibility" (or "back" on the accessibility page), and "skip course"
+--next to it on the pause menu once it's on offer (see accessibility_canskip)
+pausemenubuttoncol = 1 --the button the keyboard is on, on the pause menu's button row: 1 accessibility, 2 skip course
+
+local function makebutton(name, label, func)
+	local el = guielements[name]
+	if not el or el.label ~= label then
+		el = guielement:new("button", 0, 0, label, func, 2)
+		el.label = label
+		guielements[name] = el
+	end
+	return el
+end
+
+local function buttonwidth(el)
+	return 3 + el.width + el.space*2
+end
+
+--whether the pause menu shows "skip course"
+function pausemenu_skipshown()
+	return pausemenupage == 1 and accessibility_canskip()
+end
+
+local function pausebuttons()
 	local label = T("accessibility")
 	if pausemenupage == 2 then
 		label = T("back")
 	end
-	local el = guielements["pause_a11ybutton"]
-	if not el or el.label ~= label then
-		el = guielement:new("button", 0, 0, label, function()
-			if pausemenupage == 2 then
-				pausemenu_setpage(1)
-			else
-				pausemenu_setpage(2)
-			end
-		end, 2)
-		el.label = label
-		guielements["pause_a11ybutton"] = el
+	local main = makebutton("pause_a11ybutton", label, function()
+		if pausemenupage == 2 then
+			pausemenu_setpage(1)
+		else
+			pausemenu_setpage(2)
+		end
+	end)
+	local skip
+	if pausemenu_skipshown() then
+		skip = makebutton("pause_skipbutton", T("skip course"), accessibility_skipcourse)
+	else
+		guielements["pause_skipbutton"] = nil
+		pausemenubuttoncol = 1
 	end
-	local w = 3 + el.width + el.space*2
-	el.x = math.floor(width*8 - w/2)
-	el.y = 177 --its bottom edge is 4 pixels above the pause box's
-	return el
+	--side by side in the middle, their bottom edges 4 pixels above the pause box's
+	local gap = 6
+	local total = buttonwidth(main)
+	if skip then
+		total = total + gap + buttonwidth(skip)
+	end
+	local x = math.floor(width*8 - total/2)
+	main.x, main.y = x, 177
+	if skip then
+		skip.x, skip.y = x + buttonwidth(main) + gap, 177
+	end
+	return main, skip
+end
+
+--the keyboard on the pause menu's button row: Left and Right move between the buttons
+function pausemenu_buttonmove(dir)
+	if pausemenu_skipshown() then
+		pausemenubuttoncol = math.max(1, math.min(2, pausemenubuttoncol + dir))
+	end
+end
+
+--Enter on the pause menu's button row
+function pausemenu_buttonactivate()
+	if pausemenubuttoncol == 2 and pausemenu_skipshown() then
+		accessibility_skipcourse()
+	else
+		pausemenu_setpage(2)
+	end
 end
 
 --every frame the pause menu is on screen. active: the pause menu takes input (fully open, no prompt or popup)
@@ -1054,13 +1515,19 @@ function accessibility_pauseupdate(active, dt)
 	local idle2 = pausemenu_pageidle(2)
 	local key = pauseselectedkey()
 	updatepage(pausepage, active and idle2, key, dt)
-	local button = pausebutton()
-	button.active = active and not pausemenupageanim
-	button.nohover = not button.active
+	local main, skip = pausebuttons()
+	local onrow = pausemenupage == 1 and pausemenu_a11yrow and pausemenuselected == pausemenu_a11yrow()
+	main.active = active and not pausemenupageanim
+	main.nohover = not main.active
 	if pausemenupage == 2 then
-		button.forcehover = button.active and pausea11yselected > pagecount(pausepage)
+		main.forcehover = main.active and pausea11yselected > pagecount(pausepage)
 	else
-		button.forcehover = button.active and pausemenu_a11yrow and pausemenuselected == pausemenu_a11yrow()
+		main.forcehover = main.active and onrow and pausemenubuttoncol == 1
+	end
+	if skip then
+		skip.active = active and not pausemenupageanim
+		skip.nohover = not skip.active
+		skip.forcehover = skip.active and onrow and pausemenubuttoncol == 2
 	end
 end
 
@@ -1069,6 +1536,7 @@ function accessibility_pauseremove()
 		removewidgets(pausepage)
 	end
 	guielements["pause_a11ybutton"] = nil
+	guielements["pause_skipbutton"] = nil
 	pausepage.scroll, pausepage.scrolltarget = 0, 0
 end
 
@@ -1082,9 +1550,11 @@ function accessibility_pausedraw(offy)
 end
 
 function accessibility_pausedrawbutton()
-	local el = guielements["pause_a11ybutton"]
-	if el then
-		el:draw()
+	for _, name in ipairs({"pause_a11ybutton", "pause_skipbutton"}) do
+		local el = guielements[name]
+		if el then
+			el:draw()
+		end
 	end
 end
 

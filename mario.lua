@@ -502,6 +502,7 @@ function mario:update(dt)
 		end
 	end
 	self.stompsnap = false --what p-speed was like before this frame's landing (see floorcollide)
+	accessibility_playerupdate(self, dt) --jump buffer, coyote time, hold to swim and hold to fire (accessibility.lua)
 	--RACCOON STUFF
 	if self.float and not self.raccoonfly then
 		if self.gravitydir == "up" then
@@ -1239,7 +1240,7 @@ function mario:update(dt)
 			if self.starcolori > 4 then
 				self.starcolori = self.starcolori - 4
 			end
-			if self.size ~= 8 then
+			if self.size ~= 8 and not accessibility_reduceflashing() then --(reduce flashing: a rainbow glow instead, see drawplayer)
 				self.colors = self.characterdata.starcolors[self.starcolori]
 			end
 			
@@ -1802,6 +1803,11 @@ function mario:update(dt)
 					if checkpointsublevel then
 						sub = checkpointsublevel
 					end
+				end
+				--accessibility: another death on this course (skip course), and the area to come back in (respawn where you died)
+				accessibility_countdeath()
+				if accessibility_respawnsublevel() ~= nil then
+					sub = accessibility_respawnsublevel()
 				end
 				if testlevel and not editormode then
 					stoptestinglevel()
@@ -3894,6 +3900,8 @@ function mario:jump(force)
 	if self.disablejumping then --animationS
 		return false	
 	end
+	--jump buffer (accessibility): a press in the air that doesn't do anything is remembered (see the end of this function)
+	local bufferspeedy, bufferfalling = self.speedy, self.falling
 
 	if self.statue or self.capefly or self.clearpipe or self.groundpounding then
 		return
@@ -4017,6 +4025,11 @@ function mario:jump(force)
 					self.speedy = -30
 				end]]
 				
+				--coyote time (accessibility): walked off a ledge a moment ago, so this jump counts as from the ground
+				if (not force) and (not sizechangejump) and accessibility_coyote(self) then
+					self.falling = false
+				end
+
 				if ( ((not sizechangejump) or self.falling)
 					and (self.falling == false or sizechangejump or (self.shoe and (not self.yoshi) and self.landed)) )
 					or ( (self.characterdata.doublejump or self.characterdata.dbljmppls) and (not self.hasdoublejumped) ) then
@@ -4136,6 +4149,9 @@ function mario:jump(force)
 				return
 			end
 		end
+	end
+	if (not force) and bufferfalling and self.falling and self.speedy == bufferspeedy and self.controlsenabled then
+		accessibility_bufferjump(self)
 	end
 	net_action(self.playernumber, "jump")
 end
@@ -5430,6 +5446,13 @@ function mario:floorcollide(a, b)
 		self.jumping = false
 		self.landed = true
 
+		--accessibility: a jump pressed just before landing (jump buffer), and the last solid ground (pit rescue,
+		--respawn where you died)
+		accessibility_landed(self)
+		if a == "tile" then
+			accessibility_safeground(self)
+		end
+
 		if self.helmet == "propellerbox" then
 			self.propellerjumping = false
 			self.propellerjumped = false
@@ -6025,6 +6048,11 @@ function mario:rightcollide(a, b, passive)
 			return not not b.solidkill
 		end
 	end
+
+	--generous stomps (accessibility): coming down on an enemy's side with the feet above its middle lands on it
+	if accessibility_generousstomp(self, a, b) then
+		return self:floorcollide(a, b)
+	end
 	
 	if self.gravitydir == "right" then
 		if self.speedy == 0 then
@@ -6398,6 +6426,11 @@ function mario:leftcollide(a, b)
 		if self:starcollide(a, b) then
 			return not not b.solidkill
 		end
+	end
+
+	--generous stomps (accessibility): coming down on an enemy's side with the feet above its middle lands on it
+	if accessibility_generousstomp(self, a, b) then
+		return self:floorcollide(a, b)
 	end
 	
 	if self.gravitydir == "left" then
@@ -8019,6 +8052,10 @@ function mario:die(how)
 		--loadlevel, loadlevelinstant or nextlevel is fading the screen out
 		return
 	end
+	--pit rescue (accessibility): back on the last solid ground instead
+	if how == "pit" and accessibility_pitrescue(self) then
+		return
+	end
 
 	net_action(self.playernumber, "die|" .. how) --netplay die
 	if (CLIENT or SERVER) and self.playernumber > 1 and not self.netaction then
@@ -8120,6 +8157,7 @@ function mario:die(how)
 		self.speedy = 0
 		return
 	end
+	accessibility_playerdied(self) --respawn where you died (accessibility)
 	self.dead = true
 	
 	everyonedead = true
@@ -9140,7 +9178,9 @@ function mario:star()
 	--made more accurate
 	if self.size ~= 8 then
 		addpoints(1000, self.x+self.width/2, self.y)
-		self.colors = self.characterdata.starcolors[1]
+		if not accessibility_reduceflashing() then --(reduce flashing: the player keeps their colours, with a rainbow glow)
+			self.colors = self.characterdata.starcolors[1]
+		end
 		playsound(mushroomeatsound)
 	end
 	

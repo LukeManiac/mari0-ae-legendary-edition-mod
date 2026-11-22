@@ -2926,6 +2926,9 @@ function game_draw()
 			end
 		end
 		
+		--player indicators (accessibility)
+		accessibility_drawplayerindicators(xscroll, yscroll)
+
 		--BLOCK DEBRIS
 		for i, v in pairs(blockdebristable) do
 			v:draw()
@@ -2950,6 +2953,11 @@ function game_draw()
 					
 					local dist = math.sqrt(((x-xscroll)*16*scale - (sourcex-xscroll)*16*scale)^2 + ((y-yscroll-.5)*16*scale - (sourcey-yscroll-.5)*16*scale)^2)/16/scale
 					
+					--aim line (accessibility): a solid line to where the portal opens, instead of the dots
+					if accessibility.aimline then
+						accessibility_drawaimline(player, sourcex, sourcey, x, y, portalpossible, xscroll, yscroll)
+						dist = 0
+					end
 					portaldotspritebatch:clear()
 					for i = 1, dist/portaldotsdistance+1 do
 						if((i-1+portaldotstimer/portaldotstime)/(dist/portaldotsdistance)) < 1 then
@@ -3847,13 +3855,66 @@ function drawentity(j, w, i, v, currentscissor, drop)
 end
 
 --dontfreezeonsizechange: a size-changing player is drawn the way the animation shows them (see mario:sizefxlook)
---accessibility (half-opaque blink): a player blinking after a hit is drawn into this canvas, then onto the screen at half
---opacity, so its layers (colours, hat...) fade together instead of showing through each other
-local blinkcanvas
+--accessibility: a player drawn specially is drawn into this canvas first, then onto the screen:
+--	half-opaque blink: at half opacity while blinking after a hit, so their layers (colours, hat...) fade together
+--	reduce flashing: with a rainbow glow around and over them while they have a Starman (they keep their own colours)
+local playercanvas
+local silhouetteshader, silhouettefailed
+local GLOWRING = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {-1, 1}, {1, -1}, {-1, -1}}
+
+--draws a picture's shape in one colour (the colour set with setColor), premultiplied
+local function getsilhouette()
+	if not silhouetteshader and not silhouettefailed then
+		local ok, shader = pcall(love.graphics.newShader, [[
+			vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc)
+			{
+				float a = Texel(tex, tc).a*color.a;
+				return vec4(color.rgb*a, a);
+			}
+		]])
+		if ok then
+			silhouetteshader = shader
+		else
+			silhouettefailed = true
+		end
+	end
+	return silhouetteshader
+end
+
+--the rainbow glow of a player with a Starman (reduce flashing), drawn from the player's picture in playercanvas.
+--behind: the ring around them, otherwise the tint over them
+local function drawstarglow(behind)
+	local shader = getsilhouette()
+	if not shader then
+		return
+	end
+	local t = love.timer.getTime()
+	local pulse = 0.75 + 0.25*math.sin(t*6)
+	love.graphics.setShader(shader)
+	if behind then
+		love.graphics.setBlendMode("alpha", "premultiplied")
+		for radius = 2, 1, -1 do
+			for k, o in ipairs(GLOWRING) do
+				local r, g, b = rainbow(t + k/#GLOWRING, 1.2, 0.85, 1)
+				local alpha = 255*pulse*(0.55 - radius*0.15)
+				love.graphics.setColor(r, g, b, alpha)
+				love.graphics.draw(playercanvas, o[1]*radius*scale, o[2]*radius*scale)
+			end
+		end
+	else
+		love.graphics.setBlendMode("add", "premultiplied")
+		local r, g, b = rainbow(t, 1.2, 0.85, 1)
+		love.graphics.setColor(r, g, b, 70*pulse)
+		love.graphics.draw(playercanvas, 0, 0)
+	end
+	love.graphics.setShader()
+end
 
 function drawplayer(i, x, y, r, pad, drop)
 	local v = objects["player"][i]
-	if v and v.animation == "invincible" and accessibility_halfblink() and not v.halfblinkdrawing then
+	local halfblink = v and v.animation == "invincible" and accessibility_halfblink()
+	local starglow = v and (not drop) and accessibility_reduceflashing() and v.starred and not v.dead
+	if (halfblink or starglow) and not v.specialdrawing then
 		local target = love.graphics.getCanvas()
 		local w, h
 		if target then
@@ -3861,24 +3922,35 @@ function drawplayer(i, x, y, r, pad, drop)
 		else
 			w, h = love.graphics.getDimensions()
 		end
-		if not blinkcanvas or blinkcanvas:getWidth() ~= w or blinkcanvas:getHeight() ~= h then
-			blinkcanvas = love.graphics.newCanvas(w, h)
-			blinkcanvas:setFilter("nearest", "nearest")
+		if not playercanvas or playercanvas:getWidth() ~= w or playercanvas:getHeight() ~= h then
+			playercanvas = love.graphics.newCanvas(w, h)
+			playercanvas:setFilter("nearest", "nearest")
 		end
 		love.graphics.push("all")
-		love.graphics.setCanvas({blinkcanvas, stencil = true})
+		love.graphics.setCanvas({playercanvas, stencil = true})
 		love.graphics.clear()
-		v.halfblinkdrawing = true
+		v.specialdrawing = true
 		local result = drawplayer(i, x, y, r, pad, drop)
-		v.halfblinkdrawing = nil
+		v.specialdrawing = nil
 		love.graphics.pop()
+
 		love.graphics.push("all")
 		love.graphics.origin()
 		love.graphics.setScissor()
+		if starglow then
+			drawstarglow(true)
+		end
 		love.graphics.setShader()
 		love.graphics.setBlendMode("alpha", "premultiplied")
-		love.graphics.setColor(128, 128, 128, 128)
-		love.graphics.draw(blinkcanvas, 0, 0)
+		if halfblink then
+			love.graphics.setColor(128, 128, 128, 128)
+		else
+			love.graphics.setColor(255, 255, 255, 255)
+		end
+		love.graphics.draw(playercanvas, 0, 0)
+		if starglow then
+			drawstarglow(false)
+		end
 		love.graphics.pop()
 		return result
 	end
@@ -4533,7 +4605,12 @@ function drawHUD()
 		
 		love.graphics.draw(hudclockimg, hudclockquad[hudoutlined()], (width*16-49)*scale, 11*scale, 0, scale, scale)
 		if gamestate == "game" then
+			local timecolour = accessibility_timecolour() --low time warning (accessibility)
+			if timecolour then
+				love.graphics.setColor(timecolour)
+			end
 			properprintfunc(addzeros(math.ceil(mariotime), 3), (width*16-40)*scale, 12*scale)
+			love.graphics.setColor(hudtextcolor)
 		else
 			properprintfunc("000", (width*16-40)*scale, 12*scale)
 		end
@@ -4563,7 +4640,12 @@ function drawHUD()
 				properprintfunc(TEXT["edit"], uispace*3.5 - 16*scale, 16*scale)
 			end
 		elseif gamestate == "game" then
+			local timecolour = accessibility_timecolour() --low time warning (accessibility)
+			if timecolour then
+				love.graphics.setColor(timecolour)
+			end
 			properprintfunc(addzeros(math.ceil(mariotime), 3), uispace*3.5-8*scale, 16*scale)
+			love.graphics.setColor(hudtextcolor)
 		end
 	end
 
@@ -5103,6 +5185,13 @@ function startlevel(level, reason)
 		end
 	end
 	
+	--respawn where you died (accessibility): the last solid ground before everyone died, instead of the start or a checkpoint
+	local respawnpoint = accessibility_takerespawn()
+	if respawnpoint and not pipestartx then
+		startx = respawnpoint.x
+		starty = respawnpoint.y
+	end
+
 	--set startx to pipestart
 	if pipestartx then
 		startx = pipestartx-1
@@ -6033,7 +6122,7 @@ function game_keypressed(key, textinput)
 				elseif pausemenuselected == pausemenu_rightrow("letterbox") then
 					pausemenu_setletterbox(not letterboxfullscreen)
 				elseif pausemenuselected == pausemenu_a11yrow() then
-					pausemenu_setpage(2) --the accessibility page, below
+					pausemenu_buttonactivate() --"accessibility" (the page below) or "skip course"
 				end
 			elseif isPauseKey(key) then
 				pausemenuopen = false
@@ -6082,6 +6171,8 @@ function game_keypressed(key, textinput)
 					end
 				elseif pausemenuselected == pausemenu_rightrow("letterbox") then
 					pausemenu_setletterbox(not letterboxfullscreen)
+				elseif pausemenuselected == pausemenu_a11yrow() then
+					pausemenu_buttonmove(dir) --between "accessibility" and "skip course"
 				elseif (pausemenuselected == shader1row or pausemenuselected == shader2row) and shaderssupported ~= false then
 					local slot, i = 2, currentshaderi2
 					if pausemenuselected == shader1row then
@@ -9147,6 +9238,10 @@ function playsound(sound)
 end
 
 function runkey(i)
+	--toggle run (accessibility): run counts as held while it's switched on
+	if accessibility.togglerun and gamestate == "game" then
+		return accessibility_runlatched(i)
+	end
 	local s = controls[i]["run"]
 	return checkkey(s,i,"run")
 end
@@ -9481,6 +9576,9 @@ function controlinputpress(player, name, sourcetype, source, sourcebutton)
 		return false
 	end
 	mario.controlinputstate[name] = "active"
+	if name == "run" then
+		accessibility_runpressed(player) --toggle run (accessibility)
+	end
 	return true
 end
 

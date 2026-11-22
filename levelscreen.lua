@@ -72,6 +72,7 @@ function levelscreen_load(reason, i)
 			respawnsublevel = 0
 			checkpointx = nil
 			checkpointsublevel = false
+			accessibilityrespawn = nil --(respawn where you died: a new course starts at its start)
 			
 			--check if next level doesn't exist
 			if dcplaying then
@@ -150,6 +151,7 @@ function levelscreen_load(reason, i)
 		blacktime = gameovertime
 		playsound(gameoversound)
 		checkpointx = nil
+		accessibilityrespawn = nil --(respawn where you died: a game over starts over)
 		
 		if not dcplaying and love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/gameover.png") then
 			levelscreenimage = love.graphics.newImage(mappackfolder .. "/" .. mappack .. "/gameover.png")

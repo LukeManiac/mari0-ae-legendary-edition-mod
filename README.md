@@ -631,7 +631,9 @@ display:
     ...
 ```
 
-A label too long for its line wraps beside a checkbox. A slider or dropdown that doesn't fit next to its label goes on the line under it. If a page is taller than the space it has (a long translation, say), it scrolls, with a GUI scrollbar at its right edge that can be dragged like any other. The mouse wheel scrolls it too, and the setting the keyboard is on always scrolls into view, with the scrollbar following. The scrollbar only shows when the page doesn't fit. Settings scrolled out of view can't be clicked.
+There are six categories: **motion**, **display**, **gameplay**, **assists**, **controls** and **notices**.
+
+A label too long for its line wraps beside a checkbox. A slider or dropdown that doesn't fit next to its label goes on the line under it. Both pages are taller than the space they have, so they scroll, with a GUI scrollbar at their right edge that can be dragged like any other. The mouse wheel scrolls them too, and the setting the keyboard is on always scrolls into view, with the scrollbar following. Settings scrolled out of view can't be clicked.
 
 Every change saves straight away. They're saved in `options.txt` as `a11y_<name>:<value>`, and **Reset All Settings** puts them all back to their defaults.
 
@@ -649,11 +651,31 @@ Every change saves straight away. They're saved in `options.txt` as `a11y_<name>
 * **Colour filter:** None, protanopia, deuteranopia or tritanopia. The whole frame goes through a daltonisation filter that moves the colours someone with that colour vision deficiency would lose into ones they can tell apart. Everything is filtered, including menus, the HUD, notices and shaders.
 * **HUD outline:** Outlines the HUD in every mappack, the same as a mappack with `hudoutline` on. Score notes (the points and 1-ups that float up) get a black outline too, whenever the HUD is outlined. The mappack's own `hudoutline` setting isn't changed.
 * **Text cursor:** How wide a text input's cursor is: normal (2 pixels), large (3) or extra large (4). This also covers a slider's cursor while you type a value into it.
+* **Reduce flashing:** A Starman no longer flashes the player through colours. They keep their own colours, with a soft rainbow glow around and over them made with `rainbow()`, like in the Super Mario Maker series. The glow is a ring of the player's shape in shifting rainbow colours a pixel or two out, and a light rainbow tint over them, both pulsing gently. Only the Starman changes.
+* **Player indicator:** "P1" (or P2, P3, P4) with "↓" under it above every player, in that player's colour with a black outline. Each line is centred on the player.
+* **Aim line:** The portal gun's dots are replaced by a solid line with a black outline, from the portal gun to where the portal would open, in the colour of the player's first portal. Where a portal can't open, the line is red and ends in a red cross. The crosshair on the surface still shows.
+* **Low time warning:** Once the timer drops below 100, it turns red and pulses, so the warning doesn't depend on hearing the "hurry" sound. It doesn't show with infinite time, in courses without a timer, or in the Course Maker.
 
 **Gameplay**
 
 * **Game speed:** How fast gameplay runs, from 25% to 100% in steps of 5%. 100% by default. Everything in a course slows down together, including the timer. The pause menu, its prompts and the menus run at normal speed, and so does the Course Maker while editing. Testing a course uses the setting. Online play always runs at 100%.
 * **Half-opaque blink:** A player blinking after a hit is drawn at half opacity the whole time instead of blinking. The player is drawn as one picture first, so their colours, hat and other layers fade together instead of showing through each other.
+
+**Assists**
+
+* **Jump buffer:** Pressing jump up to 0.15 seconds before landing jumps as soon as you land. If jump was let go of by then, it's a short hop, the same as tapping jump. A press in the air that does something (a double jump, a raccoon flap, a swim stroke) isn't remembered.
+* **Coyote time:** For 0.1 seconds after walking off a ledge, you can still jump as if you were on the ground. It doesn't apply after a jump, underwater, or on vines and fences.
+* **Pit rescue:** Falling out of the bottom of the level puts you back on the last solid ground you stood on, blinking as if you'd been hit. A powered-up player drops one size (or loses their shoe, helmet or Yoshi, like any hit). A small player stays small instead of dying, and a player who can't be hurt (blinking or with a Starman) is just put back. It doesn't apply in the Course Maker, in minigames, in autoscrolling courses or once the course is finished.
+* **Respawn where you died:** After everyone dies, the next try starts on the last solid ground you stood on in that course and area, instead of the start or a checkpoint. A new course, or a game over, starts as usual. It doesn't apply in minigames or the daily challenge.
+* **Generous stomps:** Running into an enemy's side while you're coming down with your feet above its middle counts as landing on it, so clipping its edge stomps it instead of hurting you. Enemies that hurt you from above still do.
+* **Infinite lives** and **Infinite time:** The `alwaysinfinitelives` and `alwaysinfinitetime` nitpicks as settings, including what they do in the minigames. The first time the game starts, they're set to whatever the nitpicks say. From then on, the settings decide, and **Reset All Settings** takes them from the nitpicks again. The cheat tab's switches still work for the session.
+* **Skip course:** Off, after 5 deaths or after 10 deaths. Off by default. Once everyone has died that many times on a course, a **skip course** button (**skip level** in English, which says "level" where Better English says "course") appears next to **accessibility** at the bottom of the pause menu. It goes straight to the next course, the same way finishing it would. It doesn't appear while testing a course from the Course Maker, in minigames, in the daily challenge or online.
+
+**Controls**
+
+* **Toggle run:** Pressing run starts running, and pressing it again stops. Anything that needs run held (the Tanooki statue, carrying things) acts as if it's held while it's on.
+* **Hold to swim:** Holding jump underwater keeps swimming upwards, a stroke every 0.3 seconds, instead of needing a press for each stroke. Frog Mario is unaffected.
+* **Hold to fire:** Holding run keeps throwing fireballs, iceballs, superballs, hammers, boomerangs and custom power-up projectiles, one every 0.3 seconds, within the usual limit on how many can be out at once. It only repeats throws: tail whips, picking things up, Cappy and Yoshi still need a press each time. With toggle run on, it's the run button itself that has to be held.
 
 **Notices**
 
@@ -667,7 +689,8 @@ Every change saves straight away. They're saved in `options.txt` as `a11y_<name>
 **Pause menu**
 
 * An **accessibility** button sits at the bottom of the pause menu. Pressing it, or pressing Down after the last option on the right (shader2) and then Down again from the button, slides the pause menu up and the accessibility page up from below.
-* The accessibility page has two columns: motion and gameplay on the left, display and notices on the right. Its keys work the same as in the options menu. The button at the bottom says **back** there.
+* When **skip course** is on offer, its button sits next to **accessibility**. On the button row, Left and Right move between the two, and Enter presses the selected one.
+* The accessibility page has two columns: motion, gameplay and assists on the left, display, controls and notices on the right. It scrolls, with its scrollbar on the right. Its keys work the same as in the options menu. The button at the bottom says **back** there.
 * Pressing Up from the first setting, Escape (or the pause key), or **back** slides back to the pause menu, with the **accessibility** button selected. The pause menu always opens on its own page.
 * Nothing on either page can be used while they slide.
 
@@ -692,6 +715,8 @@ Every GUI text input now takes the usual editing keys:
 * `motion_scale(sx, sy)` is `love.graphics.scale` for an animation: with reduce motion on, it fades everything drawn until the matching `love.graphics.pop` instead of scaling it. `motion_zoom(zoom)` is 1 with reduce motion. Use them for any new pop-in or zoom animation.
 * `graphicsalphamult` fades everything drawn while it's below 1: `love.graphics.setColor` multiplies the alpha by it and `getColor` divides it back out, and it goes back to what it was at the matching `pop`.
 * `hudoutlined()` says whether the HUD is outlined (the mappack's `hudoutline` or the setting). `drawoutlined(fn)` draws something with a black outline a pixel wide.
+* `accessibility_playerupdate(p, dt)` runs every frame for every player (jump buffer, coyote time, hold to swim, hold to fire). `accessibility_safeground(p)` remembers where a player last stood on solid ground, and `accessibility_pitrescue(p)` puts them back there.
+* `accessibility_canskip()` says whether the pause menu offers **skip course**, and `accessibility_skipcourse()` skips it.
 * `pausemenu_setpage(page)` slides the pause menu to page 1 (itself) or 2 (accessibility). `pausemenu_a11yrow()` is the keyboard's row for the **accessibility** button.
 * `notice.mousepressed(x, y)` dismisses the notice under the mouse when notices stay until clicked.
 * `PAUSERIGHT` holds the layout of the pause menu's right side, and `pausemenu_rightrow(name)` gives the `pausemenuselected` value of one of its rows (`"controls"`, `"deadzone"`, `"scale"`, `"letterbox"`, `"shader1"` or `"shader2"`).
