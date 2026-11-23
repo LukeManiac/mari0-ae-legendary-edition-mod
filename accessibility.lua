@@ -657,16 +657,16 @@ function accessibility_drawplayerindicators(xscroll, yscroll)
 	end
 	for i = 1, players do
 		local p = objects["player"][i]
-		if p and not p.dead and p.active ~= false then
+		if p and not p.dead then
 			local colour = {255, 255, 255}
 			if mariocolors[i] and mariocolors[i][1] then
 				colour = mariocolors[i][1]
 			end
 			local cx = (p.x + p.width/2 - xscroll)*16
-			local top = (p.y - yscroll)*16 - 8
+			local top = (p.y - yscroll)*16 - 12
 			local lines = {"p" .. i, "↓"}
 			for l, line in ipairs(lines) do
-				local y = top - 2 - (#lines - l + 1)*10
+				local y = top - 2 - (#lines - l + 1)*8
 				properprintFbackground(line, math.floor((cx - utf8.len(line)*4)*scale), math.floor(y*scale), true, colour)
 			end
 		end

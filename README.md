@@ -744,6 +744,7 @@ Every GUI text input now takes the usual editing keys:
 ### ✨ Improvements
 
 * The music priority only restarts a theme when the right version isn't already playing. If it's checked again partway through an intro (when the low time sound ends, or another player's star runs out), the intro keeps playing and the song still follows it.
+* Removed the interval when adding points from the remaining timer at the end of a course. Points from the timer are now added without the previous delay between each one.
 
 #### 🛠️ Course Maker
 
