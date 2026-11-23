@@ -518,7 +518,7 @@ Dropping a new tileset onto the window shows "updating tiles..." too, since it r
 
 Everything that shows a loading overlay (loading a level, the Course Maker, a mappack or save data, testing a level, returning to the menu or editor, saving, and every **update** and **refresh data** button) now does its work in the background instead of stopping the whole program until it's done. The new `overlaytask.lua` handles it.
 
-* The game is frozen while the work runs: nothing updates and input is ignored. The window isn't: it keeps drawing frames and handling its own events, so it can be moved or closed and never stops responding.
+* The game is frozen while the work runs: nothing updates, keys are kept for later (see **Keys Pressed While Loading** below) and any other input is ignored. The window isn't: it keeps drawing frames and handling its own events, so it can be moved or closed and never stops responding.
 * The work runs a piece at a time, about 33 milliseconds a frame (`OVERLAYTASK_BUDGET`), so the window still gets about 30 frames a second. Vsync is turned off while it runs and turned back on when it's done: with vsync on, every frame waited for the monitor, and a frame whose work ran past a refresh waited for a whole extra one, which made loading take about twice as long. The fade before it keeps vsync on, so it stays smooth.
 * The work gives the frame back inside the long loops: map tiles, custom enemies, animations, custom tiles and sprites, animated tiles, sounds, music, the editor's map list and previews, and **refresh data**.
 * The fade to black before an overlay plays frame by frame too, instead of in a loop of its own.
@@ -537,6 +537,93 @@ Everything that shows a loading overlay (loading a level, the Course Maker, a ma
 * `overlay_animatedtext(text, start)` returns a text with its "..." animated from `start`.
 * `overlaytask_install()` wraps LÖVE's callbacks so they can run in the background. `love.load` runs it last.
 * `quit`, `resize` and `visible` are never run in the background, so quitting always finishes before the window closes.
+
+#### ⌨️ Keys Pressed While Loading
+
+Keys pressed while a loading overlay is up are no longer lost.
+
+* Every key pressed while the work runs is added to the end of a queue. The overlay keys (F7, F8, F9 and F11) still work straight away and aren't queued.
+* Once the work is done, the nth key of the queue is pressed on the nth frame after the end: the first key on the first frame, the second on the second, and so on. A key pressed 5 times is pressed 5 times.
+* A key held down only counts once. Its repeats aren't added.
+* Each pressed key is let go of on the frame after, unless you're still holding it down. Then it's let go of when you really let go. Until it's let go of, `love.keyboard.isDown` says it's down.
+* If a pressed key starts another load (Enter on a menu, for example), the rest of the queue waits for it. Its frames count again from 1 once that load ends, and keys pressed during it are added to the end.
+
+#### 🚪 Alt+F4
+
+* **Alt+F4** now closes the game straight away, even in the middle of a load. It's never added to the queue, and it doesn't wait for the work to finish. Left or right Alt both work.
+* The game still shuts down the normal way, so online play is left and the log is still dumped.
+
+#### 🧱 Key Queue Functions
+
+* `overlaykeyqueue` holds every key pressed while the work ran and not pressed yet, as `{key, scancode}`, oldest first.
+* `overlaykeys_play()` lets go of the key pressed on the last frame, then presses the next one in the queue. `overlaytask.lua` runs it once a frame, before the game updates, whenever the game isn't frozen.
+
+#### 🎮 TAS Editor
+
+A new **tas editor** in **Utils** (under **mappack creator**) for making tool-assisted runs a frame at a time. It works like FCEUX's TAS Editor, and takes over the whole window while it's open.
+
+* The game is on the left. The **piano roll** is on the right: one row for each frame, and one column for each input. Every key the players' controls use has a column, labelled with the key and what it does (`d` / `right`), plus **Enter** and **Escape** for the menus. Then come the mouse columns: the left, right and middle buttons, the mouse's **x** and **y** in game pixels, and the wheel. The **+** column adds a column for any other key: click it and press the key. Right-clicking a key's name takes its column away, once no frame uses it.
+* A frame's input is used going from that frame to the next one, the same as FCEUX. The game view shows the game at the **playback cursor** (the blue arrow).
+* The game runs at exactly 60 frames a second, with its own clock and random numbers, so the same input always plays the same way.
+* Inside a TAS project, **tas editor** in the game's own Utils menu can't be opened.
+
+**Greenzone**
+
+* Every frame the editor has played with the current input is in the **greenzone**, shown in green. Darker green rows have a savestate (every `TAS_KEYFRAME` frames, 20 by default). The paler ones don't, but the game gets back to them from the savestate before.
+* Savestates far behind the playback cursor are thinned out, like FCEUX's greenzone cleaning: every 60th frame after 600 frames, every 300th after 3,600 and every 1,800th after 18,000. Frame 0 is always kept.
+* So you can always rewind: going back loads the nearest savestate before the frame and plays forward to it.
+* Changing a frame's input throws the greenzone away after it. If the playback cursor was past it, the game is played again up to where it was, with the new input.
+* If a frame plays differently than it did before with the same input, the frame turns red and a **desync** message says where. A project that was saved is checked against the states it was saved with.
+
+**Playback**
+
+* **\\** goes to the next frame and **Backspace** to the previous one. Holding either keeps going after a moment.
+* **Space** (or **Pause**, or a middle click) plays and pauses. **Enter** goes to the selected frame. So does double-clicking a frame number, or clicking or dragging in the arrow column.
+* **|<**, **<**, **>** and **>|** in the toolbar go to the first frame, back one, forward one and to the end. **Shift + mouse wheel** steps through frames.
+* Going far ahead runs the game as fast as it can, without drawing, while the green arrow shows where it's going.
+
+**Selecting and editing**
+
+* Clicking a frame number selects that row. **Shift**-clicking selects every row from the last one you clicked to this one. **Ctrl**-clicking adds a row to the selection, or takes it out. Dragging selects as you go. Up, Down, Page Up, Page Down, Home and End move the selection, and with Shift they extend it.
+* Clicking a cell turns that input on or off for that frame. Dragging down the column paints the same value over every row you pass. Shift-clicking a cell sets it on every row from the last one you clicked.
+* Clicking a column's name sets that input on every selected frame. If they all have it already, it's taken off all of them instead.
+* Clicking a mouse **x**, **y** or wheel cell lets you type a number for the selected frames. Leaving it empty means "the same as the frame before".
+* Clicking the game puts the mouse there for the selected frames (or the playback frame, if nothing is selected). A red cross shows where the game sees the mouse.
+* **Ins** inserts blank frames, **Ctrl+Ins** clones the selected frames, **Del** clears them and **Ctrl+Del** deletes them. **Ctrl+C**, **Ctrl+X** and **Ctrl+V** copy, cut and paste, and **Ctrl+Shift+V** pastes by inserting. **Ctrl+A** selects everything and **Escape** selects nothing.
+* **Ctrl+Z** and **Ctrl+Y** undo and redo, up to 500 steps.
+
+**Recording**
+
+* **rec** in the toolbar (or **Ctrl+R**) turns recording on. While the game plays (or with **\\**), the keys you're holding become that frame's input. So does the mouse, while it's over the game.
+
+**Projects**
+
+* Opening the editor opens the open mappack's project, or starts a new one. Projects are saved as `alesans_entities/tasprojects/<mappack name>.tasproject` with **save** (or **Ctrl+S**), for example `alesan's entities.tasproject`.
+* **new**, **open** (a list of every project) and **save** are in the toolbar. **Ctrl+N** and **Ctrl+O** work too, and dropping a `.tasproject` onto the window opens it. Starting another project with unsaved changes asks first.
+* A project keeps every frame's input, and what every frame in the greenzone looked like: the game state, each player's position and speed, the camera, and the random generator's state. It also keeps every random number each frame drew. The players, characters, colours, hats, portal colours, controls and accessibility settings it was made with are kept too, so it always starts the same way. Opening a project puts them back for the project, and closing the editor puts yours back.
+* Frame 0 is the title screen of the project's mappack.
+* Nothing the game does inside the editor touches your real save data. It can't save files, quit, or change the window.
+* Closing the game's window with unsaved changes saves them to `<mappack name> (autosave).tasproject`.
+
+**Exporting**
+
+* **export mp4** (or **Ctrl+E**) plays the whole project from frame 0 and writes it to `alesans_entities/tasrecordings/<mappack name>_<date>.mp4`, for example `alesan's entities_20261123.mp4`. A second export on the same day gets `_2`, `_3` and so on.
+* A progress bar shows how far it is. **Escape** cancels it and deletes the half-made file. Afterwards, the playback cursor goes back where it was.
+* **size** in the toolbar sets the video's size: 1x (400x224) to 4x (1600x896), 2x by default.
+* The video is H.264 at 60 frames a second, made by the game itself (`tasexport.lua`), so nothing else has to be installed. It's lossless: each 16x16 block is either stored as it is or, when it hasn't changed, copied from the frame before. There's a whole picture every 2 seconds, so video players can seek. Because it's lossless, the file is large, about 3-4 MB a second at 2x. The video has no sound.
+
+**Closing**
+
+* **close** puts the game back exactly as it was when the editor opened, at the Utils menu, with its music.
+
+#### 🧱 TAS Functions
+
+* `tas_open()` opens the editor on the next frame (it returns `false` inside a TAS project). `tas_close()` closes it. `tas_install()` hooks LÖVE's callbacks, last in `love.load`.
+* `tascore.save(prev)` takes a savestate: every table reachable from the globals, the upvalues of every function reachable from them, and every random generator. It also keeps the background colour, the font and key repeat. Tables that haven't changed since `prev` share its copy. `tascore.load(s)` puts it all back in place, so references to a table stay good.
+* `tascore.step(input, x, y)` runs one frame with that input. It sends the game the key and mouse presses and releases that take it from the last frame's input to this one.
+* `tascore.drawgame(canvas)` draws the game into a canvas.
+* While the editor runs the game, `tasstepping` is `true`. Background loading then runs straight through, `renderoverlay` draws nothing, and `warpfadeoutnow` goes black straight away.
+* `tasexport.new(path, w, h, fps)` starts a video. `enc:frame(imagedata)` adds a frame, `enc:finishstep(budget)` puts the .mp4 together a piece at a time, and `enc:abort()` deletes it.
 
 #### 🗂️ Options Tab Picker
 
