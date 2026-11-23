@@ -509,12 +509,19 @@ function mario:update(dt)
 		if self.dead or (a and a ~= "invincible" and a ~= "grow1" and a ~= "grow2" and a ~= "shrink" and a ~= "modernsize") then
 			--something else took the player over (a pipe, the flagpole...)
 			self.lockeddoorwait = nil
-		elseif a == nil or a == "invincible" then --(the wait holds still while their size changes)
+		elseif (not a) or a == "invincible" then --(animation is false or nil when there isn't one; the wait holds still while their size changes)
 			w.timer = w.timer + dt
 			if w.timer >= lockeddoorentrywait then
 				self.lockeddoorwait = nil
-				self:door(w.x, w.y, w.i)
-				net_action(self.playernumber, "door|" .. w.x .. "|" .. w.y .. "|" .. w.i)
+				if self:door(w.x, w.y, w.i) == false then
+					--the door can't be entered (a clear pipe, or multiplayer sending everyone elsewhere): let go of the player
+					self.controlsenabled = true
+					if not self.starred then
+						self.invincible = false
+					end
+				else
+					net_action(self.playernumber, "door|" .. w.x .. "|" .. w.y .. "|" .. w.i)
+				end
 			end
 		end
 	end
@@ -2593,6 +2600,13 @@ function mario:update(dt)
 			net_action(self.playernumber, "door|" .. x .. "|" .. y .. "|" .. map[x][y][3])
 			return
 		end
+
+		--pdoor and keydoor: holding up goes in too, the same as a normal door
+		if inmap(x, y) and #map[x][y] > 1 and entityquads[map[x][y][2]] and (entityquads[map[x][y][2]].t == "pdoor" or entityquads[map[x][y][2]].t == "keydoor") and self.controlsenabled and (not editormode) and upkey(self.playernumber) and self.falling == false and self.jumping == false then
+			if self:trylockeddoor(x, y) then
+				return
+			end
+		end
 		
 		--ice
 		self.ice = false
@@ -4245,6 +4259,35 @@ function mario:leftkey()
 	end
 end
 
+--pdoor and keydoor at x, y: goes in if it's open, or opens a keydoor with a key (then goes in after
+--lockeddoorentrywait seconds, see mario:update). Returns true if it did either
+function mario:trylockeddoor(x, y)
+	for j, w in pairs(objects["doorsprite"]) do
+		if w.cox == x and w.coy == y then
+			if not w.locked then
+				self:door(x, y, map[x][y][3])
+				net_action(self.playernumber, "door|" .. x .. "|" .. y .. "|" .. map[x][y][3])
+				return true
+			elseif w.i == "keydoor" and self.key and self.key > 0 then
+				w:lock(false)
+				net_action(self.playernumber, "upkey")
+				self.key = self.key - 1
+				if self.key < 1 then
+					self.key = false
+				end
+				--stand still for lockeddoorentrywait seconds, then go in (see mario:update)
+				self.controlsenabled = false
+				self.speedx = 0
+				self.speedy = 0
+				self.invincible = true
+				self.lockeddoorwait = {timer = 0, x = x, y = y, i = map[x][y][3]}
+				return true
+			end
+		end
+	end
+	return false
+end
+
 function mario:upkey()
 	if self.sizefx then
 		return false --(dontfreezeonsizechange: frozen in place)
@@ -4261,28 +4304,8 @@ function mario:upkey()
 	local y = math.floor(self.y+self.height/2)+1
 
 	if inmap(x, y) and #map[x][y] > 1 and entityquads[map[x][y][2]] and (entityquads[map[x][y][2]].t == "pdoor" or entityquads[map[x][y][2]].t == "keydoor") and self.falling == false and self.jumping == false then
-		for j, w in pairs(objects["doorsprite"]) do
-			if w.cox == x and w.coy == y then
-				if not w.locked then
-					self:door(x, y, map[x][y][3])
-					net_action(self.playernumber, "door|" .. x .. "|" .. y .. "|" .. map[x][y][3])
-					return
-				elseif w.i == "keydoor" and self.key and self.key > 0 then
-					w:lock(false)
-					net_action(self.playernumber, "upkey")
-					self.key = self.key - 1
-					if self.key < 1 then
-						self.key = false
-					end
-					--stand still for lockeddoorentrywait seconds, then go in (see mario:update)
-					self.controlsenabled = false
-					self.speedx = 0
-					self.speedy = 0
-					self.invincible = true
-					self.lockeddoorwait = {timer = 0, x = x, y = y, i = map[x][y][3]}
-					return
-				end
-			end
+		if self:trylockeddoor(x, y) then
+			return
 		end
 	end
 	--fence
