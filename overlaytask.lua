@@ -404,9 +404,6 @@ local function wrap(name)
 		if PASSTHROUGH[name] then
 			return f(...) --never in the background: quit has to finish before the window closes
 		end
-		if tasstepping then
-			return f(...) --the TAS is running the game a frame at a time: everything runs straight through
-		end
 		if name == "keypressed" and isaltf4(...) then
 			love.event.quit()
 			return

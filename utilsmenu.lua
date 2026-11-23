@@ -5,7 +5,6 @@
 	                     written to alesans_entities/characters/<name>_formatted
 	font renderer:       renders text with the current mappack's font (and its outline) to a png
 	mappack creator:     makes a new mappack filled with blank courses and subzones
-	tas editor:          opens the TAS editor (tas.lua), which takes over the whole window
 
 	Everything here lives in its own gamestate ("utils") and keeps its gui elements to itself,
 	so nothing leaks into the global guielements table.
@@ -38,7 +37,6 @@ local HUBITEMS = {
 	{text = "character formatter", page = "charformat", info = "split a character's sheets into colour layers"},
 	{text = "font renderer", page = "fontrender", info = "render text to a png with this mappack's font"},
 	{text = "mappack creator", page = "mappack", info = "make a new mappack full of blank courses"},
-	{text = "tas editor", page = "tas", info = "make a tool-assisted run frame by frame"},
 	{text = "back", info = "back to the title screen"},
 }
 
@@ -642,7 +640,7 @@ end
 
 local function hub_itemrect(i)
 	local item = HUBITEMS[i]
-	local y = 56 + (i-1)*20
+	local y = 56 + (i-1)*22
 	if i == #HUBITEMS then
 		y = y + 10
 	end
@@ -2922,11 +2920,6 @@ function utilsmenu_close()
 end
 
 inner_utilsmenu_openpage = function(name)
-	if name == "tas" then
-		--the tas editor takes over the whole window (and can't be opened from inside a tas project)
-		tas_open()
-		return
-	end
 	page = name
 	if name == "charformat" then
 		cf_build()
