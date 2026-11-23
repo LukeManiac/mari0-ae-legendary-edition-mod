@@ -1229,6 +1229,7 @@ function mario:update(dt)
 	if self.startimer < mariostarduration and not self.dead then
 		self.startimer = self.startimer + dt
 		self.starblinktimer = self.starblinktimer + dt
+		self.starglowtimer = (self.starglowtimer or 0) + dt --reduce flashing's rainbow glow (see drawstarglow)
 		
 		local lmariostarblinkrate = mariostarblinkrate
 		if self.startimer >= mariostarduration-mariostarrunout then
@@ -9184,6 +9185,7 @@ function mario:star()
 	end
 	
 	self.startimer = 0
+	self.starglowtimer = 0
 	self.starred = true
 	music:stop(custommusic)
 	updatemusicpriority()

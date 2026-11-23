@@ -3857,10 +3857,9 @@ end
 --dontfreezeonsizechange: a size-changing player is drawn the way the animation shows them (see mario:sizefxlook)
 --accessibility: a player drawn specially is drawn into this canvas first, then onto the screen:
 --	half-opaque blink: at half opacity while blinking after a hit, so their layers (colours, hat...) fade together
---	reduce flashing: with a rainbow glow around and over them while they have a Starman (they keep their own colours)
+--	reduce flashing: with a rainbow glow over them while they have a Starman (they keep their own colours)
 local playercanvas
 local silhouetteshader, silhouettefailed
-local GLOWRING = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {-1, 1}, {1, -1}, {-1, -1}}
 
 --draws a picture's shape in one colour (the colour set with setColor), premultiplied
 local function getsilhouette()
@@ -3881,32 +3880,22 @@ local function getsilhouette()
 	return silhouetteshader
 end
 
---the rainbow glow of a player with a Starman (reduce flashing), drawn from the player's picture in playercanvas.
---behind: the ring around them, otherwise the tint over them
-local function drawstarglow(behind)
+--the rainbow glow of a player with a Starman (reduce flashing), like the Super Mario Maker games:
+--a clone of the player's whole picture in playercanvas (hat included), coloured entirely with rainbow()
+--and drawn over them with additive (glow) blending.
+--It runs on the player's own starglowtimer, which only moves while the player updates (so it stops when paused)
+local function drawstarglow(v)
 	local shader = getsilhouette()
 	if not shader then
 		return
 	end
-	local t = love.timer.getTime()
-	local pulse = 0.75 + 0.25*math.sin(t*6)
+	local t = v.starglowtimer or 0
+	local r, g, b = rainbow(t, 1.5, 1, 1)
+	local pulse = 0.75 + 0.25*math.sin(t*8)
 	love.graphics.setShader(shader)
-	if behind then
-		love.graphics.setBlendMode("alpha", "premultiplied")
-		for radius = 2, 1, -1 do
-			for k, o in ipairs(GLOWRING) do
-				local r, g, b = rainbow(t + k/#GLOWRING, 1.2, 0.85, 1)
-				local alpha = 255*pulse*(0.55 - radius*0.15)
-				love.graphics.setColor(r, g, b, alpha)
-				love.graphics.draw(playercanvas, o[1]*radius*scale, o[2]*radius*scale)
-			end
-		end
-	else
-		love.graphics.setBlendMode("add", "premultiplied")
-		local r, g, b = rainbow(t, 1.2, 0.85, 1)
-		love.graphics.setColor(r, g, b, 70*pulse)
-		love.graphics.draw(playercanvas, 0, 0)
-	end
+	love.graphics.setBlendMode("add", "premultiplied")
+	love.graphics.setColor(r, g, b, 150*pulse)
+	love.graphics.draw(playercanvas, 0, 0)
 	love.graphics.setShader()
 end
 
@@ -3937,9 +3926,6 @@ function drawplayer(i, x, y, r, pad, drop)
 		love.graphics.push("all")
 		love.graphics.origin()
 		love.graphics.setScissor()
-		if starglow then
-			drawstarglow(true)
-		end
 		love.graphics.setShader()
 		love.graphics.setBlendMode("alpha", "premultiplied")
 		if halfblink then
@@ -3949,7 +3935,7 @@ function drawplayer(i, x, y, r, pad, drop)
 		end
 		love.graphics.draw(playercanvas, 0, 0)
 		if starglow then
-			drawstarglow(false)
+			drawstarglow(v)
 		end
 		love.graphics.pop()
 		return result
