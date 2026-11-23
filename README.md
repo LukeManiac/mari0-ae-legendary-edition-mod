@@ -542,12 +542,13 @@ Everything that shows a loading overlay (loading a level, the Course Maker, a ma
 
 Keys pressed while a loading overlay is up are no longer lost.
 
-* Every key pressed while the work runs is added to the end of a queue. The overlay keys (F7, F8, F9 and F11) still work straight away and aren't queued.
-* A key held down only counts once. Its repeats aren't added.
-* Each time a piece of work finishes, the game presses the nth key of the queue for real. n starts at 1 and goes up by one every time, so the first load presses the first key, the next load the second key, and so on.
-* A key pressed this way is let go of on a later frame, unless you're still holding it down. Then it's let go of when you really let go.
-* If the pressed key starts another load (Enter on a menu, for example), keys pressed during that one are added to the end of the same queue.
-* Once every queued key has been pressed, the queue is emptied and n goes back to 1.
+* Every key pressed or let go of while the work runs is recorded, in order, along with how long after the one before it it happened. The overlay keys (F7, F8, F9 and F11) still work straight away and aren't recorded.
+* Once the work is done, every recorded key is played back with the same timing. A key pressed 5 times is pressed and let go of 5 times, and a key held for half a second is held for half a second. The first one plays as soon as the work is done.
+* While a played-back key is held, `love.keyboard.isDown` says it's down, so held controls (like walking) work too.
+* A key held down only counts once. Its repeats aren't recorded.
+* A key's press and its release never land on the same frame, even for a tap quicker than a frame, so the game always sees the key go down and come back up.
+* If a played-back key starts another load (Enter on a menu, for example), the rest wait until that one's done. Keys pressed during it are added after them.
+* A key that was held before the load and let go of during it is let go of when the load is done.
 
 #### 🚪 Alt+F4
 
@@ -556,8 +557,8 @@ Keys pressed while a loading overlay is up are no longer lost.
 
 #### 🧱 Key Queue Functions
 
-* `overlaykeyqueue` holds every key pressed while the work ran, as `{key, scancode}`, oldest first. `overlaykeyindex` is n: the queued key pressed when the next piece of work finishes.
-* `overlaykeys_replay()` presses the next queued key. `overlaytask.lua` runs it whenever a piece of work finishes.
+* `overlaykeyqueue` holds every key pressed or let go of while the work ran, oldest first, as `{kind, key, scancode, gap}`: `kind` is `"press"` or `"release"`, and `gap` is the seconds since the key before it.
+* `overlaykeys_play()` plays back every recorded key that's due. `overlaytask.lua` runs it every frame before the game updates.
 
 #### 🗂️ Options Tab Picker
 
