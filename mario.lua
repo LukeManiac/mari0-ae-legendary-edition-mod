@@ -9509,7 +9509,8 @@ function mario:canfire()
 	return self.fireballcount < maxfireballs or INFINITEFIREBALLS
 end
 
-function mario:fire()
+--nodismount: up and run doesn't take a shoe off (hold to fire's repeated throws, see accessibility_playerupdate)
+function mario:fire(nodismount)
 	if self.sizefx then
 		return false --(dontfreezeonsizechange: frozen in place)
 	end
@@ -9581,7 +9582,7 @@ function mario:fire()
 			self.cappy:trigger(self.animationdirection, "run")
 		end
 
-		if self.shoe then
+		if self.shoe and not nodismount then
 			if upkey(self.playernumber) then
 				self:shoed(false, false, true)
 				return

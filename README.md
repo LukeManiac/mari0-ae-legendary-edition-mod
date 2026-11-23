@@ -699,7 +699,7 @@ Nitpicks as settings, started from them the same way as the physics ones.
 
 * **Toggle run:** Pressing run starts running, and pressing it again stops. Anything that needs run held (the Tanooki statue, carrying things) acts as if it's held while it's on.
 * **Hold to swim:** Holding jump underwater keeps swimming upwards, a stroke every 0.3 seconds, instead of needing a press for each stroke. Frog Mario is unaffected.
-* **Hold to fire:** Holding run keeps throwing fireballs, iceballs, superballs, hammers, boomerangs and custom power-up projectiles, one every 0.3 seconds, within the usual limit on how many can be out at once. It only repeats throws: tail whips, picking things up, Cappy and Yoshi still need a press each time. It works in a Goomba shoe, stiletto, dry bones shell or cloud too, but not while Up is held, since Up and Run takes the shoe off. With toggle run on, it's the run button itself that has to be held.
+* **Hold to fire:** Holding run keeps throwing fireballs, iceballs, superballs, hammers, boomerangs and custom power-up projectiles, one every 0.3 seconds, within the usual limit on how many can be out at once. It only repeats throws: tail whips, picking things up, Cappy and Yoshi still need a press each time. It works in a Goomba shoe, stiletto, dry bones shell or cloud too, even with Up held: the repeated throws never take the shoe off, only pressing Up and Run yourself does. With toggle run on, it's the run button itself that has to be held.
 * **Rapid hold execution:** With hold to fire on, a throw is tried every frame instead of every 0.3 seconds, so a new projectile goes out as soon as there's room for one under the usual limit. It's greyed out while hold to fire is off.
 
 **Notices**
@@ -725,11 +725,12 @@ All labels, categories and options are translated into every language the game h
 
 A new nitpick, `mariomakerblockphysics`. **Generate Nitpicks File** adds it to an existing file.
 
-* A block that's hit doesn't only move up and back down: it grows from its middle as it goes up, to 1.25 times its size at the top of the bounce (`mmblockbouncescale` in `variables.lua`), and shrinks back as it comes down. Action blocks do it too. Every flip block type does too: flip blocks, action blocks, switch blocks, propeller boxes and cannon boxes. Note blocks only move, like before.
-* An item inside the block comes out once the block is back to its normal size, the same moment the bounce ends.
+* A block that's hit doesn't only move up and back down: it grows from its middle as it goes up, to 1.25 times its size at the top of the bounce (`mmblockbouncescale` in `variables.lua`), and shrinks back as it comes down. Every flip block type does too: flip blocks, action blocks, switch blocks, propeller boxes and cannon boxes. Note blocks only move, like before.
+* An item inside the block comes out once the block is back to its normal size, the same moment the bounce ends. The block always grows first: the bounce's first step stops at the top, so a long frame can't skip straight to the end and let the item out without the block ever looking bigger.
+* The sprout sound (or the vine sound) waits for the item too, and plays when it comes out instead of when the block is hit. Note blocks, and every block with the nitpick off, still play it straight away.
 * Items take `mmmushroomtime` seconds (0.4 by default, in `variables.lua`) to come out of the block, instead of `mushroomtime` (0.7).
 * Coins (and collectables) still come out straight away, as soon as the block is hit.
-* `drawbouncetile(img, quad, x, y, bouncescale)` draws a tile scaled from its middle. `classicmushroomtime` keeps the normal `mushroomtime`, so it goes back to it with the nitpick off.
+* `drawbouncetile(img, quad, x, y, bouncescale)` draws a tile scaled from its middle. `blockbouncescales(bounce)` says whether a bouncing block scales (the nitpick is on and it isn't a note block), and `sproutsound(bounce, sound)` plays an item's sound straight away or keeps it for when the item comes out. `classicmushroomtime` keeps the normal `mushroomtime`, so it goes back to it with the nitpick off.
 
 #### 🚪 Locked Doors
 

@@ -8,8 +8,6 @@
 --Loaded at the top of main.lua (before the config is read), so everything here only defines things: it doesn't use
 --the window, the language or other modules until they are called.
 
-local lg = love.graphics
-
 ------------------------------------------------------------
 -- settings
 ------------------------------------------------------------
@@ -330,15 +328,15 @@ end
 --draws something (fn draws it with the current colour) with a black outline a game pixel wide around it
 local OUTLINE = {{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}}
 function drawoutlined(fn)
-	local r, g, b, a = lg.getColor()
-	lg.setColor(0, 0, 0, a)
+	local r, g, b, a = love.graphics.getColor()
+	love.graphics.setColor(0, 0, 0, a)
 	for _, o in ipairs(OUTLINE) do
-		lg.push()
-		lg.translate(o[1]*scale, o[2]*scale)
+		love.graphics.push()
+		love.graphics.translate(o[1]*scale, o[2]*scale)
 		fn()
-		lg.pop()
+		love.graphics.pop()
 	end
-	lg.setColor(r, g, b, a)
+	love.graphics.setColor(r, g, b, a)
 	fn()
 end
 
@@ -347,10 +345,10 @@ function accessibility_contrasttext()
 	if not accessibility.increasecontrast then
 		return nil
 	end
-	local r, g, b, a = lg.getColor()
+	local r, g, b, a = love.graphics.getColor()
 	if math.abs(r-g) < 4 and math.abs(g-b) < 4 and r >= 40 and r < 200 then
 		local v = r + (255-r)*0.55
-		lg.setColor(v, v, v, a)
+		love.graphics.setColor(v, v, v, a)
 		return {r, g, b, a}
 	end
 	return nil
@@ -358,7 +356,7 @@ end
 
 function accessibility_restoretext(saved)
 	if saved then
-		lg.setColor(saved[1], saved[2], saved[3], saved[4])
+		love.graphics.setColor(saved[1], saved[2], saved[3], saved[4])
 	end
 end
 
@@ -428,8 +426,8 @@ local function canautofire(p)
 	if p.yoshi or p.pickup or p.pickupready or p.fence or p.vine or p.statue or p.ducking then
 		return false
 	end
-	--in a shoe, throws work as usual, but up and run takes the shoe off
-	if p.shoe and (p.shoe == "yoshi" or upkey(p.playernumber)) then
+	--in a shoe, throws work as usual (holding up too: the repeats never take the shoe off, see mario:fire)
+	if p.shoe == "yoshi" then
 		return false
 	end
 	if p.cappy and not UseButtonCappy then
@@ -491,7 +489,7 @@ function accessibility_playerupdate(p, dt)
 			if p.fireenemy or p.characterdata.fireenemy then
 				p:button("run") --custom power-ups fire from the run button
 			end
-			p:fire()
+			p:fire(true) --(never takes a shoe off, even with up held)
 		end
 	else
 		p.a11yfiretimer = 0
@@ -708,7 +706,7 @@ function accessibility_drawplayerindicators(xscroll, yscroll)
 			end
 		end
 	end
-	lg.setColor(255, 255, 255, 255)
+	love.graphics.setColor(255, 255, 255, 255)
 end
 
 --aim line: a solid line from the portal gun to where the portal would open, in the portal's colour
@@ -724,29 +722,29 @@ function accessibility_drawaimline(player, sourcex, sourcey, x, y, possible, xsc
 			colour = pc[1]
 		end
 	end
-	local oldwidth = lg.getLineWidth()
-	local oldstyle = lg.getLineStyle()
-	lg.setLineStyle("rough")
-	lg.setColor(0, 0, 0, 255)
-	lg.setLineWidth(3*scale)
-	lg.line(x1, y1, x2, y2)
-	lg.setColor(colour[1], colour[2], colour[3], 255)
-	lg.setLineWidth(scale)
-	lg.line(x1, y1, x2, y2)
+	local oldwidth = love.graphics.getLineWidth()
+	local oldstyle = love.graphics.getLineStyle()
+	love.graphics.setLineStyle("rough")
+	love.graphics.setColor(0, 0, 0, 255)
+	love.graphics.setLineWidth(3*scale)
+	love.graphics.line(x1, y1, x2, y2)
+	love.graphics.setColor(colour[1], colour[2], colour[3], 255)
+	love.graphics.setLineWidth(scale)
+	love.graphics.line(x1, y1, x2, y2)
 	if not possible then
 		local c = 3*scale
-		lg.setColor(0, 0, 0, 255)
-		lg.setLineWidth(3*scale)
-		lg.line(x2-c, y2-c, x2+c, y2+c)
-		lg.line(x2-c, y2+c, x2+c, y2-c)
-		lg.setColor(255, 60, 60, 255)
-		lg.setLineWidth(scale)
-		lg.line(x2-c, y2-c, x2+c, y2+c)
-		lg.line(x2-c, y2+c, x2+c, y2-c)
+		love.graphics.setColor(0, 0, 0, 255)
+		love.graphics.setLineWidth(3*scale)
+		love.graphics.line(x2-c, y2-c, x2+c, y2+c)
+		love.graphics.line(x2-c, y2+c, x2+c, y2-c)
+		love.graphics.setColor(255, 60, 60, 255)
+		love.graphics.setLineWidth(scale)
+		love.graphics.line(x2-c, y2-c, x2+c, y2+c)
+		love.graphics.line(x2-c, y2+c, x2+c, y2-c)
 	end
-	lg.setLineWidth(oldwidth)
-	lg.setLineStyle(oldstyle)
-	lg.setColor(255, 255, 255, 255)
+	love.graphics.setLineWidth(oldwidth)
+	love.graphics.setLineStyle(oldstyle)
+	love.graphics.setColor(255, 255, 255, 255)
 end
 
 ------------------------------------------------------------
@@ -758,8 +756,8 @@ end
 
 graphicsalphamult = 1
 
-local basesetcolor, basegetcolor = lg.setColor, lg.getColor
-function lg.setColor(r, g, b, a)
+local basesetcolor, basegetcolor = love.graphics.setColor, love.graphics.getColor
+function love.graphics.setColor(r, g, b, a)
 	if type(r) == "table" then
 		r, g, b, a = r[1], r[2], r[3], r[4]
 	end
@@ -769,7 +767,7 @@ function lg.setColor(r, g, b, a)
 	return basesetcolor(r, g, b, a)
 end
 
-function lg.getColor()
+function love.graphics.getColor()
 	local r, g, b, a = basegetcolor()
 	if graphicsalphamult ~= 1 then
 		a = a/graphicsalphamult
@@ -777,16 +775,16 @@ function lg.getColor()
 	return r, g, b, a
 end
 
-local basepush, basepop = lg.push, lg.pop
+local basepush, basepop = love.graphics.push, love.graphics.pop
 local alphastack, kindstack = {}, {}
-function lg.push(kind)
+function love.graphics.push(kind)
 	local n = #alphastack + 1
 	alphastack[n] = graphicsalphamult
 	kindstack[n] = kind or "transform"
 	return basepush(kind)
 end
 
-function lg.pop()
+function love.graphics.pop()
 	local n = #alphastack
 	local outer = alphastack[n] or 1
 	local kind = kindstack[n]
@@ -810,9 +808,9 @@ local function fadeuntilpop(f)
 	if f >= 1 then
 		return
 	end
-	local r, g, b, a = lg.getColor()
+	local r, g, b, a = love.graphics.getColor()
 	graphicsalphamult = graphicsalphamult*f
-	lg.setColor(r, g, b, a)
+	love.graphics.setColor(r, g, b, a)
 end
 
 --love.graphics.scale for an animation (a popup scaling in, a jelly...): with reduce motion, the scale is shown as a fade
@@ -823,7 +821,7 @@ function motion_scale(sx, sy)
 		fadeuntilpop(math.min(sx, sy))
 		return
 	end
-	lg.scale(sx, sy)
+	love.graphics.scale(sx, sy)
 end
 
 --a zoom an animation draws something at (the editor panels zooming in): 1 with reduce motion (they fade already)
@@ -881,7 +879,7 @@ accessibilityfilteractive = false
 
 local function getfiltershader()
 	if not filtershader and not filterfailed then
-		local ok, shader = pcall(lg.newShader, filtercode)
+		local ok, shader = pcall(love.graphics.newShader, filtercode)
 		if ok then
 			filtershader = shader
 		else
@@ -892,8 +890,8 @@ local function getfiltershader()
 	return filtershader
 end
 
-local basesetcanvas = lg.setCanvas
-function lg.setCanvas(...)
+local basesetcanvas = love.graphics.setCanvas
+function love.graphics.setCanvas(...)
 	if accessibilityfilteractive and filtercanvas then
 		local n = select("#", ...)
 		if n == 0 or (...) == nil then
@@ -912,33 +910,33 @@ function accessibility_install()
 	local draw = love.draw
 	love.draw = function(...)
 		local mode = FILTERMODES[accessibility.colourfilter]
-		if not mode or android or accessibilityfilteractive or lg.getCanvas() then
+		if not mode or android or accessibilityfilteractive or love.graphics.getCanvas() then
 			return draw(...)
 		end
 		local shader = getfiltershader()
 		if not shader then
 			return draw(...)
 		end
-		local w, h = lg.getDimensions()
+		local w, h = love.graphics.getDimensions()
 		if not filtercanvas or filtercanvas:getWidth() ~= w or filtercanvas:getHeight() ~= h then
-			filtercanvas = lg.newCanvas(w, h)
+			filtercanvas = love.graphics.newCanvas(w, h)
 			filtercanvas:setFilter("nearest", "nearest")
 		end
 		basesetcanvas({filtercanvas, stencil = true})
-		lg.clear(0, 0, 0, 255)
+		love.graphics.clear(0, 0, 0, 255)
 		accessibilityfilteractive = true
 		local ok, err = pcall(draw, ...)
 		accessibilityfilteractive = false
 		basesetcanvas()
-		lg.push("all")
-		lg.origin()
-		lg.setScissor()
-		lg.setShader(shader)
+		love.graphics.push("all")
+		love.graphics.origin()
+		love.graphics.setScissor()
+		love.graphics.setShader(shader)
 		shader:send("mode", mode)
-		lg.setBlendMode("replace", "premultiplied")
-		lg.setColor(255, 255, 255, 255)
-		lg.draw(filtercanvas, 0, 0)
-		lg.pop()
+		love.graphics.setBlendMode("replace", "premultiplied")
+		love.graphics.setColor(255, 255, 255, 255)
+		love.graphics.draw(filtercanvas, 0, 0)
+		love.graphics.pop()
 		if not ok then
 			error(err, 0)
 		end
@@ -1319,16 +1317,16 @@ local function drawpage(page, selected, offx, offy)
 	offx, offy = offx or 0, offy or 0
 	local vp = page.viewport
 
-	lg.push()
-	lg.translate(offx*scale, offy*scale)
+	love.graphics.push()
+	love.graphics.translate(offx*scale, offy*scale)
 	--cut to the viewport, wherever the transform (the pause menu's scale-in, a slide) puts it
-	local x0, y0 = lg.transformPoint(vp.x*scale, vp.y*scale)
-	local x1, y1 = lg.transformPoint((vp.x+vp.w)*scale, (vp.y+vp.h)*scale)
-	local sx, sy, sw, sh = lg.getScissor()
-	lg.intersectScissor(math.min(x0, x1), math.min(y0, y1), math.max(1, math.abs(x1-x0)), math.max(1, math.abs(y1-y0)))
+	local x0, y0 = love.graphics.transformPoint(vp.x*scale, vp.y*scale)
+	local x1, y1 = love.graphics.transformPoint((vp.x+vp.w)*scale, (vp.y+vp.h)*scale)
+	local sx, sy, sw, sh = love.graphics.getScissor()
+	love.graphics.intersectScissor(math.min(x0, x1), math.min(y0, y1), math.max(1, math.abs(x1-x0)), math.max(1, math.abs(y1-y0)))
 
 	local top = vp.y - page.scroll
-	lg.setColor(HEADER_COLOR)
+	love.graphics.setColor(HEADER_COLOR)
 	for _, header in ipairs(layout.headers) do
 		properprintF(header.text, header.x*scale, (top + header.y + 1)*scale)
 	end
@@ -1336,14 +1334,14 @@ local function drawpage(page, selected, offx, offy)
 		if isdisabled(key) then
 			--greyed out: darker, and only a little lighter when the keyboard is on it
 			if selected == key then
-				lg.setColor(150, 150, 150, 120)
+				love.graphics.setColor(150, 150, 150, 120)
 			else
-				lg.setColor(100, 100, 100, 110)
+				love.graphics.setColor(100, 100, 100, 110)
 			end
 		elseif selected == key then
-			lg.setColor(255, 255, 255, 255)
+			love.graphics.setColor(255, 255, 255, 255)
 		else
-			lg.setColor(100, 100, 100, 255)
+			love.graphics.setColor(100, 100, 100, 255)
 		end
 		for i, line in ipairs(row.lines) do
 			properprintF(line, row.labelx*scale, (top + row.labely + (i-1)*10)*scale)
@@ -1357,10 +1355,10 @@ local function drawpage(page, selected, offx, offy)
 		local el = guielements[pagename(page, key)]
 		if el then
 			if isdisabled(key) then
-				lg.push()
+				love.graphics.push()
 				fadeuntilpop(0.4) --greyed out
 				el:draw()
-				lg.pop()
+				love.graphics.pop()
 			else
 				el:draw()
 			end
@@ -1374,12 +1372,12 @@ local function drawpage(page, selected, offx, offy)
 	end
 
 	if sx then
-		lg.setScissor(sx, sy, sw, sh)
+		love.graphics.setScissor(sx, sy, sw, sh)
 	else
-		lg.setScissor()
+		love.graphics.setScissor()
 	end
-	lg.pop()
-	lg.setColor(255, 255, 255, 255)
+	love.graphics.pop()
+	love.graphics.setColor(255, 255, 255, 255)
 end
 
 local function pagecount(page)
