@@ -335,7 +335,59 @@ local function resume()
 	resumeat = now
 	local ok, err = coroutine.resume(co)
 	handlerco = nil
-	check(co, ok, err)
+	if not check(co, ok, err) then
+		overlaykeys_replay() --the work is done: press the next key that was queued while it ran
+	end
+end
+
+--KEYS PRESSED WHILE LOADING
+--a key pressed while the work runs isn't lost: it's added to the end of overlaykeyqueue. Each time a piece of work
+--finishes, the nth key of the queue is pressed for real (n starts at 1 and goes up by one each time), and released
+--again on a later frame if it isn't still held down
+overlaykeyqueue = {} --{key, scancode} for every key pressed while the work ran, oldest first
+overlaykeyindex = 1 --n: the queued key pressed when the next piece of work finishes
+local pendingreleases = {} --forcepressed keys still waiting for their release
+
+local function overlaykeys_queue(key, scancode, isrepeat)
+	if isrepeat then
+		return --a held key's repeats aren't new presses
+	end
+	table.insert(overlaykeyqueue, {key = key, scancode = scancode})
+end
+
+function overlaykeys_replay()
+	local entry = overlaykeyqueue[overlaykeyindex]
+	if not entry then
+		return
+	end
+	overlaykeyindex = overlaykeyindex + 1
+	--keys already pressed are dropped from the front, so the queue doesn't grow forever (n counts from the same start)
+	if overlaykeyindex > #overlaykeyqueue then
+		overlaykeyqueue = {}
+		overlaykeyindex = 1
+	end
+	love.keypressed(entry.key, entry.scancode, false)
+	table.insert(pendingreleases, entry)
+end
+
+--releases forcepressed keys the player isn't holding down (once the game isn't frozen, so the release isn't ignored)
+local function overlaykeys_release()
+	if overlaytask or #pendingreleases == 0 then
+		return
+	end
+	local releases = pendingreleases
+	pendingreleases = {}
+	for _, entry in ipairs(releases) do
+		local held = entry.scancode and love.keyboard.isScancodeDown(entry.scancode)
+		if not held then
+			love.keyreleased(entry.key, entry.scancode)
+		end
+	end
+end
+
+--Alt+F4 closes the game straight away, loading or not, and is never queued
+local function isaltf4(key)
+	return key == "f4" and (love.keyboard.isScancodeDown("lalt") or love.keyboard.isScancodeDown("ralt"))
 end
 
 --callbacks that keep working while the game is frozen: the window's own events
@@ -350,11 +402,20 @@ local function wrap(name)
 		if PASSTHROUGH[name] then
 			return f(...) --never in the background: quit has to finish before the window closes
 		end
+		if name == "keypressed" and isaltf4(...) then
+			love.event.quit()
+			return
+		end
 		if overlaytask then
 			if name == "update" then
 				resume()
+			elseif name == "keypressed" then
+				overlaykeys_queue(...)
 			end
-			return --frozen: input is ignored
+			return --frozen: other input is ignored
+		end
+		if name == "update" and not handlerco then
+			overlaykeys_release()
 		end
 		if handlerco then
 			return f(...) --called from inside another callback (android buttons, the mouse wheel...): part of that one

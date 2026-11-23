@@ -518,7 +518,7 @@ Dropping a new tileset onto the window shows "updating tiles..." too, since it r
 
 Everything that shows a loading overlay (loading a level, the Course Maker, a mappack or save data, testing a level, returning to the menu or editor, saving, and every **update** and **refresh data** button) now does its work in the background instead of stopping the whole program until it's done. The new `overlaytask.lua` handles it.
 
-* The game is frozen while the work runs: nothing updates and input is ignored. The window isn't: it keeps drawing frames and handling its own events, so it can be moved or closed and never stops responding.
+* The game is frozen while the work runs: nothing updates, keys are kept for later (see **Keys Pressed While Loading** below) and any other input is ignored. The window isn't: it keeps drawing frames and handling its own events, so it can be moved or closed and never stops responding.
 * The work runs a piece at a time, about 33 milliseconds a frame (`OVERLAYTASK_BUDGET`), so the window still gets about 30 frames a second. Vsync is turned off while it runs and turned back on when it's done: with vsync on, every frame waited for the monitor, and a frame whose work ran past a refresh waited for a whole extra one, which made loading take about twice as long. The fade before it keeps vsync on, so it stays smooth.
 * The work gives the frame back inside the long loops: map tiles, custom enemies, animations, custom tiles and sprites, animated tiles, sounds, music, the editor's map list and previews, and **refresh data**.
 * The fade to black before an overlay plays frame by frame too, instead of in a loop of its own.
@@ -537,6 +537,27 @@ Everything that shows a loading overlay (loading a level, the Course Maker, a ma
 * `overlay_animatedtext(text, start)` returns a text with its "..." animated from `start`.
 * `overlaytask_install()` wraps LÖVE's callbacks so they can run in the background. `love.load` runs it last.
 * `quit`, `resize` and `visible` are never run in the background, so quitting always finishes before the window closes.
+
+#### ⌨️ Keys Pressed While Loading
+
+Keys pressed while a loading overlay is up are no longer lost.
+
+* Every key pressed while the work runs is added to the end of a queue. The overlay keys (F7, F8, F9 and F11) still work straight away and aren't queued.
+* A key held down only counts once. Its repeats aren't added.
+* Each time a piece of work finishes, the game presses the nth key of the queue for real. n starts at 1 and goes up by one every time, so the first load presses the first key, the next load the second key, and so on.
+* A key pressed this way is let go of on a later frame, unless you're still holding it down. Then it's let go of when you really let go.
+* If the pressed key starts another load (Enter on a menu, for example), keys pressed during that one are added to the end of the same queue.
+* Once every queued key has been pressed, the queue is emptied and n goes back to 1.
+
+#### 🚪 Alt+F4
+
+* **Alt+F4** now closes the game straight away, even in the middle of a load. It's never added to the queue, and it doesn't wait for the work to finish. Left or right Alt both work.
+* The game still shuts down the normal way, so online play is left and the log is still dumped.
+
+#### 🧱 Key Queue Functions
+
+* `overlaykeyqueue` holds every key pressed while the work ran, as `{key, scancode}`, oldest first. `overlaykeyindex` is n: the queued key pressed when the next piece of work finishes.
+* `overlaykeys_replay()` presses the next queued key. `overlaytask.lua` runs it whenever a piece of work finishes.
 
 #### 🗂️ Options Tab Picker
 
