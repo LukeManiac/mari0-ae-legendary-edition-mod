@@ -354,21 +354,6 @@ function hudoutlined()
 	return false
 end
 
---draws something (fn draws it with the current colour) with a black outline a game pixel wide around it
-local OUTLINE = {{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}}
-function drawoutlined(fn)
-	local r, g, b, a = love.graphics.getColor()
-	love.graphics.setColor(0, 0, 0, a)
-	for _, o in ipairs(OUTLINE) do
-		love.graphics.push()
-		love.graphics.translate(o[1]*scale, o[2]*scale)
-		fn()
-		love.graphics.pop()
-	end
-	love.graphics.setColor(r, g, b, a)
-	fn()
-end
-
 --increase contrast: grey text (unselected options, hints...) is drawn brighter. Returns what to put back afterwards
 function accessibility_contrasttext()
 	if not accessibility.increasecontrast then

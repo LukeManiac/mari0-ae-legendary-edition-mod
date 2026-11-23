@@ -2922,21 +2922,14 @@ function game_draw()
 		--SCROLLING SCORE
 		for i, v in pairs(scrollingscores) do
 			--with the hud outlined (the mappack's hudoutline, or accessibility's hud outline), score notes are outlined too
-			local function drawnote()
-				if type(scrollingscores[i].i) == "number" then
-					properprint2(scrollingscores[i].i, math.floor((scrollingscores[i].x-xscroll-0.4)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale))
-				elseif scrollingscores[i].i == "1up" then
-					love.graphics.draw(oneuptextimage, math.floor((scrollingscores[i].x-xscroll)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale), 0, scale, scale)
-				elseif scrollingscores[i].i == "3up" then
-					love.graphics.draw(threeuptextimage, math.floor((scrollingscores[i].x-xscroll)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale), 0, scale, scale)
-				elseif type(scrollingscores[i].i) == "string" and string.sub(scrollingscores[i].i, 1, 1) == "+" then
-					properprint(scrollingscores[i].i, math.floor((scrollingscores[i].x-xscroll-0.4)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale))
-				end
-			end
-			if hudoutlined() then
-				drawoutlined(drawnote)
-			else
-				drawnote()
+			if type(scrollingscores[i].i) == "number" then
+				properprint2(scrollingscores[i].i, math.floor((scrollingscores[i].x-xscroll-0.4)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale))
+			elseif scrollingscores[i].i == "1up" then
+				love.graphics.draw(oneuptextimage, math.floor((scrollingscores[i].x-xscroll)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale), 0, scale, scale)
+			elseif scrollingscores[i].i == "3up" then
+				love.graphics.draw(threeuptextimage, math.floor((scrollingscores[i].x-xscroll)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale), 0, scale, scale)
+			elseif type(scrollingscores[i].i) == "string" and string.sub(scrollingscores[i].i, 1, 1) == "+" then
+				properprint(scrollingscores[i].i, math.floor((scrollingscores[i].x-xscroll-0.4)*16*scale), math.floor((scrollingscores[i].y-yscroll-1.5-scrollingscoreheight*(scrollingscores[i].timer/scrollingscoretime))*16*scale))
 			end
 		end
 		
