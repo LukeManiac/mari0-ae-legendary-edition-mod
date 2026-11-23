@@ -501,6 +501,23 @@ function mario:update(dt)
 			return
 		end
 	end
+	--a locked door that was just opened with a key: wait lockeddoorentrywait seconds, then go in (see upkey).
+	--It only counts while the player updates, so pausing doesn't use up the wait
+	if self.lockeddoorwait then
+		local w = self.lockeddoorwait
+		local a = self.animation
+		if self.dead or (a and a ~= "invincible" and a ~= "grow1" and a ~= "grow2" and a ~= "shrink" and a ~= "modernsize") then
+			--something else took the player over (a pipe, the flagpole...)
+			self.lockeddoorwait = nil
+		elseif a == nil or a == "invincible" then --(the wait holds still while their size changes)
+			w.timer = w.timer + dt
+			if w.timer >= lockeddoorentrywait then
+				self.lockeddoorwait = nil
+				self:door(w.x, w.y, w.i)
+				net_action(self.playernumber, "door|" .. w.x .. "|" .. w.y .. "|" .. w.i)
+			end
+		end
+	end
 	self.stompsnap = false --what p-speed was like before this frame's landing (see floorcollide)
 	accessibility_playerupdate(self, dt) --jump buffer, coyote time, hold to swim and hold to fire (accessibility.lua)
 	--RACCOON STUFF
@@ -4257,6 +4274,13 @@ function mario:upkey()
 					if self.key < 1 then
 						self.key = false
 					end
+					--stand still for lockeddoorentrywait seconds, then go in (see mario:update)
+					self.controlsenabled = false
+					self.speedx = 0
+					self.speedy = 0
+					self.invincible = true
+					self.lockeddoorwait = {timer = 0, x = x, y = y, i = map[x][y][3]}
+					return
 				end
 			end
 		end

@@ -651,7 +651,7 @@ Every change saves straight away. They're saved in `options.txt` as `a11y_<name>
 * **Colour filter:** None, protanopia, deuteranopia or tritanopia. The whole frame goes through a daltonisation filter that moves the colours someone with that colour vision deficiency would lose into ones they can tell apart. Everything is filtered, including menus, the HUD, notices and shaders.
 * **HUD outline:** Outlines the HUD in every mappack, the same as a mappack with `hudoutline` on. Score notes (the points and 1-ups that float up) get a black outline too, whenever the HUD is outlined. The mappack's own `hudoutline` setting isn't changed.
 * **Text cursor:** How wide a text input's cursor is: normal (2 pixels), large (3) or extra large (4). This also covers a slider's cursor while you type a value into it.
-* **Reduce flashing:** A Starman no longer flashes the player through colours. They keep their own colours, with a soft rainbow glow around and over them made with `rainbow()`, like in the Super Mario Maker series. The glow is a ring of the player's shape in shifting rainbow colours a pixel or two out, and a light rainbow tint over them, both pulsing gently. Only the Starman changes.
+* **Reduce flashing:** A Starman no longer flashes the player through colours. They keep their own colours, with a rainbow glow over them like in the Super Mario Maker series. The glow is a copy of the player's whole picture, hat included, coloured entirely with `rainbow()` and drawn on top with additive (glow) blending, pulsing gently. It only moves while the player updates, so it stops while the game is paused, and it slows down with **Game speed**. Only the Starman changes.
 * **Player indicator:** "P1" (or P2, P3, P4) with "↓" under it above every player, in that player's colour with a black outline. Each line is centred on the player.
 * **Aim line:** The portal gun's dots are replaced by a solid line with a black outline, from the portal gun to where the portal would open, in the colour of the player's first portal. Where a portal can't open, the line is red and ends in a red cross. The crosshair on the surface still shows.
 * **Low time warning:** Once the timer drops below 100, it turns red and pulses, so the warning doesn't depend on hearing the "hurry" sound. It doesn't show with infinite time, in courses without a timer, or in the Course Maker.
@@ -733,6 +733,7 @@ Every GUI text input now takes the usual editing keys:
 
 ### 🐛 Bug Fixes
 
+* Music now plays again after the volume is turned up from 0%. Before, setting the volume to 0% and later changing it to any other volume left the music silent.
 * `starmusic-intro.ogg` and `princessmusic-intro.ogg` now actually play. Before, built-in music only ever loaded its `-fast` version, and a mappack's star and princess themes were loaded without looking for an intro, so both themes always started without one.
 * A mappack star theme with `starmusic-intro.ogg` but no `starmusic-fast.ogg` no longer plays an intro before the fast star theme only. Now the intro plays before the normal one as well.
 * With **Continue subzone music** on, going into a subzone while the fast star theme was playing kept it playing as the course music. Now any version of the star theme counts, so the course's own music starts.
