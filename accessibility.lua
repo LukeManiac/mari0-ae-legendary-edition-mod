@@ -721,7 +721,7 @@ function accessibility_drawplayerindicators(xscroll, yscroll)
 	end
 	for i = 1, players do
 		local p = objects["player"][i]
-		if p and not p.dead then
+		if p and p.drawable and not p.dead then
 			local colour = {255, 255, 255}
 			if mariocolors[i] and mariocolors[i][1] then
 				colour = mariocolors[i][1]
