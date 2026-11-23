@@ -812,6 +812,12 @@ function game_update(dt)
 		else
 			if v.timer < blockbouncetime then
 				v.timer = v.timer + dt
+				--mariomakerblockphysics: the item only comes out once the block's scale is back to 1 after it grew.
+				--Its first step stops at the top of the bounce, so a long frame can't skip the growing
+				if (not v.grown) and blockbouncescales(v) then
+					v.grown = true
+					v.timer = math.min(v.timer, blockbouncetime/2)
+				end
 				if v.timer > blockbouncetime then
 					v.timer = blockbouncetime
 					if v.content then
@@ -11183,6 +11189,21 @@ function trackobject(x, y, obj, objtable) --grab entity onto track
 		return true
 	end
 	return false
+end
+
+--mariomakerblockphysics: whether a bouncing block scales (every block but note blocks, see drawmaptiles)
+function blockbouncescales(v)
+	if not MarioMakerBlockPhysics then
+		return false
+	end
+	if not (v.x and v.y and inmap(v.x, v.y)) then
+		return false
+	end
+	local t = tilequads[map[v.x][v.y][1]]
+	if t and t.noteblock then
+		return false
+	end
+	return true
 end
 
 function createblockbounce(x, y)
