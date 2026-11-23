@@ -97,6 +97,8 @@ function game_load(suspended, deletesuspend)
 	setphysics(1)
 	if not dcplaying and not minigameplaying then
 		loadmappacksettings()
+	else
+		restoreglobalnitpicks() --(the daily challenge and minigames never use a mappack's nitpicks)
 	end
 
 	updatemappacksettings()

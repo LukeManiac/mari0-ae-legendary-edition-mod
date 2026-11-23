@@ -1,5 +1,8 @@
 function loadmappacksettings(suspended)
 	disabletransition = false
+	--local nitpick loading: the mappack's own nitpicks.json, over the global one
+	loadlocalnitpicks()
+	setphysics(currentphysics) --(mariomakergravity may have changed)
 	if not love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/settings.txt") then
 		return false
 	end

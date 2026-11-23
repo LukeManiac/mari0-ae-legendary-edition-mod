@@ -3702,54 +3702,114 @@ function logdump()
     end
 end
 
-function loadnitpicks()
-	--shit i don't want to add
-	--if people complain about stuff they can use this
-	nitpicks = false
-	if love.filesystem.getInfo("alesans_entities/nitpicks.json") then
-		local data = love.filesystem.read("alesans_entities/nitpicks.json")
-		t = JSON:decode(data or "")
-		--CASE INSENSITVE THING
-		for i, v in pairs(t) do
+--reads a nitpicks.json: returns its table with every key also in lowercase (the key stays as it was too,
+--for debugGraphs), or nil when the file isn't there or isn't a JSON object
+function readnitpicksfile(path)
+	if not love.filesystem.getInfo(path) then
+		return nil
+	end
+	local data = love.filesystem.read(path)
+	local ok, decoded = pcall(JSON.decode, JSON, data or "")
+	if not ok or type(decoded) ~= "table" then
+		return nil
+	end
+	local t = {}
+	for i, v in pairs(decoded) do
+		t[i] = v
+		if type(i) == "string" then
 			t[i:lower()] = v
 		end
+	end
+	return t
+end
 
-		ForceDropShadow = t.dropshadow or t.forcedropshadow
-		AutoAssistMode = t.assistmode
-		PlayMusicInEditor = t.playmusicineditor
-		DisableToolTips = t.disabletooltips
-		DisableMouseInMainMenu = t.disablemouseinmainmenu
-		if t.noportalgun then
-			playertypei = 5
-			playertype = playertypelist[playertypei]
+GLOBALNITPICKSPATH = "alesans_entities/nitpicks.json"
+localnitpicksactive = false --a mappack's nitpicks.json is what the nitpicks are set from right now
+localnitpicks = nil --that mappack's nitpicks (only the ones it has), for accessibility_afterlocalnitpicks
+
+--localpath: a mappack's nitpicks.json. Its nitpicks are put over the global ones, and the nitpicks it doesn't have
+--keep their global values. Without localpath (or if that file isn't there), only the global nitpicks.json is used.
+--Settings that only make sense once, when the game starts (console, android, dpifix, letterbox, debugGraphs),
+--are only read from the global file at startup.
+function loadnitpicks(localpath)
+	--shit i don't want to add
+	--if people complain about stuff they can use this
+	local startup = not nitpicksloadedonce
+	nitpicksloadedonce = true
+	nitpicks = false
+
+	local global = readnitpicksfile(GLOBALNITPICKSPATH)
+	local loc = localpath and readnitpicksfile(localpath)
+	if not global and not loc then
+		if startup then
+			return
 		end
-		if t.mariomakergravity then
-			maxyspeed = smbmaxyspeed --SMB: 14
-			mari0maxyspeed = maxyspeed
+		global = {} --(a nitpicks file was used before: everything goes back to off)
+	end
+
+	local t = {}
+	for i, v in pairs(global or {}) do
+		t[i] = v
+	end
+	if loc then
+		for i, v in pairs(loc) do
+			t[i] = v --only the nitpicks the mappack has replace the global ones
 		end
-		dontPauseOnUnfocus = t.dontpauseonunfocus
-		FireButtonCannonHelmet = t.firebuttoncannonhelmet
-		PipesInEditor = t.pipesineditor
-		NoOnlineMultiplayerNames = t.noonlinemultiplayernames
+	end
+	localnitpicksactive = loc ~= nil
+	localnitpicks = loc
+
+	if defaultmari0maxyspeed == nil then
+		defaultmari0maxyspeed = mari0maxyspeed
+	end
+
+	ForceDropShadow = t.dropshadow or t.forcedropshadow
+	AutoAssistMode = t.assistmode
+	PlayMusicInEditor = t.playmusicineditor
+	DisableToolTips = t.disabletooltips
+	DisableMouseInMainMenu = t.disablemouseinmainmenu
+	if t.noportalgun then
+		playertypei = 5
+		playertype = playertypelist[playertypei]
+		noportalgunfromnitpicks = true
+	elseif noportalgunfromnitpicks then
+		--the last nitpicks file took the portal gun away, this one doesn't
+		playertypei = 1
+		playertype = playertypelist[playertypei]
+		noportalgunfromnitpicks = false
+	end
+	if t.mariomakergravity then
+		mari0maxyspeed = smbmaxyspeed --SMB: 14
+	else
+		mari0maxyspeed = defaultmari0maxyspeed
+	end
+	if startup and t.mariomakergravity then
+		maxyspeed = mari0maxyspeed
+	end
+	dontPauseOnUnfocus = t.dontpauseonunfocus
+	FireButtonCannonHelmet = t.firebuttoncannonhelmet
+	PipesInEditor = t.pipesineditor
+	NoOnlineMultiplayerNames = t.noonlinemultiplayernames
+	CustomPortalColors = t.customportalcolors
+	UseButtonCappy = t.usebuttoncappy
+	ShowPlayerCoords = t.showplayercoords
+	NeverCustomEnemyBG = t.alwaysnocustomenemybg
+	ShowTime = t.showtime
+	ShowBattery = t.showbattery
+	ShowFPS = t.showfps
+	InfiniteLivesMultiplayer = t.infinitelivesmultiplayer
+	SlowBackgrounds = t.slowbackgrounds
+	NoMusic = t.nomusic
+	AlwaysInfiniteTime = t.alwaysinfinitetime
+	AlwaysInfiniteLives = t.alwaysinfinitelives
+	CenterCamera = t.centercamera
+	_3DMODE = t.render3d
+	HITBOXDEBUG = t.viewhitboxes
+	HITBOXDEBUGANIMS = t.viewanimationnumbers
+	if startup then
 		if t.letterbox ~= nil then
 			letterboxfullscreen = t.letterbox --mouse inputs will be in the wrong place!
 		end
-		CustomPortalColors = t.customportalcolors
-		UseButtonCappy = t.usebuttoncappy
-		ShowPlayerCoords = t.showplayercoords
-		NeverCustomEnemyBG = t.alwaysnocustomenemybg
-		ShowTime = t.showtime
-		ShowBattery = t.showbattery
-		ShowFPS = t.showfps
-		InfiniteLivesMultiplayer = t.infinitelivesmultiplayer
-		SlowBackgrounds = t.slowbackgrounds
-		NoMusic = t.nomusic
-		AlwaysInfiniteTime = t.alwaysinfinitetime
-		AlwaysInfiniteLives = t.alwaysinfinitelives
-		CenterCamera = t.centercamera
-		_3DMODE = t.render3d
-		HITBOXDEBUG = t.viewhitboxes
-		HITBOXDEBUGANIMS = t.viewanimationnumbers
 		if t.pcversion then
 			android = false
 			androidsafe = true
@@ -3769,52 +3829,72 @@ function loadnitpicks()
 			LoveConsole = true
 			if love._openConsole then love._openConsole() end
 		end
-		NoExitConfirmation = t.noexitconfirmation
-		PersistentEditorTools = true
-		if t.persistenteditortools == false then
-			PersistentEditorTools = false
-		end
-		PersistentEditorToolsLocal = t.persistenteditortoolslocal
 		DPIFix = t.dpifix
-		NoEditorPreviews = t.noeditorpreviews
-		EnemyToolHiddensAllowed = t.displayhiddenenemiesinspawner
-		CompletelyCenteredCamera = t.completelycenteredcamera
-		ModernMultiplayerCamera = t.modernmultiplayercamera
-		SPLITSCREENISBACK = t.splitscreenmultiplayer
-		HorizontalSplitScreen = t.horizontalsplitscreenviewports
-		GOTTAGOFAST = t.hurrymode
-		GOTTAGOFASTINSTANT = t.hurrymodeskipfanfare
-		NoTransitions = t.disabletransitions
-		INFINITEFIREBALLS = t.infinitefireballs
-		SMWSwimming = t.smwwaterphysics
-		NoLogDumping = t.nologdumping
-		SkipIntro = t.skipintro
-		ConsistentVineSpeed = t.consistentvinespeed
-		OrderedMovementTypes = t.orderedmovementtypes
-		InvincibleSnake = t.invinciblesnake
-		MultipleJumping = t.multiplejumping
-		ProbabilityPasser = t.probabilitypasser
-		ImmortalComboMeter = t.immortalcombometer
-		RemoveCooldowns = t.removecooldowns
-		ClassicSpeedUpFastMusic = t.classicspeedupfastmusic
-		ModernSizeChangeAnimation = t.modernsizechangeanimation
-		NoAirSpeedCap = t.noairspeedcap
-		InertiaPhysics = t.inertiaphysics
-		MarioMakerBlockPhysics = t.mariomakerblockphysics
-		DontFreezeOnSizeChange = t.dontfreezeonsizechange
-		CameraSmoothing = t.camerasmoothing
-		BackwardSmoothing = t.backwardsmoothing
-		AutomaticEnemyReload = t.automaticenemyreload
-		AutomaticBackgroundReload = t.automaticbackgroundreload
-		AutomaticMapReload = t.automaticmapreload
-		AutomaticAnimationReload = t.automaticanimationreload
-
-		if MarioMakerBlockPhysics then
-			mushroomtime = mmmushroomtime
-		else
-			mushroomtime = classicmushroomtime
-		end
 	end
+	NoExitConfirmation = t.noexitconfirmation
+	PersistentEditorTools = true
+	if t.persistenteditortools == false then
+		PersistentEditorTools = false
+	end
+	PersistentEditorToolsLocal = t.persistenteditortoolslocal
+	NoEditorPreviews = t.noeditorpreviews
+	EnemyToolHiddensAllowed = t.displayhiddenenemiesinspawner
+	CompletelyCenteredCamera = t.completelycenteredcamera
+	ModernMultiplayerCamera = t.modernmultiplayercamera
+	SPLITSCREENISBACK = t.splitscreenmultiplayer
+	HorizontalSplitScreen = t.horizontalsplitscreenviewports
+	GOTTAGOFAST = t.hurrymode
+	GOTTAGOFASTINSTANT = t.hurrymodeskipfanfare
+	NoTransitions = t.disabletransitions
+	INFINITEFIREBALLS = t.infinitefireballs
+	SMWSwimming = t.smwwaterphysics
+	NoLogDumping = t.nologdumping
+	SkipIntro = t.skipintro
+	ConsistentVineSpeed = t.consistentvinespeed
+	OrderedMovementTypes = t.orderedmovementtypes
+	InvincibleSnake = t.invinciblesnake
+	MultipleJumping = t.multiplejumping
+	ProbabilityPasser = t.probabilitypasser
+	ImmortalComboMeter = t.immortalcombometer
+	RemoveCooldowns = t.removecooldowns
+	ClassicSpeedUpFastMusic = t.classicspeedupfastmusic
+	ModernSizeChangeAnimation = t.modernsizechangeanimation
+	NoAirSpeedCap = t.noairspeedcap
+	InertiaPhysics = t.inertiaphysics
+	MarioMakerBlockPhysics = t.mariomakerblockphysics
+	DontFreezeOnSizeChange = t.dontfreezeonsizechange
+	CameraSmoothing = t.camerasmoothing
+	BackwardSmoothing = t.backwardsmoothing
+	AutomaticEnemyReload = t.automaticenemyreload
+	AutomaticBackgroundReload = t.automaticbackgroundreload
+	AutomaticMapReload = t.automaticmapreload
+	AutomaticAnimationReload = t.automaticanimationreload
+
+	if MarioMakerBlockPhysics then
+		mushroomtime = mmmushroomtime
+	else
+		mushroomtime = classicmushroomtime
+	end
+end
+
+--local nitpick loading: the open mappack's nitpicks.json (mappackfolder/mappack/nitpicks.json) is put over the
+--global one. Nothing is read again while neither the mappack nor the last one had a nitpicks.json.
+function loadlocalnitpicks()
+	local path = mappackfolder .. "/" .. mappack .. "/nitpicks.json"
+	if not love.filesystem.getInfo(path) and not localnitpicksactive then
+		return
+	end
+	loadnitpicks(path)
+	accessibility_afterlocalnitpicks(localnitpicks)
+end
+
+--puts the global nitpicks back after a mappack's nitpicks.json was used (menu, daily challenge, minigames)
+function restoreglobalnitpicks()
+	if not localnitpicksactive then
+		return
+	end
+	loadnitpicks()
+	accessibility_afterlocalnitpicks(nil)
 end
 
 function disablecheats()

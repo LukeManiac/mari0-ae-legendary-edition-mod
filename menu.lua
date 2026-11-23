@@ -2211,6 +2211,7 @@ end
 
 function menu_load()
 	love.audio.stop()
+	restoreglobalnitpicks() --(a mappack's own nitpicks.json only counts while it's being played or edited)
 	pausedaudio = nil
 	music:disableintromusic()
 	if dailychallengebuiltingraphics then

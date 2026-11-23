@@ -309,6 +309,8 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 Set nitpicks in `alesans_entities/nitpicks.json`. Some of them are also settings in the accessibility menu (see **Accessibility** under v1.4): there, the nitpick is only where the setting starts. Most are boolean options: use `true` to enable them. Settings assigned directly from the JSON keep their supplied value; an omitted setting is `nil`. `letterbox` is applied whenever its key exists, including when set to `false`. `dpifix` accepts `true` (use a scale factor of 2) or a number (use that scale factor). `androidversion` is copied into the Android setting when truthy. `persistenteditortools` is enabled by default when the file exists, and only the explicit value `false` disables it. The key `debugGraphs` uses that exact capitalisation.
 
+A mappack can also have its own `nitpicks.json`, next to its `settings.txt`. Its nitpicks replace the global ones while that mappack is played or edited, and every nitpick it doesn't list keeps its global value (see **Local Nitpick Loading** under v1.4).
+
 - `dropshadow`: Forces drop shadows in loaded mappacks, outside the editor. Alias for `forcedropshadow`.
 - `forcedropshadow`: Forces drop shadows in loaded mappacks, outside the editor. Alias for `dropshadow`.
 - `assistmode`: Set the editor's initial Assist Mode value when Assist Mode has not already been initialised.
@@ -617,6 +619,27 @@ Mari0 AE and Legendary Edition share `alesans_entities/options.txt`. When Mari0 
 
 For anyone working with the settings code: `readoptionsfile()` is what `loadconfig` reads, `OPTIONS_LE_MARKER` is the marker and `OPTIONS_LE_BACKUP` is the backup's path.
 
+#### 🗂️ Local Nitpick Loading
+
+Mappacks can now have their own nitpicks. Put a `nitpicks.json` in the mappack's folder (`<mappack folder>/<mappack>/nitpicks.json`, next to `settings.txt`), written the same way as the global `alesans_entities/nitpicks.json`.
+
+* Whenever the mappack's settings load (starting or continuing a game, opening the Course Maker, online play), the game runs `loadnitpicks()` again with the mappack's file on top of the global one.
+* Only the nitpicks the mappack's file lists are changed. Every other nitpick keeps its value from the global `nitpicks.json`. For example, a mappack file with just `{"nomusic": false}` turns the music back on for that mappack and leaves everything else as the player set it.
+* If the mappack has no `nitpicks.json`, every nitpick goes back to its value from the global file. Nothing is read again while neither the mappack nor the last one had a file, so nitpicks switched with F7, F8 or F9 stay how they are.
+* Going back to the menu, the daily challenge and the minigames always use the global nitpicks.
+* Nitpicks that are also accessibility settings (smooth camera, infinite lives, the physics and camera ones) follow the mappack's file when it lists them, and the player's setting otherwise. The settings themselves aren't changed or saved, so they come back once you leave the mappack.
+* Taking `noportalgun` or `mariomakergravity` out goes back to the portal gun and the normal fall speed.
+* A few nitpicks only work at startup, so they're only read from the global file: `console`, `androidversion`, `pcversion`, `hideandroidbuttons`, `dpifix`, `letterbox` and `debugGraphs`.
+* A broken mappack `nitpicks.json` counts as missing, instead of crashing.
+
+For anyone working with the nitpicks code:
+
+* `loadnitpicks(localpath)` reads the global file, puts `localpath` over it if it's there, and sets the nitpicks. Without `localpath`, only the global file is used.
+* `readnitpicksfile(path)` returns a nitpicks file's table with its keys in lowercase, or `nil` if it isn't there or isn't valid JSON.
+* `loadlocalnitpicks()` loads the open mappack's file. `loadmappacksettings` runs it first.
+* `restoreglobalnitpicks()` puts the global nitpicks back after a mappack's were used. `menu_load` runs it, and so does `game_load` for the daily challenge and minigames.
+* `accessibility_afterlocalnitpicks(loc)` lets the nitpicks in `loc` replace their accessibility settings, and puts the settings back for the rest.
+
 #### ♿ Accessibility
 
 A new **accessibility** tab in the options menu, after **cheat** in the tab picker, and the same settings on a new page of the pause menu. Both list them in categories, with each setting's label indented under its category and its widget at the end of the line:
@@ -734,7 +757,7 @@ A new nitpick, `mariomakerblockphysics`. **Generate Nitpicks File** adds it to a
 
 #### 🚪 Locked Doors
 
-* Opening a key door with a key now stops you in front of it. Your controls are turned off, your speed goes to 0 and you can't be hurt. After `lockeddoorentrywait` seconds (1 by default, in `variables.lua`), you go in.
+* Opening a key door with a key now stops you in front of it. Your controls are turned off, your speed goes to 0 and you can't be hurt. After `lockeddoorentrywait` seconds (0.5 by default, in `variables.lua`), you go in.
 * The wait only counts while you're updating, so pausing doesn't use it up, and it holds still while your size is changing. If you die, or something else takes you over first, the wait is called off.
 * If the door can't be entered when the wait is over (in multiplayer, when everyone has to take another one), your controls come back.
 * P-doors and key doors now work like normal doors when you hold Up while walking into them: an open one lets you in, and a locked key door opens with your key. Before, Up had to be pressed while standing in front of them.

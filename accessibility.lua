@@ -200,6 +200,35 @@ function accessibility_afternitpicks()
 	accessibility_resolve()
 end
 
+--the nitpick each of those settings starts as, where it isn't the setting's own name
+local NITPICKNAMES = {
+	infinitelives = "alwaysinfinitelives",
+	infinitetime = "alwaysinfinitetime",
+}
+
+--after a mappack's nitpicks.json was loaded (or the global one put back, with loc nil): a nitpick the mappack has
+--replaces its setting while the mappack is open. Every other one goes back to the setting. The settings themselves,
+--and the global values Reset All Settings starts them from, aren't changed.
+function accessibility_afterlocalnitpicks(loc)
+	for key, global in pairs(FROMNITPICKS) do
+		local name = NITPICKNAMES[key] or key
+		if loc and loc[name] ~= nil then
+			local value = false
+			if loc[name] then
+				value = true
+			end
+			_G[global] = value
+			if key == "infinitelives" then
+				infinitelives = value
+			elseif key == "infinitetime" then
+				infinitetime = value
+			end
+		else
+			applynitpicksetting(key)
+		end
+	end
+end
+
 local function snap(item, value)
 	value = tonumber(value) or item.max
 	value = math.floor((value - item.min)/item.step + 0.5)*item.step + item.min
