@@ -459,7 +459,6 @@ cameralerp_duration = 0.25
 
 blockbouncetime = 0.2
 blockbounceheight = 0.4
-mmblockbouncetime = blockbouncetime*2 --mariomakerblockphysics: how long a whole block bounce takes (0.4)
 mmblockbouncescale = 0.25 --mariomakerblockphysics: how much bigger a bouncing block gets at the top of its bounce
 coinblocktime = 0.3
 coinblockdelay = 1/60
