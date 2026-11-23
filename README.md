@@ -307,7 +307,7 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 # Nitpicks
 
-Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use `true` to enable them. Settings assigned directly from the JSON keep their supplied value; an omitted setting is `nil`. `letterbox` is applied whenever its key exists, including when set to `false`. `dpifix` accepts `true` (use a scale factor of 2) or a number (use that scale factor). `androidversion` is copied into the Android setting when truthy. `persistenteditortools` is enabled by default when the file exists, and only the explicit value `false` disables it. The key `debugGraphs` uses that exact capitalisation.
+Set nitpicks in `alesans_entities/nitpicks.json`. Some of them are also settings in the accessibility menu (see **Accessibility** under v1.4): there, the nitpick is only where the setting starts. Most are boolean options: use `true` to enable them. Settings assigned directly from the JSON keep their supplied value; an omitted setting is `nil`. `letterbox` is applied whenever its key exists, including when set to `false`. `dpifix` accepts `true` (use a scale factor of 2) or a number (use that scale factor). `androidversion` is copied into the Android setting when truthy. `persistenteditortools` is enabled by default when the file exists, and only the explicit value `false` disables it. The key `debugGraphs` uses that exact capitalisation.
 
 - `dropshadow`: Forces drop shadows in loaded mappacks, outside the editor. Alias for `forcedropshadow`.
 - `forcedropshadow`: Forces drop shadows in loaded mappacks, outside the editor. Alias for `dropshadow`.
@@ -371,6 +371,7 @@ Set nitpicks in `alesans_entities/nitpicks.json`. Most are boolean options: use 
 - `modernsizechangeanimation`: Powering up and down uses a Super Mario Maker 2 style animation instead of the classic one.
 - `noairspeedcap`: Holding run in the air speeds you up to full running speed, even if you jumped from below walking speed.
 - `inertiaphysics`: Jumping or falling off a moving platform keeps its speed, so you fly off in the direction it was going.
+- `mariomakerblockphysics`: Blocks grow as they bounce up and shrink back as they come down, like in Super Mario Maker. Items come out of blocks in 0.4 seconds instead of 0.7.
 - `dontfreezeonsizechange`: Powering up and down only freezes the player it happens to, like in SMBX2. Everything else keeps moving, and that player can't be touched until the animation is done.
 - `camerasmoothing`: The camera eases after where it's going instead of moving rigidly, so it trails slightly behind.
 - `backwardsmoothing`: The camera leads ahead by as much as `camerasmoothing` would make it trail. Requires `camerasmoothing`.
@@ -631,9 +632,9 @@ display:
     ...
 ```
 
-There are six categories: **motion**, **display**, **gameplay**, **assists**, **controls** and **notices**.
+There are eight categories: **motion**, **display**, **gameplay**, **physics**, **assists**, **camera**, **controls** and **notices**.
 
-A setting that does nothing because of another one (skip course after ... deaths while never skip automatically is ticked, rapid hold execution while hold to fire is off) is greyed out: its label and widget are dimmed, and it doesn't take clicks or keys until the other setting allows it. A label too long for its line wraps beside a checkbox. A slider or dropdown that doesn't fit next to its label goes on the line under it. Both pages are taller than the space they have, so they scroll, with a GUI scrollbar at their right edge that can be dragged like any other. The mouse wheel scrolls them too, and the setting the keyboard is on always scrolls into view, with the scrollbar following. Settings scrolled out of view can't be clicked.
+A setting that does nothing because of another one (skip course after ... deaths while never skip automatically is ticked, rapid hold execution while hold to fire is off, backward smoothing while smooth camera is off, horizontal splitscreen viewports while splitscreen multiplayer is off) is greyed out: its label and widget are dimmed, and it doesn't take clicks or keys until the other setting allows it. A label too long for its line wraps beside a checkbox. A slider or dropdown that doesn't fit next to its label goes on the line under it. Both pages are taller than the space they have, so they scroll, with a GUI scrollbar at their right edge that can be dragged like any other. The mouse wheel scrolls them too, and the setting the keyboard is on always scrolls into view, with the scrollbar following. Settings scrolled out of view can't be clicked.
 
 Every change saves straight away. They're saved in `options.txt` as `a11y_<name>:<value>`, and **Reset All Settings** puts them all back to their defaults.
 
@@ -643,6 +644,7 @@ Every change saves straight away. They're saved in `options.txt` as `a11y_<name>
 * **Screen shake:** How strong screen shake is, from 25% to 100% in steps of 5%. 100% by default.
 * **Shake direction:** Which way the screen shakes: vertical, horizontal or both. Both by default.
 * **Smooth camera:** The `camerasmoothing` nitpick as a setting. The first time the game starts, it's set to whatever the nitpick says. From then on, the setting decides, and **Reset All Settings** takes it from the nitpick again.
+* **Backward smoothing:** The `backwardsmoothing` nitpick as a setting, started from the nitpick the same way. It's greyed out while smooth camera is off. If it's on without smooth camera when the game starts, a red notice says "backward smoothing needs smooth camera: turn on smooth camera to use it!".
 
 **Display**
 
@@ -661,6 +663,17 @@ Every change saves straight away. They're saved in `options.txt` as `a11y_<name>
 * **Game speed:** How fast gameplay runs, from 25% to 100% in steps of 5%. 100% by default. Everything in a course slows down together, including the timer. The pause menu, its prompts and the menus run at normal speed, and so does the Course Maker while editing. Testing a course uses the setting. Online play always runs at 100%.
 * **Half-opaque blink:** A player blinking after a hit is drawn at half opacity the whole time instead of blinking. The player is drawn as one picture first, so their colours, hat and other layers fade together instead of showing through each other.
 
+**Physics**
+
+Nitpicks as settings. Like smooth camera, each one starts as its nitpick the first time the game starts. From then on, the setting decides, and **Reset All Settings** takes it from the nitpick again.
+
+* **SMW water physics:** `smwwaterphysics`.
+* **Consistent vine speed:** `consistentvinespeed`.
+* **Modern size change animation:** `modernsizechangeanimation`.
+* **SMBX2-styled size change animation:** `dontfreezeonsizechange`.
+* **No air speed cap:** `noairspeedcap`.
+* **Inertia physics:** `inertiaphysics`.
+
 **Assists**
 
 * **Jump buffer:** Pressing jump up to 0.15 seconds before landing jumps as soon as you land. If jump was let go of by then, it's a short hop, the same as tapping jump. A press in the air that does something (a double jump, a raccoon flap, a swim stroke) isn't remembered.
@@ -673,11 +686,20 @@ Every change saves straight away. They're saved in `options.txt` as `a11y_<name>
 * **Skip course after ... deaths:** Only while never skip automatically is unticked. The course is skipped by itself on the death that reaches this number, with a notice saying so, instead of starting the course again. It's from 5 to 100, 10 by default. It isn't skipped by itself on the last life: that's a game over, as usual, and the pause menu offers **skip course** once that many deaths have been reached. The number is a text input like the Course Maker's colour inputs: click it and type a number (Enter sets it), or drag it left and right. A number outside 5 to 100 is moved into it, and anything that isn't a number puts the old one back with a red notice. With the keyboard, Left and Right change it by 1, and Enter selects it to type over. In English it reads "skip level after ... deaths", since English says "level" where Better English says "course".
 * Skipping never happens, and the button never shows, while testing a course from the Course Maker, in minigames, in the daily challenge or online.
 
+**Camera**
+
+Nitpicks as settings, started from them the same way as the physics ones.
+
+* **Completely centered camera:** `completelycenteredcamera`.
+* **Modern multiplayer camera:** `modernmultiplayercamera`.
+* **Splitscreen multiplayer:** `splitscreenmultiplayer`. Rival Rumble Royale still keeps split screen on for the whole battle. Changing this setting during a battle takes effect once the battle ends.
+* **Horizontal splitscreen viewports:** `horizontalsplitscreenviewports`. It's greyed out while splitscreen multiplayer is off.
+
 **Controls**
 
 * **Toggle run:** Pressing run starts running, and pressing it again stops. Anything that needs run held (the Tanooki statue, carrying things) acts as if it's held while it's on.
 * **Hold to swim:** Holding jump underwater keeps swimming upwards, a stroke every 0.3 seconds, instead of needing a press for each stroke. Frog Mario is unaffected.
-* **Hold to fire:** Holding run keeps throwing fireballs, iceballs, superballs, hammers, boomerangs and custom power-up projectiles, one every 0.3 seconds, within the usual limit on how many can be out at once. It only repeats throws: tail whips, picking things up, Cappy and Yoshi still need a press each time. With toggle run on, it's the run button itself that has to be held.
+* **Hold to fire:** Holding run keeps throwing fireballs, iceballs, superballs, hammers, boomerangs and custom power-up projectiles, one every 0.3 seconds, within the usual limit on how many can be out at once. It only repeats throws: tail whips, picking things up, Cappy and Yoshi still need a press each time. It works in a Goomba shoe, stiletto, dry bones shell or cloud too, but not while Up is held, since Up and Run takes the shoe off. With toggle run on, it's the run button itself that has to be held.
 * **Rapid hold execution:** With hold to fire on, a throw is tried every frame instead of every 0.3 seconds, so a new projectile goes out as soon as there's room for one under the usual limit. It's greyed out while hold to fire is off.
 
 **Notices**
@@ -693,11 +715,29 @@ Every change saves straight away. They're saved in `options.txt` as `a11y_<name>
 
 * An **accessibility** button sits at the bottom of the pause menu. Pressing it, or pressing Down after the last option on the right (shader2) and then Down again from the button, slides the pause menu up and the accessibility page up from below.
 * When **skip course** is on offer (see **Never skip automatically** above), its button sits next to **accessibility**. On the button row, Left and Right move between the two, and Enter presses the selected one.
-* The accessibility page has two columns: motion, gameplay and assists on the left, display, controls and notices on the right. It scrolls, with its scrollbar on the right. Its keys work the same as in the options menu. The button at the bottom says **back** there.
+* The accessibility page has two columns: motion, gameplay, physics and assists on the left, display, camera, controls and notices on the right. It scrolls, with its scrollbar on the right. Its keys work the same as in the options menu. The button at the bottom says **back** there.
 * Pressing Up from the first setting, Escape (or the pause key), or **back** slides back to the pause menu, with the **accessibility** button selected. The pause menu always opens on its own page.
 * Nothing on either page can be used while they slide.
 
 All labels, categories and options are translated into every language the game has.
+
+#### 🧱 Mario Maker Block Physics
+
+A new nitpick, `mariomakerblockphysics`. **Generate Nitpicks File** adds it to an existing file.
+
+* A block that's hit doesn't only move up and back down: it grows from its middle as it goes up, to 1.25 times its size at the top of the bounce (`mmblockbouncescale` in `variables.lua`), and shrinks back as it comes down. Action blocks do it too. Every flip block type does too: flip blocks, action blocks, switch blocks, propeller boxes and cannon boxes. Note blocks only move, like before.
+* An item inside the block comes out once the block is back to its normal size, the same moment the bounce ends.
+* Items take `mmmushroomtime` seconds (0.4 by default, in `variables.lua`) to come out of the block, instead of `mushroomtime` (0.7).
+* Coins (and collectables) still come out straight away, as soon as the block is hit.
+* `drawbouncetile(img, quad, x, y, bouncescale)` draws a tile scaled from its middle. `classicmushroomtime` keeps the normal `mushroomtime`, so it goes back to it with the nitpick off.
+
+#### 🚪 Locked Doors
+
+* Opening a key door with a key now stops you in front of it. Your controls are turned off, your speed goes to 0 and you can't be hurt. After `lockeddoorentrywait` seconds (1 by default, in `variables.lua`), you go in.
+* The wait only counts while you're updating, so pausing doesn't use it up, and it holds still while your size is changing. If you die, or something else takes you over first, the wait is called off.
+* If the door can't be entered when the wait is over (in multiplayer, when everyone has to take another one), your controls come back.
+* P-doors and key doors now work like normal doors when you hold Up while walking into them: an open one lets you in, and a locked key door opens with your key. Before, Up had to be pressed while standing in front of them.
+* `mario:trylockeddoor(x, y)` goes through or opens the P-door or key door at `x`, `y`, and returns `true` if it did either.
 
 #### ⌨️ Text Input Keys
 
@@ -733,6 +773,7 @@ Every GUI text input now takes the usual editing keys:
 
 ### 🐛 Bug Fixes
 
+* In Rival Rumble Royale, sudden death can no longer leave split screen on after the battle. Starting sudden death saved the split screen setting again, which could happen while the battle was still forcing it on. Now the setting saved when the battle started is kept.
 * Music now plays again after the volume is turned up from 0%. Before, setting the volume to 0% and later changing it to any other volume left the music silent.
 * `starmusic-intro.ogg` and `princessmusic-intro.ogg` now actually play. Before, built-in music only ever loaded its `-fast` version, and a mappack's star and princess themes were loaded without looking for an intro, so both themes always started without one.
 * A mappack star theme with `starmusic-intro.ogg` but no `starmusic-fast.ogg` no longer plays an intro before the fast star theme only. Now the intro plays before the normal one as well.

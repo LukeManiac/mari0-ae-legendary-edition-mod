@@ -11216,6 +11216,15 @@ function tilemap(x, y)
 	end
 end
 
+--draws a tile at x, y (its top left corner), scaled by bouncescale from its middle (mariomakerblockphysics)
+function drawbouncetile(img, quad, x, y, bouncescale)
+	if bouncescale == 1 then
+		love.graphics.draw(img, quad, x, y, 0, scale, scale)
+	else
+		love.graphics.draw(img, quad, x+8*scale, y+8*scale, 0, scale*bouncescale, scale*bouncescale, 8, 8)
+	end
+end
+
 function drawmaptiles(drawtype, xscroll, yscroll)
 	local fore = (drawtype == "foreground")
 	local drop = (drawtype == "dropshadow") or (drawtype == "menudropshadow")
@@ -11268,6 +11277,7 @@ function drawmaptiles(drawtype, xscroll, yscroll)
 			local cox, coy = x, y
 
 			local bounceyoffset = 0
+			local bouncescale = 1
 			if blockbounce then
 				local blockbouncet = getblockbounce(x, y)
 				if blockbouncet then
@@ -11278,6 +11288,10 @@ function drawmaptiles(drawtype, xscroll, yscroll)
 					else
 						bounceyoffset = (2 - timer / (blockbouncetime/2)) * blockbounceheight
 					end
+					--mariomakerblockphysics: the block grows as it goes up and shrinks back as it comes down (not noteblocks)
+					if MarioMakerBlockPhysics and not tilequads[tilenumber].noteblock then
+						bouncescale = 1 + mmblockbouncescale*(bounceyoffset/blockbounceheight)
+					end
 					if v.timer < 0 then
 						bounceyoffset = -bounceyoffset
 					end
@@ -11287,25 +11301,25 @@ function drawmaptiles(drawtype, xscroll, yscroll)
 			if fore or drop or menudraw then
 				if tilequads[tilenumber]:getproperty("foreground", cox, coy) then
 					if tilenumber > 90000 then
-						love.graphics.draw(tilequads[tilenumber].image, tilequads[tilenumber]:getquad(cox, coy), math.floor((x-1-xoff)*16*scale), math.floor(((y-1-yoff-bounceyoffset)*16-8)*scale), 0, scale, scale)
+						drawbouncetile(tilequads[tilenumber].image, tilequads[tilenumber]:getquad(cox, coy), math.floor((x-1-xoff)*16*scale), math.floor(((y-1-yoff-bounceyoffset)*16-8)*scale), bouncescale)
 					else
-						love.graphics.draw(tilequads[tilenumber].image, tilequads[tilenumber].quad, math.floor((x-1-xoff)*16*scale), math.floor(((y-1-yoff-bounceyoffset)*16-8)*scale), 0, scale, scale)
+						drawbouncetile(tilequads[tilenumber].image, tilequads[tilenumber].quad, math.floor((x-1-xoff)*16*scale), math.floor(((y-1-yoff-bounceyoffset)*16-8)*scale), bouncescale)
 					end
 				end
 			end
 			if (not fore) or drop or menudraw then
 				if not tilequads[tilenumber]:getproperty("foreground", cox, coy) then
 					if tilequads[tilenumber].coinblock and tilenumber < 90000 and not tilequads[tilenumber].invisible then --coinblock
-						love.graphics.draw(coinblockimage, coinblockquads[spriteset][coinframe], math.floor((x-1-xoff)*16*scale), math.floor(((y-1-yoff-bounceyoffset)*16-8)*scale), 0, scale, scale)
+						drawbouncetile(coinblockimage, coinblockquads[spriteset][coinframe], math.floor((x-1-xoff)*16*scale), math.floor(((y-1-yoff-bounceyoffset)*16-8)*scale), bouncescale)
 					elseif (tilequads[tilenumber].coin and tilenumber < 90000) or (menudraw and t[2] == "187") then --coin
-						love.graphics.draw(coinimage, coinquads[spriteset][coinframe], math.floor((x-1-xoff)*16*scale), math.floor(((y-1-yoff-bounceyoffset)*16-8)*scale), 0, scale, scale)
+						drawbouncetile(coinimage, coinquads[spriteset][coinframe], math.floor((x-1-xoff)*16*scale), math.floor(((y-1-yoff-bounceyoffset)*16-8)*scale), bouncescale)
 					elseif tilenumber > 90000 then --same as below, but keeps animated tiles on grid
 						if not tilequads[tilenumber].invisible then
-							love.graphics.draw(tilequads[tilenumber].image, tilequads[tilenumber]:getquad(cox, coy), math.floor((x-1-xoff)*16*scale), math.floor(((y-1-yoff-bounceyoffset)*16-8)*scale), 0, scale, scale)
+							drawbouncetile(tilequads[tilenumber].image, tilequads[tilenumber]:getquad(cox, coy), math.floor((x-1-xoff)*16*scale), math.floor(((y-1-yoff-bounceyoffset)*16-8)*scale), bouncescale)
 						end
 					elseif bounceyoffset ~= 0 or menudraw or (_3DMODE and (((not collision) and (not tilequads[tilenumber].collision))) or ((collision and tilequads[tilenumber].collision and bounceyoffset ~= 0))) then
 						if not tilequads[tilenumber].invisible then
-							love.graphics.draw(tilequads[tilenumber].image, tilequads[tilenumber].quad, math.floor((x-1-xoff)*16*scale), ((y-1-yoff-bounceyoffset)*16-8)*scale, 0, scale, scale)
+							drawbouncetile(tilequads[tilenumber].image, tilequads[tilenumber].quad, math.floor((x-1-xoff)*16*scale), ((y-1-yoff-bounceyoffset)*16-8)*scale, bouncescale)
 						end
 					end
 				end

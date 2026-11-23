@@ -1266,6 +1266,7 @@ local nitpickkeys = {
 	"modernsizechangeanimation",
 	"noairspeedcap",
 	"inertiaphysics",
+	"mariomakerblockphysics",
 	"dontfreezeonsizechange",
 	"camerasmoothing",
 	"backwardsmoothing",

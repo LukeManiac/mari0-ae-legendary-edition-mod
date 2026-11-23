@@ -92,6 +92,13 @@ function flipblock:update(dt)
 	else
 		self.offsetY = (2 - self.blockbouncetimer / (blockbouncetime/2)) * blockbounceheight * 16
 	end
+	--mariomakerblockphysics: every type (flip, action and switch blocks, propeller and cannon boxes) grows as it goes up
+	--and shrinks back as it comes down, like other blocks
+	if MarioMakerBlockPhysics then
+		self.customscale = 1 + mmblockbouncescale*(self.offsetY/(blockbounceheight*16))
+	else
+		self.customscale = nil
+	end
 
 	if self.t == "switchblock" then
 		switchblockswitched[self.color] = false

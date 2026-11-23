@@ -548,7 +548,7 @@ function love.load()
 	
 	--nitpicks
 	loadnitpicks()
-	accessibility_afternitpicks() --smooth camera starts as the camerasmoothing nitpick
+	accessibility_afternitpicks() --the settings that come from nitpicks (smooth camera...) start as them
 
 	--the settings came from legendary edition's backup (Mari0 AE saved options.txt last): put them back in options.txt
 	if optionsbackuprestored then
@@ -560,7 +560,7 @@ function love.load()
 	--still play their entrance animation on launch instead of snapping in fully visible
 
 	if BackwardSmoothing and not CameraSmoothing then
-		notice.new("backwardsmoothing needs camerasmoothing:\nenable camerasmoothing to use it!", notice.red, 6)
+		notice.new("backward smoothing needs smooth camera:\nturn on smooth camera to use it!", notice.red, 6)
 	end
 
 	loadcustomplayers()
@@ -3800,6 +3800,7 @@ function loadnitpicks()
 		ModernSizeChangeAnimation = t.modernsizechangeanimation
 		NoAirSpeedCap = t.noairspeedcap
 		InertiaPhysics = t.inertiaphysics
+		MarioMakerBlockPhysics = t.mariomakerblockphysics
 		DontFreezeOnSizeChange = t.dontfreezeonsizechange
 		CameraSmoothing = t.camerasmoothing
 		BackwardSmoothing = t.backwardsmoothing
@@ -3807,6 +3808,12 @@ function loadnitpicks()
 		AutomaticBackgroundReload = t.automaticbackgroundreload
 		AutomaticMapReload = t.automaticmapreload
 		AutomaticAnimationReload = t.automaticanimationreload
+
+		if MarioMakerBlockPhysics then
+			mushroomtime = mmmushroomtime
+		else
+			mushroomtime = classicmushroomtime
+		end
 	end
 end
 

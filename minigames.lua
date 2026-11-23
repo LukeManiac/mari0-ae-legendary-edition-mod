@@ -4835,6 +4835,16 @@ local RRR_BUILTINMUSIC = {"overworld", "underground", "castle"}
 local rrr_saved = nil
 local rrr_saved_split = nil --the split screen nitpick, it's always on during a battle
 
+--the splitscreen multiplayer setting changed during a battle: it's put back to that once the battle ends,
+--instead of turning split screen off now. Returns true while a battle is keeping split screen on
+function rrr_setsavedsplit(on)
+	if rrr_saved_split then
+		rrr_saved_split.on = on
+		return true
+	end
+	return false
+end
+
 ----------------
 --  HELPERS  --
 ----------------
@@ -7801,7 +7811,9 @@ addminigame({
 		end
 
 		--split screen for every person (all bots: one screen that follows whoever is left)
-		rrr_saved_split = {on = SPLITSCREENISBACK} --(put back by rrr_cleanup)
+		if not rrr_saved_split then --(sudden death keeps the one saved when the battle started)
+			rrr_saved_split = {on = SPLITSCREENISBACK} --(put back by rrr_cleanup)
+		end
 		if carry then
 			--sudden death: the whole arena fits on one screen, so everyone shares it
 			SPLITSCREENISBACK = false

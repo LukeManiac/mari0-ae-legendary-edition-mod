@@ -48,12 +48,26 @@ local ITEMS = {
 	holdtoswim = {kind = "checkbox", label = "hold to swim"},
 	holdtofire = {kind = "checkbox", label = "hold to fire"},
 	rapidhold = {kind = "checkbox", label = "rapid hold execution"},
+	--nitpicks as settings (they start as their nitpicks, see FROMNITPICKS)
+	backwardsmoothing = {kind = "checkbox", label = "backward smoothing"},
+	completelycenteredcamera = {kind = "checkbox", label = "completely centered camera"},
+	modernmultiplayercamera = {kind = "checkbox", label = "modern multiplayer camera"},
+	splitscreenmultiplayer = {kind = "checkbox", label = "splitscreen multiplayer"},
+	horizontalsplitscreenviewports = {kind = "checkbox", label = "horizontal splitscreen viewports"},
+	smwwaterphysics = {kind = "checkbox", label = "smw water physics"},
+	consistentvinespeed = {kind = "checkbox", label = "consistent vine speed"},
+	modernsizechangeanimation = {kind = "checkbox", label = "modern size change animation"},
+	dontfreezeonsizechange = {kind = "checkbox", label = "smbx2-styled size change animation"},
+	noairspeedcap = {kind = "checkbox", label = "no air speed cap"},
+	inertiaphysics = {kind = "checkbox", label = "inertia physics"},
 }
 
 --settings that can't be changed while another one makes them do nothing: greyed out, and they don't take clicks or keys
 local DISABLEDWHEN = {
 	skipdeaths = function() return accessibility.skipnever end, --only the automatic skip uses the number
 	rapidhold = function() return not accessibility.holdtofire end, --only hold to fire repeats
+	backwardsmoothing = function() return not accessibility.camerasmoothing end, --it leads by what smoothing trails
+	horizontalsplitscreenviewports = function() return not accessibility.splitscreenmultiplayer end, --only splitscreen has viewports
 }
 
 local function isdisabled(key)
@@ -66,12 +80,16 @@ end
 
 --the categories, in order (label is a TEXT key)
 local CATEGORIES = {
-	{label = "motion:", items = {"reducemotion", "shakeintensity", "shakedirection", "camerasmoothing"}},
+	{label = "motion:", items = {"reducemotion", "shakeintensity", "shakedirection", "camerasmoothing", "backwardsmoothing"}},
 	{label = "display:", items = {"reducetransparency", "increasecontrast", "colourfilter", "hudoutline", "cursorsize",
 		"reduceflashing", "playerindicator", "aimline", "lowtimewarning"}},
 	{label = "gameplay:", items = {"gamespeed", "halfopaqueblink"}},
+	{label = "physics:", items = {"smwwaterphysics", "consistentvinespeed", "modernsizechangeanimation",
+		"dontfreezeonsizechange", "noairspeedcap", "inertiaphysics"}},
 	{label = "assists:", items = {"jumpbuffer", "coyotetime", "pitrescue", "respawnwheredied", "generousstomps",
 		"infinitelives", "infinitetime", "skipdeaths", "skipnever"}},
+	{label = "camera:", items = {"completelycenteredcamera", "modernmultiplayercamera", "splitscreenmultiplayer",
+		"horizontalsplitscreenviewports"}},
 	{label = "controls:", items = {"togglerun", "holdtoswim", "holdtofire", "rapidhold"}},
 	{label = "notices:", items = {"clicknotices"}},
 }
@@ -110,6 +128,25 @@ local DEFAULTS = {
 
 accessibility = {}
 
+--the settings that start as a nitpick, and the global the game reads them from. They're nil until the nitpicks
+--are read (unless options.txt has them), then they start as their nitpick
+local FROMNITPICKS = {
+	camerasmoothing = "CameraSmoothing",
+	infinitelives = "AlwaysInfiniteLives",
+	infinitetime = "AlwaysInfiniteTime",
+	backwardsmoothing = "BackwardSmoothing",
+	completelycenteredcamera = "CompletelyCenteredCamera",
+	modernmultiplayercamera = "ModernMultiplayerCamera",
+	splitscreenmultiplayer = "SPLITSCREENISBACK",
+	horizontalsplitscreenviewports = "HorizontalSplitScreen",
+	smwwaterphysics = "SMWSwimming",
+	consistentvinespeed = "ConsistentVineSpeed",
+	modernsizechangeanimation = "ModernSizeChangeAnimation",
+	dontfreezeonsizechange = "DontFreezeOnSizeChange",
+	noairspeedcap = "NoAirSpeedCap",
+	inertiaphysics = "InertiaPhysics",
+}
+
 local nitpicksread = false
 
 --puts every setting back to its default (defaultconfig and reset all settings)
@@ -117,19 +154,12 @@ function accessibility_defaults()
 	for key, value in pairs(DEFAULTS) do
 		accessibility[key] = value
 	end
-	accessibility.camerasmoothing = nil
-	accessibility.infinitelives = nil
-	accessibility.infinitetime = nil
+	for key in pairs(FROMNITPICKS) do
+		accessibility[key] = nil --(they start as their nitpicks again)
+	end
 	accessibility_resolve()
 end
 
---the settings that start as a nitpick, and the global the game reads them from:
---smooth camera (camerasmoothing), infinite lives (alwaysinfinitelives) and infinite time (alwaysinfinitetime)
-local FROMNITPICKS = {
-	camerasmoothing = "CameraSmoothing",
-	infinitelives = "AlwaysInfiniteLives",
-	infinitetime = "AlwaysInfiniteTime",
-}
 local nitpickvalues = {}
 
 --puts a setting that comes from a nitpick where the game reads it
@@ -137,6 +167,9 @@ local function applynitpicksetting(key)
 	local value = accessibility[key]
 	if value == nil then
 		return
+	end
+	if key == "splitscreenmultiplayer" and rrr_setsavedsplit and rrr_setsavedsplit(value) then
+		return --(Rival Rumble Royale keeps split screen on until the battle ends)
 	end
 	_G[FROMNITPICKS[key]] = value
 	if key == "infinitelives" then
@@ -392,7 +425,11 @@ end
 --whether a projectile power-up's throw can repeat (hold to fire): not a tail whip, pick up, Cappy or Yoshi
 local THROWSIZES = {[3] = true, [4] = true, [7] = true, [13] = true, [15] = true}
 local function canautofire(p)
-	if p.yoshi or p.shoe or p.pickup or p.pickupready or p.fence or p.vine or p.statue or p.ducking then
+	if p.yoshi or p.pickup or p.pickupready or p.fence or p.vine or p.statue or p.ducking then
+		return false
+	end
+	--in a shoe, throws work as usual, but up and run takes the shoe off
+	if p.shoe and (p.shoe == "yoshi" or upkey(p.playernumber)) then
 		return false
 	end
 	if p.cappy and not UseButtonCappy then
@@ -1447,7 +1484,7 @@ ACCESSIBILITY_OPTIONSTAB = 5
 local optionspage = {
 	prefix = "a11y_",
 	columns = {{x = 30, w = 199}}, --(the scrollbar goes right of it)
-	catcolumns = {1, 1, 1, 1, 1, 1},
+	catcolumns = {1, 1, 1, 1, 1, 1, 1, 1},
 	viewport = {x = 23, y = 33, w = 214, h = 181},
 }
 
@@ -1502,7 +1539,7 @@ pausea11yselected = 1 --the setting the keyboard is on (its index), or count+1 f
 local pausepage = {
 	prefix = "pa11y_",
 	columns = {{x = 58, w = 138}, {x = 204, w = 134}}, --(the scrollbar goes right of the second)
-	catcolumns = {1, 2, 1, 1, 2, 2}, --motion, gameplay and assists on the left; display, controls and notices on the right
+	catcolumns = {1, 2, 1, 1, 1, 2, 2, 2}, --motion, gameplay, physics and assists on the left; display, camera, controls and notices on the right
 	viewport = {x = 52, y = 32, w = 296, h = 143},
 }
 

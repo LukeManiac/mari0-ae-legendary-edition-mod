@@ -229,7 +229,8 @@ yoshiswallowtime = 0.3
 
 --items
 mushroomspeed = 3.6
-mushroomtime = 0.7 --time until it fully emerged out the block
+classicmushroomtime = 0.7 --time until it fully emerged out the block
+mmmushroomtime = 0.4 --mariomakerblockphysics: time until an item fully emerged out the block
 mushroomjumpforce = 13
 poisonmushspeed = 3.6
 poisonmushtime = 0.7 --time until it fully emerged out the block
@@ -458,6 +459,7 @@ cameralerp_duration = 0.25
 
 blockbouncetime = 0.2
 blockbounceheight = 0.4
+mmblockbouncescale = 0.25 --mariomakerblockphysics: how much bigger a bouncing block gets at the top of its bounce
 coinblocktime = 0.3
 coinblockdelay = 1/60
 
@@ -826,6 +828,7 @@ loadingtips = {
 	"modernsizechangeanimation uses super mario maker 2 style power-up animations.",
 	"with smwwaterphysics, hold down for weaker swim strokes and up for stronger ones.",
 	"noairspeedcap lets you reach full running speed in the air.",
+	"mariomakerblockphysics makes blocks grow as they bounce, and items come out faster.",
 	"infinitefireballs removes the limit on fireballs, hammers and other projectiles.",
 	"skipintro skips the intro and goes straight to the menu.",
 	"rival rumble royale has 25 bot levels, from complete noob to the undefeatable.",
