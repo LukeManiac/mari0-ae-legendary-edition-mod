@@ -566,6 +566,7 @@ A new **tas editor** in **Utils** (under **mappack creator**) for making tool-as
 * A frame's input is used going from that frame to the next one, the same as FCEUX. The game view shows the game at the **playback cursor** (the blue arrow).
 * The game runs at exactly 60 frames a second, with its own clock and random numbers, so the same input always plays the same way.
 * Inside a TAS project, **tas editor** in the game's own Utils menu can't be opened.
+* Everything the editor shows is translated into every language the game has. The editor draws its text with DejaVu Sans (`graphics/fonts/DejaVuSans.ttf`, with its licence next to it), which has the letters of all of them, Cyrillic, Turkish and Esperanto included. Counts are written as "frames: 5", so they read right in every language.
 
 **Greenzone**
 

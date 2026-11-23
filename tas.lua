@@ -26,6 +26,7 @@ TAS_SEEKBUDGET = 0.014 --seconds of seeking a frame
 TAS_EXPORTBUDGET = 0.03 --seconds of exporting a frame
 TAS_PROJECTFOLDER = "alesans_entities/tasprojects"
 TAS_RECORDINGFOLDER = "alesans_entities/tasrecordings"
+TAS_FONT = "graphics/fonts/DejaVuSans.ttf" --has the letters of every language the game has (Cyrillic, Turkish, Esperanto...)
 
 local ROWH = 16
 local HEADERH = 34
@@ -51,6 +52,26 @@ end
 
 local function setcolor(c, a)
 	love.graphics.setColor(c[1], c[2], c[3], a or c[4] or 255)
+end
+
+--the editor's text comes from the language files (languages/*.json), like the rest of the game
+local function T(key)
+	if TEXT and TEXT[key] and TEXT[key] ~= "" then
+		return TEXT[key]
+	end
+	return key
+end
+local function TF(key, ...)
+	return string.format(T(key), ...)
+end
+
+--cuts a text to n characters (not bytes, so it never splits a letter in two)
+local function utf8cut(s, n)
+	local cut = utf8.offset(s, n + 1)
+	if cut then
+		return s:sub(1, cut - 1)
+	end
+	return s
 end
 
 local function status(text, bad)
@@ -287,7 +308,7 @@ local function controlkeys()
 							local key = C.normalkey(entry[1])
 							if not seen[key] then
 								seen[key] = true
-								list[#list+1] = {key = key, label = (p > 1 and ("p" .. p .. " ") or "") .. action}
+								list[#list+1] = {key = key, action = action, player = p}
 							end
 						end
 					end
@@ -298,7 +319,7 @@ local function controlkeys()
 	for _, key in ipairs({"return", "escape"}) do
 		if not seen[key] then
 			seen[key] = true
-			list[#list+1] = {key = key, label = key == "return" and "menu" or "back"}
+			list[#list+1] = {key = key, action = key == "return" and "menu" or "back", player = 1}
 		end
 	end
 	return list
@@ -322,7 +343,7 @@ local function newproject()
 		exportscale = 2,
 	}
 	for _, c in ipairs(controlkeys()) do
-		p.columns[#p.columns+1] = {kind = "key", key = c.key, label = c.label}
+		p.columns[#p.columns+1] = {kind = "key", key = c.key, action = c.action, player = c.player}
 	end
 	return p
 end
@@ -341,9 +362,14 @@ local function rebuildcolumns()
 	local cols = {}
 	local seen = {}
 	for _, c in ipairs(E.project.columns) do
+		--columns saved with a plain label ("jump", "p2 jump") get their action and player back, so they're translated
+		if c.kind == "key" and not c.action and c.label and c.label ~= "" then
+			local player, action = c.label:match("^p(%d) (.+)$")
+			c.action, c.player = action or c.label, tonumber(player) or 1
+		end
 		if c.kind == "key" and not seen[c.key] then
 			seen[c.key] = true
-			cols[#cols+1] = {kind = "key", key = c.key, label = c.label or "", width = 34}
+			cols[#cols+1] = {kind = "key", key = c.key, action = c.action, player = c.player, label = c.label or "", width = 34}
 		end
 	end
 	--every key a frame uses has a column
@@ -512,7 +538,7 @@ local function stepframe(record)
 		E.playing = false
 		E.pauseframe = nil
 		E.exportfailed = err
-		status("the game broke at frame " .. f .. ": " .. tostring(err):match("[^\n]*"), true)
+		status(TF("the game broke at frame %d: %s", f, tostring(err):match("[^\n]*")), true)
 		print(err)
 		--go back to a state that works
 		C.frame = f
@@ -526,7 +552,7 @@ local function stepframe(record)
 	local expected = E.summaries[now] or (E.expected and E.expected[now])
 	if expected and not C.samesummary(s, expected) and not E.desync then
 		E.desync = now
-		status("desync: frame " .. now .. " plays differently than before", true)
+		status(TF("desync: frame %d plays differently than before", now), true)
 	end
 	E.summaries[now] = s
 	if E.statevalid and E.gzsize <= now then
@@ -657,7 +683,7 @@ local function undo()
 	local h = E.history
 	local entry = h.list[h.pos]
 	if not entry then
-		status("nothing to undo")
+		status(T("nothing to undo"))
 		return
 	end
 	local first = math.huge
@@ -669,14 +695,14 @@ local function undo()
 	h.pos = h.pos - 1
 	invalidate(first)
 	rebuildcolumns()
-	status("undid " .. entry.name)
+	status(TF("undid: %s", T(entry.name)))
 end
 
 local function redo()
 	local h = E.history
 	local entry = h.list[h.pos + 1]
 	if not entry then
-		status("nothing to redo")
+		status(T("nothing to redo"))
 		return
 	end
 	local first = math.huge
@@ -687,7 +713,7 @@ local function redo()
 	h.pos = h.pos + 1
 	invalidate(first)
 	rebuildcolumns()
-	status("redid " .. entry.name)
+	status(TF("redid: %s", T(entry.name)))
 end
 
 --changes one input of the given frames: fn(copy of the frame's input) changes it
@@ -757,7 +783,7 @@ local function clearselected()
 	if #list == 0 then
 		return
 	end
-	editframes("clear", list, function(input)
+	editframes("clear frames", list, function(input)
 		input.k = {}
 		input.b, input.x, input.y, input.w = nil, nil, nil, nil
 	end)
@@ -825,13 +851,13 @@ local function copyselected()
 	for _, f in ipairs(list) do
 		E.clipboard[#E.clipboard+1] = copyinput(inputat(f))
 	end
-	status("copied " .. #list .. " frame" .. (#list == 1 and "" or "s"))
+	status(TF("copied frames: %d", #list))
 	return true
 end
 
 local function paste(insert)
 	if not E.clipboard or #E.clipboard == 0 then
-		status("nothing to paste")
+		status(T("nothing to paste"))
 		return
 	end
 	local at = selectedlist()[1] or C.frame
@@ -944,7 +970,7 @@ local function startproject(project, path)
 		menu_load()
 	end)
 	if not ok then
-		status("couldn't start the game: " .. tostring(err):match("[^\n]*"), true)
+		status(TF("couldn't start the game: %s", tostring(err):match("[^\n]*")), true)
 		print(err)
 	end
 	E.greenzone[0] = C.save()
@@ -986,20 +1012,20 @@ local function saveproject()
 	if ok then
 		E.path = path
 		E.dirty = false
-		status("saved " .. path)
+		status(TF("saved %s", path))
 	else
-		status("couldn't save: " .. tostring(err), true)
+		status(TF("couldn't save: %s", tostring(err)), true)
 	end
 end
 
 local function readproject(path)
 	local data = love.filesystem.read(path)
 	if not data then
-		return nil, "couldn't read " .. path
+		return nil, TF("couldn't read %s", path)
 	end
 	local ok, p = pcall(function() return JSON:decode(data) end)
 	if not ok or type(p) ~= "table" then
-		return nil, "that isn't a tas project"
+		return nil, T("that isn't a tas project")
 	end
 	p.frames = framesfromjson(p.frames)
 	p.columns = p.columns or {}
@@ -1014,14 +1040,14 @@ local function openproject(path)
 		return
 	end
 	if p.mappack and mappackfolder and not love.filesystem.getInfo((p.mappackfolder or mappackfolder) .. "/" .. p.mappack) then
-		status("the mappack \"" .. tostring(p.mappack) .. "\" isn't here: the game might not play the same", true)
+		status(TF("the mappack \"%s\" isn't here: the game might not play the same", tostring(p.mappack)), true)
 	end
 	startproject(p, path)
 	local back = tonumber(p.playback)
 	if back and back > 0 then
 		jump(back)
 	end
-	status("opened " .. path)
+	status(TF("opened %s", path))
 end
 
 local function listprojects()
@@ -1061,7 +1087,7 @@ local function startexport()
 	local path = exportpath()
 	local enc, err = tasexport.new(path, w, h, C.FPS)
 	if not enc then
-		status("couldn't export: " .. tostring(err), true)
+		status(TF("couldn't export: %s", tostring(err)), true)
 		return
 	end
 	E.export = {enc = enc, path = path, total = total, done = 0, back = C.frame, scale = e, w = w, h = h, phase = "frames"}
@@ -1069,7 +1095,7 @@ local function startexport()
 	E.playing, E.target = false, nil
 	loadframe(0)
 	C.setmuted(true)
-	status("exporting to " .. path)
+	status(TF("exporting to %s", path))
 end
 
 local function endexport(cancelled)
@@ -1078,7 +1104,7 @@ local function endexport(cancelled)
 	C.setmuted(false)
 	if cancelled then
 		x.enc:abort()
-		status("export cancelled")
+		status(T("export cancelled"))
 	end
 	--back to where the playback cursor was
 	E.statevalid = false
@@ -1094,7 +1120,7 @@ local function updateexport()
 				x.enc:abort()
 				E.export = nil
 				C.setmuted(false)
-				status("export stopped: the game broke at frame " .. C.frame, true)
+				status(TF("export stopped: the game broke at frame %d", C.frame), true)
 				return
 			end
 			E.gamecanvas = C.drawgame(E.gamecanvas)
@@ -1112,7 +1138,7 @@ local function updateexport()
 				x.enc:abort()
 				E.export = nil
 				C.setmuted(false)
-				status("export failed: " .. tostring(err), true)
+				status(TF("export failed: %s", tostring(err)), true)
 				return
 			end
 			x.done = x.done + 1
@@ -1126,13 +1152,12 @@ local function updateexport()
 			x.enc:abort()
 			E.export = nil
 			C.setmuted(false)
-			status("export failed: " .. tostring(done), true)
+			status(TF("export failed: %s", tostring(done)), true)
 			return
 		end
 		if done then
-			local mb = x.enc.bytes and string.format(" (%.1f MB)", x.enc.bytes/1048576) or ""
 			endexport(false)
-			status("exported " .. x.path .. mb)
+			status(TF("exported %s (%.1f mb)", x.path, (x.enc.bytes or 0)/1048576))
 		end
 	end
 end
@@ -1196,11 +1221,11 @@ local function toolbarrects()
 		if b.gap then
 			x = x + 12
 		else
-			local text = b.text
+			local text = b.text:match("^[|<>]+$") and b.text or T(b.text)
 			if b.id == "play" then
-				text = (E.playing or seeking()) and "pause" or "play"
+				text = T((E.playing or seeking()) and "pause" or "play")
 			elseif b.id == "scale" then
-				text = "size " .. (E.project.exportscale or 2) .. "x"
+				text = TF("size %dx", E.project.exportscale or 2)
 			end
 			local w = font:getWidth(text) + 16
 			rects[#rects+1] = {id = b.id, text = text, x = x, y = 4, w = w, h = TOOLBARH - 8}
@@ -1299,7 +1324,7 @@ local function drawgameview(L)
 	love.graphics.line(cx, cy + 2, cx, cy + 6)
 	if E.drawerror then
 		love.graphics.setColor(255, 80, 80)
-		love.graphics.printf("the game couldn't be drawn:\n" .. tostring(E.drawerror):match("[^\n]*"), L.gx + 8, L.gy + 8, L.gw - 16)
+		love.graphics.printf(T("the game couldn't be drawn:") .. "\n" .. tostring(E.drawerror):match("[^\n]*"), L.gx + 8, L.gy + 8, L.gw - 16)
 	end
 	if E.recording then
 		love.graphics.setColor(220, 30, 30)
@@ -1311,36 +1336,38 @@ local function drawinfo(L)
 	local x, y = 10, L.infoy
 	local lh = font:getHeight() + 2
 	love.graphics.setColor(235, 235, 235)
-	local state = E.export and "exporting" or (seeking() and ("seeking to " .. E.target)) or (E.playing and "playing") or "paused"
-	love.graphics.print(string.format("frame %d / %d   %s   greenzone 0-%d   rerecords %d", C.frame, #E.project.frames, state, E.gzsize - 1, E.rerecords), x, y)
-	y = y + lh
+	local state = E.export and T("exporting") or (seeking() and TF("seeking to %d", E.target)) or T(E.playing and "playing" or "paused")
+	local w = L.leftw - 20
+	local function line(text)
+		love.graphics.printf(text, x, y, w)
+		local _, lines = font:getWrap(text, w)
+		y = y + lh*math.max(1, #lines)
+	end
+	line(table.concat({TF("frame %d / %d", C.frame, #E.project.frames), state, TF("greenzone 0-%d", E.gzsize - 1), TF("rerecords %d", E.rerecords)}, "   "))
 	local s = E.summaries[C.frame]
-	local line = "state: " .. tostring(gamestate)
+	local text = TF("state: %s", tostring(gamestate))
 	if s and s.p and s.p[1] then
 		local p = s.p[1]
-		line = line .. string.format("   %s-%s   p1 x %.4f  y %.4f   speed %.4f, %.4f", tostring(s.w or "?"), tostring(s.l or "?"),
-			p.x or 0, p.y or 0, p.sx or 0, p.sy or 0)
+		local n = function(v) return string.format("%.4f", v or 0) end
+		text = text .. "   " .. tostring(s.w or "?") .. "-" .. tostring(s.l or "?") .. "   " .. TF("p1 x %s  y %s   speed %s, %s", n(p.x), n(p.y), n(p.sx), n(p.sy))
 	end
-	love.graphics.print(line, x, y)
-	y = y + lh
+	line(text)
 	local out = E.rngouts[C.frame - 1]
-	local rngline = "random numbers last frame: "
+	local numbers
 	if out and #out > 0 then
 		local parts = {}
 		for i = 1, math.min(#out, 8) do
 			local v = out[i]
 			parts[i] = (v % 1 == 0) and tostring(v) or string.format("%.4f", v)
 		end
-		rngline = rngline .. #out .. " (" .. table.concat(parts, ", ") .. (#out > 8 and ", ..." or "") .. ")"
+		numbers = #out .. " (" .. table.concat(parts, ", ") .. (#out > 8 and ", ..." or "") .. ")"
 	else
-		rngline = rngline .. "none"
+		numbers = T("none")
 	end
-	love.graphics.print(rngline, x, y)
-	y = y + lh
+	line(TF("random numbers last frame: %s", numbers))
 	local name = E.project.name .. (E.dirty and " *" or "")
 	love.graphics.setColor(170, 170, 180)
-	love.graphics.print("project: " .. name .. "   mappack: " .. tostring(E.project.mappack), x, y)
-	y = y + lh
+	line(TF("project: %s   mappack: %s", name, tostring(E.project.mappack)))
 	if E.export then
 		local x2 = E.export
 		local p = x2.phase == "finish" and (x2.enc.finishprogress and x2.enc:finishprogress() or 1) or x2.done/x2.total
@@ -1350,8 +1377,8 @@ local function drawinfo(L)
 		love.graphics.setColor(80, 170, 90)
 		love.graphics.rectangle("fill", x, y + 2, bw*p, 16, 3, 3)
 		love.graphics.setColor(255, 255, 255)
-		local text = x2.phase == "finish" and string.format("finishing the mp4... %d%%", math.floor(p*100))
-			or string.format("exporting frame %d / %d (%d%%)   esc: cancel", x2.done, x2.total, math.floor(p*100))
+		local text = x2.phase == "finish" and TF("finishing the mp4... %d%%", math.floor(p*100))
+			or TF("exporting frame %d / %d (%d%%)   esc: cancel", x2.done, x2.total, math.floor(p*100))
 		love.graphics.print(text, x + 6, y + 3)
 		y = y + 22
 	end
@@ -1365,11 +1392,12 @@ local function drawinfo(L)
 		y = y + lh*2
 	end
 	love.graphics.setColor(130, 130, 140)
-	local help = "\\ next frame   backspace previous frame   space play/pause   enter go to the selected frame\n"
-		.. "click: select   shift: select up to   ctrl: add/remove   click the game: set the mouse there\n"
-		.. "ins insert   ctrl+ins clone   del clear   ctrl+del delete   ctrl+c/x/v   ctrl+z/y   ctrl+r record"
+	local help = T("\\ next frame   backspace previous frame   space play/pause   enter go to the selected frame") .. "\n"
+		.. T("click: select   shift: select up to   ctrl: add/remove   click the game: set the mouse there") .. "\n"
+		.. T("ins insert   ctrl+ins clone   del clear   ctrl+del delete   ctrl+c/x/v   ctrl+z/y   ctrl+r record")
 	love.graphics.setFont(smallfont)
-	love.graphics.printf(help, x, math.max(y, L.H - smallfont:getHeight()*3 - 8), L.leftw - 20)
+	local _, helplines = smallfont:getWrap(help, L.leftw - 20)
+	love.graphics.printf(help, x, math.max(y, L.H - smallfont:getHeight()*#helplines - 8), L.leftw - 20)
 	love.graphics.setFont(font)
 end
 
@@ -1384,7 +1412,7 @@ local function drawroll(L)
 	love.graphics.rectangle("fill", x0, y0, L.rollw, HEADERH)
 	love.graphics.setColor(40, 40, 40)
 	love.graphics.setFont(smallfont)
-	love.graphics.print("frame#", x0 + L.iconw + 4, y0 + 10)
+	love.graphics.print(T("frame#"), x0 + L.iconw + 4, y0 + 10)
 	local sel = selectedlist()
 	for i, c in ipairs(E.columns) do
 		local cx, cw = L.colx[i][1], L.colx[i][2]
@@ -1395,14 +1423,19 @@ local function drawroll(L)
 		love.graphics.setColor(200, 200, 205)
 		love.graphics.line(cx + 0.5, y0, cx + 0.5, y0 + L.rollh)
 		love.graphics.setColor(30, 30, 30)
-		local top = c.kind == "key" and keylabel(c.key) or c.label
+		local top = c.kind == "key" and keylabel(c.key) or (c.kind == "button" or c.kind == "wheel") and utf8cut(T(c.label), 4) or c.label
 		love.graphics.printf(top, cx, y0 + 4, cw, "center")
-		if c.kind == "key" and c.label and c.label ~= "" then
+		local under
+		if c.kind == "key" and c.action then
+			under = (c.player or 1) > 1 and TF("p%d %s", c.player, T(c.action)) or T(c.action)
+		elseif c.kind == "key" then
+			under = c.label --projects from before columns kept their action
+		elseif c.kind ~= "add" then
+			under = T("mouse")
+		end
+		if under and under ~= "" then
 			love.graphics.setColor(110, 110, 120)
-			love.graphics.printf(c.label:sub(1, 6), cx, y0 + 18, cw, "center")
-		elseif c.kind ~= "key" and c.kind ~= "add" then
-			love.graphics.setColor(110, 110, 120)
-			love.graphics.printf("mouse", cx, y0 + 18, cw, "center")
+			love.graphics.printf(utf8cut(under, 6), cx, y0 + 18, cw, "center")
 		end
 	end
 	love.graphics.setColor(180, 180, 185)
@@ -1466,7 +1499,7 @@ local function drawroll(L)
 			if c.kind == "key" or c.kind == "button" then
 				if input and cellvalue(c, f) then
 					love.graphics.setColor(25, 25, 25)
-					love.graphics.printf(c.kind == "key" and keylabel(c.key) or c.label, cx, y + 2, cw, "center")
+					love.graphics.printf(c.kind == "key" and keylabel(c.key) or utf8cut(T(c.label), 4), cx, y + 2, cw, "center")
 				end
 			elseif c.kind == "mx" or c.kind == "my" then
 				local v = input and (c.kind == "mx" and input.x or input.y)
@@ -1503,10 +1536,10 @@ local function drawdialog(L)
 	love.graphics.rectangle("fill", x, y, w, h, 6, 6)
 	love.graphics.setColor(235, 235, 235)
 	if d.kind == "open" then
-		love.graphics.print("open a tas project (" .. TAS_PROJECTFOLDER .. ")", x + 12, y + 10)
+		love.graphics.print(TF("open a tas project (%s)", TAS_PROJECTFOLDER), x + 12, y + 10)
 		if #d.list == 0 then
 			love.graphics.setColor(170, 170, 170)
-			love.graphics.print("there aren't any projects yet", x + 12, y + 36)
+			love.graphics.print(T("there aren't any projects yet"), x + 12, y + 36)
 		end
 		for i, name in ipairs(d.list) do
 			local ry = y + 34 + (i-1)*20
@@ -1521,7 +1554,7 @@ local function drawdialog(L)
 			love.graphics.print(name:gsub("%.tasproject$", ""), x + 14, ry + 3)
 		end
 	elseif d.kind == "key" then
-		love.graphics.printf("press the key to add a column for\n(esc: cancel)", x + 12, y + 30, w - 24, "center")
+		love.graphics.printf(T("press the key to add a column for\n(esc: cancel)"), x + 12, y + 30, w - 24, "center")
 	elseif d.kind == "number" then
 		love.graphics.printf(d.title, x + 12, y + 14, w - 24, "center")
 		love.graphics.setColor(25, 25, 30)
@@ -1530,9 +1563,9 @@ local function drawdialog(L)
 		local caret = (math.floor(realtime()*2) % 2 == 0) and "|" or ""
 		love.graphics.printf(d.text .. caret, x + 60, y + 49, w - 120, "center")
 		love.graphics.setColor(170, 170, 170)
-		love.graphics.printf("enter: set   empty: same as the frame before   esc: cancel", x + 12, y + 84, w - 24, "center")
+		love.graphics.printf(T("enter: set   empty: same as the frame before   esc: cancel"), x + 12, y + 84, w - 24, "center")
 	elseif d.kind == "confirm" then
-		love.graphics.printf(d.text .. "\n\nenter: yes   esc: no", x + 12, y + 24, w - 24, "center")
+		love.graphics.printf(d.text .. "\n\n" .. T("enter: yes   esc: no"), x + 12, y + 24, w - 24, "center")
 	end
 end
 
@@ -1563,7 +1596,7 @@ function E.draw()
 		end
 	end
 	love.graphics.setColor(150, 150, 160)
-	love.graphics.print("tas editor", L.W - font:getWidth("tas editor") - 10, 8)
+	love.graphics.print(T("tas editor"), L.W - font:getWidth(T("tas editor")) - 10, 8)
 
 	drawgameview(L)
 	drawinfo(L)
@@ -1612,7 +1645,7 @@ function E.update(dt)
 		cleangreenzone()
 	end
 	for _, m in ipairs(C.messages) do
-		status(m .. " (frame " .. C.frame .. ")", true)
+		status(TF("%s (frame %d)", T(m), C.frame), true)
 	end
 	C.messages = {}
 	if E.held then
@@ -1672,7 +1705,7 @@ end
 local function setrecording(on)
 	E.recording = on
 	E.recordsession = {}
-	status(on and "recording: the keyboard and the mouse over the game go into the frames" or "stopped recording")
+	status(T(on and "recording: the keyboard and the mouse over the game go into the frames" or "stopped recording"))
 end
 
 local function confirmdirty(text, fn)
@@ -1685,12 +1718,12 @@ end
 
 local function toolbarclick(id)
 	if id == "new" then
-		confirmdirty("start a new project? the changes to this one that aren't saved are lost", function()
+		confirmdirty(T("start a new project? the changes to this one that aren't saved are lost"), function()
 			startproject(newproject(), nil)
-			status("new project")
+			status(T("new project"))
 		end)
 	elseif id == "open" then
-		confirmdirty("open another project? the changes to this one that aren't saved are lost", function()
+		confirmdirty(T("open another project? the changes to this one that aren't saved are lost"), function()
 			E.dialog = {kind = "open", list = listprojects(), sel = 1}
 		end)
 	elseif id == "save" then
@@ -1701,7 +1734,7 @@ local function toolbarclick(id)
 		E.project.exportscale = ((E.project.exportscale or 2) % 4) + 1
 		E.dirty = true
 		local e = E.project.exportscale
-		status(string.format("the mp4 will be %dx%d", width*16*e, height*16*e))
+		status(TF("the mp4 will be %dx%d", width*16*e, height*16*e))
 	elseif id == "start" then
 		jump(0)
 	elseif id == "back" then
@@ -1715,7 +1748,7 @@ local function toolbarclick(id)
 	elseif id == "record" then
 		setrecording(not E.recording)
 	elseif id == "close" then
-		confirmdirty("close the tas editor? the changes that aren't saved are lost", function()
+		confirmdirty(T("close the tas editor? the changes that aren't saved are lost"), function()
 			E.pendingclose = true
 		end)
 	end
@@ -1725,7 +1758,7 @@ local function opennumber(col, list)
 	local first = inputat(list[1])
 	local v = col.kind == "mx" and first.x or col.kind == "my" and first.y or first.w
 	E.dialog = {kind = "number", col = col, list = list, text = v and tostring(v) or "",
-		title = (col.kind == "wheel" and "mouse wheel" or ("mouse " .. col.label)) .. " for " .. #list .. " frame" .. (#list == 1 and "" or "s")}
+		title = TF("%s for frames: %d", T(col.kind == "wheel" and "mouse wheel" or ("mouse " .. col.label)), #list)}
 end
 
 local function dialogkey(key)
@@ -1747,14 +1780,14 @@ local function dialogkey(key)
 			key = C.normalkey(key)
 			for _, c in ipairs(E.project.columns) do
 				if c.key == key then
-					status("there's already a column for " .. key)
+					status(TF("there's already a column for %s", key))
 					return
 				end
 			end
 			E.project.columns[#E.project.columns+1] = {kind = "key", key = key, label = ""}
 			E.dirty = true
 			rebuildcolumns()
-			status("added a column for " .. key)
+			status(TF("added a column for %s", key))
 		end
 	elseif d.kind == "number" then
 		if key == "escape" then
@@ -1765,7 +1798,7 @@ local function dialogkey(key)
 			E.dialog = nil
 			local v = tonumber(d.text)
 			if d.text ~= "" and not v then
-				status("that isn't a number", true)
+				status(T("that isn't a number"), true)
 				return
 			end
 			local col = d.col
@@ -1973,7 +2006,7 @@ function E.mousepressed(x, y, button)
 			editframes("set mouse", targetframes(), function(input)
 				input.x, input.y = gx, gy
 			end)
-			status(string.format("the mouse is at %d, %d on %d frame%s", gx, gy, #targetframes(), #targetframes() == 1 and "" or "s"))
+			status(TF("the mouse is at %d, %d on frames: %d", gx, gy, #targetframes()))
 		end
 		return
 	end
@@ -2002,7 +2035,7 @@ function E.mousepressed(x, y, button)
 					end
 				end
 				if used then
-					status("frames still use " .. col.key .. ": clear that column first (select all, then click its name)", true)
+					status(TF("frames still use %s: clear that column first (select all, then click its name)", col.key), true)
 				else
 					for i, c in ipairs(E.project.columns) do
 						if c.key == col.key then
@@ -2012,7 +2045,7 @@ function E.mousepressed(x, y, button)
 					end
 					E.dirty = true
 					rebuildcolumns()
-					status("removed the column for " .. col.key)
+					status(TF("removed the column for %s", col.key))
 				end
 			elseif col.kind == "key" or col.kind == "button" then
 				local list = selectedlist()
@@ -2170,7 +2203,7 @@ function E.filedropped(file)
 			love.filesystem.createDirectory(TAS_PROJECTFOLDER)
 			local path = TAS_PROJECTFOLDER .. "/" .. name:match("([^/\\]+)$")
 			love.filesystem.write(path, data)
-			confirmdirty("open " .. name:match("([^/\\]+)$") .. "? the changes to this one that aren't saved are lost", function()
+			confirmdirty(TF("open %s? the changes to this one that aren't saved are lost", name:match("([^/\\]+)$")), function()
 				openproject(path)
 			end)
 		end
@@ -2185,7 +2218,7 @@ end
 function tas_open()
 	if tasactive or tasstepping then
 		if notice then
-			notice.new("the tas editor can't be opened inside a tas project!", notice.red, 3)
+			notice.new(T("the tas editor can't be opened inside a tas project!"), notice.red, 3)
 		end
 		return false
 	end
@@ -2196,8 +2229,13 @@ end
 local function reallyopen()
 	E.pendingopen = false
 	if not font then
-		font = love.graphics.newFont(12)
-		smallfont = love.graphics.newFont(11)
+		if love.filesystem.getInfo(TAS_FONT) then
+			font = love.graphics.newFont(TAS_FONT, 12)
+			smallfont = love.graphics.newFont(TAS_FONT, 11)
+		else
+			font = love.graphics.newFont(12)
+			smallfont = love.graphics.newFont(11)
+		end
 	end
 	--everything as it is now, put back when the editor closes
 	E.home = C.save()
@@ -2216,7 +2254,7 @@ local function reallyopen()
 		openproject(path)
 	else
 		startproject(newproject(), nil)
-		status("new project for " .. E.project.name .. " (ctrl+s saves it as " .. path .. ")")
+		status(TF("new project for %s (ctrl+s saves it as %s)", E.project.name, path))
 	end
 end
 
@@ -2296,7 +2334,7 @@ function tas_install()
 					local ok, err = xpcall(h, debug.traceback, ...)
 					if not ok then
 						print(err)
-						status("tas editor error: " .. tostring(err):match("[^\n]*"), true)
+						status(TF("tas editor error: %s", tostring(err):match("[^\n]*")), true)
 					end
 				end
 				return

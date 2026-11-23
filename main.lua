@@ -452,6 +452,7 @@ function love.load()
 	for i = 1, #luas do
 		require(luas[i])
 	end
+	require "tas"
 	print("done loading .luas!")
 
 	love.graphics.clear(0, 0, 0)
@@ -1209,6 +1210,7 @@ function love.load()
 	--loading overlays hand their work to the background from now on (see overlaytask.lua)
 	overlaytask_install()
 	accessibility_install()
+	tas_install() --last: while the tas editor is open, it gets every callback before anything else
 end
 
 function love.update(dt)

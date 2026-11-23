@@ -7229,6 +7229,11 @@ function warpfadeoutnow(ignorelevelsetting)
 	if warpfade then
 		return
 	end
+	if tasstepping then
+		--the TAS runs the game a frame at a time and its clock only moves between frames: go black straight away
+		warpfade = {t = warpfadetime, hold = true}
+		return
+	end
 	if overlaytask_canyield() then
 		--in the background: the main loop keeps drawing the (frozen) game while it fades, a frame at a time
 		local start = love.timer.getTime()
@@ -11688,6 +11693,11 @@ function renderoverlay(text, donotpresentgraphics, donotupdate)
 
 	if donotpresentgraphics then
 		drawoverlay(translated) --drawn from love.draw: no fade
+		return
+	end
+
+	--the TAS is running the game a frame at a time: the work just runs, without an overlay (the TAS editor shows the game)
+	if tasstepping then
 		return
 	end
 
