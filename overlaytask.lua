@@ -339,26 +339,15 @@ local function resume()
 end
 
 --KEYS PRESSED WHILE LOADING
---keys pressed while the work runs aren't lost. Every press and release is recorded in overlaykeyqueue, with how long
---after the one before it it happened. Once the work is done, they're played back in the same order and with the same
---timing, a key at a time: a key pressed 5 times is pressed (and let go of) 5 times, and a key held for half a second is
---held for half a second. While a played-back key is down, love.keyboard.isDown says so too.
---A key's press and its release never land on the same frame, so the game always sees the key go down and come up.
---If a played-back key starts more work, the rest wait for it, and keys pressed during it go on the end
-overlaykeyqueue = {} --{kind = "press"/"release", key, scancode, gap} oldest first
-local lastrecorded = nil --when the last key of this piece of work was recorded (nil: none yet)
-local lastplayed = nil --when the last key was played back
-local virtualdown = {} --keys pressed by the playback and not let go of yet
-
-local function overlaykeys_record(kind, key, scancode, isrepeat)
-	if isrepeat then
-		return --a held key's repeats aren't new presses
-	end
-	local now = love.timer.getTime()
-	local gap = lastrecorded and (now - lastrecorded) or 0 --the first key of a load plays as soon as it's done
-	lastrecorded = now
-	table.insert(overlaykeyqueue, {kind = kind, key = key, scancode = scancode, gap = gap})
-end
+--keys pressed while the work runs aren't lost: each press is added to the end of overlaykeyqueue. Once the work is
+--done, the nth key of the queue is pressed on the nth frame after the end (the 1st on the 1st frame, the 2nd on the
+--2nd...), so a key pressed 5 times is pressed 5 times. A pressed key is let go of on the frame after its press, unless
+--it's still held down for real. Until then, love.keyboard.isDown says it's down.
+--If a pressed key starts more work, the rest wait for it and count their frames again from its end, and keys pressed
+--during it go on the end
+overlaykeyqueue = {} --{key, scancode} for every key pressed while the work ran, oldest first
+local virtualdown = {} --keys pressed by the playback and not let go of yet: key = scancode
+local releasing = nil --the key pressed on the last frame, let go of on this one: {key, scancode}
 
 local function normalkey(k)
 	if k == " " then
@@ -367,39 +356,35 @@ local function normalkey(k)
 	return k
 end
 
---plays back every recorded key that's due. Runs every frame while the game isn't frozen
-function overlaykeys_play()
-	lastrecorded = nil --the work is over: the next load's keys start their own timing
-	if #overlaykeyqueue == 0 then
-		lastplayed = nil
-		return
+local function overlaykeys_queue(key, scancode, isrepeat)
+	if isrepeat then
+		return --a held key's repeats aren't new presses
 	end
-	local now = love.timer.getTime()
-	lastplayed = lastplayed or now
-	local touched = {} --keys already played this frame
-	while overlaykeyqueue[1] and not overlaytask do
-		local entry = overlaykeyqueue[1]
+	table.insert(overlaykeyqueue, {key = key, scancode = scancode})
+end
+
+--runs once a frame while the game isn't frozen: lets go of the last frame's key, then presses the next one
+function overlaykeys_play()
+	if releasing then
+		local entry = releasing
+		releasing = nil
 		local key = normalkey(entry.key)
-		if touched[key] or now - lastplayed < entry.gap then
-			return --due on a later frame
-		end
-		table.remove(overlaykeyqueue, 1)
-		touched[key] = true
-		lastplayed = lastplayed + entry.gap
-		if entry.kind == "press" then
-			virtualdown[key] = true
-			love.keypressed(entry.key, entry.scancode, false)
-		elseif virtualdown[key] or not (entry.scancode and love.keyboard.isScancodeDown(entry.scancode)) then
-			--let go of it, unless it was pressed again for real and is still held
+		if virtualdown[key] and not (entry.scancode and love.keyboard.isScancodeDown(entry.scancode)) then
 			virtualdown[key] = nil
 			love.keyreleased(entry.key, entry.scancode)
+			if overlaytask then
+				return --letting go of it started more work
+			end
 		end
+		virtualdown[key] = nil
 	end
-	if #overlaykeyqueue == 0 then
-		lastplayed = nil
-	elseif overlaytask then
-		lastplayed = nil --more work started: the rest carry on as soon as it's done
+	local entry = table.remove(overlaykeyqueue, 1)
+	if not entry then
+		return
 	end
+	virtualdown[normalkey(entry.key)] = entry.scancode or true
+	releasing = entry
+	love.keypressed(entry.key, entry.scancode, false)
 end
 
 --Alt+F4 closes the game straight away, loading or not, and is never queued
@@ -427,9 +412,7 @@ local function wrap(name)
 			if name == "update" then
 				resume()
 			elseif name == "keypressed" then
-				overlaykeys_record("press", ...)
-			elseif name == "keyreleased" then
-				overlaykeys_record("release", ...)
+				overlaykeys_queue(...)
 			end
 			return --frozen: other input is ignored
 		end
