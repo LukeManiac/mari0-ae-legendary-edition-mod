@@ -199,7 +199,7 @@ end
 
 function music:play(name, isfast, nointro)
 	local isintro = false
-	if name and soundenabled then
+	if name then
 		--find fast
 		intromusic = false
 		if isfast and self.loaded[self:variant(name, "-fast")] then
