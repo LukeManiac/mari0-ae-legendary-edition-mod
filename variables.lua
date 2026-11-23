@@ -688,7 +688,7 @@ pipespawndelay = 3
 multiplayerpipedelay = 0.5
 multiplayerpipewaittime = 5
 multiplayerdoorwait = 1
-lockeddoorentrywait = 1 --how long a player stands still after opening a locked door with a key, before going in
+lockeddoorentrywait = 0.5 --how long a player stands still after opening a locked door with a key, before going in
 
 growtime = 0.9
 shrinktime = 0.9
