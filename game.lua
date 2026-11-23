@@ -804,6 +804,9 @@ function game_update(dt)
 					v.timer = -blockbouncetime
 					if v.content then
 						item(v.content, v.x, v.y, v.content2)
+						if v.sound then --(mariomakerblockphysics: the sprout sound waits for the item, see sproutsound)
+							playsound(v.sound)
+						end
 					end
 					if not delete then delete = {} end
 					table.insert(delete, i)
@@ -822,6 +825,9 @@ function game_update(dt)
 					v.timer = blockbouncetime
 					if v.content then
 						item(v.content, v.x, v.y, v.content2)
+						if v.sound then --(mariomakerblockphysics: the sprout sound waits for the item, see sproutsound)
+							playsound(v.sound)
+						end
 					end
 					if not delete then delete = {} end
 					table.insert(delete, i)

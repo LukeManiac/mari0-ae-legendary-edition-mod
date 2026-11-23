@@ -7669,6 +7669,16 @@ function portalintile(x, y)
 	return false
 end
 
+--the sound of an item coming out of a block. With mariomakerblockphysics (on blocks that scale), it plays when the
+--item comes out, once the bounce is done (see game_update), instead of straight away
+function sproutsound(blockbouncet, sound)
+	if blockbouncescales(blockbouncet) then
+		blockbouncet.sound = sound
+	else
+		playsound(sound)
+	end
+end
+
 function hitblock(x, y, t, v)
 	local size = (t and t.size) or 2
 	local dir, nospritebatch = "up", false
@@ -7780,9 +7790,9 @@ function hitblock(x, y, t, v)
 				end
 			end
 			if entityquads[r[2]].t == "vine" then
-				playsound(vinesound)
+				sproutsound(blockbouncet, vinesound)
 			elseif entityquads[r[2]].t ~= "pipe" then
-				playsound(mushroomappearsound)
+				sproutsound(blockbouncet, mushroomappearsound)
 			end
 			if tilequads[r[1]].noteblock then
 				if entityquads[r[2]] and entityquads[r[2]].t ~= "pipe" then
@@ -7792,7 +7802,7 @@ function hitblock(x, y, t, v)
 		elseif #r > 1 and tablecontains(customenemies, r[2]) then
 			blockbouncet.content = r[2]
 			blockbouncet.content2 = size
-			playsound(mushroomappearsound)
+			sproutsound(blockbouncet, mushroomappearsound)
 			
 			if tilequads[r[1]]:getproperty("invisible", x, y) then
 				if spriteset == 1 then
