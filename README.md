@@ -299,7 +299,7 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 * Removed the annoying `"pipe not found"` spam that could repeatedly appear during character debugging.
 * The dropdown arrow and the checkbox are now drawn with LÖVE's native graphics instead of image files.
 
-**Note:** The four-keybind system remains compatible with original Mari0 AE save data and does not negatively affect it. Running Mari0 AE may remove the secondary, tertiary, and quaternary keybinds from your save data so make sure to backup your data. Since v1.4, Legendary Edition keeps a backup of its own settings and puts them back after Mari0 AE (see **Settings Backup** under v1.4).
+**Note:** The four-keybind system remains compatible with original Mari0 AE save data and does not negatively affect it. Running Mari0 AE may remove the secondary, tertiary, and quaternary keybinds from your save data so make sure to backup your data. Since v1.4.0, Legendary Edition keeps a backup of its own settings and puts them back after Mari0 AE (see **Settings Backup** under v1.4.0).
 
 **Mod Production Note:** These changes were made with Claude, Grok, and GitHub Copilot.
 
@@ -307,9 +307,9 @@ The first release of **Legendary Edition**, a community-made expansion and modif
 
 # Nitpicks
 
-Set nitpicks in `alesans_entities/nitpicks.json`. Some of them are also settings in the accessibility menu (see **Accessibility** under v1.4): there, the nitpick is only where the setting starts. Most are boolean options: use `true` to enable them. Settings assigned directly from the JSON keep their supplied value; an omitted setting is `nil`. `letterbox` is applied whenever its key exists, including when set to `false`. `dpifix` accepts `true` (use a scale factor of 2) or a number (use that scale factor). `androidversion` is copied into the Android setting when truthy. `persistenteditortools` is enabled by default when the file exists, and only the explicit value `false` disables it. The key `debugGraphs` uses that exact capitalisation.
+Set nitpicks in `alesans_entities/nitpicks.json`. Some of them are also settings in the accessibility menu (see **Accessibility** under v1.4.0): there, the nitpick is only where the setting starts. Most are boolean options: use `true` to enable them. Settings assigned directly from the JSON keep their supplied value; an omitted setting is `nil`. `letterbox` is applied whenever its key exists, including when set to `false`. `dpifix` accepts `true` (use a scale factor of 2) or a number (use that scale factor). `androidversion` is copied into the Android setting when truthy. `persistenteditortools` is enabled by default when the file exists, and only the explicit value `false` disables it. The key `debugGraphs` uses that exact capitalisation.
 
-A mappack can also have its own `nitpicks.json`, next to its `settings.txt`. Its nitpicks replace the global ones while that mappack is played or edited, and every nitpick it doesn't list keeps its global value (see **Local Nitpick Loading** under v1.4).
+A mappack can also have its own `nitpicks.json`, next to its `settings.txt`. Its nitpicks replace the global ones while that mappack is played or edited, and every nitpick it doesn't list keeps its global value (see **Local Nitpick Loading** under v1.4.0).
 
 - `dropshadow`: Forces drop shadows in loaded mappacks, outside the editor. Alias for `forcedropshadow`.
 - `forcedropshadow`: Forces drop shadows in loaded mappacks, outside the editor. Alias for `dropshadow`.
@@ -377,9 +377,9 @@ A mappack can also have its own `nitpicks.json`, next to its `settings.txt`. Its
 - `dontfreezeonsizechange`: Powering up and down only freezes the player it happens to, like in SMBX2. Everything else keeps moving, and that player can't be touched until the animation is done.
 - `camerasmoothing`: The camera eases after where it's going instead of moving rigidly, so it trails slightly behind.
 - `backwardsmoothing`: The camera leads ahead by as much as `camerasmoothing` would make it trail. Requires `camerasmoothing`.
-- `automaticenemyreload`: The Course Maker loads every custom enemy again whenever a map is loaded or tested, like before v1.4, so you don't have to press **refresh data**.
-- `automaticbackgroundreload`: The Course Maker decodes custom backgrounds and foregrounds again whenever a map is loaded or tested, like before v1.4, so you don't have to press **refresh data** in the backgrounds tab.
-- `automaticanimationreload`: The Course Maker reads every animation again whenever a map is loaded or tested, like before v1.4, so you don't have to press the **Animations** tab's arrow button.
+- `automaticenemyreload`: The Course Maker loads every custom enemy again whenever a map is loaded or tested, like before v1.4.0, so you don't have to press **refresh data**.
+- `automaticbackgroundreload`: The Course Maker decodes custom backgrounds and foregrounds again whenever a map is loaded or tested, like before v1.4.0, so you don't have to press **refresh data** in the backgrounds tab.
+- `automaticanimationreload`: The Course Maker reads every animation again whenever a map is loaded or tested, like before v1.4.0, so you don't have to press the **Animations** tab's arrow button.
 - `automaticmapreload`: The Course Maker reads every map and preview again whenever a map is loaded or tested, or the editor panel is opened, so you don't have to press **refresh data** in the **Maps** tab.
 
 ---
@@ -388,7 +388,7 @@ A mappack can also have its own `nitpicks.json`, next to its `settings.txt`. Its
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
-## v1.4
+## v1.4.0
 
 ### 🧩 New Features
 
@@ -429,7 +429,7 @@ A new **refresh data** button in the Course Maker's custom enemies tab (**Custom
 
 #### ⚙️ Automatic Enemy Reload
 
-A new nitpick, `automaticenemyreload`. With it on, the Course Maker loads every custom enemy again each time a map is loaded or tested, the way it did before v1.4. Changes to enemy files then show up on the next map load, without pressing **refresh data**. Maps load slower with it on, the more custom enemies a mappack has. **Generate Nitpicks File** adds it to an existing file.
+A new nitpick, `automaticenemyreload`. With it on, the Course Maker loads every custom enemy again each time a map is loaded or tested, the way it did before v1.4.0. Changes to enemy files then show up on the next map load, without pressing **refresh data**. Maps load slower with it on, the more custom enemies a mappack has. **Generate Nitpicks File** adds it to an existing file.
 
 #### 🖼️ Background Refresh Data
 
@@ -442,7 +442,7 @@ The custom backgrounds tab (**Custom → Backgrounds**) has a **refresh data** b
 
 #### ⚙️ Automatic Background Reload
 
-A new nitpick, `automaticbackgroundreload`. With it on, the Course Maker decodes backgrounds and foregrounds again on every map load, the way it did before v1.4, so you never need **refresh data** for them. **Generate Nitpicks File** adds it to an existing file.
+A new nitpick, `automaticbackgroundreload`. With it on, the Course Maker decodes backgrounds and foregrounds again on every map load, the way it did before v1.4.0, so you never need **refresh data** for them. **Generate Nitpicks File** adds it to an existing file.
 
 #### 🗺️ Map Refresh Data
 
@@ -480,7 +480,7 @@ The **Animations** tab has a new button between **save** and **x**, showing the 
 
 #### ⚙️ Automatic Animation Reload
 
-A new nitpick, `automaticanimationreload`. With it on, the animation cache is reset every time a map is loaded or tested in the Course Maker, so every animation is read and decoded again, the way it was before v1.4. Changes made to animation files outside the game then show up on the next map load, without pressing the arrow button. Normal play still uses the cache. Maps load slower with it on, the more animations a mappack has. **Generate Nitpicks File** adds it to an existing file.
+A new nitpick, `automaticanimationreload`. With it on, the animation cache is reset every time a map is loaded or tested in the Course Maker, so every animation is read and decoded again, the way it was before v1.4.0. Changes made to animation files outside the game then show up on the next map load, without pressing the arrow button. Normal play still uses the cache. Maps load slower with it on, the more animations a mappack has. **Generate Nitpicks File** adds it to an existing file.
 
 #### 🧩 Map Parse Cache
 
@@ -811,6 +811,7 @@ Every GUI text input now takes the usual editing keys:
 
 * The music priority only restarts a theme when the right version isn't already playing. If it's checked again partway through an intro (when the low time sound ends, or another player's star runs out), the intro keeps playing and the song still follows it.
 * Removed the interval when adding points from the remaining timer at the end of a course. Points from the timer are now added without the previous delay between each one.
+* The superball sounds are now fixed because I just had to remove the silence at the start.
 
 #### 🛠️ Course Maker
 
@@ -829,7 +830,7 @@ Every GUI text input now takes the usual editing keys:
 * Loading a map no longer reads and decodes every mappack animation again. Press the **Animations** tab's arrow button to pick up changes made to them outside the game, or turn on `automaticanimationreload` to read them on every map load like before.
 * Loading a map that was already loaded no longer reads and parses its file again, unless the file or the tileset changed.
 
-## v1.3
+## v1.3.0
 
 ### 🧩 New Features
 
