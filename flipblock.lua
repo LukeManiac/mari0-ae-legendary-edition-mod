@@ -72,7 +72,12 @@ function flipblock:init(x, y, t, r)
 	
 	self.flip = false
 	self.timer = 0
-	self.blockbouncetimer = blockbouncetime
+	--how long its bounce takes: mmblockbouncetime with mariomakerblockphysics, since every type scales
+	self.blockbouncetime = blockbouncetime
+	if MarioMakerBlockPhysics then
+		self.blockbouncetime = mmblockbouncetime
+	end
+	self.blockbouncetimer = self.blockbouncetime
 end
 
 function flipblock:update(dt)
@@ -81,16 +86,17 @@ function flipblock:update(dt)
 		return true
 	end
 
-	if self.blockbouncetimer < blockbouncetime then
+	local bt = self.blockbouncetime
+	if self.blockbouncetimer < bt then
 		self.blockbouncetimer = self.blockbouncetimer + dt
-		if self.blockbouncetimer > blockbouncetime then
-			self.blockbouncetimer = blockbouncetime
+		if self.blockbouncetimer > bt then
+			self.blockbouncetimer = bt
 		end
 	end
-	if self.blockbouncetimer < blockbouncetime/2 then
-		self.offsetY = self.blockbouncetimer / (blockbouncetime/2) * blockbounceheight * 16
+	if self.blockbouncetimer < bt/2 then
+		self.offsetY = self.blockbouncetimer / (bt/2) * blockbounceheight * 16
 	else
-		self.offsetY = (2 - self.blockbouncetimer / (blockbouncetime/2)) * blockbounceheight * 16
+		self.offsetY = (2 - self.blockbouncetimer / (bt/2)) * blockbounceheight * 16
 	end
 	--mariomakerblockphysics: every type (flip, action and switch blocks, propeller and cannon boxes) grows as it goes up
 	--and shrinks back as it comes down, like other blocks

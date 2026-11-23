@@ -6112,10 +6112,11 @@ local function rrr_bounceoffset(x, y)
 		return 0
 	end
 	local t = math.abs(bounce.timer)
-	if t < blockbouncetime/2 then
-		return t/(blockbouncetime/2)*blockbounceheight
+	local bt = blockbounceduration(bounce)
+	if t < bt/2 then
+		return t/(bt/2)*blockbounceheight
 	end
-	return math.max(0, (2 - t/(blockbouncetime/2))*blockbounceheight)
+	return math.max(0, (2 - t/(bt/2))*blockbounceheight)
 end
 
 --the roulette (or the cooldown) over every ? block

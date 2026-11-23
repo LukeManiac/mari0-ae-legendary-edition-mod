@@ -797,11 +797,12 @@ function game_update(dt)
 	--blockbounce
 	local delete
 	for i, v in pairs(blockbounce) do
+		local bt = blockbounceduration(v)
 		if v.timer < 0 then
-			if v.timer > -blockbouncetime then
+			if v.timer > -bt then
 				v.timer = v.timer - dt
-				if v.timer < -blockbouncetime then
-					v.timer = -blockbouncetime
+				if v.timer < -bt then
+					v.timer = -bt
 					if v.content then
 						item(v.content, v.x, v.y, v.content2)
 						if v.sound then --(mariomakerblockphysics: the sprout sound waits for the item, see sproutsound)
@@ -813,16 +814,16 @@ function game_update(dt)
 				end
 			end
 		else
-			if v.timer < blockbouncetime then
+			if v.timer < bt then
 				v.timer = v.timer + dt
 				--mariomakerblockphysics: the item only comes out once the block's scale is back to 1 after it grew.
 				--Its first step stops at the top of the bounce, so a long frame can't skip the growing
 				if (not v.grown) and blockbouncescales(v) then
 					v.grown = true
-					v.timer = math.min(v.timer, blockbouncetime/2)
+					v.timer = math.min(v.timer, bt/2)
 				end
-				if v.timer > blockbouncetime then
-					v.timer = blockbouncetime
+				if v.timer > bt then
+					v.timer = bt
 					if v.content then
 						item(v.content, v.x, v.y, v.content2)
 						if v.sound then --(mariomakerblockphysics: the sprout sound waits for the item, see sproutsound)
@@ -11212,6 +11213,19 @@ function blockbouncescales(v)
 	return true
 end
 
+--how long a block's whole bounce takes: mmblockbouncetime for blocks that scale (mariomakerblockphysics),
+--otherwise blockbouncetime. Worked out once per bounce, so it can't change halfway through
+function blockbounceduration(v)
+	if not v.duration then
+		if blockbouncescales(v) then
+			v.duration = mmblockbouncetime
+		else
+			v.duration = blockbouncetime
+		end
+	end
+	return v.duration
+end
+
 function createblockbounce(x, y)
 	local i = tilemap(x, y)
 	blockbounce[i] = {}
@@ -11310,10 +11324,11 @@ function drawmaptiles(drawtype, xscroll, yscroll)
 				if blockbouncet then
 					local v = blockbouncet
 					local timer = math.abs(v.timer)
-					if timer < blockbouncetime/2 then
-						bounceyoffset = timer / (blockbouncetime/2) * blockbounceheight
+					local bt = blockbounceduration(v)
+					if timer < bt/2 then
+						bounceyoffset = timer / (bt/2) * blockbounceheight
 					else
-						bounceyoffset = (2 - timer / (blockbouncetime/2)) * blockbounceheight
+						bounceyoffset = (2 - timer / (bt/2)) * blockbounceheight
 					end
 					--mariomakerblockphysics: the block grows as it goes up and shrinks back as it comes down (not noteblocks)
 					if MarioMakerBlockPhysics and not tilequads[tilenumber].noteblock then
