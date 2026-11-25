@@ -189,6 +189,25 @@ function bowser:draw()
 	end
 end
 
+--axe cutscene (see mario:axeanimateenemies): only Bowser's walk animation runs, nothing else from his update,
+--so he can't move, turn, jump, breathe fire or throw hammers. dt is already sped up by enemycastlefallanimspeed
+function bowser:axeanimation(dt)
+	self.animationtimer = self.animationtimer + dt
+	while self.animationtimer > bowseranimationspeed do
+		self.animationtimer = self.animationtimer - bowseranimationspeed
+		if self.walkframe == 1 then
+			self.walkframe = 2
+		else
+			self.walkframe = 1
+		end
+	end
+	local set = 1
+	if self.e then
+		set = 2
+	end
+	self.quad = bowserquad[set][self.fireframe or 1][self.walkframe]
+end
+
 function bowser:newtargetx(dir)
 	if dir == "right" then
 		self.targetx = self.startx-1-math.random(2)

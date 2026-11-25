@@ -9494,6 +9494,9 @@ function mario:axeanimateenemies(dt)
 				e.boomtimer = e.boomtimer - axeboomboomanimspeed
 				axeboomboomframe(v, (v.quadi or 0) % 6 + 1)
 			end
+		elseif v.axeanimation then
+			--the class has its own cutscene animation (Bowser): just that, no update
+			v:axeanimation(animdt)
 		elseif v.update then
 			local saved = {}
 			for k, val in pairs(v) do
