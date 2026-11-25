@@ -193,8 +193,8 @@ end
 --so he can't move, turn, jump, breathe fire or throw hammers. dt is already sped up by enemycastlefallanimspeed
 function bowser:axeanimation(dt)
 	self.animationtimer = self.animationtimer + dt
-	while self.animationtimer > bowseranimationspeed do
-		self.animationtimer = self.animationtimer - bowseranimationspeed
+	while self.animationtimer > bowseranimationspeed/2 do
+		self.animationtimer = self.animationtimer - bowseranimationspeed/2
 		if self.walkframe == 1 then
 			self.walkframe = 2
 		else
