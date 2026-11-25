@@ -1728,8 +1728,10 @@ function mario:update(dt)
 			return
 		end
 
-		--the bridge is gone: held enemies play their normal animation from the start, enemycastlefallanimspeed times faster
+		--the bridge is gone: held enemies play their normal animation from the start, enemycastlefallanimspeed times faster,
+		--and once they've been made to fall, they fall at Bowser's speed
 		self:axeanimateenemies(dt)
+		self:axecapfalls()
 
 		--3. "facing": the enemies face the player for beforeenemyfalltime, then they're made to fall.
 		--bowserfall only plays if one of them has nothing under it (with no enemies, everything else still happens)
@@ -9402,8 +9404,13 @@ function mario:axedropenemies()
 			v.speedy = 0
 			
 			local hasgravity = v.active and (not v.static) and (not v.ignoregravity) and v.gravity ~= 0
-			if hasgravity and v.width and v.height and not axeenemysupported(v) then
-				anyfalls = true
+			if hasgravity then
+				--every enemy falls the way Bowser does: his gravity, capped at his fall speed (see axecapfalls)
+				v.gravity = bowsergravity
+				e.falls = true
+				if v.width and v.height and not axeenemysupported(v) then
+					anyfalls = true
+				end
 			end
 		end
 	end
@@ -9422,6 +9429,20 @@ local axeanimskipobjects = {
 	tile = true, portalwall = true, screenboundary = true, coin = true, tracksegment = true,
 	clearpipesegment = true, pixeltile = true, player = true
 }
+
+--enemies whose animation is flipping their sprite left and right (Goombas, Spike Balls, custom "mirror" enemies):
+--for them, animationdirection is part of the animation, so it's kept from their update instead of put back
+local axemirrorgoombas = {goomba = true, goombrat = true, drygoomba = true, biggoomba = true, tinygoomba = true}
+local function axemirroranimated(kind, v)
+	if kind == "enemy" then
+		return v.animationtype == "mirror"
+	elseif kind == "goomba" then
+		return axemirrorgoombas[v.t] == true
+	elseif kind == "spikeball" then
+		return not v.rolling
+	end
+	return false
+end
 
 --run each held enemy's own update at enemycastlefallanimspeed times the speed, then undo everything except its animation:
 --position, speed, facing, timers, AI state, sounds and anything it spawned are all rolled back
@@ -9460,7 +9481,7 @@ function mario:axeanimateenemies(dt)
 				end
 			end
 			for k, val in pairs(saved) do
-				if not axeanimfields[k] then
+				if not (axeanimfields[k] or (k == "animationdirection" and axemirroranimated(e.kind, v))) then
 					v[k] = val
 				end
 			end
@@ -9476,6 +9497,17 @@ function mario:axeanimateenemies(dt)
 					t[k] = nil
 				end
 			end
+		end
+	end
+end
+
+--keeps every dropped enemy at Bowser's fall speed. Their own updates are off (Bowser's is what normally caps his),
+--so the cutscene does it every frame from the drop on
+function mario:axecapfalls()
+	for _, e in ipairs(self.axeheldenemies or {}) do
+		local v = e.obj
+		if e.falls and v.speedy and v.speedy > bowserfallspeed then
+			v.speedy = bowserfallspeed
 		end
 	end
 end
