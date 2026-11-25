@@ -789,11 +789,11 @@ Grabbing the axe at the end of a castle now plays a new cutscene. Every new timi
 
 * The axe disappears and `grabsound` plays. The music keeps going.
 * Every enemy that isn't on screen is deleted straight away, including ones with `resistseverything` or `resistsenemykill`.
-* Everything in the course freezes for `beforebridgebreaktime` seconds (0.5 by default). Nothing moves or animates except the cutscene.
+* Everything in the course freezes for `beforebridgebreaktime` seconds (0.5 by default). Nothing moves or animates except the cutscene, but the camera keeps going, so it still catches up with the player.
 * Then the bridge breaks one block at a time, at the same speed as before. It always breaks now, even when there's no boss or the boss was already beaten with fireballs. Before, the cutscene skipped straight to the walk in that case.
-* Every enemy stops where it is as soon as the axe is grabbed, not just Bowser. This covers built-in and custom enemies. Enemies with `resistseverything` or `resistsenemykill` aren't affected: once the freeze is over, they carry on like normal.
-* The stopped enemies don't walk, shoot or jump any more. From the moment the bridge starts breaking, they play their normal animation `enemycastlefallanimspeed` times faster (2 by default), instead of only Bowser tapping his feet. Anything their animation would spawn or play is taken straight back out.
-* Once the last block is gone, the stopped enemies turn to face the player who grabbed the axe and stay completely still, still playing their sped-up animation.
+* Every enemy stops where it is as soon as the axe is grabbed, not just Bowser, and its animation stops too. This covers built-in and custom enemies. Enemies with `resistseverything` or `resistsenemykill` aren't affected: once the freeze is over, they carry on like normal.
+* The stopped enemies don't walk, shoot, jump or animate while the bridge breaks. Bowser no longer taps his feet.
+* Once the last block is gone, the stopped enemies turn to face the player who grabbed the axe and stay completely still. Their animation starts over and plays `enemycastlefallanimspeed` times faster (2 by default). Anything their animation would spawn or play is taken straight back out.
 * `beforeenemyfalltime` seconds (1) later, they're made to fall: they get gravity back, so anything with nothing under it drops. The game checks straight away whether any of them has nothing under it, and if one does, `bowserfallsound` plays on that same frame. Players under an enemy don't count as something to stand on.
 * Either way, the music stops at that moment. With no stopped enemies, or none of them falling, everything below happens the same way, just without `bowserfallsound`.
 * At that moment, the player who grabbed the axe can move again, but their controls stay off. Their speed goes to 0 and any jump stops, so they drop straight down if they were in the air. Other players aren't affected.
@@ -805,10 +805,11 @@ Grabbing the axe at the end of a castle now plays a new cutscene. Every new timi
 
 #### 🧱 Axe Cutscene Functions
 
-* `axefreezetimer` is how long the freeze has left. While it's set, `game_update` only updates the player who grabbed the axe.
+* `axefreezetimer` is how long the freeze has left. While it's set, `game_update` only updates the player who grabbed the axe and the camera.
+* `game_updatecamera(dt)` is the camera part of `game_update` (scrolling, autoscroll, camera stoppers, splitscreen viewports, pans, smoothing and the tile batches), in its own function so the freeze can run it too.
 * `mario:axedeleteoffscreenenemies()` deletes every enemy that isn't on screen when the axe is grabbed, the same way the game deletes objects.
 * `mario:axeholdenemies()` stops every enemy for the cutscene and marks it `axeheld`. `game_update` doesn't run the update of an enemy marked `axeheld`, so it only has physics left.
-* `mario:axefaceenemies()` turns the stopped enemies to face the player and stops them moving. `axefacingreversed` lists the built-in enemies whose sprites face right by default, so they're turned the other way.
+* `mario:axefaceenemies()` turns the stopped enemies to face the player, stops them moving and starts their animation over: every animation timer goes back to 0, and custom enemies go back to their first frame. `axefacingreversed` lists the built-in enemies whose sprites face right by default, so they're turned the other way.
 * `mario:axeanimateenemies(dt)` runs every stopped enemy's own update at `enemycastlefallanimspeed` times the speed, then puts back everything except the fields in `axeanimfields` (`quad`, `frame`, `animationtimer` and so on). Sounds are muted while it runs, and anything spawned is removed. An enemy whose animation uses another field needs that field added to `axeanimfields`.
 * `mario:axedropenemies()` gives the stopped enemies their gravity back and returns `true` if any of them has nothing under it, so it's about to fall. It checks with `checkrect` just under each enemy, using the enemy's own collision mask.
 * `mario:axeenemiesfell(fallsound)` stops the music, plays `bowserfallsound` if `fallsound` is `true`, and starts the wait before the walk.

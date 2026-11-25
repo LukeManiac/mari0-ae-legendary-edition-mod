@@ -1690,8 +1690,7 @@ function mario:update(dt)
 
 		--2. "bridge": the game runs again, the bridge goes one block (column) at a time
 		if self.axephase == "bridge" then
-			--every held enemy plays its normal animation, enemycastlefallanimspeed times faster (see axeanimateenemies)
-			self:axeanimateenemies(dt)
+			--held enemies don't animate while the bridge breaks (their update is off, see axeheld in game_update)
 			self.animationtimer2 = self.animationtimer2 + dt
 			while self.axephase == "bridge" and self.animationtimer2 > castleanimationbridgedisappeardelay do
 				self.animationtimer2 = self.animationtimer2 - castleanimationbridgedisappeardelay
@@ -1722,7 +1721,7 @@ function mario:update(dt)
 			return
 		end
 
-		--held enemies keep playing their normal animation, enemycastlefallanimspeed times faster
+		--the bridge is gone: held enemies play their normal animation from the start, enemycastlefallanimspeed times faster
 		self:axeanimateenemies(dt)
 
 		--3. "facing": the enemies face the player for beforeenemyfalltime, then they're made to fall.
@@ -9291,7 +9290,31 @@ function mario:axeholdenemies()
 	end
 end
 
---bridge is gone: held enemies turn to face the axe player and stop moving completely (their animation keeps going)
+--animation timers go back to 0; custom enemies also go back to their first animation frame
+local axeanimtimers = {"animationtimer", "animationtimer2", "animtimer", "animationtime", "smallanimationtimer", "runanimationtimer"}
+local function axeresetanimation(v)
+	for _, k in ipairs(axeanimtimers) do
+		if type(v[k]) == "number" then
+			v[k] = 0
+		end
+	end
+	if type(v.animationtimerstage) == "number" then
+		v.animationtimerstage = 1
+	end
+	if v.quadgroup and type(v.quadi) == "number" then
+		local first = 1
+		if v.animationtype == "frames" and v.animationstart then
+			first = v.animationstart
+		end
+		if v.quadgroup[first] then
+			v.quadi = first
+			v.quad = v.quadgroup[first]
+		end
+	end
+end
+
+--bridge is gone: held enemies turn to face the axe player and stop moving completely,
+--and their animation starts over (it plays from now on, see axeanimateenemies)
 function mario:axefaceenemies()
 	local px = self.x + self.width/2
 	for _, e in ipairs(self.axeheldenemies) do
@@ -9309,6 +9332,7 @@ function mario:axefaceenemies()
 			v.active = false
 			v.speedx = 0
 			v.speedy = 0
+			axeresetanimation(v)
 		end
 	end
 end

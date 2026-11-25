@@ -384,6 +384,491 @@ function pausemenu_setshader(slot, i)
 	saveconfig()
 end
 
+--the camera: scrolling, autoscroll, camera stoppers, splitscreen viewports, pans, smoothing and the tile batches.
+--Its own function so the axe freeze (see axefreezetimer) can keep the camera going while everything else is frozen
+local function game_updatecamera(dt)
+	--SCROLLING
+	camerasmoothing_restore("shared", splitxscroll, splityscroll, 1) --(the camera logic works on the real camera)
+	updatecenteredcameraalive()
+	
+	
+	--HORIZONTAL
+	
+	local oldscroll = splitxscroll[1]
+	
+	if autoscroll and autoscrollx ~= false and not minimapdragging then
+		local splitwidth = width/#splitscreen
+		for split = 1, #splitscreen do
+			local oldscroll = splitxscroll[split]
+			--scrolling
+			--LEFT
+			local i = 1
+			while i <= players and objects["player"][i].dead do
+				i = i + 1
+			end
+			local fastestplayer = objects["player"][i]
+			
+			
+			if fastestplayer then
+				if not CLIENT and not SERVER then
+					for i = 1, players do
+						if not objects["player"][i].dead and objects["player"][i].x > fastestplayer.x then
+							fastestplayer = objects["player"][i]
+						end
+					end
+				end
+				
+				local oldscroll = splitxscroll[split]
+				
+				--LEFT
+
+				local focusx, focusy, focusspeedx = getmodernmultiplayerfocus()
+				if focusx then
+					fastestplayer = {x = focusx - fastestplayer.width/2, width = fastestplayer.width, speedx = focusspeedx}
+				end
+
+				if (not (autoscrollingx and not editormode)) and (camerasetting ~= 3 or editormode) then
+					if fastestplayer.x < splitxscroll[split] + scrollingleftstart*screenzoom2 and splitxscroll[split] > 0 then
+						if fastestplayer.x < splitxscroll[split] + scrollingleftstart*screenzoom2 and fastestplayer.speedx < 0 then
+							if fastestplayer.speedx < -scrollrate then
+								splitxscroll[split] = splitxscroll[split] - scrollrate*dt
+							else
+								splitxscroll[split] = splitxscroll[split] + fastestplayer.speedx*dt
+							end
+						end
+					
+						if fastestplayer.x < splitxscroll[split] + scrollingleftcomplete*screenzoom2 then
+							splitxscroll[split] = splitxscroll[split] - scrollrate*dt
+							if fastestplayer.x > splitxscroll[split] + scrollingleftcomplete*screenzoom2 then
+								splitxscroll[split] = fastestplayer.x - scrollingleftcomplete*screenzoom2
+							end
+						end
+					end
+				end
+				if autoscrollingx and not editormode then
+					splitxscroll[split] = math.max(0, math.min(mapwidth-width*screenzoom2, splitxscroll[split] + autoscrollingx*dt))
+				end
+				
+				--RIGHT
+				
+				if not (autoscrollingx and not editormode) then
+					if fastestplayer.x > splitxscroll[split] + width*screenzoom2 - scrollingstart*screenzoom2 and splitxscroll[split] < mapwidth - width*screenzoom2 then
+						if fastestplayer.x > splitxscroll[split] + width*screenzoom2 - scrollingstart*screenzoom2 and fastestplayer.speedx > 0.3 then
+							if fastestplayer.speedx > scrollrate then
+								splitxscroll[split] = splitxscroll[split] + scrollrate*dt
+							else
+								splitxscroll[split] = splitxscroll[split] + fastestplayer.speedx*dt
+							end
+						end
+					
+						if fastestplayer.x > splitxscroll[split] + width*screenzoom2 - scrollingcomplete*screenzoom2 then
+							splitxscroll[split] = splitxscroll[split] + scrollrate*dt
+							if splitxscroll[split] > fastestplayer.x - (width*screenzoom2 - scrollingcomplete*screenzoom2) then
+								splitxscroll[split] = fastestplayer.x - (width*screenzoom2 - scrollingcomplete*screenzoom2)
+							end
+						end
+					end
+					if camerasetting == 3 then
+						objects["screenboundary"]["left"].x = xscroll
+					end
+				end
+
+				--just force that shit
+				if not levelfinished and not (autoscrollingx and not editormode) then
+					if fastestplayer.x > splitxscroll[split] + width*screenzoom2 - scrollingcomplete*screenzoom2 then
+						splitxscroll[split] = splitxscroll[split] + superscroll*dt
+						if fastestplayer.x < splitxscroll[split] + width*screenzoom2 - scrollingcomplete*screenzoom2 then
+							splitxscroll[split] = fastestplayer.x - width*screenzoom2 + scrollingcomplete*screenzoom2
+						end
+					elseif fastestplayer.x < splitxscroll[split] + scrollingleftcomplete*screenzoom2 and (camerasetting ~= 3 or editormode) then
+						splitxscroll[split] = splitxscroll[split] - superscroll*dt
+						if fastestplayer.x > splitxscroll[split] + scrollingleftcomplete*screenzoom2 then
+							splitxscroll[split] = fastestplayer.x - scrollingleftcomplete*screenzoom2
+						end
+					end
+				end
+
+				if CompletelyCenteredCamera and not (autoscrollingx and not editormode) then
+					local target = (fastestplayer.x + fastestplayer.width/2) - (width*screenzoom2)/2
+					splitxscroll[split] = interpolatecenteredcamera("x", split, target)
+				end
+
+				--CLAMP
+				if splitxscroll[split] > mapwidth-width then
+					splitxscroll[split] = math.max(0, mapwidth-width)
+					hitrightside()
+				end
+
+				if (axex and splitxscroll[split] > axex-width and axex >= width) then
+					splitxscroll[split] = axex-width
+					hitrightside()
+				end
+				if splitxscroll[split] < 0 then
+					splitxscroll[split] = 0
+				end
+			end
+		end
+		
+	end
+	
+	
+	--VERTICAL SCROLLING
+	local oldscrolly = splityscroll[1]
+	if autoscroll and autoscrolly ~= false and not minimapdragging then
+		for split = 1, #splitscreen do
+			local fastestplayer = 1
+			while fastestplayer <= players and objects["player"][fastestplayer].dead do
+				fastestplayer = fastestplayer + 1
+			end
+			if not CLIENT and not SERVER and objects["player"][fastestplayer] then
+				if mapwidth <= width then
+					for i = 1, players do
+						if not objects["player"][i].dead and math.abs(starty-objects["player"][i].y) > math.abs(starty-objects["player"][fastestplayer].y) then
+							fastestplayer = i
+						end
+					end
+				else
+					for i = 1, players do
+						if not objects["player"][i].dead and objects["player"][i].y > objects["player"][fastestplayer].y then
+							fastestplayer = i
+						end
+					end
+				end
+			end
+			if mapheight > 15*screenzoom2 and objects["player"][fastestplayer] then
+				if not (autoscrollingy and not editormode) then
+					local px, py = objects["player"][fastestplayer].x, objects["player"][fastestplayer].y
+					if objects["player"][fastestplayer].height > 2 then
+						py = objects["player"][fastestplayer].y+objects["player"][fastestplayer].height/2
+					end
+					local focusx, focusy, focusspeedx, focusspeedy = getmodernmultiplayerfocus()
+					if focusx then
+						px, py = focusx, focusy
+					end
+					local pspeed = focusspeedy or objects["player"][1].speedy
+					if objects["player"][fastestplayer].oldy and pspeed == 0 and math.abs(objects["player"][fastestplayer].y-objects["player"][fastestplayer].oldy) < 3 then
+						pspeed = (objects["player"][fastestplayer].y-objects["player"][fastestplayer].oldy)/dt
+					end
+					objects["player"][fastestplayer].oldy = objects["player"][fastestplayer].y
+					
+					local sx, sy = px-xscroll, py-yscroll--position on screen
+					yscrolltarget = yscrolltarget or splityscroll[split]
+
+					local upbound = 9*screenzoom2
+					local downbound = 4*screenzoom2
+					if camerasetting == 2 then
+						upbound = 8*screenzoom2
+						downbound = 6*screenzoom2
+					end
+					if speed == 0 then
+						yscrolltarget = math.min(py-downbound, math.max(py-upbound, yscrolltarget))--(objects["player"][fastestplayer].y+objects["player"][fastestplayer].width/2)-(height/2)
+					elseif sy > upbound then
+						yscrolltarget = py-upbound
+					elseif sy < downbound then
+						yscrolltarget = py-downbound
+					end
+
+					if CompletelyCenteredCamera then
+						yscrolltarget = (focusy or getunduckedhitbox(objects["player"][fastestplayer]).centery) - (height*screenzoom2)/2 - .5
+					end
+
+					local seeking = false
+					local yscrolltarget = math.min(math.max(0, mapheight-height*screenzoom2-1), math.max(0, yscrolltarget))
+					if objects["player"][fastestplayer].animationstate == "idle" then
+						if objects["player"][fastestplayer].upkeytimer > seektime then
+							yscrolltarget = yscrolltarget - seekrange
+							yscrolltarget = math.min(math.max(0, mapheight-height*screenzoom2-1), math.max(0, yscrolltarget))
+							seeking = true
+						elseif objects["player"][fastestplayer].downkeytimer > seektime then
+							yscrolltarget = yscrolltarget + seekrange
+							yscrolltarget = math.min(math.max(0, mapheight-height*screenzoom2-1), math.max(0, yscrolltarget))
+							seeking = true
+						end
+					end
+					
+					local diff = math.abs(splityscroll[split]-yscrolltarget)
+					local speed = math.abs(pspeed)--scrollrate*(diff/1.5)+0.5 --math.min(superscrollrate)?
+					if seeking then	
+						speed = seekspeed
+					elseif speed == 0 then--not objects["player"][fastestplayer].jumping and not objects["player"][fastestplayer].falling then
+						if diff > 2.5 then
+							speed = superscrollrate
+						else
+							speed = scrollrate
+						end
+					end
+					if yscrolltarget > splityscroll[split] then
+						splityscroll[split] = math.min(yscrolltarget, splityscroll[split] + speed*dt)
+					elseif yscrolltarget < splityscroll[split] then
+						splityscroll[split] = math.max(yscrolltarget, splityscroll[split] - speed*dt)
+					end
+
+					if CompletelyCenteredCamera and not (autoscrollingy and not editormode) then
+						local cameraTransition = centeredcameraanim and love.timer.getTime()-centeredcameraanim.start < cameralerp_duration
+						if cameraTransition then
+							centeredseeking = false
+							splityscroll[split] = interpolatecenteredcamera("y", split, yscrolltarget)
+						elseif seeking then
+							centeredseeking = true
+						elseif not centeredseeking or math.abs(splityscroll[split]-yscrolltarget) <= 1/16 then
+							centeredseeking = false
+							splityscroll[split] = yscrolltarget
+						end
+					end
+
+					if splityscroll[split] > mapheight-height*screenzoom2-1 then
+						splityscroll[split] = math.max(0, mapheight-height*screenzoom2-1)
+					end
+					
+					if splityscroll[split] < 0 then
+						splityscroll[split] = 0
+					end
+				elseif not editormode then
+					--vertical autoscrolling
+					splityscroll[split] = math.max(0, math.min(mapheight-height*screenzoom2-1, splityscroll[split] + autoscrollingy*dt))
+				end
+			end
+		end
+	end
+
+	-- camera stoppers (must run after CompletelyCenteredCamera so they are not ignored)
+	for i, v in pairs(objects["camerastop"]) do
+		v:collide(oldscroll, oldscrolly)
+	end
+	
+	if players == 2 then
+		--updatesplitscreen()
+	end
+
+	if splitscreenactive() then
+		splitscreen_update(dt)
+	end
+
+	--camera pan x
+	if xpan then
+		xpantimer = xpantimer + dt
+		if xpantimer >= xpantime then
+			xpan = false
+			xpantimer = xpantime
+		end
+		
+		local i = xpantimer/xpantime
+		
+		xscroll = math.min(mapwidth-width, xpanstart + xpandiff*i)
+		splitxscroll[1] = xscroll
+	end
+	
+	--camera pan y
+	if ypan then
+		ypantimer = ypantimer + dt
+		if ypantimer >= ypantime then
+			ypan = false
+			ypantimer = ypantime
+		end
+		
+		local i = ypantimer/ypantime
+		
+		yscroll = math.min(mapheight-height, ypanstart + ypandiff*i)
+		splityscroll[1] = yscroll
+	end
+
+	--camerasmoothing: what's shown (and used until the next frame) is the smoothed camera
+	camerasmoothing_apply("shared", splitxscroll, splityscroll, 1, dt, math.max(0, mapwidth-width*screenzoom2), math.max(0, mapheight-height*screenzoom2-1))
+	xscroll, yscroll = splitxscroll[1], splityscroll[1]
+
+	updateenemycamerarelativepositions()
+	
+	--SPRITEBATCH UPDATE and CASTLEREPEATS
+	if math.floor(splitxscroll[1]) ~= spritebatchX[1] then
+		if not editormode then
+			for currentx = lastrepeat+1, math.floor(splitxscroll[1])+2 do
+				lastrepeat = math.floor(currentx)
+				--castlerepeat?
+				--get mazei
+				local mazei = 0
+				
+				for j = 1, #mazeends do
+					if mazeends[j] < currentx+width then
+						mazei = j
+					end
+				end
+				
+				--check if maze was solved!
+				for i = 1, players do
+					if objects["player"][i].mazevar == mazegates[mazei] then
+						local actualmaze = 0
+						for j = 1, #mazestarts do
+							if objects["player"][i].x > mazestarts[j] then
+								actualmaze = j
+							end
+						end
+						mazesolved[actualmaze] = true
+						for j = 1, players do
+							objects["player"][j].mazevar = 0
+						end
+						break
+					end
+				end
+				
+				if not mazesolved[mazei] or mazeinprogress then --get if inside maze
+					if not mazesolved[mazei] then
+						mazeinprogress = true
+					end
+					
+					local x = math.ceil(currentx)+width
+					
+					if repeatX == 0 then
+						repeatX = mazestarts[mazei]
+					end
+					
+					if repeatX and map[repeatX] then
+						local t = {}
+						for y = 1, mapheight do
+							table.insert(t, {1})
+						end
+						table.insert(map, x, t)
+						for y = 1, mapheight do
+							for j = 1, #map[repeatX][y] do
+								map[x][y][j] = map[repeatX][y][j]
+							end
+							--map[x][y"]["gels""] = {}
+							map[x][y]["gels"] = map[repeatX][y]["gels"]
+							map[x][y]["portaloverride"] = nil
+							
+							for cox = mapwidth, x, -1 do
+								--move objects
+								if objects["tile"][tilemap(cox, y)] then
+									objects["tile"][tilemap(cox + 1, y)] = tile:new(cox, y-1, 1, 1, true)
+									objects["tile"][tilemap(cox, y)] = nil
+								end
+							end
+							
+							--create object for block
+							if tilequads[map[repeatX][y][1]].collision == true then
+								objects["tile"][tilemap(x, y)] = tile:new(x-1, y-1, 1, 1, true)
+							end
+
+							--create pipe objects again
+							if map[x][y][2] then
+								local t = entityquads[map[x][y][2]].t
+								if t == "warppipe" or t == "pipe" or t == "pipe2" or t == "pipespawn" or t == "pipespawndown" or t == "pipespawnhor" then
+									loadentity(t, x, y, map[x][y], map[x][y][2])
+								end
+							end
+						end
+						mapwidth = mapwidth + 1
+						repeatX = repeatX + 1
+						if flagx then
+							flagx = flagx + 1
+							flagimgx = flagimgx + 1
+							objects["screenboundary"]["flag"].x = objects["screenboundary"]["flag"].x + 1
+						end
+						
+						if axex then
+							axex = axex + 1
+							objects["screenboundary"]["axe"].x = objects["screenboundary"]["axe"].x + 1
+						end
+						
+						if firestartx then
+							firestartx = firestartx + 1
+						end
+						
+						objects["screenboundary"]["right"].x = objects["screenboundary"]["right"].x + 1
+						
+						--move mazestarts and ends
+						for i = 1, #mazestarts do
+							mazestarts[i] = mazestarts[i]+1
+							mazeends[i] = mazeends[i]+1
+						end
+						
+						--check for endblock
+						local x = math.ceil(currentx)+width
+						for y = 1, mapheight do
+							if map[x][y][2] and entityquads[map[x][y][2]].t == "mazeend" then
+								if mazesolved[mazei] then
+									repeatX = mazestarts[mazei+1]
+								end
+								mazeinprogress = false
+							end
+						end
+					end
+					
+					--reset thingie
+					
+					local x = math.ceil(currentx)+width-1
+					for y = 1, mapheight do
+						if map[x] and map[x][y] and map[x][y][2] and entityquads[map[x][y][2]].t == "mazeend" then
+							for j = 1, players do
+								objects["player"][j].mazevar = 0
+							end
+						end
+					end
+				end
+			end
+		end
+		
+		generatespritebatch()
+		spritebatchX[1] = math.floor(splitxscroll[1])
+		
+		if editormode == false and splitxscroll[1] < mapwidth-width then
+			local x1, x2 = math.ceil(prevxscroll)+math.ceil(width*screenzoom2)+1, math.floor(splitxscroll[1])+math.ceil(width*screenzoom2)+1
+			if prevxscroll > splitxscroll[1] then --spawn enemies in both directions
+				x1, x2 = math.floor(splitxscroll[1])+1, math.floor(prevxscroll)+1
+			end
+			for x = math.max(1, x1), math.min(mapwidth, x2) do
+				for y = math.max(1, math.floor(splityscroll[1])+1), math.min(mapheight, math.ceil(splityscroll[1])+math.ceil(height*screenzoom2)+1+2) do
+					spawnenemyentity(x, y)
+				end
+				if goombaattack then
+					local randomtable = {}
+					for y = 1, mapheight do
+						table.insert(randomtable, y)
+					end
+					while #randomtable > 0 do
+						local rand = math.random(#randomtable)
+						if tilequads[map[x][randomtable[rand]][1]].collision then
+							table.remove(randomtable, rand)
+						else
+							local n = math.random(1, 58)
+							if n <= 40 then
+								table.insert(objects["goomba"], goomba:new(x-.5, math.random(13)))
+							elseif n <= 46 then
+								table.insert(objects["goomba"], goomba:new(x-.5, math.random(13), "goombrat"))
+							elseif n <= 50 then
+								table.insert(objects["goomba"], goomba:new(x-.5, math.random(13), "biggoomba"))
+							elseif n <= 51 then
+								table.insert(objects["goomba"], goomba:new(x-.5, math.random(13), "drygoomba"))
+							elseif n <= 54 then
+								table.insert(objects["goomba"], goomba:new(x-.5, math.random(13), "paragoomba"))
+							elseif n <= 58 then
+								table.insert(objects["goomba"], goomba:new(x-.5, math.random(13), "tinygoomba"))
+							end
+							break
+						end
+					end
+				end
+			end
+		end
+	end
+	if math.floor(splityscroll[1]) ~= spritebatchY[1] then
+		generatespritebatch()
+		spritebatchY[1] = math.floor(splityscroll[1])
+		if editormode == false then
+			for x = math.max(1, math.floor(splitxscroll[1])+1), math.min(mapwidth, math.ceil(splitxscroll[1])+math.ceil(width*screenzoom2)+1) do
+				local y1, y2 = math.floor(splityscroll[1])+1, math.floor(prevyscroll)+1
+				if prevyscroll < splityscroll[1] then
+					y1, y2 = math.floor(prevyscroll)+1+math.ceil(height*screenzoom2)+2, math.floor(splityscroll[1])+1+math.ceil(height*screenzoom2)+2
+				end
+				for y = math.max(1, y1), math.min(mapheight, y2) do
+					spawnenemyentity(x, y)
+				end
+			end
+		end
+	end
+	prevxscroll = splitxscroll[1]
+	prevyscroll = splityscroll[1]
+end
+
 function game_update(dt)
 	--------
 	--GAME--
@@ -612,7 +1097,7 @@ function game_update(dt)
 		return
 	end
 
-	--axe grabbed: everything freezes for beforebridgebreaktime, only the axe cutscene keeps running (see mario:axe)
+	--axe grabbed: everything freezes for beforebridgebreaktime, only the axe cutscene and the camera keep running (see mario:axe)
 	if axefreezetimer then
 		axefreezetimer = axefreezetimer - dt
 		if axefreezetimer <= 0 then
@@ -623,10 +1108,8 @@ function game_update(dt)
 				v:update(dt)
 			end
 		end
-		if splitscreenactive() then
-			splitscreen_update(dt)
-		end
-		updateenemycamerarelativepositions()
+		--the camera isn't frozen
+		game_updatecamera(dt)
 		return
 	end
 
@@ -1286,486 +1769,8 @@ function game_update(dt)
 		table.remove(spawnanimations, v)
 	end
 	
-	--SCROLLING
-	camerasmoothing_restore("shared", splitxscroll, splityscroll, 1) --(the camera logic works on the real camera)
-	updatecenteredcameraalive()
-	
-	
-	--HORIZONTAL
-	
-	local oldscroll = splitxscroll[1]
-	
-	if autoscroll and autoscrollx ~= false and not minimapdragging then
-		local splitwidth = width/#splitscreen
-		for split = 1, #splitscreen do
-			local oldscroll = splitxscroll[split]
-			--scrolling
-			--LEFT
-			local i = 1
-			while i <= players and objects["player"][i].dead do
-				i = i + 1
-			end
-			local fastestplayer = objects["player"][i]
-			
-			
-			if fastestplayer then
-				if not CLIENT and not SERVER then
-					for i = 1, players do
-						if not objects["player"][i].dead and objects["player"][i].x > fastestplayer.x then
-							fastestplayer = objects["player"][i]
-						end
-					end
-				end
-				
-				local oldscroll = splitxscroll[split]
-				
-				--LEFT
-
-				local focusx, focusy, focusspeedx = getmodernmultiplayerfocus()
-				if focusx then
-					fastestplayer = {x = focusx - fastestplayer.width/2, width = fastestplayer.width, speedx = focusspeedx}
-				end
-
-				if (not (autoscrollingx and not editormode)) and (camerasetting ~= 3 or editormode) then
-					if fastestplayer.x < splitxscroll[split] + scrollingleftstart*screenzoom2 and splitxscroll[split] > 0 then
-						if fastestplayer.x < splitxscroll[split] + scrollingleftstart*screenzoom2 and fastestplayer.speedx < 0 then
-							if fastestplayer.speedx < -scrollrate then
-								splitxscroll[split] = splitxscroll[split] - scrollrate*dt
-							else
-								splitxscroll[split] = splitxscroll[split] + fastestplayer.speedx*dt
-							end
-						end
-					
-						if fastestplayer.x < splitxscroll[split] + scrollingleftcomplete*screenzoom2 then
-							splitxscroll[split] = splitxscroll[split] - scrollrate*dt
-							if fastestplayer.x > splitxscroll[split] + scrollingleftcomplete*screenzoom2 then
-								splitxscroll[split] = fastestplayer.x - scrollingleftcomplete*screenzoom2
-							end
-						end
-					end
-				end
-				if autoscrollingx and not editormode then
-					splitxscroll[split] = math.max(0, math.min(mapwidth-width*screenzoom2, splitxscroll[split] + autoscrollingx*dt))
-				end
-				
-				--RIGHT
-				
-				if not (autoscrollingx and not editormode) then
-					if fastestplayer.x > splitxscroll[split] + width*screenzoom2 - scrollingstart*screenzoom2 and splitxscroll[split] < mapwidth - width*screenzoom2 then
-						if fastestplayer.x > splitxscroll[split] + width*screenzoom2 - scrollingstart*screenzoom2 and fastestplayer.speedx > 0.3 then
-							if fastestplayer.speedx > scrollrate then
-								splitxscroll[split] = splitxscroll[split] + scrollrate*dt
-							else
-								splitxscroll[split] = splitxscroll[split] + fastestplayer.speedx*dt
-							end
-						end
-					
-						if fastestplayer.x > splitxscroll[split] + width*screenzoom2 - scrollingcomplete*screenzoom2 then
-							splitxscroll[split] = splitxscroll[split] + scrollrate*dt
-							if splitxscroll[split] > fastestplayer.x - (width*screenzoom2 - scrollingcomplete*screenzoom2) then
-								splitxscroll[split] = fastestplayer.x - (width*screenzoom2 - scrollingcomplete*screenzoom2)
-							end
-						end
-					end
-					if camerasetting == 3 then
-						objects["screenboundary"]["left"].x = xscroll
-					end
-				end
-
-				--just force that shit
-				if not levelfinished and not (autoscrollingx and not editormode) then
-					if fastestplayer.x > splitxscroll[split] + width*screenzoom2 - scrollingcomplete*screenzoom2 then
-						splitxscroll[split] = splitxscroll[split] + superscroll*dt
-						if fastestplayer.x < splitxscroll[split] + width*screenzoom2 - scrollingcomplete*screenzoom2 then
-							splitxscroll[split] = fastestplayer.x - width*screenzoom2 + scrollingcomplete*screenzoom2
-						end
-					elseif fastestplayer.x < splitxscroll[split] + scrollingleftcomplete*screenzoom2 and (camerasetting ~= 3 or editormode) then
-						splitxscroll[split] = splitxscroll[split] - superscroll*dt
-						if fastestplayer.x > splitxscroll[split] + scrollingleftcomplete*screenzoom2 then
-							splitxscroll[split] = fastestplayer.x - scrollingleftcomplete*screenzoom2
-						end
-					end
-				end
-
-				if CompletelyCenteredCamera and not (autoscrollingx and not editormode) then
-					local target = (fastestplayer.x + fastestplayer.width/2) - (width*screenzoom2)/2
-					splitxscroll[split] = interpolatecenteredcamera("x", split, target)
-				end
-
-				--CLAMP
-				if splitxscroll[split] > mapwidth-width then
-					splitxscroll[split] = math.max(0, mapwidth-width)
-					hitrightside()
-				end
-
-				if (axex and splitxscroll[split] > axex-width and axex >= width) then
-					splitxscroll[split] = axex-width
-					hitrightside()
-				end
-				if splitxscroll[split] < 0 then
-					splitxscroll[split] = 0
-				end
-			end
-		end
-		
-	end
-	
-	
-	--VERTICAL SCROLLING
-	local oldscrolly = splityscroll[1]
-	if autoscroll and autoscrolly ~= false and not minimapdragging then
-		for split = 1, #splitscreen do
-			local fastestplayer = 1
-			while fastestplayer <= players and objects["player"][fastestplayer].dead do
-				fastestplayer = fastestplayer + 1
-			end
-			if not CLIENT and not SERVER and objects["player"][fastestplayer] then
-				if mapwidth <= width then
-					for i = 1, players do
-						if not objects["player"][i].dead and math.abs(starty-objects["player"][i].y) > math.abs(starty-objects["player"][fastestplayer].y) then
-							fastestplayer = i
-						end
-					end
-				else
-					for i = 1, players do
-						if not objects["player"][i].dead and objects["player"][i].y > objects["player"][fastestplayer].y then
-							fastestplayer = i
-						end
-					end
-				end
-			end
-			if mapheight > 15*screenzoom2 and objects["player"][fastestplayer] then
-				if not (autoscrollingy and not editormode) then
-					local px, py = objects["player"][fastestplayer].x, objects["player"][fastestplayer].y
-					if objects["player"][fastestplayer].height > 2 then
-						py = objects["player"][fastestplayer].y+objects["player"][fastestplayer].height/2
-					end
-					local focusx, focusy, focusspeedx, focusspeedy = getmodernmultiplayerfocus()
-					if focusx then
-						px, py = focusx, focusy
-					end
-					local pspeed = focusspeedy or objects["player"][1].speedy
-					if objects["player"][fastestplayer].oldy and pspeed == 0 and math.abs(objects["player"][fastestplayer].y-objects["player"][fastestplayer].oldy) < 3 then
-						pspeed = (objects["player"][fastestplayer].y-objects["player"][fastestplayer].oldy)/dt
-					end
-					objects["player"][fastestplayer].oldy = objects["player"][fastestplayer].y
-					
-					local sx, sy = px-xscroll, py-yscroll--position on screen
-					yscrolltarget = yscrolltarget or splityscroll[split]
-
-					local upbound = 9*screenzoom2
-					local downbound = 4*screenzoom2
-					if camerasetting == 2 then
-						upbound = 8*screenzoom2
-						downbound = 6*screenzoom2
-					end
-					if speed == 0 then
-						yscrolltarget = math.min(py-downbound, math.max(py-upbound, yscrolltarget))--(objects["player"][fastestplayer].y+objects["player"][fastestplayer].width/2)-(height/2)
-					elseif sy > upbound then
-						yscrolltarget = py-upbound
-					elseif sy < downbound then
-						yscrolltarget = py-downbound
-					end
-
-					if CompletelyCenteredCamera then
-						yscrolltarget = (focusy or getunduckedhitbox(objects["player"][fastestplayer]).centery) - (height*screenzoom2)/2 - .5
-					end
-
-					local seeking = false
-					local yscrolltarget = math.min(math.max(0, mapheight-height*screenzoom2-1), math.max(0, yscrolltarget))
-					if objects["player"][fastestplayer].animationstate == "idle" then
-						if objects["player"][fastestplayer].upkeytimer > seektime then
-							yscrolltarget = yscrolltarget - seekrange
-							yscrolltarget = math.min(math.max(0, mapheight-height*screenzoom2-1), math.max(0, yscrolltarget))
-							seeking = true
-						elseif objects["player"][fastestplayer].downkeytimer > seektime then
-							yscrolltarget = yscrolltarget + seekrange
-							yscrolltarget = math.min(math.max(0, mapheight-height*screenzoom2-1), math.max(0, yscrolltarget))
-							seeking = true
-						end
-					end
-					
-					local diff = math.abs(splityscroll[split]-yscrolltarget)
-					local speed = math.abs(pspeed)--scrollrate*(diff/1.5)+0.5 --math.min(superscrollrate)?
-					if seeking then	
-						speed = seekspeed
-					elseif speed == 0 then--not objects["player"][fastestplayer].jumping and not objects["player"][fastestplayer].falling then
-						if diff > 2.5 then
-							speed = superscrollrate
-						else
-							speed = scrollrate
-						end
-					end
-					if yscrolltarget > splityscroll[split] then
-						splityscroll[split] = math.min(yscrolltarget, splityscroll[split] + speed*dt)
-					elseif yscrolltarget < splityscroll[split] then
-						splityscroll[split] = math.max(yscrolltarget, splityscroll[split] - speed*dt)
-					end
-
-					if CompletelyCenteredCamera and not (autoscrollingy and not editormode) then
-						local cameraTransition = centeredcameraanim and love.timer.getTime()-centeredcameraanim.start < cameralerp_duration
-						if cameraTransition then
-							centeredseeking = false
-							splityscroll[split] = interpolatecenteredcamera("y", split, yscrolltarget)
-						elseif seeking then
-							centeredseeking = true
-						elseif not centeredseeking or math.abs(splityscroll[split]-yscrolltarget) <= 1/16 then
-							centeredseeking = false
-							splityscroll[split] = yscrolltarget
-						end
-					end
-
-					if splityscroll[split] > mapheight-height*screenzoom2-1 then
-						splityscroll[split] = math.max(0, mapheight-height*screenzoom2-1)
-					end
-					
-					if splityscroll[split] < 0 then
-						splityscroll[split] = 0
-					end
-				elseif not editormode then
-					--vertical autoscrolling
-					splityscroll[split] = math.max(0, math.min(mapheight-height*screenzoom2-1, splityscroll[split] + autoscrollingy*dt))
-				end
-			end
-		end
-	end
-
-	-- camera stoppers (must run after CompletelyCenteredCamera so they are not ignored)
-	for i, v in pairs(objects["camerastop"]) do
-		v:collide(oldscroll, oldscrolly)
-	end
-	
-	if players == 2 then
-		--updatesplitscreen()
-	end
-
-	if splitscreenactive() then
-		splitscreen_update(dt)
-	end
-
-	--camera pan x
-	if xpan then
-		xpantimer = xpantimer + dt
-		if xpantimer >= xpantime then
-			xpan = false
-			xpantimer = xpantime
-		end
-		
-		local i = xpantimer/xpantime
-		
-		xscroll = math.min(mapwidth-width, xpanstart + xpandiff*i)
-		splitxscroll[1] = xscroll
-	end
-	
-	--camera pan y
-	if ypan then
-		ypantimer = ypantimer + dt
-		if ypantimer >= ypantime then
-			ypan = false
-			ypantimer = ypantime
-		end
-		
-		local i = ypantimer/ypantime
-		
-		yscroll = math.min(mapheight-height, ypanstart + ypandiff*i)
-		splityscroll[1] = yscroll
-	end
-
-	--camerasmoothing: what's shown (and used until the next frame) is the smoothed camera
-	camerasmoothing_apply("shared", splitxscroll, splityscroll, 1, dt, math.max(0, mapwidth-width*screenzoom2), math.max(0, mapheight-height*screenzoom2-1))
-	xscroll, yscroll = splitxscroll[1], splityscroll[1]
-
-	updateenemycamerarelativepositions()
-	
-	--SPRITEBATCH UPDATE and CASTLEREPEATS
-	if math.floor(splitxscroll[1]) ~= spritebatchX[1] then
-		if not editormode then
-			for currentx = lastrepeat+1, math.floor(splitxscroll[1])+2 do
-				lastrepeat = math.floor(currentx)
-				--castlerepeat?
-				--get mazei
-				local mazei = 0
-				
-				for j = 1, #mazeends do
-					if mazeends[j] < currentx+width then
-						mazei = j
-					end
-				end
-				
-				--check if maze was solved!
-				for i = 1, players do
-					if objects["player"][i].mazevar == mazegates[mazei] then
-						local actualmaze = 0
-						for j = 1, #mazestarts do
-							if objects["player"][i].x > mazestarts[j] then
-								actualmaze = j
-							end
-						end
-						mazesolved[actualmaze] = true
-						for j = 1, players do
-							objects["player"][j].mazevar = 0
-						end
-						break
-					end
-				end
-				
-				if not mazesolved[mazei] or mazeinprogress then --get if inside maze
-					if not mazesolved[mazei] then
-						mazeinprogress = true
-					end
-					
-					local x = math.ceil(currentx)+width
-					
-					if repeatX == 0 then
-						repeatX = mazestarts[mazei]
-					end
-					
-					if repeatX and map[repeatX] then
-						local t = {}
-						for y = 1, mapheight do
-							table.insert(t, {1})
-						end
-						table.insert(map, x, t)
-						for y = 1, mapheight do
-							for j = 1, #map[repeatX][y] do
-								map[x][y][j] = map[repeatX][y][j]
-							end
-							--map[x][y"]["gels""] = {}
-							map[x][y]["gels"] = map[repeatX][y]["gels"]
-							map[x][y]["portaloverride"] = nil
-							
-							for cox = mapwidth, x, -1 do
-								--move objects
-								if objects["tile"][tilemap(cox, y)] then
-									objects["tile"][tilemap(cox + 1, y)] = tile:new(cox, y-1, 1, 1, true)
-									objects["tile"][tilemap(cox, y)] = nil
-								end
-							end
-							
-							--create object for block
-							if tilequads[map[repeatX][y][1]].collision == true then
-								objects["tile"][tilemap(x, y)] = tile:new(x-1, y-1, 1, 1, true)
-							end
-
-							--create pipe objects again
-							if map[x][y][2] then
-								local t = entityquads[map[x][y][2]].t
-								if t == "warppipe" or t == "pipe" or t == "pipe2" or t == "pipespawn" or t == "pipespawndown" or t == "pipespawnhor" then
-									loadentity(t, x, y, map[x][y], map[x][y][2])
-								end
-							end
-						end
-						mapwidth = mapwidth + 1
-						repeatX = repeatX + 1
-						if flagx then
-							flagx = flagx + 1
-							flagimgx = flagimgx + 1
-							objects["screenboundary"]["flag"].x = objects["screenboundary"]["flag"].x + 1
-						end
-						
-						if axex then
-							axex = axex + 1
-							objects["screenboundary"]["axe"].x = objects["screenboundary"]["axe"].x + 1
-						end
-						
-						if firestartx then
-							firestartx = firestartx + 1
-						end
-						
-						objects["screenboundary"]["right"].x = objects["screenboundary"]["right"].x + 1
-						
-						--move mazestarts and ends
-						for i = 1, #mazestarts do
-							mazestarts[i] = mazestarts[i]+1
-							mazeends[i] = mazeends[i]+1
-						end
-						
-						--check for endblock
-						local x = math.ceil(currentx)+width
-						for y = 1, mapheight do
-							if map[x][y][2] and entityquads[map[x][y][2]].t == "mazeend" then
-								if mazesolved[mazei] then
-									repeatX = mazestarts[mazei+1]
-								end
-								mazeinprogress = false
-							end
-						end
-					end
-					
-					--reset thingie
-					
-					local x = math.ceil(currentx)+width-1
-					for y = 1, mapheight do
-						if map[x] and map[x][y] and map[x][y][2] and entityquads[map[x][y][2]].t == "mazeend" then
-							for j = 1, players do
-								objects["player"][j].mazevar = 0
-							end
-						end
-					end
-				end
-			end
-		end
-		
-		generatespritebatch()
-		spritebatchX[1] = math.floor(splitxscroll[1])
-		
-		if editormode == false and splitxscroll[1] < mapwidth-width then
-			local x1, x2 = math.ceil(prevxscroll)+math.ceil(width*screenzoom2)+1, math.floor(splitxscroll[1])+math.ceil(width*screenzoom2)+1
-			if prevxscroll > splitxscroll[1] then --spawn enemies in both directions
-				x1, x2 = math.floor(splitxscroll[1])+1, math.floor(prevxscroll)+1
-			end
-			for x = math.max(1, x1), math.min(mapwidth, x2) do
-				for y = math.max(1, math.floor(splityscroll[1])+1), math.min(mapheight, math.ceil(splityscroll[1])+math.ceil(height*screenzoom2)+1+2) do
-					spawnenemyentity(x, y)
-				end
-				if goombaattack then
-					local randomtable = {}
-					for y = 1, mapheight do
-						table.insert(randomtable, y)
-					end
-					while #randomtable > 0 do
-						local rand = math.random(#randomtable)
-						if tilequads[map[x][randomtable[rand]][1]].collision then
-							table.remove(randomtable, rand)
-						else
-							local n = math.random(1, 58)
-							if n <= 40 then
-								table.insert(objects["goomba"], goomba:new(x-.5, math.random(13)))
-							elseif n <= 46 then
-								table.insert(objects["goomba"], goomba:new(x-.5, math.random(13), "goombrat"))
-							elseif n <= 50 then
-								table.insert(objects["goomba"], goomba:new(x-.5, math.random(13), "biggoomba"))
-							elseif n <= 51 then
-								table.insert(objects["goomba"], goomba:new(x-.5, math.random(13), "drygoomba"))
-							elseif n <= 54 then
-								table.insert(objects["goomba"], goomba:new(x-.5, math.random(13), "paragoomba"))
-							elseif n <= 58 then
-								table.insert(objects["goomba"], goomba:new(x-.5, math.random(13), "tinygoomba"))
-							end
-							break
-						end
-					end
-				end
-			end
-		end
-	end
-	if math.floor(splityscroll[1]) ~= spritebatchY[1] then
-		generatespritebatch()
-		spritebatchY[1] = math.floor(splityscroll[1])
-		if editormode == false then
-			for x = math.max(1, math.floor(splitxscroll[1])+1), math.min(mapwidth, math.ceil(splitxscroll[1])+math.ceil(width*screenzoom2)+1) do
-				local y1, y2 = math.floor(splityscroll[1])+1, math.floor(prevyscroll)+1
-				if prevyscroll < splityscroll[1] then
-					y1, y2 = math.floor(prevyscroll)+1+math.ceil(height*screenzoom2)+2, math.floor(splityscroll[1])+1+math.ceil(height*screenzoom2)+2
-				end
-				for y = math.max(1, y1), math.min(mapheight, y2) do
-					spawnenemyentity(x, y)
-				end
-			end
-		end
-	end
-	prevxscroll = splitxscroll[1]
-	prevyscroll = splityscroll[1]
+	--SCROLLING (see game_updatecamera)
+	game_updatecamera(dt)
 
 	--portal update
 	for i, v in pairs(portals) do
