@@ -9356,6 +9356,23 @@ function mario:axeunpauseenemies()
 	self.axepausedenemies = nil
 end
 
+--enemies in their shell (Koopas, Dry Bones, custom enemies with a shell, Koopalings): their quad is left as it was
+local function axeshelled(v)
+	return v.small == true or v.shell == true
+end
+
+--Boom Boom always shows his moving animation in the cutscene (frames 1 to 6), unless he's stomped or dead
+local axeboomboomanimspeed = 0.065
+local function axeboomboommoving(v)
+	return not (v.stomped or v.dead or v.shot)
+end
+local function axeboomboomframe(v, frame)
+	v.quadi = frame
+	if boomboomquad[spriteset] and boomboomquad[spriteset][frame] then
+		v.quad = boomboomquad[spriteset][frame]
+	end
+end
+
 --bridge is gone: held enemies turn to face the axe player and stop moving completely,
 --and their animation starts over (it plays from now on, see axeanimateenemies)
 function mario:axefaceenemies()
@@ -9375,43 +9392,42 @@ function mario:axefaceenemies()
 			v.active = false
 			v.speedx = 0
 			v.speedy = 0
-			axeresetanimation(v)
+			if e.kind == "boomboom" and axeboomboommoving(v) then
+				axeboomboomframe(v, 1)
+				e.boomtimer = 0
+			elseif not axeshelled(v) then
+				axeresetanimation(v)
+			end
 		end
 	end
 end
 
---does this enemy have anything under it to stand on? Uses the enemy's own collision mask, ignores players
-local function axeenemysupported(v)
-	local hits = checkrect(v.x + 1/16, v.y + v.height, math.max(v.width - 2/16, 1/16), 2/16, {"exclude", v}, true)
-	for i = 1, #hits, 2 do
-		if hits[i] ~= "player" then
-			return true
-		end
-	end
-	return false
+--a collision mask that ignores every category: an enemy with it falls through everything
+local axenocollisionmask = {}
+for i = 1, 64 do
+	axenocollisionmask[i] = true
 end
 
---beforeenemyfalltime is up: the held enemies get gravity back. Returns true if any of them has nothing under it,
---which is checked right away (not a frame later), so bowserfall plays on the same frame
+--beforeenemyfalltime is up: every held enemy is made to fall the way Bowser does. It's made active and stops being
+--static, its customtimer and customtrigger are switched off, and it falls through everything (it ignores collisions).
+--Returns true if any enemy was made to fall, so bowserfall plays on the same frame
 function mario:axedropenemies()
 	local anyfalls = false
 	for _, e in ipairs(self.axeheldenemies) do
 		local v = e.obj
 		if not (v.delete or v.dead or v.shot) then
-			v.active = e.active
-			v.gravity = e.gravity
+			v.active = true
+			v.static = false
+			v.activestatic = false
+			v.ignoregravity = false
+			v.customtimer = false
+			v.customtrigger = false
+			v.mask = axenocollisionmask
+			v.gravity = bowsergravity --capped at bowserfallspeed (see axecapfalls)
 			v.speedx = 0
 			v.speedy = 0
-			
-			local hasgravity = v.active and (not v.static) and (not v.ignoregravity) and v.gravity ~= 0
-			if hasgravity then
-				--every enemy falls the way Bowser does: his gravity, capped at his fall speed (see axecapfalls)
-				v.gravity = bowsergravity
-				e.falls = true
-				if v.width and v.height and not axeenemysupported(v) then
-					anyfalls = true
-				end
-			end
+			e.falls = true
+			anyfalls = true
 		end
 	end
 	return anyfalls
@@ -9467,7 +9483,18 @@ function mario:axeanimateenemies(dt)
 	soundenabled = false
 	for _, e in ipairs(self.axeheldenemies) do
 		local v = e.obj
-		if v.update and not (v.delete or v.dead or v.shot) then
+		if v.delete or v.dead or v.shot then
+			--nothing to animate
+		elseif axeshelled(v) then
+			--in its shell: the quad stays as it was
+		elseif e.kind == "boomboom" and axeboomboommoving(v) then
+			--Boom Boom: his moving animation, whatever he was doing
+			e.boomtimer = (e.boomtimer or 0) + animdt
+			while e.boomtimer > axeboomboomanimspeed do
+				e.boomtimer = e.boomtimer - axeboomboomanimspeed
+				axeboomboomframe(v, (v.quadi or 0) % 6 + 1)
+			end
+		elseif v.update then
 			local saved = {}
 			for k, val in pairs(v) do
 				saved[k] = val
