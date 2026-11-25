@@ -1683,6 +1683,7 @@ function mario:update(dt)
 		if self.axephase == "freeze" then
 			if not axefreezetimer then
 				self.axephase = "bridge"
+				self:axepauseenemies()
 				self.animationtimer2 = castleanimationbridgedisappeardelay --first block goes right away
 			end
 			return
@@ -1690,7 +1691,7 @@ function mario:update(dt)
 
 		--2. "bridge": the game runs again, the bridge goes one block (column) at a time
 		if self.axephase == "bridge" then
-			--held enemies don't animate while the bridge breaks (their update is off, see axeheld in game_update)
+			--no enemy updates while the bridge breaks, not even resistseverything / resistsenemykill ones (see axepauseenemies)
 			self.animationtimer2 = self.animationtimer2 + dt
 			while self.axephase == "bridge" and self.animationtimer2 > castleanimationbridgedisappeardelay do
 				self.animationtimer2 = self.animationtimer2 - castleanimationbridgedisappeardelay
@@ -1712,11 +1713,14 @@ function mario:update(dt)
 					self.axeforgivedistance = self.axeforgivedistance - 1
 					self.animationbridgex = self.animationbridgex - 1
 				else
-					--bridge is gone: every held enemy turns to face the player and stays completely still.
-					--The camera can move again
+					--bridge is gone: every held enemy turns to face the player and stays completely still,
+					--the other enemies carry on, the camera can move again, and the axe player gets its physics back
+					--(it drops if it's in the air) and turns left turnafteraxeland from now (see axeturnupdate)
 					axecamerablocked = false
+					self:axeunpauseenemies()
 					self:axefaceenemies()
-					self.axeturntimer = 0 --the axe player turns left turnafteraxeland from now (see axeturnupdate)
+					self:axeenableplayer()
+					self.axeturntimer = 0
 					self.axephase = "facing"
 					self.axetimer = 0
 				end
@@ -1731,6 +1735,10 @@ function mario:update(dt)
 		--bowserfall only plays if one of them has nothing under it (with no enemies, everything else still happens)
 		if self.axephase == "facing" then
 			self.axetimer = self.axetimer + dt
+			if self.active then
+				self:axewaterphysics()
+			end
+			self:axeplayerlanding()
 			self:axeturnupdate(dt)
 			if self.axetimer >= beforeenemyfalltime then
 				local anyfalls = self:axedropenemies()
@@ -1739,7 +1747,7 @@ function mario:update(dt)
 			return
 		end
 
-		--4. "afterfall": wait beforeaxeplaytime after the bowserfall sound
+		--4. "afterfall": wait beforeaxeplaytime after the enemies were made to fall
 		if self.axephase == "afterfall" then
 			self.axetimer = self.axetimer + dt
 			if self.active then
@@ -9233,7 +9241,7 @@ local axefacingreversed = {
 
 --names of every object table that holds enemies, built-in and custom
 local function axeenemykeys()
-	local keys = {"enemy", "bowser", "koopaling", "boomboom"}
+	local keys = {"enemy", "bowser", "koopaling", "boomboom", "thwomp", "fuzzy", "amp", "bulletbill", "bigbill", "kingbill", "upfire"}
 	for i = 1, #enemies do
 		table.insert(keys, enemies[i])
 	end
@@ -9318,6 +9326,32 @@ local function axeresetanimation(v)
 			v.quad = v.quadgroup[first]
 		end
 	end
+end
+
+--the bridge starts breaking: no enemy updates until it's gone, not even resistseverything / resistsenemykill ones,
+--and nothing moves either. axeenemiespaused makes game_update skip every enemy table, so an enemy that appears
+--in the meantime doesn't update either
+function mario:axepauseenemies()
+	axeenemiespaused = {}
+	self.axepausedenemies = {}
+	for _, name in ipairs(axeenemykeys()) do
+		axeenemiespaused[name] = true
+		for j, v in pairs(objects[name]) do
+			if not v.axeheld then
+				table.insert(self.axepausedenemies, {obj = v, active = v.active})
+				v.active = false
+			end
+		end
+	end
+end
+
+--the bridge is gone: the enemies that weren't held carry on where they left off
+function mario:axeunpauseenemies()
+	axeenemiespaused = nil
+	for _, e in ipairs(self.axepausedenemies or {}) do
+		e.obj.active = e.active
+	end
+	self.axepausedenemies = nil
 end
 
 --bridge is gone: held enemies turn to face the axe player and stop moving completely,
@@ -9446,8 +9480,8 @@ function mario:axeanimateenemies(dt)
 	end
 end
 
---the enemies were made to fall (or there were none): the music stops, the axe player drops,
---and the walk starts beforeaxeplaytime later. bowserfall only plays when an enemy really falls
+--the enemies were made to fall (or there were none): the music stops, and the walk starts beforeaxeplaytime later.
+--bowserfall only plays when an enemy really falls
 function mario:axeenemiesfell(fallsound)
 	stopmusic()
 	if fallsound then
@@ -9455,10 +9489,9 @@ function mario:axeenemiesfell(fallsound)
 	end
 	self.axephase = "afterfall"
 	self.axetimer = 0
-	self:axeenableplayer()
 end
 
---enemies started falling: the axe player gets physics back (falls if in the air) but no controls
+--bridge is gone: the axe player gets physics back (falls if in the air) but no controls
 function mario:axeenableplayer()
 	self.active = true
 	self.controlsenabled = false

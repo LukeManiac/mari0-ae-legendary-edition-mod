@@ -1624,7 +1624,8 @@ function game_update(dt)
 				end
 				local deleteobject = w.instantdelete
 				--axeheld: enemies caught by the axe cutscene have no AI left, only physics (see mario:axeholdenemies)
-				if not deleteobject and w.update and not w.axeheld then
+				--axeenemiespaused: no enemy updates at all while the bridge breaks (see mario:axepauseenemies)
+				if not deleteobject and w.update and not w.axeheld and not (axeenemiespaused and axeenemiespaused[i]) then
 					deleteobject = w:update(dt) or w.instantdelete
 				end
 				if deleteobject then
@@ -4861,6 +4862,7 @@ function startlevel(level, reason)
 	levelfinished = false
 	axefreezetimer = nil
 	axecamerablocked = nil
+	axeenemiespaused = nil
 	flagpolewaiting = false
 	coinanimation = 1
 	flaganimation = 1
