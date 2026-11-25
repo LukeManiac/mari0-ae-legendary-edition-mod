@@ -1122,6 +1122,17 @@ function minigame_menu_mousepressed(x, y, button)
 	return false
 end
 
+function minigame_menu_mousereleased(x, y, button)
+	--let go of sliders, dropdown lists and buttons in the settings
+	for _, el in ipairs(minigamegui) do
+		el:unclick(x, y, button)
+	end
+	--and of the description and highscores scrollbars
+	for _, el in pairs(minigamescrollbars) do
+		el:unclick(x, y, button)
+	end
+end
+
 function minigame_menu_mousemoved(x, y)
 	if scrollbardragging() then
 		return --the gui scrollbar follows the mouse by itself
