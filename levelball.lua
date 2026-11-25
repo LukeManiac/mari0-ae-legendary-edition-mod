@@ -65,19 +65,16 @@ function levelball:update(dt)
 			if mariotime > 0 then
 				if subtractscore then
 					subtracttimer = subtracttimer + dt
-					while subtracttimer > scoresubtractspeed do
-						subtracttimer = subtracttimer - scoresubtractspeed
-						if mariotime > 0 then
-							mariotime = math.max(0, math.ceil(mariotime - 4))
-							marioscore = marioscore + 50
-						end
-						
-						if mariotime <= 0 then
-							scoreringsound:stop()
-							subtractscore = false
-							subtracttimer = 0
-							mariotime = 0
-						end
+					if mariotime > 0 then
+						mariotime = math.ceil(mariotime - 1)
+						marioscore = marioscore + 50
+					end
+					
+					if mariotime <= 0 then
+						subtractscore = false
+						scoreringsound:stop()
+						castleflagmove = true
+						mariotime = 0
 					end
 				else
 					playsound(scoreringsound)
