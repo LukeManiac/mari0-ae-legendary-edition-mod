@@ -1712,7 +1712,9 @@ function mario:update(dt)
 					self.axeforgivedistance = self.axeforgivedistance - 1
 					self.animationbridgex = self.animationbridgex - 1
 				else
-					--bridge is gone: every held enemy turns to face the player and stays completely still
+					--bridge is gone: every held enemy turns to face the player and stays completely still.
+					--The camera can move again
+					axecamerablocked = false
 					self:axefaceenemies()
 					self.axephase = "facing"
 					self.axetimer = 0
@@ -9211,8 +9213,9 @@ function mario:axe()
 	self:axedeleteoffscreenenemies()
 	self:axeholdenemies()
 
-	--freeze the whole game (see game_update)
+	--freeze the whole game (see game_update), and hold the camera still until the bridge is gone
 	axefreezetimer = beforebridgebreaktime
+	axecamerablocked = true
 
 	axex = false
 	axey = false

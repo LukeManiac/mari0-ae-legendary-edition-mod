@@ -385,7 +385,7 @@ function pausemenu_setshader(slot, i)
 end
 
 --the camera: scrolling, autoscroll, camera stoppers, splitscreen viewports, pans, smoothing and the tile batches.
---Its own function so the axe freeze (see axefreezetimer) can keep the camera going while everything else is frozen
+--Its own function so it can be skipped while the axe cutscene holds the camera still (see axecamerablocked)
 local function game_updatecamera(dt)
 	--SCROLLING
 	camerasmoothing_restore("shared", splitxscroll, splityscroll, 1) --(the camera logic works on the real camera)
@@ -1097,7 +1097,7 @@ function game_update(dt)
 		return
 	end
 
-	--axe grabbed: everything freezes for beforebridgebreaktime, only the axe cutscene and the camera keep running (see mario:axe)
+	--axe grabbed: everything freezes for beforebridgebreaktime, only the axe cutscene keeps running (see mario:axe)
 	if axefreezetimer then
 		axefreezetimer = axefreezetimer - dt
 		if axefreezetimer <= 0 then
@@ -1108,8 +1108,7 @@ function game_update(dt)
 				v:update(dt)
 			end
 		end
-		--the camera isn't frozen
-		game_updatecamera(dt)
+		--the camera is frozen too (see axecamerablocked)
 		return
 	end
 
@@ -1769,8 +1768,10 @@ function game_update(dt)
 		table.remove(spawnanimations, v)
 	end
 	
-	--SCROLLING (see game_updatecamera)
-	game_updatecamera(dt)
+	--SCROLLING (see game_updatecamera). The camera stays put from grabbing the axe until the bridge is gone (see axecamerablocked)
+	if not axecamerablocked then
+		game_updatecamera(dt)
+	end
 
 	--portal update
 	for i, v in pairs(portals) do
@@ -4859,6 +4860,7 @@ function startlevel(level, reason)
 	everyonedead = false
 	levelfinished = false
 	axefreezetimer = nil
+	axecamerablocked = nil
 	flagpolewaiting = false
 	coinanimation = 1
 	flaganimation = 1

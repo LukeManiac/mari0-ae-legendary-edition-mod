@@ -789,7 +789,7 @@ Grabbing the axe at the end of a castle now plays a new cutscene. Every new timi
 
 * The axe disappears and `grabsound` plays. The music keeps going.
 * Every enemy that isn't on screen is deleted straight away, including ones with `resistseverything` or `resistsenemykill`.
-* Everything in the course freezes for `beforebridgebreaktime` seconds (0.5 by default). Nothing moves or animates except the cutscene, but the camera keeps going, so it still catches up with the player.
+* Everything in the course freezes for `beforebridgebreaktime` seconds (0.5 by default). Nothing moves or animates except the cutscene. The camera stays where it is from the moment the axe is grabbed until the last bridge block is gone.
 * Then the bridge breaks one block at a time, at the same speed as before. It always breaks now, even when there's no boss or the boss was already beaten with fireballs. Before, the cutscene skipped straight to the walk in that case.
 * Every enemy stops where it is as soon as the axe is grabbed, not just Bowser, and its animation stops too. This covers built-in and custom enemies. Enemies with `resistseverything` or `resistsenemykill` aren't affected: once the freeze is over, they carry on like normal.
 * The stopped enemies don't walk, shoot, jump or animate while the bridge breaks. Bowser no longer taps his feet.
@@ -805,8 +805,9 @@ Grabbing the axe at the end of a castle now plays a new cutscene. Every new timi
 
 #### 🧱 Axe Cutscene Functions
 
-* `axefreezetimer` is how long the freeze has left. While it's set, `game_update` only updates the player who grabbed the axe and the camera.
-* `game_updatecamera(dt)` is the camera part of `game_update` (scrolling, autoscroll, camera stoppers, splitscreen viewports, pans, smoothing and the tile batches), in its own function so the freeze can run it too.
+* `axefreezetimer` is how long the freeze has left. While it's set, `game_update` only updates the player who grabbed the axe.
+* `axecamerablocked` is `true` from grabbing the axe until the bridge is gone. While it's on, `game_update` skips `game_updatecamera(dt)`.
+* `game_updatecamera(dt)` is the camera part of `game_update` (scrolling, autoscroll, camera stoppers, splitscreen viewports, pans, smoothing and the tile batches), in its own function so it can be skipped while `axecamerablocked` is on.
 * `mario:axedeleteoffscreenenemies()` deletes every enemy that isn't on screen when the axe is grabbed, the same way the game deletes objects.
 * `mario:axeholdenemies()` stops every enemy for the cutscene and marks it `axeheld`. `game_update` doesn't run the update of an enemy marked `axeheld`, so it only has physics left.
 * `mario:axefaceenemies()` turns the stopped enemies to face the player, stops them moving and starts their animation over: every animation timer goes back to 0, and custom enemies go back to their first frame. `axefacingreversed` lists the built-in enemies whose sprites face right by default, so they're turned the other way.
