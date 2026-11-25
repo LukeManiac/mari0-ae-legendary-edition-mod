@@ -612,6 +612,24 @@ function game_update(dt)
 		return
 	end
 
+	--axe grabbed: everything freezes for beforebridgebreaktime, only the axe cutscene keeps running (see mario:axe)
+	if axefreezetimer then
+		axefreezetimer = axefreezetimer - dt
+		if axefreezetimer <= 0 then
+			axefreezetimer = nil
+		end
+		for i, v in pairs(objects["player"]) do
+			if v.animation == "axe" then
+				v:update(dt)
+			end
+		end
+		if splitscreenactive() then
+			splitscreen_update(dt)
+		end
+		updateenemycamerarelativepositions()
+		return
+	end
+
 	--animationS
 	animationsystem_update(dt)
 	
@@ -1123,7 +1141,8 @@ function game_update(dt)
 					w.rotation = w.dropshadowrotation
 				end
 				local deleteobject = w.instantdelete
-				if not deleteobject and w.update then
+				--axeheld: enemies caught by the axe cutscene have no AI left, only physics (see mario:axeholdenemies)
+				if not deleteobject and w.update and not w.axeheld then
 					deleteobject = w:update(dt) or w.instantdelete
 				end
 				if deleteobject then
@@ -4834,6 +4853,7 @@ function startlevel(level, reason)
 	--MISC VARS
 	everyonedead = false
 	levelfinished = false
+	axefreezetimer = nil
 	flagpolewaiting = false
 	coinanimation = 1
 	flaganimation = 1

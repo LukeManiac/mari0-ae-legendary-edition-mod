@@ -882,7 +882,13 @@ castleanimationcameraaccelerate = 1.83 -- time when camera starts moving faster 
 castleanimationmariostop = 2.3 -- when mario stops next to toad, relative to start of his move
 castleanimationtextfirstline = 3.2 -- when camera stops and first line of text appears, relative to the start of his move
 castleanimationtextsecondline = 5.3 --second line appears
-castleanimationnextlevel = 9.47 -- splash screen for next level appears
+castleanimationnextlevel = 9.47 -- no longer used: the next level loads once the time bonus is counted (see aftercastleendtime)
+beforebridgebreaktime = 0.5 --everything in the game freezes for this long after the axe is grabbed, then the bridge starts breaking
+axefallchecktime = 0.2 --after the bridge is gone, how long to wait for an enemy to start falling before skipping straight to the castle cutscene
+enemycastlefallanimspeed = 2 --once the enemies face the player, their normal animation plays this many times faster
+turnafteraxeland = 0.25 --once enemies fall, the axe player drops to the ground; this long after landing it turns to face left
+beforeaxeplaytime = 1 --delay from the bowserfall sound to the castle cutscene (player walks, castleend plays)
+aftercastleendtime = 2 --delay from the castleend sound finishing to the scorering (time to score) starting; the next level loads once the score is counted
 -- first bowser is white goomba - see http://www.mariowiki.com/False_Bowser
 -- first bowser takes 5 fireflower hits and dies as goomba
 -- when fireflower killing boss, axe doesn't make bridge disappear

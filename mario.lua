@@ -1679,29 +1679,34 @@ function mario:update(dt)
 		return
 		
 	elseif self.animation == "axe" then
-		self.animationtimer = self.animationtimer + dt
-		
-		if (not bowserfall) and self.animationtimer - dt < castleanimationchaindisappear and self.animationtimer >= castleanimationchaindisappear then
-			bridgedisappear = true
-		end
-		
-		if bridgedisappear then
-			local v = self.axeboss
-			if v then
-				v.walkframe = round(math.fmod(self.animationtimer, castleanimationbowserframedelay*2)*(1/(castleanimationbowserframedelay*2)))+1
+		--1. "freeze": the whole game is frozen (see axefreezetimer in game.lua), only this runs
+		if self.axephase == "freeze" then
+			if not axefreezetimer then
+				self.axephase = "bridge"
+				self.animationtimer2 = castleanimationbridgedisappeardelay --first block goes right away
 			end
+			return
+		end
+
+		--2. "bridge": the game runs again, the bridge goes one block (column) at a time
+		if self.axephase == "bridge" then
+			self:axetapfeet(dt)
 			self.animationtimer2 = self.animationtimer2 + dt
-			while self.animationtimer2 > castleanimationbridgedisappeardelay do
+			while self.axephase == "bridge" and self.animationtimer2 > castleanimationbridgedisappeardelay do
 				self.animationtimer2 = self.animationtimer2 - castleanimationbridgedisappeardelay
 				local removedtile = false
 				for y = 1, mapheight do
 					if inmap(self.animationbridgex, y) and (tilequads[map[self.animationbridgex][y][1]]:getproperty("bridge", self.animationbridgex, y) or map[self.animationbridgex][y][1] == 10) then
+						local waschain = map[self.animationbridgex][y][1] == 10
 						removedtile = true
 						map[self.animationbridgex][y][1] = 1
 						objects["tile"][tilemap(self.animationbridgex, y)] = nil
+						if (not waschain) and ((not self.axebridgetop) or y < self.axebridgetop) then
+							self.axebridgetop = y
+						end
 					end
 				end
-				
+
 				if removedtile then
 					generatespritebatch()
 					playsound(bridgebreaksound)
@@ -1711,39 +1716,53 @@ function mario:update(dt)
 					self.axeforgivedistance = self.axeforgivedistance - 1
 					self.animationbridgex = self.animationbridgex - 1
 				else
-					bowserfall = true
-					bridgedisappear = false
+					--bridge is gone: every held enemy turns to face the player and gravity takes over
+					self:axereleaseenemies()
+					self.axephase = "waitfall"
+					self.axetimer = 0
 				end
 			end
+			return
 		end
-		
-		if bowserfall then
-			local v = self.axeboss
-			if v and (not v.fall) then
-				v.fall = true
-				v.speedx = 0
-				v.speedy = 0
-				v.active = true
-				v.gravity = 27.5
+
+		--from here on the released enemies play their normal animation, enemycastlefallanimspeed times faster
+		self:axeanimateenemies(dt)
+
+		--3. "waitfall": did anything drop through the gap?
+		if self.axephase == "waitfall" then
+			self.axetimer = self.axetimer + dt
+			if self:axeanyenemyfalling() then
 				playsound(bowserfallsound)
-				self.animationtimer = 0
-				return
+				self.axephase = "afterfall"
+				self.axetimer = 0
+				self:axeenableplayer()
+			elseif self.axetimer >= axefallchecktime then
+				self:axestartcastle()
 			end
+			return
 		end
-		
-		if bowserfall and self.animationtimer - dt < castleanimationmariomove and self.animationtimer >= castleanimationmariomove then
-			self.active = true
-			self.gravity = self.characterdata.yacceleration
-			self.animationstate = "running"
-			self.speedx = 4.27
-			self.animationdirection = "right"
-			self.pointingangle = -math.pi/2
-		
-			stopmusic()
-			love.audio.stop()
-			playsound(dailychallenge and dcwin2sound or castleendsound)
+
+		--4. "afterfall": wait beforeaxeplaytime after the bowserfall sound
+		if self.axephase == "afterfall" then
+			self.axetimer = self.axetimer + dt
+			if self.active then
+				self:axewaterphysics()
+			end
+			self:axeplayerlanding(dt)
+			if self.axetimer >= beforeaxeplaytime then
+				self:axestartcastle()
+			end
+			return
 		end
-		
+
+		--5. "castle": walk to toad/princess, text, then time to score
+		self.animationtimer = self.animationtimer + dt
+
+		--underwater: falling into water during the cutscene uses water physics
+		if self.active then
+			self:axewaterphysics()
+		end
+
 		if self.speedx > 0 and self.x >= mapwidth - 8 then
 			self.x = mapwidth - 8
 			self.animationstate = "idle"
@@ -1751,54 +1770,80 @@ function mario:update(dt)
 			self:setquad()
 			self.speedx = 0
 		end
-		
+
 		if levelfinishedmisc2 == 1 then
 			if self.animationtimer - dt < castleanimationtextfirstline and self.animationtimer >= castleanimationtextfirstline then
 				levelfinishedmisc = 1
 			end
-			
+
 			if self.animationtimer - dt < castleanimationtextsecondline and self.animationtimer >= castleanimationtextsecondline then
 				levelfinishedmisc = 2
 			end
-		
-			if self.animationtimer - dt < castleanimationnextlevel and self.animationtimer >= castleanimationnextlevel then
-				nextlevel()
+
+			--wait aftercastleendtime after the castleend sound is done, then count the time into score
+			if not (self.axescorering or self.axecastlesound:isPlaying()) then
+				self.axeaftercastletimer = self.axeaftercastletimer + dt
+				if self.axeaftercastletimer >= aftercastleendtime then
+					if mariotime > 0 then
+						playsound(scoreringsound)
+						self.axescorering = true
+					else
+						mariotime = 0
+						nextlevel()
+						return
+					end
+				end
+			end
+
+			if self.axescorering then
+				if mariotime > 0 then
+					mariotime = math.ceil(mariotime - 1)
+					marioscore = marioscore + 50
+				end
+
+				if mariotime <= 0 then
+					mariotime = 0
+					self.axescorering = false
+					scoreringsound:stop()
+					nextlevel()
+					return
+				end
 			end
 		else
 			if self.animationtimer - dt < endanimationtextfirstline and self.animationtimer >= endanimationtextfirstline then
 				levelfinishedmisc = 1
 			end
-			
+
 			if self.animationtimer - dt < endanimationtextsecondline and self.animationtimer >= endanimationtextsecondline then
 				levelfinishedmisc = 2
 				stopmusic()
 				love.audio.stop()
 				music:play("princessmusic")
 			end
-		
+
 			if self.animationtimer - dt < endanimationtextthirdline and self.animationtimer >= endanimationtextthirdline then
 				levelfinishedmisc = 3
 			end
-			
+
 			if self.animationtimer - dt < endanimationtextfourthline and self.animationtimer >= endanimationtextfourthline then
 				levelfinishedmisc = 4
 			end
-			
+
 			if self.animationtimer - dt < endanimationtextfifthline and self.animationtimer >= endanimationtextfifthline then
 				levelfinishedmisc = 5
 			end
-		
+
 			if self.animationtimer - dt < endanimationend and self.animationtimer >= endanimationend then
 				endpressbutton = true
 			end
 		end
-		
+
 		--Run animation
-		if self.animationstate == "running" and self.animationtimer >= castleanimationmariomove then
+		if self.animationstate == "running" then
 			self:runanimation(dt)
 		end
 		return
-		
+
 	elseif self.animation == "death" or self.animation == "deathpit" then
 		self.animationtimer = self.animationtimer + dt
 		self.animationstate = "dead"
@@ -9132,14 +9177,17 @@ function mario:axe()
 	for i = 1, players do
 		objects["player"][i]:removeportals()
 	end
-	
+
 	for i, v in pairs(objects["platform"]) do
 		objects["platform"][i] = nil
 	end
 
+	--axe disappears (axex = false below), music stops, grab sound
 	stopmusic()
+	playsound(grabsound)
 	self.static = false
 	self.animation = "axe"
+	self.axephase = "freeze"
 	self.fireanimationtimer = fireanimationtime
 	self.invincible = true--false
 	self.drawable = true
@@ -9161,59 +9209,272 @@ function mario:axe()
 	if marioworld >= 8 and not love.filesystem.getInfo(mappackfolder .. "/" .. mappack .. "/" .. marioworld+1 .. "-1.txt") then --changed  since
 		levelfinishedmisc2 = 2
 	end
-	bridgedisappear = false
 	self.animationtimer2 = castleanimationbridgedisappeardelay
 	self.axeforgivedistance = 2 --how far the axe can be away from the bridge and still destroy it
-	bowserfall = false
+	self.axebridgetop = nil --highest bridge row removed, to tell if an enemy fell through the gap
+	self.axetimer = 0
+	self.axetaptimer = 0
+	self.axescorering = false
+	self.axeaftercastletimer = 0
 	objects["screenboundary"]["axe"] = nil
-	
-	self.axeboss = false
-	if objects["bowser"] and objects["bowser"]["boss"] then
-		self.axeboss = objects["bowser"]["boss"]
-	else
-		local checktable = {"koopaling", "boomboom", "enemy"}
-		for i2, v2 in pairs(checktable) do
-			local dobreak = false
-			for i, v in pairs(objects[v2]) do
-				if i == "enemy" then
-					if v.boss and (not v.shot) then
-						self.axeboss = v
-						dobreak = true
-						break
-					end
-				elseif (not v.enemy) and (not v.dead) then
-					self.axeboss = v
-					dobreak = true
-					break
+
+	self:axeholdenemies()
+
+	--freeze the whole game (see game_update)
+	axefreezetimer = beforebridgebreaktime
+
+	axex = false
+	axey = false
+end
+
+--enemies whose sprites face right by default (animationdirection "left" makes them face left)
+local axefacingreversed = {
+	bigbill = true, bulletbill = true, kingbill = true, torpedoted = true, pokey = true,
+	core = true, plant = true, koopaling = true, hammerbro = true
+}
+
+--stop every enemy in place for the axe cutscene. Their AI is off from now on (see axeheld in game_update)
+--resistseverything / resistsenemykill enemies are left alone and keep doing their thing
+function mario:axeholdenemies()
+	self.axeheldenemies = {}
+	local keys = {"enemy", "bowser", "koopaling", "boomboom"}
+	for i = 1, #enemies do
+		table.insert(keys, enemies[i])
+	end
+
+	local done = {}
+	for _, name in ipairs(keys) do
+		if (not done[name]) and objects[name] then
+			done[name] = true
+			for j, v in pairs(objects[name]) do
+				if not (v.resistseverything or v.resistsenemykill or v.shot or v.dead or v.delete) then
+					table.insert(self.axeheldenemies, {obj = v, kind = name, active = v.active, gravity = v.gravity})
+					v.axeheld = true
+					v.active = false
+					v.speedx = 0
+					v.speedy = 0
 				end
-			end
-			if dobreak then
-				break
 			end
 		end
 	end
-	if self.axeboss and (not self.axeboss.shot) then
-		local v = self.axeboss
-		v.speedx = 0
-		v.speedy = 0
-		v.active = false
-		v.gravity = 0
-		v.category = 1
-	else
-		self.animationtimer = castleanimationmariomove
-		self.active = true
-		self.gravity = self.characterdata.yacceleration
-		self.animationstate = "running"
-		self.speedx = 4.27
-		self.pointingangle = -math.pi/2
-		
-		stopmusic()
-		love.audio.stop()
-		playsound(dailychallenge and dcwin2sound or castleendsound)
+end
+
+--bridge is gone: held enemies face the player and drop if there's nothing under them
+function mario:axereleaseenemies()
+	local px = self.x + self.width/2
+	for _, e in ipairs(self.axeheldenemies) do
+		local v = e.obj
+		if not (v.delete or v.dead or v.shot) then
+			local playerright = px > v.x + (v.width or 0)/2
+			if axefacingreversed[e.kind] then
+				playerright = not playerright
+			end
+			if playerright then
+				v.animationdirection = "left" --drawn flipped: facing right
+			else
+				v.animationdirection = "right"
+			end
+
+			v.active = e.active
+			v.gravity = e.gravity
+			v.speedx = 0
+			v.speedy = 0
+			e.released = true
+		end
 	end
-	
-	axex = false
-	axey = false
+end
+
+--the only fields an enemy keeps from its own update while it's held: everything about how it looks, nothing about what it does
+local axeanimfields = {
+	quad = true, quadi = true, frame = true, walkframe = true, runframe = true,
+	animationtimer = true, animationtimer2 = true, animationtimerstage = true, animtimer = true, animationtime = true,
+	smallanimationtimer = true, smallanimationquadi = true, runanimationtimer = true
+}
+
+--big object tables enemies never spawn into (skipped to keep the spawn check cheap)
+local axeanimskipobjects = {
+	tile = true, portalwall = true, screenboundary = true, coin = true, tracksegment = true,
+	clearpipesegment = true, pixeltile = true, player = true
+}
+
+--run each released enemy's own update at enemycastlefallanimspeed times the speed, then undo everything except its animation:
+--position, speed, facing, timers, AI state, sounds and anything it spawned are all rolled back
+function mario:axeanimateenemies(dt)
+	if not self.axeheldenemies then
+		return
+	end
+	local animdt = dt*enemycastlefallanimspeed
+
+	local objectsbefore = {}
+	for name, t in pairs(objects) do
+		if not axeanimskipobjects[name] then
+			local keys = {}
+			for k in pairs(t) do
+				keys[k] = true
+			end
+			objectsbefore[name] = keys
+		end
+	end
+
+	local oldsoundenabled = soundenabled
+	soundenabled = false
+	for _, e in ipairs(self.axeheldenemies) do
+		local v = e.obj
+		if e.released and v.update and not (v.delete or v.dead or v.shot) then
+			local saved = {}
+			for k, val in pairs(v) do
+				saved[k] = val
+			end
+
+			pcall(v.update, v, animdt) --this isn't how updates normally get called, so don't let one bring the game down
+
+			for k in pairs(v) do
+				if saved[k] == nil and not axeanimfields[k] then
+					v[k] = nil
+				end
+			end
+			for k, val in pairs(saved) do
+				if not axeanimfields[k] then
+					v[k] = val
+				end
+			end
+		end
+	end
+	soundenabled = oldsoundenabled
+
+	for name, keys in pairs(objectsbefore) do
+		local t = objects[name]
+		if t then
+			for k in pairs(t) do
+				if not keys[k] then
+					t[k] = nil
+				end
+			end
+		end
+	end
+end
+
+function mario:axeanyenemyfalling()
+	for _, e in ipairs(self.axeheldenemies) do
+		local v = e.obj
+		if v.active and (not v.delete) and v.speedy and v.y then
+			if self.axebridgetop then
+				--sank half a block below where the bridge was
+				if v.speedy > 0 and v.y + (v.height or 1) > self.axebridgetop - 0.5 then
+					return true
+				end
+			elseif v.speedy > 2 then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+--bowser taps his feet while the bridge breaks
+function mario:axetapfeet(dt)
+	self.axetaptimer = self.axetaptimer + dt
+	local frame = round(math.fmod(self.axetaptimer, castleanimationbowserframedelay*2)*(1/(castleanimationbowserframedelay*2)))+1
+	for _, e in ipairs(self.axeheldenemies) do
+		local v = e.obj
+		if e.kind == "bowser" and not (v.delete or v.shot) then
+			v.walkframe = frame
+			local set = 1
+			if v.e then
+				set = 2
+			end
+			local fireframe = v.fireframe or 1
+			if bowserquad[set] and bowserquad[set][fireframe] then
+				v.quad = bowserquad[set][fireframe][frame]
+			end
+		end
+	end
+end
+
+--enemies started falling: the axe player gets physics back (falls if in the air) but no controls
+function mario:axeenableplayer()
+	self.active = true
+	self.controlsenabled = false
+	self.gravity = self.characterdata.yacceleration
+	self.speedx = 0
+	self.speedy = 0
+	self.jumping = false
+	self.falling = true --floorcollide clears this on the first frame if already standing
+	self.axelandwatch = true
+	self.axeturntimer = nil
+	self:axewaterphysics()
+end
+
+--once the axe player is on the ground, wait turnafteraxeland and turn to face left
+function mario:axeplayerlanding(dt)
+	if not self.axelandwatch then
+		return
+	end
+	self.speedx = 0
+	if self.axeturntimer then
+		self.axeturntimer = self.axeturntimer + dt
+		if self.axeturntimer >= turnafteraxeland then
+			self.animationdirection = "left"
+			self.pointingangle = math.pi/2 --portal gun characters face where they point
+			self:setquad()
+			self.axelandwatch = false
+		end
+	elseif not (self.falling or self.jumping) then
+		self.axeturntimer = 0
+		self.animationstate = "idle"
+		self.idleframe = 1
+		self:setquad()
+	end
+end
+
+function mario:axestartcastle()
+	self.axephase = "castle"
+	self.axelandwatch = false
+	self.animationtimer = castleanimationmariomove --text timings stay relative to when the player starts walking
+	self.active = true
+	self.gravity = self.characterdata.yacceleration
+	self.animationstate = "running"
+	self.speedx = 4.27
+	self.animationdirection = "right"
+	self.pointingangle = -math.pi/2
+	self.axeaftercastletimer = 0
+	self.axescorering = false
+
+	stopmusic()
+	love.audio.stop()
+	if dailychallenge then
+		self.axecastlesound = dcwin2sound
+	else
+		self.axecastlesound = castleendsound
+	end
+	playsound(self.axecastlesound)
+
+	self:axewaterphysics()
+end
+
+--underwater physics during the castle walk (water level, or falling into water tiles)
+function mario:axewaterphysics()
+	local inwater = underwater
+	if not inwater then
+		local x = math.floor(self.x+self.width/2)+1
+		local y = math.floor(self.y+self.height/2)+1
+		if inmap(x, y) and tilequads[map[x][y][1]]:getproperty("water", x, y) then
+			inwater = true
+		end
+	end
+
+	if inwater then
+		if not self.water then
+			self:dive(true)
+		end
+		self.gravity = self.characterdata.uwyacceleration
+		if self.speedx > self.characterdata.uwmaxwalkspeed then
+			self.speedx = self.characterdata.uwmaxwalkspeed
+		end
+	elseif self.water then
+		self:dive(false)
+		self.gravity = self.characterdata.yacceleration
+	end
 end
 
 function mario:vineanimation()
