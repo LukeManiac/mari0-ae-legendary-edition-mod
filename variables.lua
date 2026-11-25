@@ -886,7 +886,7 @@ castleanimationnextlevel = 9.47 -- no longer used: the next level loads once the
 beforebridgebreaktime = 0.5 --everything in the game freezes for this long after the axe is grabbed, then the bridge starts breaking
 beforeenemyfalltime = 1 --after the bridge is gone, the enemies face the player for this long before they're made to fall
 enemycastlefallanimspeed = 2 --once the enemies face the player, their normal animation plays this many times faster
-turnafteraxeland = 0.25 --once enemies fall, the axe player drops to the ground; this long after landing it turns to face left
+turnafteraxeland = 0.25 --this long after the bridge is gone, the axe player turns to face left
 beforeaxeplaytime = 1 --delay from the bowserfall sound to the castle cutscene (player walks, castleend plays)
 aftercastleendtime = 2 --delay from the castleend sound finishing to the scorering (time to score) starting; the next level loads once the score is counted
 -- first bowser is white goomba - see http://www.mariowiki.com/False_Bowser

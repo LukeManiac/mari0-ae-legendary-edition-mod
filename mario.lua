@@ -1716,6 +1716,7 @@ function mario:update(dt)
 					--The camera can move again
 					axecamerablocked = false
 					self:axefaceenemies()
+					self.axeturntimer = 0 --the axe player turns left turnafteraxeland from now (see axeturnupdate)
 					self.axephase = "facing"
 					self.axetimer = 0
 				end
@@ -1730,6 +1731,7 @@ function mario:update(dt)
 		--bowserfall only plays if one of them has nothing under it (with no enemies, everything else still happens)
 		if self.axephase == "facing" then
 			self.axetimer = self.axetimer + dt
+			self:axeturnupdate(dt)
 			if self.axetimer >= beforeenemyfalltime then
 				local anyfalls = self:axedropenemies()
 				self:axeenemiesfell(anyfalls)
@@ -1743,7 +1745,8 @@ function mario:update(dt)
 			if self.active then
 				self:axewaterphysics()
 			end
-			self:axeplayerlanding(dt)
+			self:axeplayerlanding()
+			self:axeturnupdate(dt)
 			if self.axetimer >= beforeaxeplaytime then
 				self:axestartcastle()
 			end
@@ -9206,6 +9209,7 @@ function mario:axe()
 	self.animationtimer2 = castleanimationbridgedisappeardelay
 	self.axeforgivedistance = 2 --how far the axe can be away from the bridge and still destroy it
 	self.axetimer = 0
+	self.axeturntimer = nil
 	self.axescorering = false
 	self.axeaftercastletimer = 0
 	objects["screenboundary"]["axe"] = nil
@@ -9464,28 +9468,33 @@ function mario:axeenableplayer()
 	self.jumping = false
 	self.falling = true --floorcollide clears this on the first frame if already standing
 	self.axelandwatch = true
-	self.axeturntimer = nil
 	self:axewaterphysics()
 end
 
---once the axe player is on the ground, wait turnafteraxeland and turn to face left
-function mario:axeplayerlanding(dt)
+--the axe player drops with no speed of its own, and stands idle once it lands
+function mario:axeplayerlanding()
 	if not self.axelandwatch then
 		return
 	end
 	self.speedx = 0
-	if self.axeturntimer then
-		self.axeturntimer = self.axeturntimer + dt
-		if self.axeturntimer >= turnafteraxeland then
-			self.animationdirection = "left"
-			self.pointingangle = math.pi/2 --portal gun characters face where they point
-			self:setquad()
-			self.axelandwatch = false
-		end
-	elseif not (self.falling or self.jumping) then
-		self.axeturntimer = 0
+	if not (self.falling or self.jumping) then
 		self.animationstate = "idle"
 		self.idleframe = 1
+		self:setquad()
+		self.axelandwatch = false
+	end
+end
+
+--turnafteraxeland after the bridge is gone, the axe player turns to face left (wherever it is: standing or falling)
+function mario:axeturnupdate(dt)
+	if not self.axeturntimer then
+		return
+	end
+	self.axeturntimer = self.axeturntimer + dt
+	if self.axeturntimer >= turnafteraxeland then
+		self.axeturntimer = nil
+		self.animationdirection = "left"
+		self.pointingangle = math.pi/2 --portal gun characters face where they point
 		self:setquad()
 	end
 end
@@ -9493,6 +9502,7 @@ end
 function mario:axestartcastle()
 	self.axephase = "castle"
 	self.axelandwatch = false
+	self.axeturntimer = nil
 	self.animationtimer = castleanimationmariomove --text timings stay relative to when the player starts walking
 	self.active = true
 	self.gravity = self.characterdata.yacceleration
