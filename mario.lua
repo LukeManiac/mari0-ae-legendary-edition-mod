@@ -1698,13 +1698,9 @@ function mario:update(dt)
 				local removedtile = false
 				for y = 1, mapheight do
 					if inmap(self.animationbridgex, y) and (tilequads[map[self.animationbridgex][y][1]]:getproperty("bridge", self.animationbridgex, y) or map[self.animationbridgex][y][1] == 10) then
-						local waschain = map[self.animationbridgex][y][1] == 10
 						removedtile = true
 						map[self.animationbridgex][y][1] = 1
 						objects["tile"][tilemap(self.animationbridgex, y)] = nil
-						if (not waschain) and ((not self.axebridgetop) or y < self.axebridgetop) then
-							self.axebridgetop = y
-						end
 					end
 				end
 
@@ -1717,9 +1713,9 @@ function mario:update(dt)
 					self.axeforgivedistance = self.axeforgivedistance - 1
 					self.animationbridgex = self.animationbridgex - 1
 				else
-					--bridge is gone: every held enemy turns to face the player and gravity takes over
-					self:axereleaseenemies()
-					self.axephase = "waitfall"
+					--bridge is gone: every held enemy turns to face the player and stays completely still
+					self:axefaceenemies()
+					self.axephase = "facing"
 					self.axetimer = 0
 				end
 			end
@@ -1729,14 +1725,13 @@ function mario:update(dt)
 		--held enemies keep playing their normal animation, enemycastlefallanimspeed times faster
 		self:axeanimateenemies(dt)
 
-		--3. "waitfall": did anything drop through the gap?
-		if self.axephase == "waitfall" then
+		--3. "facing": the enemies face the player for beforeenemyfalltime, then they're made to fall.
+		--bowserfall only plays if one of them has nothing under it (with no enemies, everything else still happens)
+		if self.axephase == "facing" then
 			self.axetimer = self.axetimer + dt
-			if self:axeanyenemyfalling() then
-				self:axeenemiesfell(true)
-			elseif #self.axeheldenemies == 0 or self.axetimer >= axefallchecktime then
-				--no enemies, or none of them fell: same as if one did, just without bowserfall
-				self:axeenemiesfell(false)
+			if self.axetimer >= beforeenemyfalltime then
+				local anyfalls = self:axedropenemies()
+				self:axeenemiesfell(anyfalls)
 			end
 			return
 		end
@@ -9209,7 +9204,6 @@ function mario:axe()
 	end
 	self.animationtimer2 = castleanimationbridgedisappeardelay
 	self.axeforgivedistance = 2 --how far the axe can be away from the bridge and still destroy it
-	self.axebridgetop = nil --highest bridge row removed, to tell if an enemy fell through the gap
 	self.axetimer = 0
 	self.axescorering = false
 	self.axeaftercastletimer = 0
@@ -9297,8 +9291,8 @@ function mario:axeholdenemies()
 	end
 end
 
---bridge is gone: held enemies face the player and drop if there's nothing under them
-function mario:axereleaseenemies()
+--bridge is gone: held enemies turn to face the axe player and stop moving completely (their animation keeps going)
+function mario:axefaceenemies()
 	local px = self.x + self.width/2
 	for _, e in ipairs(self.axeheldenemies) do
 		local v = e.obj
@@ -9312,14 +9306,43 @@ function mario:axereleaseenemies()
 			else
 				v.animationdirection = "right"
 			end
+			v.active = false
+			v.speedx = 0
+			v.speedy = 0
+		end
+	end
+end
 
+--does this enemy have anything under it to stand on? Uses the enemy's own collision mask, ignores players
+local function axeenemysupported(v)
+	local hits = checkrect(v.x + 1/16, v.y + v.height, math.max(v.width - 2/16, 1/16), 2/16, {"exclude", v}, true)
+	for i = 1, #hits, 2 do
+		if hits[i] ~= "player" then
+			return true
+		end
+	end
+	return false
+end
+
+--beforeenemyfalltime is up: the held enemies get gravity back. Returns true if any of them has nothing under it,
+--which is checked right away (not a frame later), so bowserfall plays on the same frame
+function mario:axedropenemies()
+	local anyfalls = false
+	for _, e in ipairs(self.axeheldenemies) do
+		local v = e.obj
+		if not (v.delete or v.dead or v.shot) then
 			v.active = e.active
 			v.gravity = e.gravity
 			v.speedx = 0
 			v.speedy = 0
-			e.released = true
+			
+			local hasgravity = v.active and (not v.static) and (not v.ignoregravity) and v.gravity ~= 0
+			if hasgravity and v.width and v.height and not axeenemysupported(v) then
+				anyfalls = true
+			end
 		end
 	end
+	return anyfalls
 end
 
 --the only fields an enemy keeps from its own update while it's held: everything about how it looks, nothing about what it does
@@ -9392,25 +9415,8 @@ function mario:axeanimateenemies(dt)
 	end
 end
 
-function mario:axeanyenemyfalling()
-	for _, e in ipairs(self.axeheldenemies) do
-		local v = e.obj
-		if v.active and (not v.delete) and v.speedy and v.y then
-			if self.axebridgetop then
-				--sank half a block below where the bridge was
-				if v.speedy > 0 and v.y + (v.height or 1) > self.axebridgetop - 0.5 then
-					return true
-				end
-			elseif v.speedy > 2 then
-				return true
-			end
-		end
-	end
-	return false
-end
-
---an enemy fell through the gap (or there was nothing to fall): the music stops, the axe player drops,
---and the walk starts beforeaxeplaytime later. bowserfall only plays when an enemy really fell
+--the enemies were made to fall (or there were none): the music stops, the axe player drops,
+--and the walk starts beforeaxeplaytime later. bowserfall only plays when an enemy really falls
 function mario:axeenemiesfell(fallsound)
 	stopmusic()
 	if fallsound then

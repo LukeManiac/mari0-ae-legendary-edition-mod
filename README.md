@@ -793,9 +793,9 @@ Grabbing the axe at the end of a castle now plays a new cutscene. Every new timi
 * Then the bridge breaks one block at a time, at the same speed as before. It always breaks now, even when there's no boss or the boss was already beaten with fireballs. Before, the cutscene skipped straight to the walk in that case.
 * Every enemy stops where it is as soon as the axe is grabbed, not just Bowser. This covers built-in and custom enemies. Enemies with `resistseverything` or `resistsenemykill` aren't affected: once the freeze is over, they carry on like normal.
 * The stopped enemies don't walk, shoot or jump any more. From the moment the bridge starts breaking, they play their normal animation `enemycastlefallanimspeed` times faster (2 by default), instead of only Bowser tapping his feet. Anything their animation would spawn or play is taken straight back out.
-* Once the last block is gone, the stopped enemies turn to face the player who grabbed the axe, and fall if there's nothing under them.
-* If any of them falls through the gap, the music stops and `bowserfallsound` plays. An enemy counts once it's half a block below where the bridge was.
-* If there are no stopped enemies, or none of them falls within `axefallchecktime` seconds (0.2), the cutscene carries on as if one had fallen: the music stops and everything below happens the same way, just without `bowserfallsound`.
+* Once the last block is gone, the stopped enemies turn to face the player who grabbed the axe and stay completely still, still playing their sped-up animation.
+* `beforeenemyfalltime` seconds (1) later, they're made to fall: they get gravity back, so anything with nothing under it drops. The game checks straight away whether any of them has nothing under it, and if one does, `bowserfallsound` plays on that same frame. Players under an enemy don't count as something to stand on.
+* Either way, the music stops at that moment. With no stopped enemies, or none of them falling, everything below happens the same way, just without `bowserfallsound`.
 * At that moment, the player who grabbed the axe can move again, but their controls stay off. Their speed goes to 0 and any jump stops, so they drop straight down if they were in the air. Other players aren't affected.
 * `turnafteraxeland` seconds (0.25) after that player lands, they turn to face left.
 * `beforeaxeplaytime` seconds (1) after that, the player walks to the end of the course and the course end sound plays, like before. Toad's lines show at the same times as before, counted from the start of the walk.
@@ -808,9 +808,9 @@ Grabbing the axe at the end of a castle now plays a new cutscene. Every new timi
 * `axefreezetimer` is how long the freeze has left. While it's set, `game_update` only updates the player who grabbed the axe.
 * `mario:axedeleteoffscreenenemies()` deletes every enemy that isn't on screen when the axe is grabbed, the same way the game deletes objects.
 * `mario:axeholdenemies()` stops every enemy for the cutscene and marks it `axeheld`. `game_update` doesn't run the update of an enemy marked `axeheld`, so it only has physics left.
-* `mario:axereleaseenemies()` turns the stopped enemies to face the player and gives them their physics back. `axefacingreversed` lists the built-in enemies whose sprites face right by default, so they're turned the other way.
+* `mario:axefaceenemies()` turns the stopped enemies to face the player and stops them moving. `axefacingreversed` lists the built-in enemies whose sprites face right by default, so they're turned the other way.
 * `mario:axeanimateenemies(dt)` runs every stopped enemy's own update at `enemycastlefallanimspeed` times the speed, then puts back everything except the fields in `axeanimfields` (`quad`, `frame`, `animationtimer` and so on). Sounds are muted while it runs, and anything spawned is removed. An enemy whose animation uses another field needs that field added to `axeanimfields`.
-* `mario:axeanyenemyfalling()` says whether one of the stopped enemies is falling through the gap.
+* `mario:axedropenemies()` gives the stopped enemies their gravity back and returns `true` if any of them has nothing under it, so it's about to fall. It checks with `checkrect` just under each enemy, using the enemy's own collision mask.
 * `mario:axeenemiesfell(fallsound)` stops the music, plays `bowserfallsound` if `fallsound` is `true`, and starts the wait before the walk.
 * `mario:axeenableplayer()` gives the axe player their physics back without controls, and `mario:axeplayerlanding(dt)` turns them left once they've landed.
 * `mario:axestartcastle()` starts the walk and the course end sound.
