@@ -1690,7 +1690,8 @@ function mario:update(dt)
 
 		--2. "bridge": the game runs again, the bridge goes one block (column) at a time
 		if self.axephase == "bridge" then
-			self:axetapfeet(dt)
+			--every held enemy plays its normal animation, enemycastlefallanimspeed times faster (see axeanimateenemies)
+			self:axeanimateenemies(dt)
 			self.animationtimer2 = self.animationtimer2 + dt
 			while self.axephase == "bridge" and self.animationtimer2 > castleanimationbridgedisappeardelay do
 				self.animationtimer2 = self.animationtimer2 - castleanimationbridgedisappeardelay
@@ -1725,19 +1726,17 @@ function mario:update(dt)
 			return
 		end
 
-		--from here on the released enemies play their normal animation, enemycastlefallanimspeed times faster
+		--held enemies keep playing their normal animation, enemycastlefallanimspeed times faster
 		self:axeanimateenemies(dt)
 
 		--3. "waitfall": did anything drop through the gap?
 		if self.axephase == "waitfall" then
 			self.axetimer = self.axetimer + dt
 			if self:axeanyenemyfalling() then
-				playsound(bowserfallsound)
-				self.axephase = "afterfall"
-				self.axetimer = 0
-				self:axeenableplayer()
-			elseif self.axetimer >= axefallchecktime then
-				self:axestartcastle()
+				self:axeenemiesfell(true)
+			elseif #self.axeheldenemies == 0 or self.axetimer >= axefallchecktime then
+				--no enemies, or none of them fell: same as if one did, just without bowserfall
+				self:axeenemiesfell(false)
 			end
 			return
 		end
@@ -9182,8 +9181,7 @@ function mario:axe()
 		objects["platform"][i] = nil
 	end
 
-	--axe disappears (axex = false below), music stops, grab sound
-	stopmusic()
+	--axe disappears (axex = false below), grab sound. The music keeps playing until an enemy falls (see axeenemiesfell)
 	playsound(grabsound)
 	self.static = false
 	self.animation = "axe"
@@ -9213,11 +9211,11 @@ function mario:axe()
 	self.axeforgivedistance = 2 --how far the axe can be away from the bridge and still destroy it
 	self.axebridgetop = nil --highest bridge row removed, to tell if an enemy fell through the gap
 	self.axetimer = 0
-	self.axetaptimer = 0
 	self.axescorering = false
 	self.axeaftercastletimer = 0
 	objects["screenboundary"]["axe"] = nil
 
+	self:axedeleteoffscreenenemies()
 	self:axeholdenemies()
 
 	--freeze the whole game (see game_update)
@@ -9233,27 +9231,67 @@ local axefacingreversed = {
 	core = true, plant = true, koopaling = true, hammerbro = true
 }
 
---stop every enemy in place for the axe cutscene. Their AI is off from now on (see axeheld in game_update)
---resistseverything / resistsenemykill enemies are left alone and keep doing their thing
-function mario:axeholdenemies()
-	self.axeheldenemies = {}
+--names of every object table that holds enemies, built-in and custom
+local function axeenemykeys()
 	local keys = {"enemy", "bowser", "koopaling", "boomboom"}
 	for i = 1, #enemies do
 		table.insert(keys, enemies[i])
 	end
-
+	local list = {}
 	local done = {}
 	for _, name in ipairs(keys) do
 		if (not done[name]) and objects[name] then
 			done[name] = true
-			for j, v in pairs(objects[name]) do
-				if not (v.resistseverything or v.resistsenemykill or v.shot or v.dead or v.delete) then
-					table.insert(self.axeheldenemies, {obj = v, kind = name, active = v.active, gravity = v.gravity})
-					v.axeheld = true
-					v.active = false
-					v.speedx = 0
-					v.speedy = 0
-				end
+			table.insert(list, name)
+		end
+	end
+	return list
+end
+
+--axe grabbed: every enemy that isn't on screen is deleted straight away, resistseverything / resistsenemykill ones too
+function mario:axedeleteoffscreenenemies()
+	for _, name in ipairs(axeenemykeys()) do
+		local t = objects[name]
+		local gone = {}
+		for j, v in pairs(t) do
+			if (not v.delete) and not onscreenobj(v) then
+				table.insert(gone, {key = j, obj = v})
+			end
+		end
+		
+		--numbered slots go from the highest down, so table.remove doesn't shift the ones still to go
+		table.sort(gone, function(a, b)
+			if type(a.key) == "number" and type(b.key) == "number" then
+				return a.key > b.key
+			end
+			return type(a.key) == "number"
+		end)
+		for _, g in ipairs(gone) do
+			g.obj.delete = true
+			if g.obj.autodeleted then
+				g.obj:autodeleted()
+			end
+			if type(g.key) == "number" and g.key <= #t then
+				table.remove(t, g.key)
+			else
+				t[g.key] = nil
+			end
+		end
+	end
+end
+
+--stop every enemy in place for the axe cutscene. Their AI is off from now on (see axeheld in game_update)
+--resistseverything / resistsenemykill enemies are left alone and keep doing their thing
+function mario:axeholdenemies()
+	self.axeheldenemies = {}
+	for _, name in ipairs(axeenemykeys()) do
+		for j, v in pairs(objects[name]) do
+			if not (v.resistseverything or v.resistsenemykill or v.shot or v.dead or v.delete) then
+				table.insert(self.axeheldenemies, {obj = v, kind = name, active = v.active, gravity = v.gravity})
+				v.axeheld = true
+				v.active = false
+				v.speedx = 0
+				v.speedy = 0
 			end
 		end
 	end
@@ -9297,7 +9335,7 @@ local axeanimskipobjects = {
 	clearpipesegment = true, pixeltile = true, player = true
 }
 
---run each released enemy's own update at enemycastlefallanimspeed times the speed, then undo everything except its animation:
+--run each held enemy's own update at enemycastlefallanimspeed times the speed, then undo everything except its animation:
 --position, speed, facing, timers, AI state, sounds and anything it spawned are all rolled back
 function mario:axeanimateenemies(dt)
 	if not self.axeheldenemies then
@@ -9320,7 +9358,7 @@ function mario:axeanimateenemies(dt)
 	soundenabled = false
 	for _, e in ipairs(self.axeheldenemies) do
 		local v = e.obj
-		if e.released and v.update and not (v.delete or v.dead or v.shot) then
+		if v.update and not (v.delete or v.dead or v.shot) then
 			local saved = {}
 			for k, val in pairs(v) do
 				saved[k] = val
@@ -9371,24 +9409,16 @@ function mario:axeanyenemyfalling()
 	return false
 end
 
---bowser taps his feet while the bridge breaks
-function mario:axetapfeet(dt)
-	self.axetaptimer = self.axetaptimer + dt
-	local frame = round(math.fmod(self.axetaptimer, castleanimationbowserframedelay*2)*(1/(castleanimationbowserframedelay*2)))+1
-	for _, e in ipairs(self.axeheldenemies) do
-		local v = e.obj
-		if e.kind == "bowser" and not (v.delete or v.shot) then
-			v.walkframe = frame
-			local set = 1
-			if v.e then
-				set = 2
-			end
-			local fireframe = v.fireframe or 1
-			if bowserquad[set] and bowserquad[set][fireframe] then
-				v.quad = bowserquad[set][fireframe][frame]
-			end
-		end
+--an enemy fell through the gap (or there was nothing to fall): the music stops, the axe player drops,
+--and the walk starts beforeaxeplaytime later. bowserfall only plays when an enemy really fell
+function mario:axeenemiesfell(fallsound)
+	stopmusic()
+	if fallsound then
+		playsound(bowserfallsound)
 	end
+	self.axephase = "afterfall"
+	self.axetimer = 0
+	self:axeenableplayer()
 end
 
 --enemies started falling: the axe player gets physics back (falls if in the air) but no controls

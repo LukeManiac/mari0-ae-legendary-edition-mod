@@ -787,15 +787,18 @@ A new nitpick, `mariomakerblockphysics`. **Generate Nitpicks File** adds it to a
 
 Grabbing the axe at the end of a castle now plays a new cutscene. Every new timing is in `variables.lua`.
 
-* The axe disappears, the music stops and `grabsound` plays.
+* The axe disappears and `grabsound` plays. The music keeps going.
+* Every enemy that isn't on screen is deleted straight away, including ones with `resistseverything` or `resistsenemykill`.
 * Everything in the course freezes for `beforebridgebreaktime` seconds (0.5 by default). Nothing moves or animates except the cutscene.
-* Then the bridge breaks one block at a time, at the same speed as before, while Bowser taps his feet. It always breaks now, even when there's no boss or the boss was already beaten with fireballs. Before, the cutscene skipped straight to the walk in that case.
+* Then the bridge breaks one block at a time, at the same speed as before. It always breaks now, even when there's no boss or the boss was already beaten with fireballs. Before, the cutscene skipped straight to the walk in that case.
 * Every enemy stops where it is as soon as the axe is grabbed, not just Bowser. This covers built-in and custom enemies. Enemies with `resistseverything` or `resistsenemykill` aren't affected: once the freeze is over, they carry on like normal.
-* Once the last block is gone, the stopped enemies turn to face the player who grabbed the axe, and fall if there's nothing under them. They don't walk, shoot or jump any more, but they play their normal animation `enemycastlefallanimspeed` times faster (2 by default). Anything their animation would spawn or play is taken straight back out.
-* If any of them falls through the gap, `bowserfallsound` plays. An enemy counts once it's half a block below where the bridge was. If none of them falls within `axefallchecktime` seconds (0.2), the cutscene goes straight to the walk.
-* As soon as an enemy falls, the player who grabbed the axe can move again, but their controls stay off. Their speed goes to 0 and any jump stops, so they drop straight down if they were in the air. Other players aren't affected.
+* The stopped enemies don't walk, shoot or jump any more. From the moment the bridge starts breaking, they play their normal animation `enemycastlefallanimspeed` times faster (2 by default), instead of only Bowser tapping his feet. Anything their animation would spawn or play is taken straight back out.
+* Once the last block is gone, the stopped enemies turn to face the player who grabbed the axe, and fall if there's nothing under them.
+* If any of them falls through the gap, the music stops and `bowserfallsound` plays. An enemy counts once it's half a block below where the bridge was.
+* If there are no stopped enemies, or none of them falls within `axefallchecktime` seconds (0.2), the cutscene carries on as if one had fallen: the music stops and everything below happens the same way, just without `bowserfallsound`.
+* At that moment, the player who grabbed the axe can move again, but their controls stay off. Their speed goes to 0 and any jump stops, so they drop straight down if they were in the air. Other players aren't affected.
 * `turnafteraxeland` seconds (0.25) after that player lands, they turn to face left.
-* `beforeaxeplaytime` seconds (1) after `bowserfallsound`, the player walks to the end of the course and the course end sound plays, like before. Toad's lines show at the same times as before, counted from the start of the walk.
+* `beforeaxeplaytime` seconds (1) after that, the player walks to the end of the course and the course end sound plays, like before. Toad's lines show at the same times as before, counted from the start of the walk.
 * `aftercastleendtime` seconds (2) after the course end sound finishes, `scoreringsound` plays and the time left is added to the score, the same way as at the flagpole. The next course loads as soon as it's done, or straight away if there's no time left.
 * Falling into water during the cutscene, or walking through an underwater castle, now uses underwater physics: water gravity, slowed speed and the underwater walking speed. Before, the player fell as if there were no water.
 * The final castle's ending (the princess's lines and pressing a button to finish) is the same as before.
@@ -803,15 +806,16 @@ Grabbing the axe at the end of a castle now plays a new cutscene. Every new timi
 #### 🧱 Axe Cutscene Functions
 
 * `axefreezetimer` is how long the freeze has left. While it's set, `game_update` only updates the player who grabbed the axe.
+* `mario:axedeleteoffscreenenemies()` deletes every enemy that isn't on screen when the axe is grabbed, the same way the game deletes objects.
 * `mario:axeholdenemies()` stops every enemy for the cutscene and marks it `axeheld`. `game_update` doesn't run the update of an enemy marked `axeheld`, so it only has physics left.
 * `mario:axereleaseenemies()` turns the stopped enemies to face the player and gives them their physics back. `axefacingreversed` lists the built-in enemies whose sprites face right by default, so they're turned the other way.
 * `mario:axeanimateenemies(dt)` runs every stopped enemy's own update at `enemycastlefallanimspeed` times the speed, then puts back everything except the fields in `axeanimfields` (`quad`, `frame`, `animationtimer` and so on). Sounds are muted while it runs, and anything spawned is removed. An enemy whose animation uses another field needs that field added to `axeanimfields`.
 * `mario:axeanyenemyfalling()` says whether one of the stopped enemies is falling through the gap.
+* `mario:axeenemiesfell(fallsound)` stops the music, plays `bowserfallsound` if `fallsound` is `true`, and starts the wait before the walk.
 * `mario:axeenableplayer()` gives the axe player their physics back without controls, and `mario:axeplayerlanding(dt)` turns them left once they've landed.
 * `mario:axestartcastle()` starts the walk and the course end sound.
 * `mario:axewaterphysics()` switches the axe player to underwater physics and back.
-* `mario:axetapfeet(dt)` makes Bowser tap his feet while the bridge breaks.
-* `castleanimationchaindisappear` and `castleanimationnextlevel` are no longer used.
+* `castleanimationchaindisappear`, `castleanimationbowserframedelay` and `castleanimationnextlevel` are no longer used.
 
 #### ⌨️ Text Input Keys
 
