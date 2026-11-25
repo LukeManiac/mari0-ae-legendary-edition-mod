@@ -9545,8 +9545,8 @@ end
 --the enemies were made to fall (or there were none): the music stops, and the walk starts beforeaxeplaytime later.
 --bowserfall only plays when an enemy really falls
 function mario:axeenemiesfell(fallsound)
-	stopmusic()
 	if fallsound then
+		stopmusic()
 		playsound(bowserfallsound)
 	end
 	self.axephase = "afterfall"
