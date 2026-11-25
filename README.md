@@ -803,6 +803,7 @@ Grabbing the axe at the end of a castle now plays a new cutscene. Every new timi
 * `beforeaxeplaytime` seconds (1) after that, the player walks to the end of the course and the course end sound plays, like before. Toad's lines show at the same times as before, counted from the start of the walk.
 * `aftercastleendtime` seconds (2) after the course end sound finishes, `scoreringsound` plays and the time left is added to the score, the same way as at the flagpole. The next course loads as soon as it's done, or straight away if there's no time left.
 * Falling into water during the cutscene, or walking through an underwater castle, now uses underwater physics: water gravity, slowed speed and the underwater walking speed. Before, the player fell as if there were no water.
+* Falling in water during the cutscene plays the swim falling animation, the same as falling in water during normal play. Out of water, it's the regular falling animation.
 * The final castle's ending (the princess's lines and pressing a button to finish) is the same as before.
 
 #### 🧱 Axe Cutscene Functions
@@ -823,8 +824,16 @@ Grabbing the axe at the end of a castle now plays a new cutscene. Every new timi
 * `mario:axeenableplayer()` gives the axe player their physics back without controls, and `mario:axeplayerlanding()` puts them in their standing pose once they've landed.
 * `mario:axeturnupdate(dt)` turns the axe player left `turnafteraxeland` seconds after the bridge is gone.
 * `mario:axestartcastle()` starts the walk and the course end sound.
-* `mario:axewaterphysics()` switches the axe player to underwater physics and back.
+* `mario:axewaterphysics()` switches the axe player to underwater physics and back. It runs `mario:cutscenewater()`, then keeps the player at the underwater walking speed at most while in water.
 * `castleanimationchaindisappear`, `castleanimationbowserframedelay` and `castleanimationnextlevel` are no longer used.
+
+#### 🧱 Cutscene Functions
+
+The flag, the axe and animation walks (`mario:animationwalk(dir, speed)`) skip the player's normal update, water check included, so they share these instead:
+
+* `mario:cutscenewater()` is the water check for cutscenes. It dives into and out of water tiles, and gives the player underwater gravity while they're in water: in an underwater course, in a water tile, or in rising water. It returns `true` while the player is in water.
+* `mario:cutscenefall(dt)` plays the falling animation while the player is in the air: the swim falling animation in water, and the regular falling animation out of it. Once they land, it puts them back to running, or standing if they aren't moving. It returns `true` while the player is in the air.
+* `mario:swimanimation(dt)` is the swim animation from `mario:underwatermovement(dt)`, in its own function so cutscenes can use it too.
 
 #### ⌨️ Text Input Keys
 
@@ -869,6 +878,11 @@ Every GUI text input now takes the usual editing keys:
 * The **Maps** tab's right-click menu now pops out with its jelly every time it opens. Before, the animation only played the first time, and every menu after that appeared straight away.
 * The **Maps** tab's right-click menu now animates closing too, instead of vanishing. Like a dropdown's options, it swells a little, then shrinks back into the corner it opened from over 0.2 seconds (`RIGHTCLICK_CLOSETIME`), with its width following its height. It stops taking clicks as soon as it starts closing, and right-clicking another map while it closes opens the new one straight away.
 * While a right-click menu on an entity opens and closes in the Course Maker, the selected tile or entity is no longer drawn at the cursor, fading out and back in with the menu. It shows again once the menu has finished closing.
+* Falling after the flagpole in an underwater course now uses underwater gravity. Before, the player fell as fast as they would out of water. Water tiles and rising water count too.
+* Falling in water after the flagpole or in the axe cutscene now plays the swim falling animation, like normal. Before, the player kept their running or standing pose all the way down.
+* Animation walks (an animation's walk action) only move the walking frames while the player is on the ground. Before, the player kept running in mid-air.
+* Falling during an animation walk now plays the regular falling animation, or the swim falling animation with underwater gravity in water. Before, the walk skipped the water check, so walking into water didn't change anything.
+* Landing after a fall during the flagpole, axe or animation walk cutscenes now puts the player back in their running pose, or their standing pose if they aren't moving. Before, they could stay stuck in their falling pose until the cutscene ended.
 
 ### ✨ Improvements
 

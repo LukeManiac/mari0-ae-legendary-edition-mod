@@ -1322,7 +1322,12 @@ function mario:update(dt)
 				self.speedx = -self.animationmisc[2]
 			end
 		end
-		self:runanimation(dt)
+		self:cutscenewater()
+		--walk frames only change on the ground
+		if not self:cutscenefall(dt) then
+			self.animationstate = "running"
+			self:runanimation(dt)
+		end
 		return
 	elseif self.animation == "pipedown" then
 		local dist = pipeanimationdistancedown
@@ -1585,6 +1590,12 @@ function mario:update(dt)
 		else
 			self.animationtimer = self.animationtimer + dt
 		end
+
+		--walking off after the flag: underwater gravity in water, and the swim / regular falling animation in the air
+		if self.active then
+			self:cutscenewater()
+			self:cutscenefall(dt)
+		end
 		
 		local add = 6
 
@@ -1739,6 +1750,7 @@ function mario:update(dt)
 			self.axetimer = self.axetimer + dt
 			if self.active then
 				self:axewaterphysics()
+				self:cutscenefall(dt)
 			end
 			self:axeplayerlanding()
 			self:axeturnupdate(dt)
@@ -1754,6 +1766,7 @@ function mario:update(dt)
 			self.axetimer = self.axetimer + dt
 			if self.active then
 				self:axewaterphysics()
+				self:cutscenefall(dt)
 			end
 			self:axeplayerlanding()
 			self:axeturnupdate(dt)
@@ -3543,6 +3556,35 @@ function mario:runanimation(dt, speed, animationspeed)
 	self:setquad()
 end
 
+--swim animation while in the air underwater (also used by cutscenes, see cutscenefall)
+function mario:swimanimation(dt)
+	if self.animationstate == "jumping" or self.animationstate == "falling" and not self.float then
+		self.swimanimationprogress = self.swimanimationprogress + self.characterdata.runanimationspeed*dt
+		while self.swimanimationprogress >= 3 do
+			self.swimanimationprogress = self.swimanimationprogress - 2
+		end
+		self.swimframe = math.floor(self.swimanimationprogress)
+	end
+	if self.swimpush then
+		local i = math.floor((self.swimpush-1)%3+1)
+		if i == 1 then
+			self.swimframe = math.floor(self.swimanimationprogress)
+		elseif i == 2 then
+			self.swimframe = 2+math.floor(self.swimanimationprogress)
+		else
+			if self.characterdata.swimpushframes >= 2 then
+				self.swimframe = 4+math.floor(self.swimanimationprogress)
+			else
+				self.swimframe = 5
+			end
+		end
+		self.swimpush = self.swimpush + self.characterdata.runanimationspeed*dt
+		if self.swimpush >= 7 then
+			self.swimpush = false
+		end
+	end
+end
+
 function mario:underwatermovement(dt)
 	local runningkey = runkey(self.playernumber)
 	local mariojumpkey = jumpkey(self.playernumber)
@@ -3567,32 +3609,7 @@ function mario:underwatermovement(dt)
 	end
 
 	if self.jumping or self.falling then
-		--Swim animation
-		if self.animationstate == "jumping" or self.animationstate == "falling" and not self.float then
-			self.swimanimationprogress = self.swimanimationprogress + self.characterdata.runanimationspeed*dt
-			while self.swimanimationprogress >= 3 do
-				self.swimanimationprogress = self.swimanimationprogress - 2
-			end
-			self.swimframe = math.floor(self.swimanimationprogress)
-		end
-		if self.swimpush then
-			local i = math.floor((self.swimpush-1)%3+1)
-			if i == 1 then
-				self.swimframe = math.floor(self.swimanimationprogress)
-			elseif i == 2 then
-				self.swimframe = 2+math.floor(self.swimanimationprogress)
-			else
-				if self.characterdata.swimpushframes >= 2 then
-					self.swimframe = 4+math.floor(self.swimanimationprogress)
-				else
-					self.swimframe = 5
-				end
-			end
-			self.swimpush = self.swimpush + self.characterdata.runanimationspeed*dt
-			if self.swimpush >= 7 then
-				self.swimpush = false
-			end
-		end
+		self:swimanimation(dt)
 	else
 		--Run animation
 		if self.animationstate == "running" then
@@ -9622,6 +9639,16 @@ end
 
 --underwater physics during the castle walk (water level, or falling into water tiles)
 function mario:axewaterphysics()
+	if self:cutscenewater() then
+		if self.speedx > self.characterdata.uwmaxwalkspeed then
+			self.speedx = self.characterdata.uwmaxwalkspeed
+		end
+	end
+end
+
+--cutscenes (flag, axe, animationwalk) skip the water check in update, so they use this one:
+--dives in and out of water tiles, and gives underwater gravity while in water. Returns true when in water
+function mario:cutscenewater()
 	local inwater = underwater
 	if not inwater then
 		local x = math.floor(self.x+self.width/2)+1
@@ -9636,13 +9663,44 @@ function mario:axewaterphysics()
 			self:dive(true)
 		end
 		self.gravity = self.characterdata.uwyacceleration
-		if self.speedx > self.characterdata.uwmaxwalkspeed then
-			self.speedx = self.characterdata.uwmaxwalkspeed
-		end
 	elseif self.water then
-		self:dive(false)
-		self.gravity = self.characterdata.yacceleration
+		if self.swimwing or self.risingwater then
+			inwater = true
+			self.gravity = self.characterdata.uwyacceleration
+		else
+			self:dive(false)
+		end
 	end
+	self.risingwater = false
+
+	return inwater
+end
+
+--falling during a cutscene: in water it's the swim falling animation, out of water it's the regular falling animation.
+--Landing goes back to running (idle when standing still). Returns true while in the air
+function mario:cutscenefall(dt)
+	if self.falling or self.jumping then
+		if self.water then
+			if self.animationstate == "running" or self.animationstate == "idle" then
+				self.animationstate = "falling"
+			end
+			self:swimanimation(dt)
+		elseif self.animationstate == "running" then
+			self.animationstate = "falling"
+		end
+		self:setquad()
+		return true
+	end
+
+	if self.animationstate == "falling" or self.animationstate == "jumping" then
+		if self.speedx == 0 then
+			self.animationstate = "idle"
+		else
+			self.animationstate = "running"
+		end
+		self:setquad()
+	end
+	return false
 end
 
 function mario:vineanimation()
