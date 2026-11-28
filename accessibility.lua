@@ -553,6 +553,7 @@ function accessibility_pitrescue(p)
 
 	--the same bounce as stomping an enemy with jump held in mario maker physics (mario:stompbounce), for every physics
 	local grav = p.gravity or yacceleration
+	playsound(bumperjumpsound)
 	p.speedy = -math.sqrt(2*grav*bounceheighthigh)
 	--always the jump-held bounce, held or not: only letting go of jump during it cuts it (see accessibility_pitjumpcut)
 	p.jumping = true
