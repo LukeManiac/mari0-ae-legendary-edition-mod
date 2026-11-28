@@ -416,6 +416,8 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
 
 ### ✨ Improvements
 
+* The mappack menu's tabs (**local**, **dlc**, **daily challenge** and **minigames**) are now buttons, in the same places and the same sizes as before. They're liquid glass like every other button, lean towards the mouse, and squash and wobble with a jelly when clicked. The open tab is a white pane with black text and a lit rim, like the old selected tab. Clicking a tab still slides to its page, and Left and Right (or A and D) still switch tabs. Clicking the tab that's already open does nothing.
+* For anyone working with the menu code: `MAPPACKTABS` holds each tab's text, position and width, `mappacktab_select(i)` opens tab `i` (0 to 3), and `mappacktabbuttons_draw()`, `mappacktabbuttons_click(x, y, button)` and `mappacktabbuttons_unclick(x, y)` run the buttons.
 * The world selection popup no longer draws worlds the mappack doesn't have (with no `N-1.txt` course) in black. Their spot is left empty, so the other worlds stay where they were. Worlds that exist but haven't been reached are still drawn in dark grey.
 
 ### 🐛 Bug Fixes

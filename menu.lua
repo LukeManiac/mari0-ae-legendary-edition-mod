@@ -2261,6 +2261,7 @@ function menu_load()
 	openmappacksbutton.active = false
 	opendlcbutton = guielement:new("button", 241, 190, "open dlc folder", opendlcfolder, nil, 0, 2.5, 147, true)
 	opendlcbutton.active = false
+	mappacktabbuttons_create()
 	mappacksearchbar = guielement:new("input", 240, 16, 15, searchmappacks, "", 100, nil, nil, 0)
 	mappacksearchbar.active = false
 	oldmappacksearchtable = {}
@@ -4022,42 +4023,7 @@ function menu_draw()
 		love.graphics.setScissor()
 		
 		--draw tabs
-		local colors = {}
-		for i = 0, 3 do
-			if mappackhorscroll == i then
-				colors[i] = {{255, 255, 255}, {0, 0, 0}}
-			else
-				colors[i] = {{0, 0, 0}, {255, 255, 255}}
-			end
-		end
-		--local
-		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", 22*scale, 3*scale, 44*scale, 13*scale)
-		love.graphics.setColor(colors[0][1])
-		love.graphics.rectangle("fill", 23*scale, 4*scale, 42*scale, 11*scale)
-		love.graphics.setColor(colors[0][2])
-		properprint("local", 23*scale, 6*scale)
-		--dlc
-		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", 70*scale, 3*scale, 29*scale, 13*scale)
-		love.graphics.setColor(colors[1][1])
-		love.graphics.rectangle("fill", 71*scale, 4*scale, 27*scale, 11*scale)
-		love.graphics.setColor(colors[1][2])
-		properprint("dlc", 72*scale, 6*scale)
-		--daily challenge
-		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", 103*scale, 3*scale, 125*scale, 13*scale)
-		love.graphics.setColor(colors[2][1])
-		love.graphics.rectangle("fill", 104*scale, 4*scale, 123*scale, 11*scale)
-		love.graphics.setColor(colors[2][2])
-		properprint("daily challenge", 105*scale, 6*scale)
-		--minigames
-		love.graphics.setColor(0, 0, 0)
-		love.graphics.rectangle("fill", 232*scale, 3*scale, 77*scale, 13*scale)
-		love.graphics.setColor(colors[3][1])
-		love.graphics.rectangle("fill", 233*scale, 4*scale, 75*scale, 11*scale)
-		love.graphics.setColor(colors[3][2])
-		properprint("minigames", 234*scale, 6*scale)
+		mappacktabbuttons_draw()
 		
 		--an open minigame settings dropdown goes over the tabs
 		if mappacktype == "minigames" then
@@ -4328,6 +4294,76 @@ function onlineupdatescroll()
 		else
 			onlinemappackscroll = onlinemappackselection-3.233
 		end
+	end
+end
+
+--the mappack menu's tabs (local, dlc, daily challenge, minigames) are buttons, in the same places as the old tabs:
+--{x, width} in game pixels, a button's box is 5 pixels wider than its width (3 + a pixel of space on each side)
+MAPPACKTABS = {
+	{text = "local", x = 22, width = 39},
+	{text = "dlc", x = 70, width = 24},
+	{text = "daily challenge", x = 103, width = 120},
+	{text = "minigames", x = 232, width = 72},
+}
+
+--switches the mappack menu to tab i (0 local, 1 dlc, 2 daily challenge, 3 minigames), like clicking the old tabs did
+function mappacktab_select(i)
+	if mappackhorscroll == i then
+		return
+	end
+	mappackhorscroll = i
+	openmappacksbutton.active = false
+	opendlcbutton.active = false
+	mappacks()
+end
+
+function mappacktabbuttons_create()
+	mappacktabbuttons = {}
+	for n, tab in ipairs(MAPPACKTABS) do
+		local i = n-1
+		local b = guielement:new("button", tab.x, 3, tab.text, mappacktab_select, 1, {i}, 1, tab.width)
+		b.tabindex = i
+		mappacktabbuttons[n] = b
+	end
+end
+
+--the open tab looks like the old selected tab: a white pane with black text, and its rim lit
+local function mappacktabbuttons_setstyle()
+	for _, b in ipairs(mappacktabbuttons) do
+		local selected = mappackhorscroll == b.tabindex
+		if selected then
+			b.fillcolor = {255, 255, 255}
+			b.textcolor = {0, 0, 0}
+			b.tintstrength = 0.85
+		else
+			b.fillcolor = {0, 0, 0}
+			b.textcolor = {255, 255, 255}
+			b.tintstrength = nil
+		end
+		b.forcehover = selected
+	end
+end
+
+function mappacktabbuttons_draw()
+	mappacktabbuttons_setstyle()
+	for _, b in ipairs(mappacktabbuttons) do
+		b:draw()
+	end
+end
+
+--true if a tab took the click
+function mappacktabbuttons_click(x, y, button)
+	for _, b in ipairs(mappacktabbuttons) do
+		if b:click(x, y, button) then
+			return true
+		end
+	end
+	return false
+end
+
+function mappacktabbuttons_unclick(x, y)
+	for _, b in ipairs(mappacktabbuttons) do
+		b:unclick(x, y)
 	end
 end
 
@@ -5443,23 +5479,8 @@ function menu_mousepressed(x, y, button)
 		elseif button == "wd" then
 			menu_keypressed("down")
 		elseif button == "l" then
-			if y > 4*scale and y < 15*scale then --tab buttons
-				local oldmappackhorscroll = mappackhorscroll
-				if x > 23*scale and x < 65*scale then
-					mappackhorscroll = 0
-				elseif x > 71*scale and x < 98*scale then
-					mappackhorscroll = 1
-				elseif x > 103*scale and x < 225*scale then
-					mappackhorscroll = 2
-				elseif x > 233*scale and x < 308*scale then
-					mappackhorscroll = 3
-				end
-				if oldmappackhorscroll ~= mappackhorscroll then
-					openmappacksbutton.active = false
-					opendlcbutton.active = false
-					mappacks()
-					return
-				end
+			if mappacktabbuttons_click(x, y, button) then --tab buttons
+				return
 			end
 			if mappacktype == "minigames" then
 				if minigame_menu_mousepressed(x, y, button) then
@@ -5525,6 +5546,7 @@ function menu_mousereleased(x, y, button)
 		mouseonselecthold = false
 	elseif gamestate == "mappackmenu" then
 		mappackgui_mousereleased(x, y)
+		mappacktabbuttons_unclick(x, y)
 		mappacksearchbar:unclick(x, y)
 		if mappacktype == "minigames" then
 			minigame_menu_mousereleased(x, y, button)
