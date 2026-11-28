@@ -2194,6 +2194,7 @@ end
 local function wheelduration(distance)
 	return math.min(math.sqrt(math.abs(distance)*scale), WHEEL_DURATION_MAX)/WHEEL_DURATION_DIVISOR
 end
+gui_wheelduration = wheelduration --for lists outside the gui that scroll the same way (the mappack menu)
 
 function guielement:wheelscroll(button)
 	if not (self.cutoff and self.scrollbar) then

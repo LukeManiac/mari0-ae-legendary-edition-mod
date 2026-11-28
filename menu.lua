@@ -3284,7 +3284,7 @@ function mappackgui_scrollbar(kind)
 	if not gui.scrollbar then
 		--scrollbar(x, y, range, width, height, start, dir)
 		local scrollbar = guielement:new("scrollbar", 227, MAPPACKFRAME_TOP, 192, 8, 32, 0, "ver")
-		scrollbar.scrollstepdisabled = true --the wheel moves the selection instead
+		scrollbar.scrollstepdisabled = true --the wheel is handled for the whole list instead (mappackgui_wheel)
 		scrollbar.updatefunc = function(self, value)
 			if mappackgui_scrollrange(kind) <= 0 then
 				self.value = 0
@@ -3321,6 +3321,7 @@ end
 
 function mappackgui_update(dt)
 	for _, kind in ipairs({"local", "online", "minigames"}) do
+		mappackgui_updatewheel(kind) --the mouse wheel's slide, like a web page
 		local gui = mappackgui[kind]
 		if gui and gui.scrollbar then
 			local scrollbar = gui.scrollbar
@@ -3376,6 +3377,120 @@ function mappackgui_mousereleased(x, y)
 		for _, frame in pairs(gui.frames) do
 			frame:unclick(x, y)
 		end
+	end
+end
+
+--sets where a list is scrolled to (in frames), straight away, with nothing easing after it
+local function mappackgui_setscroll(kind, scroll)
+	if kind == "online" then
+		onlinemappackscroll = scroll
+		onlinemappackscrollsmooth = scroll
+	elseif kind == "minigames" then
+		minigamescroll = scroll
+		minigamescrollsmooth = scroll
+	else
+		mappackscroll = scroll
+		mappackscrollsmooth = scroll
+	end
+end
+
+--while the wheel scrolls a list, the frame under the mouse is the selected one, the way hovering works on a web page.
+--with the mouse off the list, the selection is kept on a frame that's in full view
+local function mappackgui_followmouse(kind)
+	local n, sel, scroll = mappackgui_vars(kind)
+	if n <= 0 then
+		return
+	end
+	local low, high = math.ceil(1+scroll-1e-6), math.floor(3+scroll+1e-6)
+	if not android then
+		local x, y = love.mouse.getPosition()
+		local first, last = mappackgui_layout(kind)
+		for i = first, last do
+			--picking a minigame scrolls its frame into full view (minigame_updatescroll), which would jerk the list
+			--mid-slide, so only a minigame in full view follows the mouse
+			if mappackgui_frame(kind, i):inhighlight(x, y) and (kind ~= "minigames" or (i >= low and i <= high)) then
+				if i ~= sel then
+					mappackgui_select(kind, i)
+				end
+				return
+			end
+		end
+	end
+	local clamped = math.max(1, math.min(n, math.max(low, math.min(high, sel))))
+	if clamped ~= sel then
+		mappackgui_select(kind, clamped)
+	end
+end
+
+--mouse wheel on a list: scrolls it the way a web browser does, the same as the editor's lists and long dropdowns
+--(see guielement:wheelscroll in gui.lua). Every notch moves the list DROPDOWN_WHEEL_PIXELS screen pixels (less with a
+--fine scrolling wheel or a touchpad), sliding there on cubic-bezier(0.42, 0, 0.58, 1) over sqrt(screen pixels)/60
+--seconds, at most 0.2. A notch that comes in mid-slide moves the target further and carries on at the slide's speed.
+--returns true if the page has a list to scroll
+function mappackgui_wheel(button)
+	local kind = mappackgui_kind()
+	if not kind then
+		return false
+	end
+	local gui = mappackgui_get(kind)
+	local range = mappackgui_scrollrange(kind)
+	if range <= 0 or mappackgui_scrollbar(kind).dragging then
+		return true
+	end
+	local frames = (mousewheelamount or 1)*DROPDOWN_WHEEL_PIXELS/scale/MAPPACKFRAME_SPACING --screen pixels to frames
+	if button == "wu" then
+		frames = -frames
+	end
+	local now = love.timer.getTime()
+	local _, _, scroll, smooth = mappackgui_vars(kind)
+	local anim = gui.wheelanim
+	if anim and scroll ~= anim.lastscroll then
+		anim = nil --something else (the keyboard, the scrollbar) moved the list since
+	end
+	local current = smooth
+	local velocity = 0 --frames per second
+	if anim then
+		local a = gui_wheelanimposition(anim, now - 0.001)
+		local b = gui_wheelanimposition(anim, now)
+		current = b
+		velocity = (b-a)/0.001
+	end
+	local target = math.max(0, math.min(range, ((anim and anim.to) or current) + frames))
+	local delta = target - current
+	if math.abs(delta) < 1e-4 then
+		return true --already at the end
+	end
+	local duration = gui_wheelduration(delta*MAPPACKFRAME_SPACING)
+	local slope = math.max(-1000, math.min(1000, velocity*duration/delta))
+	gui.wheelanim = {from = current, to = target, start = now, duration = duration, y1 = 0.42*slope, lastscroll = current}
+	mappackgui_setscroll(kind, current) --the list is where the slide starts, with nothing else easing it
+	return true
+end
+
+--moves a list along its wheel slide (mappackgui_update runs it every frame)
+function mappackgui_updatewheel(kind)
+	local gui = mappackgui[kind]
+	local anim = gui and gui.wheelanim
+	if not anim then
+		return
+	end
+	local _, _, scroll = mappackgui_vars(kind)
+	if mappackgui_kind() ~= kind or (gui.scrollbar and gui.scrollbar.dragging) or scroll ~= anim.lastscroll then
+		gui.wheelanim = nil --another page, the scrollbar or the keyboard took over
+		return
+	end
+	local pos, done = gui_wheelanimposition(anim, love.timer.getTime())
+	pos = math.max(0, math.min(mappackgui_scrollrange(kind), pos))
+	mappackgui_setscroll(kind, pos)
+	anim.lastscroll = pos
+	if done then
+		gui.wheelanim = nil
+	end
+	mappackgui_followmouse(kind)
+	--following the mouse can't move the list (the selection is always kept in full view), but if it ever did, it wins
+	local _, _, after = mappackgui_vars(kind)
+	if after ~= pos then
+		gui.wheelanim = nil
 	end
 end
 
@@ -5474,10 +5589,11 @@ function menu_mousepressed(x, y, button)
 		if mappacktype == "minigames" and (button == "wu" or button == "wd") and minigame_menu_wheel(x, y, button) then
 			return
 		end
-		if button == "wu" then
-			menu_keypressed("up")
-		elseif button == "wd" then
-			menu_keypressed("down")
+		if button == "wu" or button == "wd" then
+			--the local, dlc and minigames lists scroll like a web page; the daily challenge page has no list
+			if not mappackgui_wheel(button) then
+				menu_keypressed(button == "wu" and "up" or "down")
+			end
 		elseif button == "l" then
 			if mappacktabbuttons_click(x, y, button) then --tab buttons
 				return

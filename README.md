@@ -418,6 +418,13 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
 
 * The mappack menu's tabs (**local**, **dlc**, **daily challenge** and **minigames**) are now buttons, in the same places and the same sizes as before. They're liquid glass like every other button, lean towards the mouse, and squash and wobble with a jelly when clicked. The open tab is a white pane with black text and a lit rim, like the old selected tab. Clicking a tab still slides to its page, and Left and Right (or A and D) still switch tabs. Clicking the tab that's already open does nothing.
 * For anyone working with the menu code: `MAPPACKTABS` holds each tab's text, position and width, `mappacktab_select(i)` opens tab `i` (0 to 3), and `mappacktabbuttons_draw()`, `mappacktabbuttons_click(x, y, button)` and `mappacktabbuttons_unclick(x, y)` run the buttons.
+* The mouse wheel now scrolls the mappack menu's **local**, **dlc** and **minigames** lists the way a web page scrolls, the same as the Course Maker's lists and long dropdowns. Before, it moved the selection up and down like the arrow keys.
+  * Every notch moves the list 100 screen pixels (`DROPDOWN_WHEEL_PIXELS`), or less with a fine scrolling wheel or a touchpad. The list slides there on an ease-in-out curve that takes up to 0.2 seconds, and a notch that comes in mid-slide moves the target further and carries on at the speed the list already has.
+  * The list stops at its top and bottom, and the scrollbar follows it.
+  * While the list slides, the frame under the mouse becomes the selected one, like hovering on a web page. With the mouse off the list, the selection stays on a frame in full view. In the minigames list, only a minigame in full view follows the mouse, since picking one scrolls it into full view.
+  * Dragging the scrollbar, or moving with the keyboard, takes over from the wheel straight away.
+  * The minigames' description and highscores still scroll with the wheel when the mouse is over them, and an open dropdown there still keeps the wheel. The daily challenge page has no list, so the wheel still works like Up and Down there.
+  * For anyone working with the menu code: `mappackgui_wheel(button)` scrolls the open page's list, and `gui_wheelduration(distance)` is how long a wheel slide over `distance` game pixels takes.
 * The world selection popup no longer draws worlds the mappack doesn't have (with no `N-1.txt` course) in black. Their spot is left empty, so the other worlds stay where they were. Worlds that exist but haven't been reached are still drawn in dark grey.
 
 ### 🐛 Bug Fixes
