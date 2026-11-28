@@ -6287,7 +6287,7 @@ function game_keypressed(key, textinput)
 				elseif pausemenuselected == pausemenu_rightrow("letterbox") then
 					pausemenu_setletterbox(not letterboxfullscreen)
 				elseif pausemenuselected == pausemenu_a11yrow() then
-					pausemenu_buttonactivate() --"accessibility" (the page below) or "skip course"
+					pausemenu_buttonactivate() --"accessibility" (the page below), "skip course" or "respawn at previous death"
 				end
 			elseif isPauseKey(key) then
 				pausemenuopen = false
@@ -6303,13 +6303,20 @@ function game_keypressed(key, textinput)
 		if pausemenuopentimer >= pausemenuopenduration and menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 then
 			local shader1row, shader2row = pausemenu_rightrow("shader1"), pausemenu_rightrow("shader2")
 			if (key == "down" or key == "s") then
-				if pausemenuselected < pausemenu_a11yrow() then
+				if pausemenuselected == pausemenu_a11yrow() and pausemenu_buttonvertical(1) then
+					--down from "respawn at previous death" onto "skip course" under it
+				elseif pausemenuselected < pausemenu_a11yrow() then
 					pausemenuselected = pausemenuselected + 1
+					if pausemenuselected == pausemenu_a11yrow() then
+						pausemenu_buttonenter()
+					end
 				else
 					pausemenu_setpage(2) --down from the "accessibility" button: the page below
 				end
 			elseif (key == "up" or key == "w") then
-				if pausemenuselected > 1 then
+				if pausemenuselected == pausemenu_a11yrow() and pausemenu_buttonvertical(-1) then
+					--up from "skip course" onto "respawn at previous death" above it
+				elseif pausemenuselected > 1 then
 					pausemenuselected = pausemenuselected - 1
 				end
 			elseif (key == "right" or key == "d") or (key == "left" or key == "a") then
@@ -6337,7 +6344,7 @@ function game_keypressed(key, textinput)
 				elseif pausemenuselected == pausemenu_rightrow("letterbox") then
 					pausemenu_setletterbox(not letterboxfullscreen)
 				elseif pausemenuselected == pausemenu_a11yrow() then
-					pausemenu_buttonmove(dir) --between "accessibility" and "skip course"
+					pausemenu_buttonmove(dir) --along the bottom row: "accessibility", and "skip course" (or "respawn at previous death")
 				elseif (pausemenuselected == shader1row or pausemenuselected == shader2row) and shaderssupported ~= false then
 					local slot, i = 2, currentshaderi2
 					if pausemenuselected == shader1row then

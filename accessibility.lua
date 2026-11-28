@@ -590,12 +590,106 @@ end
 --respawn where you died: where the next try starts after everyone died, or nil
 accessibilityrespawn = nil
 
+--every death on the course being played, by every player, oldest first, whether respawn where you died is on or not.
+--Each one is where that player last stood on solid ground: {x, y, course, sub, index}, index being its place in the list.
+--key is the mappack and course they belong to
+accessibilitydeaths = {key = nil}
+
+--the death the players last came back at (its index in accessibilitydeaths), from dying or from "respawn at previous
+--death", or nil when they haven't come back at one yet
+accessibilityrespawncursor = nil
+
+local function deathcoursekey()
+	return tostring(mappack) .. ":" .. tostring(marioworld) .. "-" .. tostring(mariolevel)
+end
+
+--deaths only count in a normal course: not in the Course Maker (or testing from it), minigames or the daily challenge
+local function deathscount()
+	return not editormode and not testlevel and not minigameplaying and not dcplaying
+end
+
+--forgets every death and where to respawn: a new course, a game over, a skipped course or the menu
+function accessibility_resetdeaths()
+	accessibilitydeaths = {key = nil}
+	accessibilityrespawncursor = nil
+	accessibilityrespawn = nil
+end
+
 --a player died for real: remember where they last stood
 function accessibility_playerdied(p)
-	if accessibility.respawnwheredied and not editormode and not minigameplaying and not dcplaying and safehere(p.a11ysafe) then
-		local safe = p.a11ysafe
-		accessibilityrespawn = {x = safe.x, y = safe.y, course = safe.course, sub = safe.sub}
+	if not deathscount() or not safehere(p.a11ysafe) then
+		return
 	end
+	local key = deathcoursekey()
+	if accessibilitydeaths.key ~= key then
+		accessibility_resetdeaths()
+		accessibilitydeaths.key = key
+	end
+	local safe = p.a11ysafe
+	local point = {x = safe.x, y = safe.y, course = safe.course, sub = safe.sub, index = #accessibilitydeaths + 1}
+	table.insert(accessibilitydeaths, point)
+	if accessibility.respawnwheredied then
+		accessibilityrespawn = point
+	end
+end
+
+--the death "respawn at previous death" goes to: the one before the death the players last came back at, or the latest
+--death if they haven't come back at one yet. nil when there isn't one
+local function previousdeathindex()
+	if accessibilitydeaths.key ~= deathcoursekey() then
+		return nil
+	end
+	local i = #accessibilitydeaths
+	if accessibilityrespawncursor then
+		i = accessibilityrespawncursor - 1
+	end
+	if i >= 1 then
+		return i
+	end
+	return nil
+end
+
+--whether the pause menu shows "respawn at previous death": respawn where you died is on, in a normal course
+function accessibility_respawnpreviousshown()
+	return accessibility.respawnwheredied and gamestate == "game" and deathscount() and not SERVER and not CLIENT
+end
+
+--whether "respawn at previous death" can be pressed: there's a death to go back to, and nothing else is happening
+function accessibility_canrespawnprevious()
+	if not accessibility_respawnpreviousshown() or levelfinished or everyonedead or warpfade then
+		return false
+	end
+	return previousdeathindex() ~= nil
+end
+
+--"respawn at previous death": loads the course again (the area of that death) with the players where they last stood
+--before that death. It isn't a death: lives, form, shoes and Yoshi stay, and skip course doesn't count it
+function accessibility_respawnprevious()
+	if not accessibility_canrespawnprevious() then
+		return false
+	end
+	local point = accessibilitydeaths[previousdeathindex()]
+	accessibilityrespawn = point --(startlevel takes it, and moves the cursor to it, see accessibility_takerespawn)
+	local sub = tonumber(point.sub) or 0
+	return startwarpfade(function()
+		pausemenuopen = false
+		pausedaudio = nil
+		stopmusic()
+		love.audio.stop()
+		--keep every player's form, like going through a pipe
+		updatesizes()
+		updateplayerproperties()
+		--the same way the level screen loads a course after a death (levelscreen.lua)
+		if sub ~= 0 then
+			actualsublevel = sub
+			startlevel(marioworld .. "-" .. mariolevel .. "_" .. sub)
+			mariosublevel = sub
+		else
+			mariosublevel = 0
+			actualsublevel = 0
+			startlevel(marioworld .. "-" .. mariolevel)
+		end
+	end, false, true)
 end
 
 --the area to load after everyone died, when respawning where they died (nil: as usual)
@@ -621,6 +715,7 @@ function accessibility_takerespawn(level)
 	local point = accessibilityrespawn
 	accessibilityrespawn = nil
 	if point and accessibility.respawnwheredied and respawnlevelname(point) == tostring(level) then
+		accessibilityrespawncursor = point.index --the death they came back at (see previousdeathindex)
 		return point
 	end
 	return nil
@@ -675,7 +770,7 @@ end
 
 local function skiptonext()
 	coursedeaths.key, coursedeaths.count = nil, 0
-	accessibilityrespawn = nil
+	accessibility_resetdeaths()
 	mariosublevel = 0
 	prevsublevel = false
 	nextlevel()
@@ -1654,9 +1749,19 @@ function pausemenu_setpage(page, instant)
 	end
 end
 
---the buttons at the bottom of the pause box: "accessibility" (or "back" on the accessibility page), and "skip course"
---next to it on the pause menu once it's on offer (see accessibility_canskip)
-pausemenubuttoncol = 1 --the button the keyboard is on, on the pause menu's button row: 1 accessibility, 2 skip course
+--the buttons at the bottom of the pause box: "accessibility" (or "back" on the accessibility page), "skip course" next to
+--it on the pause menu once it's on offer (see accessibility_canskip), and "respawn at previous death" while respawn where
+--you died is on (see accessibility_respawnpreviousshown): just above "skip course", or next to "accessibility" in its
+--place when "skip course" isn't shown
+PAUSEBUTTON_A11Y = 1
+PAUSEBUTTON_SKIP = 2
+PAUSEBUTTON_RESPAWN = 3
+pausemenubuttoncol = PAUSEBUTTON_A11Y --the button the keyboard is on, on the pause menu's button row
+
+local PAUSEBUTTON_ROWY = 177 --the bottom row: its bottom edges 4 pixels above the pause box's
+local PAUSEBUTTON_GAP = 6 --between the buttons side by side
+local PAUSEBUTTON_STACKGAP = 3 --between "respawn at previous death" and "skip course" under it
+local PAUSEBUTTON_DIMALPHA = 110 --a button that can't be pressed yet
 
 local function makebutton(name, label, func)
 	local el = guielements[name]
@@ -1672,9 +1777,46 @@ local function buttonwidth(el)
 	return 3 + el.width + el.space*2
 end
 
+local function buttonheight(el)
+	return 1 + el.height*10 + el.space*2
+end
+
 --whether the pause menu shows "skip course"
 function pausemenu_skipshown()
 	return pausemenupage == 1 and accessibility_canskip()
+end
+
+--whether the pause menu shows "respawn at previous death"
+function pausemenu_respawnshown()
+	return pausemenupage == 1 and accessibility_respawnpreviousshown()
+end
+
+--whether "respawn at previous death" sits above "skip course" (otherwise it's on the bottom row, in its place)
+local function respawnstacked()
+	return pausemenu_respawnshown() and pausemenu_skipshown()
+end
+
+--the right edge of the pause menu's left column text that runs between top and bottom (game pixels), or 0. The options
+--are drawn at width*8-135, 25 pixels apart, with their second line 10 pixels under the first (see game_draw)
+local function leftcolumnright(top, bottom)
+	local right = 0
+	local x = width*8 - 135
+	for i = 1, #pausemenuoptions do
+		local y = 52 + (i-1)*25
+		local texts = {TEXT[pausemenuoptions[i]], TEXT[pausemenuoptions2[i]]}
+		for t = 1, 2 do
+			if texts[t] then
+				local liney = y + (t-1)*10
+				for line in (tostring(texts[t]) .. "\n"):gmatch("(.-)\n") do --a translation can run over more lines
+					if liney < bottom and liney + 8 > top then
+						right = math.max(right, x + (utf8.len(line) or #line)*8)
+					end
+					liney = liney + 10
+				end
+			end
+		end
+	end
+	return right
 end
 
 local function pausebuttons()
@@ -1694,33 +1836,121 @@ local function pausebuttons()
 		skip = makebutton("pause_skipbutton", T("skip course"), accessibility_skipcourse)
 	else
 		guielements["pause_skipbutton"] = nil
-		pausemenubuttoncol = 1
 	end
-	--side by side in the middle, their bottom edges 4 pixels above the pause box's
-	local gap = 6
+	local respawn
+	if pausemenu_respawnshown() then
+		respawn = makebutton("pause_respawnbutton", T("respawn at previous death"), accessibility_respawnprevious)
+	else
+		guielements["pause_respawnbutton"] = nil
+	end
+
+	--the bottom row, side by side in the middle: "accessibility", then "skip course", or "respawn at previous death"
+	--when there's no "skip course" to sit above
+	local inline
+	if respawn and not skip then
+		inline = respawn
+	end
 	local total = buttonwidth(main)
 	if skip then
-		total = total + gap + buttonwidth(skip)
+		total = total + PAUSEBUTTON_GAP + buttonwidth(skip)
+	end
+	if inline then
+		total = total + PAUSEBUTTON_GAP + buttonwidth(inline)
 	end
 	local x = math.floor(width*8 - total/2)
-	main.x, main.y = x, 177
+	main.x, main.y = x, PAUSEBUTTON_ROWY
+	local nextx = x + buttonwidth(main) + PAUSEBUTTON_GAP
 	if skip then
-		skip.x, skip.y = x + buttonwidth(main) + gap, 177
+		skip.x, skip.y = nextx, PAUSEBUTTON_ROWY
 	end
-	return main, skip
+	if inline then
+		inline.x, inline.y = nextx, PAUSEBUTTON_ROWY
+	end
+
+	--"respawn at previous death" above "skip course": centred on it, but kept inside the pause box (4 pixels in from its
+	--right edge) and clear of the left column's text beside it
+	if respawn and skip then
+		local w, h = buttonwidth(respawn), buttonheight(respawn)
+		local y = PAUSEBUTTON_ROWY - PAUSEBUTTON_STACKGAP - h
+		local rx = skip.x + buttonwidth(skip)/2 - w/2
+		rx = math.min(rx, width*8 + 150 - 4 - w)
+		rx = math.max(rx, leftcolumnright(y, y + h) + 4)
+		respawn.x, respawn.y = math.floor(rx), y
+	end
+
+	--the keyboard can't stay on a button that's gone, or that can't be pressed
+	if pausemenubuttoncol == PAUSEBUTTON_SKIP and not skip then
+		pausemenubuttoncol = PAUSEBUTTON_A11Y
+	elseif pausemenubuttoncol == PAUSEBUTTON_RESPAWN and not (respawn and accessibility_canrespawnprevious()) then
+		if respawnstacked() then
+			pausemenubuttoncol = PAUSEBUTTON_SKIP
+		else
+			pausemenubuttoncol = PAUSEBUTTON_A11Y
+		end
+	end
+	return main, skip, respawn
 end
 
---the keyboard on the pause menu's button row: Left and Right move between the buttons
-function pausemenu_buttonmove(dir)
+--the buttons on the bottom row, left to right
+local function rowbuttons()
+	local row = {PAUSEBUTTON_A11Y}
 	if pausemenu_skipshown() then
-		pausemenubuttoncol = math.max(1, math.min(2, pausemenubuttoncol + dir))
+		table.insert(row, PAUSEBUTTON_SKIP)
+	elseif pausemenu_respawnshown() and accessibility_canrespawnprevious() then
+		table.insert(row, PAUSEBUTTON_RESPAWN)
 	end
+	return row
+end
+
+--the keyboard on the pause menu's button row: Left and Right move between the buttons of the bottom row
+function pausemenu_buttonmove(dir)
+	if pausemenubuttoncol == PAUSEBUTTON_RESPAWN and respawnstacked() then
+		return --above the row: Up and Down move from it
+	end
+	local row = rowbuttons()
+	local at = 1
+	for i, col in ipairs(row) do
+		if col == pausemenubuttoncol then
+			at = i
+		end
+	end
+	at = math.max(1, math.min(#row, at + dir))
+	pausemenubuttoncol = row[at]
+end
+
+--the keyboard coming down onto the button row from the row above: onto "respawn at previous death" when it sits above
+--"skip course" and can be pressed, since it's the nearest
+function pausemenu_buttonenter()
+	if respawnstacked() and accessibility_canrespawnprevious() then
+		pausemenubuttoncol = PAUSEBUTTON_RESPAWN
+	elseif pausemenubuttoncol == PAUSEBUTTON_RESPAWN then
+		pausemenubuttoncol = PAUSEBUTTON_A11Y
+	end
+end
+
+--Up (dir -1) or Down (dir 1) on the button row, between "skip course" and "respawn at previous death" above it.
+--Returns true when it moved, false when the key leaves the row as usual
+function pausemenu_buttonvertical(dir)
+	if not respawnstacked() then
+		return false
+	end
+	if dir < 0 and pausemenubuttoncol == PAUSEBUTTON_SKIP and accessibility_canrespawnprevious() then
+		pausemenubuttoncol = PAUSEBUTTON_RESPAWN
+		return true
+	end
+	if dir > 0 and pausemenubuttoncol == PAUSEBUTTON_RESPAWN then
+		pausemenubuttoncol = PAUSEBUTTON_SKIP
+		return true
+	end
+	return false
 end
 
 --Enter on the pause menu's button row
 function pausemenu_buttonactivate()
-	if pausemenubuttoncol == 2 and pausemenu_skipshown() then
+	if pausemenubuttoncol == PAUSEBUTTON_SKIP and pausemenu_skipshown() then
 		accessibility_skipcourse()
+	elseif pausemenubuttoncol == PAUSEBUTTON_RESPAWN and pausemenu_respawnshown() then
+		accessibility_respawnprevious()
 	else
 		pausemenu_setpage(2)
 	end
@@ -1731,19 +1961,26 @@ function accessibility_pauseupdate(active, dt)
 	local idle2 = pausemenu_pageidle(2)
 	local key = pauseselectedkey()
 	updatepage(pausepage, active and idle2, key, dt)
-	local main, skip = pausebuttons()
+	local main, skip, respawn = pausebuttons()
 	local onrow = pausemenupage == 1 and pausemenu_a11yrow and pausemenuselected == pausemenu_a11yrow()
 	main.active = active and not pausemenupageanim
 	main.nohover = not main.active
 	if pausemenupage == 2 then
 		main.forcehover = main.active and pausea11yselected > pagecount(pausepage)
 	else
-		main.forcehover = main.active and onrow and pausemenubuttoncol == 1
+		main.forcehover = main.active and onrow and pausemenubuttoncol == PAUSEBUTTON_A11Y
 	end
 	if skip then
 		skip.active = active and not pausemenupageanim
 		skip.nohover = not skip.active
-		skip.forcehover = skip.active and onrow and pausemenubuttoncol == 2
+		skip.forcehover = skip.active and onrow and pausemenubuttoncol == PAUSEBUTTON_SKIP
+	end
+	if respawn then
+		--greyed out, and takes no clicks, until there's a death to go back to
+		respawn.dimmed = not accessibility_canrespawnprevious()
+		respawn.active = active and not pausemenupageanim and not respawn.dimmed
+		respawn.nohover = not respawn.active
+		respawn.forcehover = respawn.active and onrow and pausemenubuttoncol == PAUSEBUTTON_RESPAWN
 	end
 end
 
@@ -1753,6 +1990,7 @@ function accessibility_pauseremove()
 	end
 	guielements["pause_a11ybutton"] = nil
 	guielements["pause_skipbutton"] = nil
+	guielements["pause_respawnbutton"] = nil
 	pausepage.scroll, pausepage.scrolltarget = 0, 0
 end
 
@@ -1766,10 +2004,14 @@ function accessibility_pausedraw(offy)
 end
 
 function accessibility_pausedrawbutton()
-	for _, name in ipairs({"pause_a11ybutton", "pause_skipbutton"}) do
+	for _, name in ipairs({"pause_a11ybutton", "pause_skipbutton", "pause_respawnbutton"}) do
 		local el = guielements[name]
 		if el then
-			el:draw()
+			if el.dimmed then
+				el:draw(PAUSEBUTTON_DIMALPHA)
+			else
+				el:draw()
+			end
 		end
 	end
 end

@@ -414,6 +414,27 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
 * **Reset All Settings** takes it out of `options.txt` again, along with every unlocked world. With the nitpick on, it comes back the next time the game starts.
 * For anyone working with the settings code: `unlockmappackworlds(folder, name)` unlocks every world of one mappack, `unlockallmappackworlds()` does it for every mappack, and `unlockallworlds_setpersistent()` does that and turns `unlockallworldspersistently` on. Each of the first two returns how many worlds were newly unlocked.
 
+#### ⏪ Respawn at Previous Death
+
+The game now keeps track of every death in the course you're playing, and the pause menu can take you back to them.
+
+* Every death is kept: every player's, in every area of the course, whether **Respawn where you died** (accessibility) is on or not. Each one is where that player last stood on solid ground before dying, the same spot respawn where you died uses.
+* Deaths aren't kept in the Course Maker, while testing a course from it, in minigames or in the daily challenge. A death without solid ground to go back to (one in an area before you landed in it) isn't kept either.
+* They're forgotten when the course ends, on a game over, when the course is skipped and when you go back to the menu. Starting another course starts a new list.
+
+While **Respawn where you died** is on, the pause menu has a **respawn at previous death** button.
+
+* It sits just above **skip course**. When **skip course** isn't on offer, it's next to **accessibility** instead, where **skip course** would be.
+* The first press takes you back to your last death. If you've just come back at a death (by dying, or with the button), it takes you to the death before that one instead. Press it again to keep going further back.
+* Dying again adds the new death to the end of the list and brings you back there, so the next press goes to the death before it.
+* It's greyed out, and can't be pressed, while there's no earlier death to go back to: before the first death, and once you're back at the first one. It's also greyed out once the course is finished, while everyone is dead and while the screen is fading.
+* Pressing it fades to black and loads the course again in the area of that death, with the players where they stood. It doesn't count as a death: you keep your lives, your form, your shoe, helmet or Yoshi, and **skip course** doesn't count it. Enemies near the spot are kept away, the same as with respawn where you died.
+* It isn't shown in the Course Maker, while testing a course from it, in minigames, in the daily challenge or online.
+* With the keyboard, Down from **shader2** goes to it. Down from it goes to **skip course** under it, and Up from **skip course** goes back up to it. When it's on the bottom row, Left and Right move to it like **skip course**. Enter presses it.
+* It's kept clear of the left column's text beside it and inside the pause box, in every language. Its label is translated into every language the game has.
+* For anyone working with the accessibility code: `accessibilitydeaths` holds the deaths, oldest first, each one `{x, y, course, sub, index}`, and `accessibilityrespawncursor` is the index of the death the players last came back at. `accessibility_respawnprevious()` is what the button runs, `accessibility_canrespawnprevious()` says whether it can be pressed and `accessibility_respawnpreviousshown()` whether it's shown. `accessibility_resetdeaths()` forgets every death.
+* The pause menu's bottom buttons are `PAUSEBUTTON_A11Y`, `PAUSEBUTTON_SKIP` and `PAUSEBUTTON_RESPAWN` in `pausemenubuttoncol`. `pausemenu_respawnshown()` says whether the button is on the pause menu. `pausemenu_buttonenter()` runs when the keyboard comes down onto the button row, and `pausemenu_buttonvertical(dir)` moves between **skip course** and the button above it.
+
 ### ✨ Improvements
 
 * With `modernsizechangeanimation`, a player with a Starman who changes size keeps flashing in the star's colours like before, but the colour they're on stays the same until the animation is over. The blinking keeps time, so it carries on from the same colour afterwards instead of jumping ahead. This works with `dontfreezeonsizechange` too. For anyone working with the player code: `mario:modernsizeplaying()` says whether a modern size change animation is playing on the player.
