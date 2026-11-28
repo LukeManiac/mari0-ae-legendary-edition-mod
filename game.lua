@@ -312,18 +312,29 @@ function registercameraportaltransition()
 	end
 end
 
---how much of the screen the pause box takes: all of the width but an eighth on each side, and from an eighth of the way
---down for this much of the height (taller than wide, so the buttons at the bottom get two rows above them)
+--how much of the screen the pause box takes, centred both ways: all of the width but an eighth on each side, and this
+--much of the height (taller than that, so the buttons at the bottom get two rows above them)
 PAUSEMENU_WIDTHFRACTION = 0.75
 PAUSEMENU_HEIGHTFRACTION = 0.875
 
 --the pause box's top and bottom edges in game pixels (see game_draw)
 function pausemenu_boxtop()
-	return height*16/8
+	return (height*16 - height*16*PAUSEMENU_HEIGHTFRACTION)/2
 end
 
 function pausemenu_boxbottom()
 	return pausemenu_boxtop() + height*16*PAUSEMENU_HEIGHTFRACTION
+end
+
+--everything in the pause menu is laid out for a box that starts an eighth of the way down (the positions below and in
+--game_draw): this is how far it all moves up or down to stay in the centred box, in whole game pixels
+function pausemenu_offsety()
+	return math.floor(pausemenu_boxtop() - height*16/8 + 0.5)
+end
+
+--a pause menu position (game pixels, laid out for the old box) where it goes in the centred box
+local function pausey(y)
+	return y + pausemenu_offsety()
 end
 
 --the pause menu's right column, top to bottom (game pixels). Every row has its label at labely; a widget
@@ -905,14 +916,14 @@ function game_update(dt)
 	if pausemenuopentimer > 0 then
 		local volumeslider = guielements["pause_volume"]
 		if not volumeslider then
-			volumeslider = volumeslider_new((width*8)-135, 64, 100)
+			volumeslider = volumeslider_new((width*8)-135, pausey(64), 100)
 			guielements["pause_volume"] = volumeslider
 		end
 
 		for i = 1, #pausemenuoptions do
 			if pausemenuoptions[i] == "volume" then
 				volumeslider.x = (width*8)-135
-				volumeslider.y = 64+(i-1)*25
+				volumeslider.y = pausey(64+(i-1)*25)
 			end
 		end
 
@@ -947,11 +958,11 @@ function game_update(dt)
 		--joystick deadzone slider (the same one as options > misc.)
 		local deadzoneslider = guielements["pause_deadzone"]
 		if not deadzoneslider then
-			deadzoneslider = deadzoneslider_new(rightx, PAUSERIGHT.deadzone.widgety, PAUSERIGHT.width)
+			deadzoneslider = deadzoneslider_new(rightx, pausey(PAUSERIGHT.deadzone.widgety), PAUSERIGHT.width)
 			guielements["pause_deadzone"] = deadzoneslider
 		end
 		deadzoneslider.x = rightx
-		deadzoneslider.y = PAUSERIGHT.deadzone.widgety
+		deadzoneslider.y = pausey(PAUSERIGHT.deadzone.widgety)
 		deadzoneslider.active = pause_gui_active
 		deadzoneslider.nohover = not pause_gui_active
 		deadzoneslider.forcehover = (pausemenuselected == pausemenu_rightrow("deadzone"))
@@ -971,12 +982,12 @@ function game_update(dt)
 		--scale dropdown, at the right end of its label's line
 		local scaledd = guielements["pause_scale"]
 		if not scaledd then
-			scaledd = guielement:new("dropdown", rightedge-(13+9*8), PAUSERIGHT.scale.widgety, 9, pausemenu_setscale, pausemenu_scalevalue(), 1, 2, 3, 4, 5)
+			scaledd = guielement:new("dropdown", rightedge-(13+9*8), pausey(PAUSERIGHT.scale.widgety), 9, pausemenu_setscale, pausemenu_scalevalue(), 1, 2, 3, 4, 5)
 			scaledd.displayentries = {"*1", "*2", "*3", "*4", "resizable"}
 			guielements["pause_scale"] = scaledd
 		end
 		scaledd.x = rightedge-(13+9*8)
-		scaledd.y = PAUSERIGHT.scale.widgety
+		scaledd.y = pausey(PAUSERIGHT.scale.widgety)
 		scaledd.active = pause_gui_active
 		scaledd.nohover = not pause_gui_active
 		scaledd.forcehover = (pausemenuselected == pausemenu_rightrow("scale"))
@@ -987,11 +998,11 @@ function game_update(dt)
 		--letterbox checkbox, at the right end of its label's line
 		local letterboxcb = guielements["pause_letterbox"]
 		if not letterboxcb then
-			letterboxcb = guielement:new("checkbox", rightedge-9, PAUSERIGHT.letterbox.widgety, pausemenu_setletterbox, letterboxfullscreen)
+			letterboxcb = guielement:new("checkbox", rightedge-9, pausey(PAUSERIGHT.letterbox.widgety), pausemenu_setletterbox, letterboxfullscreen)
 			guielements["pause_letterbox"] = letterboxcb
 		end
 		letterboxcb.x = rightedge-9
-		letterboxcb.y = PAUSERIGHT.letterbox.widgety
+		letterboxcb.y = pausey(PAUSERIGHT.letterbox.widgety)
 		letterboxcb.var = letterboxfullscreen
 		letterboxcb.active = pause_gui_active
 		letterboxcb.nohover = not pause_gui_active
@@ -1010,13 +1021,13 @@ function game_update(dt)
 				local dd = guielements[name]
 				if not dd then
 					local start = (slot == 1) and currentshaderi1 or currentshaderi2
-					dd = guielement:new("dropdown", rightx, row.widgety, shaderwidth, function(i)
+					dd = guielement:new("dropdown", rightx, pausey(row.widgety), shaderwidth, function(i)
 						pausemenu_setshader(slot, i)
 					end, start, unpack(shaderlist))
 					guielements[name] = dd
 				end
 				dd.x = rightx
-				dd.y = row.widgety
+				dd.y = pausey(row.widgety)
 				dd.width = shaderwidth
 				dd.active = pause_gui_active
 				dd.nohover = not pause_gui_active
@@ -3514,12 +3525,12 @@ function game_draw()
 		love.graphics.translate(winwidth/2, winheight/2)
 		motion_scale(math.max(bettertimer, 0.0001), math.max(bettertimer, 0.0001))
 		love.graphics.translate(-winwidth/2, -winheight/2)
-		guiglass.box((width*8*scale)-150*scale, winheight/8, pausewidth, pauseheight, pauseradius)
+		guiglass.box((width*8*scale)-150*scale, (winheight-pauseheight)/2, pausewidth, pauseheight, pauseradius)
 
 		--two pages: the pause menu, and the accessibility page below it (accessibility.lua). Moving between them
 		--slides them up and down inside the box, cut to it
 		local pageprogress = pausemenu_pageprogress()
-		local boxx, boxy = (width*8*scale)-150*scale, winheight/8
+		local boxx, boxy = (width*8*scale)-150*scale, (winheight-pauseheight)/2
 		local bx0, by0 = love.graphics.transformPoint(boxx, boxy)
 		local bx1, by1 = love.graphics.transformPoint(boxx+pausewidth, boxy+pauseheight)
 		local oldsx, oldsy, oldsw, oldsh = love.graphics.getScissor()
@@ -3532,21 +3543,21 @@ function game_draw()
 			love.graphics.setColor(100, 100, 100, 255)
 			if pausemenuselected == i and not (menuprompt or desktopprompt) then
 				love.graphics.setColor(255, 255, 255, 255)
-				properprint(">", (width*8*scale)-145*scale, (112*scale)-60*scale+(i-1)*25*scale)
+				properprint(">", (width*8*scale)-145*scale, (112*scale)-60*scale+pausemenu_offsety()*scale+(i-1)*25*scale)
 			end
 			if testlevel and not editormode and pausemenuoptions[i] == "save game" then --testing a course: stop testing instead of saving
 				local lines = pausemenu_wraplabel(TEXT["stop testing level"], 16)
 				for l = 1, #lines do
-					properprintF(lines[l], (width*8*scale)-135*scale, (112*scale)-60*scale+(i-1)*25*scale+(l-1)*10*scale)
+					properprintF(lines[l], (width*8*scale)-135*scale, (112*scale)-60*scale+pausemenu_offsety()*scale+(i-1)*25*scale+(l-1)*10*scale)
 				end
 			elseif (dcplaying or minigameplaying) and pausemenuoptions[i] == "save game" then --restart instead of suspend
-				properprintF(TEXT["restart"], (width*8*scale)-135*scale, (112*scale)-60*scale+(i-1)*25*scale)
+				properprintF(TEXT["restart"], (width*8*scale)-135*scale, (112*scale)-60*scale+pausemenu_offsety()*scale+(i-1)*25*scale)
 			elseif alwaysdeletesuspend and pausemenuoptions[i] == "save game" then
-				properprintF(TEXT["suspend"], (width*8*scale)-135*scale, (112*scale)-60*scale+(i-1)*25*scale)
+				properprintF(TEXT["suspend"], (width*8*scale)-135*scale, (112*scale)-60*scale+pausemenu_offsety()*scale+(i-1)*25*scale)
 			else
-				properprintF(TEXT[pausemenuoptions[i]], (width*8*scale)-135*scale, (112*scale)-60*scale+(i-1)*25*scale)
+				properprintF(TEXT[pausemenuoptions[i]], (width*8*scale)-135*scale, (112*scale)-60*scale+pausemenu_offsety()*scale+(i-1)*25*scale)
 			end
-			properprintF(TEXT[pausemenuoptions2[i]], (width*8*scale)-135*scale, (112*scale)-50*scale+(i-1)*25*scale)
+			properprintF(TEXT[pausemenuoptions2[i]], (width*8*scale)-135*scale, (112*scale)-50*scale+pausemenu_offsety()*scale+(i-1)*25*scale)
 			
 			if pausemenuoptions[i] == "volume" and guielements["pause_volume"] then
 				guielements["pause_volume"]:draw()
@@ -3559,13 +3570,13 @@ function game_draw()
 			love.graphics.setColor(100, 100, 100, 255)
 			if pausemenuselected == pausemenu_rightrow(name) then
 				love.graphics.setColor(255, 255, 255, 255)
-				properprint(">", (rx-10)*scale, y*scale)
+				properprint(">", (rx-10)*scale, pausey(y)*scale)
 			end
-			properprintF(text, rx*scale, y*scale)
+			properprintF(text, rx*scale, pausey(y)*scale)
 		end
 
 		rightlabel("controls", "controls:", PAUSERIGHT.controls.labely)
-		properprintF("edit", rx*scale, PAUSERIGHT.controls.edity*scale)
+		properprintF("edit", rx*scale, pausey(PAUSERIGHT.controls.edity)*scale)
 
 		rightlabel("deadzone", TEXT["joy deadzone:"], PAUSERIGHT.deadzone.labely)
 		if guielements["pause_deadzone"] then
@@ -3580,11 +3591,11 @@ function game_draw()
 
 		rightlabel("shader1", TEXT["shader1:"], PAUSERIGHT.shader1.labely)
 		if shaderssupported == false then
-			properprintF(TEXT["unsupported"], rx*scale, PAUSERIGHT.shader1.widgety*scale)
+			properprintF(TEXT["unsupported"], rx*scale, pausey(PAUSERIGHT.shader1.widgety)*scale)
 		end
 		rightlabel("shader2", TEXT["shader2:"], PAUSERIGHT.shader2.labely)
 		if shaderssupported == false then
-			properprintF(TEXT["unsupported"], rx*scale, PAUSERIGHT.shader2.widgety*scale)
+			properprintF(TEXT["unsupported"], rx*scale, pausey(PAUSERIGHT.shader2.widgety)*scale)
 		end
 
 		--dropdowns last, so an open list sits over the rows under it (shader2 before shader1 for the same reason)
@@ -4854,9 +4865,10 @@ local function clearenemiesnearstart(cx, cy)
 	end
 end
 
---respawn where you died: keeps those enemies from spawning on a tile that's within radius tiles of a player's hitbox
---(x, y, w, h, in game coordinates). Tile tx, ty covers tx-1 to tx sideways and ty-1 to ty up and down, and it counts
---when it overlaps the hitbox grown by radius on every side (just touching its edge doesn't count, like any hitbox)
+--respawn where you died: keeps those enemies from spawning on a tile that's within respawnenemyclearradius tiles
+--(variables.lua) of a player's hitbox (x, y, w, h, in game coordinates). Tile tx, ty covers tx-1 to tx sideways and ty-1
+--to ty up and down, and it counts when it overlaps the hitbox grown by respawnenemyclearradius on every side (just
+--touching its edge doesn't count, like any hitbox)
 local function clearenemiesnearhitbox(x, y, w, h)
 	local bx, by, bw, bh = x - respawnenemyclearradius, y - respawnenemyclearradius, w + respawnenemyclearradius*2, h + respawnenemyclearradius*2
 	for ty = math.floor(by), math.ceil(by + bh) + 1 do
@@ -5248,12 +5260,12 @@ function startlevel(level, reason)
 	if checkpointx and checkcheckpoint then
 		startx = checkpointx
 		starty = checkpointpoints[checkpointx] or mapheight - 2
-		
+
 		--clear enemies from spawning near (around the respawn point instead, when respawning where you died)
 		if not respawnpoint then
 			clearenemiesnearstart(startx, starty)
 		end
-		
+
 		--find which i it is
 		for i = 1, #checkpoints do
 			if checkpointx == checkpoints[i] then
@@ -5378,7 +5390,7 @@ function startlevel(level, reason)
 			clearenemiesnearhitbox(p.x, p.y, p.width, p.height)
 		end
 	end
-	
+
 	splitscreen_reset()
 
 	if player_position and player_position[1] then

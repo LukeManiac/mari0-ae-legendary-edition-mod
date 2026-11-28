@@ -1724,7 +1724,8 @@ local pausepage = {
 	prefix = "pa11y_",
 	columns = {{x = 58, w = 138}, {x = 204, w = 134}}, --(the scrollbar goes right of the second)
 	catcolumns = {1, 2, 1, 1, 1, 2, 2, 2}, --motion, gameplay, physics and assists on the left; display, camera, controls and notices on the right
-	viewport = {x = 52, y = 32, w = 296, h = 171}, --(h follows the pause box's height, see accessibility_pauseupdate)
+	viewport = {x = 52, y = 18, w = 296, h = 171}, --(y and h follow the pause box, see accessibility_pauseupdate)
+	viewporttop = 32, --the viewport's top, laid out for a pause box an eighth of the way down (see pausemenu_offsety)
 }
 
 --1 on the accessibility page, 0 on the pause menu
@@ -1793,10 +1794,11 @@ function pausemenu_setpage(page, instant)
 	end
 end
 
---the buttons at the bottom of the pause box. The bottom row: "accessibility" (or "back" on the accessibility page), and
---"skip course" next to it on the pause menu once it's on offer (see accessibility_canskip). Stacked above "skip course"
---(or above "accessibility" when "skip course" isn't shown), bottom first: "respawn at previous death" while respawn
---where you died is on (see accessibility_respawnpreviousshown), then "start over" (see accessibility_startovershown)
+--the buttons at the bottom of the pause box. The bottom row, in the middle of the box: "accessibility" (or "back" on the
+--accessibility page), and "skip course" next to it on the pause menu once it's on offer (see accessibility_canskip).
+--Stacked above the bottom row, each one in the middle of the box, bottom first: "respawn at previous death" while
+--respawn where you died is on (see accessibility_respawnpreviousshown), then "start over" (see
+--accessibility_startovershown)
 PAUSEBUTTON_A11Y = 1
 PAUSEBUTTON_SKIP = 2
 PAUSEBUTTON_RESPAWN = 3
@@ -1805,7 +1807,7 @@ pausemenubuttoncol = PAUSEBUTTON_A11Y --the button the keyboard is on, on the pa
 
 local PAUSEBUTTON_BOTTOMGAP = 4 --between the bottom row's bottom edges and the pause box's
 local PAUSEBUTTON_GAP = 6 --between the buttons side by side
-local PAUSEBUTTON_STACKGAP = 3 --between stacked buttons
+local PAUSEBUTTON_STACKGAP = 2 --between stacked buttons
 local PAUSEBUTTON_DIMALPHA = 110 --a button that can't be pressed yet
 
 local function makebutton(name, label, func)
@@ -1868,21 +1870,26 @@ local function stackedbuttons()
 	return stack
 end
 
---the bottom row button the stack sits above
+--the bottom row button the keyboard was on before going up into the stack, so Down out of it goes back there
+local stackfrom = nil
+
+--the bottom row button Down out of the stack goes to: the one the keyboard came up from, or "skip course" (on the right,
+--under the right column the keyboard came down from) when it came down into the stack, or "accessibility" without it
 local function stackanchor()
-	if pausemenu_skipshown() then
+	if stackfrom ~= PAUSEBUTTON_A11Y and pausemenu_skipshown() then
 		return PAUSEBUTTON_SKIP
 	end
 	return PAUSEBUTTON_A11Y
 end
 
 --the right edge of the pause menu's left column text that runs between top and bottom (game pixels), or 0. The options
---are drawn at width*8-135, 25 pixels apart, with their second line 10 pixels under the first (see game_draw)
+--are drawn at width*8-135, 25 pixels apart, with their second line 10 pixels under the first, moved with the centred
+--pause box (see game_draw and pausemenu_offsety)
 local function leftcolumnright(top, bottom)
 	local right = 0
 	local x = width*8 - 135
 	for i = 1, #pausemenuoptions do
-		local y = 52 + (i-1)*25
+		local y = 52 + (i-1)*25 + pausemenu_offsety()
 		local texts = {TEXT[pausemenuoptions[i]], TEXT[pausemenuoptions2[i]]}
 		for t = 1, 2 do
 			if texts[t] then
@@ -1946,15 +1953,14 @@ local function pausebuttons()
 		skip.x, skip.y = x + buttonwidth(main) + PAUSEBUTTON_GAP, rowy
 	end
 
-	--the stack above "skip course" (or "accessibility"), bottom first: each one centred on it, but kept inside the pause
-	--box (4 pixels in from its right edge) and clear of the left column's text beside it
-	local anchor = skip or main
+	--the stack above the bottom row, bottom first: each one in the middle of the pause box, but kept inside it (4 pixels
+	--in from its right edge) and clear of the left column's text beside it, in case a long label can't be in the middle
 	local y = rowy
 	for _, el in ipairs({respawn, startover}) do
 		if el then
 			local w, h = buttonwidth(el), buttonheight(el)
 			y = y - PAUSEBUTTON_STACKGAP - h
-			local bx = anchor.x + buttonwidth(anchor)/2 - w/2
+			local bx = math.floor(width*8 - w/2)
 			bx = math.min(bx, width*8 + 150 - 4 - w)
 			bx = math.max(bx, leftcolumnright(y, y + h) + 4)
 			el.x, el.y = math.floor(bx), y
@@ -1989,6 +1995,7 @@ end
 
 --the keyboard coming down onto the buttons from the row above: onto the top of the stack, since it's the nearest
 function pausemenu_buttonenter()
+	stackfrom = nil
 	local stack = stackedbuttons()
 	if #stack > 0 then
 		pausemenubuttoncol = stack[#stack]
@@ -1997,7 +2004,7 @@ function pausemenu_buttonenter()
 	end
 end
 
---Up (dir -1) or Down (dir 1) on the buttons: through the stack, and between it and the button it sits above.
+--Up (dir -1) or Down (dir 1) on the buttons: through the stack, and between it and the bottom row under it.
 --Returns true when it moved, false when the key leaves the buttons as usual
 function pausemenu_buttonvertical(dir)
 	local stack = stackedbuttons()
@@ -2011,8 +2018,9 @@ function pausemenu_buttonvertical(dir)
 		end
 	end
 	if at == 0 then
-		--up from the bottom row: only from the button the stack sits above
-		if dir < 0 and pausemenubuttoncol == stackanchor() then
+		--up from either button of the bottom row, since the stack is over the middle of both
+		if dir < 0 then
+			stackfrom = pausemenubuttoncol
 			pausemenubuttoncol = stack[1]
 			return true
 		end
@@ -2059,7 +2067,8 @@ end
 
 --every frame the pause menu is on screen. active: the pause menu takes input (fully open, no prompt or popup)
 function accessibility_pauseupdate(active, dt)
-	--the accessibility page ends 2 pixels above the bottom row
+	--the accessibility page moves with the centred pause box, and ends 2 pixels above the bottom row
+	pausepage.viewport.y = pausepage.viewporttop + pausemenu_offsety()
 	pausepage.viewport.h = bottomrowy() - 2 - pausepage.viewport.y
 	local idle2 = pausemenu_pageidle(2)
 	local key = pauseselectedkey()
