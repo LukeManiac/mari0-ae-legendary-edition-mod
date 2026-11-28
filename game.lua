@@ -6556,6 +6556,7 @@ end
 function pausemenu_close()
 	pausemenuopen = false
 	pausemenuresumemusic = true
+	playsound(pausesound)
 end
 
 --every frame (game_update, after the pause menu's timer): brings the music back once the pause menu has finished
