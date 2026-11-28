@@ -388,6 +388,16 @@ A mappack can also have its own `nitpicks.json`, next to its `settings.txt`. Its
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
+## v1.4.1
+
+### 🐛 Bug Fixes
+
+* Coins and collectables now have the same height as a regular tile when it comes to collecting them. A player only collects one when their hitbox actually reaches into its tile.
+  * Ducking under a coin or collectable no longer collects it. Before, a big player who ducked still collected whatever was in the tile above their head, since the game always checked one tile above the middle of their hitbox.
+  * A big player in mid-air no longer collects a coin or collectable in the tile above them that their hitbox doesn't reach, and always collects one in every tile their hitbox does reach. Before, the game only checked a few fixed points, so it could do either.
+  * Just touching the edge of the tile doesn't count. The hitbox has to reach `coinoverlapepsilon` tiles into it (0.0001, in `variables.lua`).
+  * This covers small, big and every other size. Huge and Mega players, and coins hit from below a block, work the same as before.
+
 ## v1.4.0
 
 ### 🧩 New Features

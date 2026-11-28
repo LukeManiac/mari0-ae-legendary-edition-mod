@@ -689,6 +689,7 @@ multiplayerpipedelay = 0.5
 multiplayerpipewaittime = 5
 multiplayerdoorwait = 1
 lockeddoorentrywait = 0.5 --how long a player stands still after opening a locked door with a key, before going in
+coinoverlapepsilon = 0.0001 --how far a player's hitbox has to reach into a coin or collectable's tile before it counts, so only touching its edge doesn't collect it
 
 growtime = 0.9
 shrinktime = 0.9

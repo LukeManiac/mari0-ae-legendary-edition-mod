@@ -2257,35 +2257,19 @@ function mario:update(dt)
 				end
 			end
 		else
+			--coins and collectables use a full tile's height: only rows the hitbox actually overlaps count
+			--tile row y covers y-1 to y, so a ducking player no longer grabs a coin above their head
 			local x = math.floor(self.x+self.width/2)+1
-			local y = math.floor(self.y+self.height)+1
-			if inmap(x, y) then
-				if tilequads[map[x][y][1]].coin then
-					collectcoin(x, y)
-				elseif objects["coin"][tilemap(x, y)] then
-					collectcoinentity(x, y)
-				elseif objects["collectable"][tilemap(x, y)] and not objects["collectable"][tilemap(x, y)].coinblock then
-					getcollectable(x, y)
-				end
-			end
-			local y = math.floor(self.y+self.height/2)+1
-			if inmap(x, y) then
-				if tilequads[map[x][y][1]].coin then
-					collectcoin(x, y)
-				elseif objects["coin"][tilemap(x, y)] then
-					collectcoinentity(x, y)
-				elseif objects["collectable"][tilemap(x, y)] and not objects["collectable"][tilemap(x, y)].coinblock then
-					getcollectable(x, y)
-				end
-			end
-			if self.size > 1 and not (self.ducking and self.size == 14) then
-				if inmap(x, y-1) then
-					if tilequads[map[x][y-1][1]].coin then
-						collectcoin(x, y-1)
-					elseif objects["coin"][tilemap(x, y-1)] then
-						collectcoinentity(x, y-1)
-					elseif objects["collectable"][tilemap(x, y-1)] and not objects["collectable"][tilemap(x, y-1)].coinblock then
-						getcollectable(x, y-1)
+			local top = math.floor(self.y+coinoverlapepsilon)+1
+			local bottom = math.ceil(self.y+self.height-coinoverlapepsilon)
+			for y = top, bottom do
+				if inmap(x, y) then
+					if tilequads[map[x][y][1]].coin then
+						collectcoin(x, y)
+					elseif objects["coin"][tilemap(x, y)] then
+						collectcoinentity(x, y)
+					elseif objects["collectable"][tilemap(x, y)] and not objects["collectable"][tilemap(x, y)].coinblock then
+						getcollectable(x, y)
 					end
 				end
 			end
