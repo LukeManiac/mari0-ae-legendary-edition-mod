@@ -414,6 +414,10 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
 * **Reset All Settings** takes it out of `options.txt` again, along with every unlocked world. With the nitpick on, it comes back the next time the game starts.
 * For anyone working with the settings code: `unlockmappackworlds(folder, name)` unlocks every world of one mappack, `unlockallmappackworlds()` does it for every mappack, and `unlockallworlds_setpersistent()` does that and turns `unlockallworldspersistently` on. Each of the first two returns how many worlds were newly unlocked.
 
+### ✨ Improvements
+
+* The world selection popup no longer draws worlds the mappack doesn't have (with no `N-1.txt` course) in black. Their spot is left empty, so the other worlds stay where they were. Worlds that exist but haven't been reached are still drawn in dark grey.
+
 ### 🐛 Bug Fixes
 
 * Coins and collectables now have the same height as a regular tile when it comes to collecting them. A player only collects one when their hitbox actually reaches into its tile.

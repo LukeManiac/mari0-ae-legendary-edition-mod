@@ -3915,6 +3915,8 @@ function menu_draw()
             local now = love.timer.getTime()
             local function drawworldpage(page, pageoffset, drawcursor)
                 for i = page, page+7 do
+                    --a world the mappack doesn't have (no N-1.txt) isn't drawn at all; its slot stays empty
+                    local drawworld = selectworldexists[i] or reachedworlds[mappack][i]
                     local color
                     if selectworldcursor == i then
                         color = 255
@@ -3943,7 +3945,9 @@ function menu_draw()
                         world = alphabet:sub(i-9, i-9)
                     end
                     local worldx = 55 + (i-page)*20 + pageoffset
-                    properprint(world, worldx*scale, 130*scale)
+                    if drawworld then
+                        properprint(world, worldx*scale, 130*scale)
+                    end
 
                     if drawcursor and selectworldcursor == i then
                         local cursorprogress = math.min((now - selectworldcursoranimstart) / 0.22, 1)
