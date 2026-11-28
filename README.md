@@ -389,7 +389,7 @@ A mappack can also have its own `nitpicks.json`, next to its `settings.txt`. Its
 
 All notable releases and updates to **Legendary Edition** are documented here.
 
-## v1.4.1
+## v1.5.0
 
 ### 🧩 New Features
 
