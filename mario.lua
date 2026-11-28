@@ -2891,6 +2891,11 @@ function mario:update(dt)
 			end
 		end
 		
+		--pit rescue (accessibility): bounces out as soon as the bottom of the hitbox reaches the bottom of the level
+		if self.gravitydir == "down" and self.speedy > 0 and self.y + self.height >= mapheight then
+			accessibility_pitrescue(self)
+		end
+
 		if self.gravitydir == "up" and self.y < 0 then
 			self:die("pit")
 		elseif (self.gravitydir == "left" or self.gravitydir == "right") and (self.y < 0 or self.y >= mapheight) then
@@ -3859,7 +3864,7 @@ function mario:setquad(anim, s)
 			if self.yoshiswallow then
 				self.yoshiquad = yoshiquad[self.yoshi.color][12+self.yoshiswallowframe]
 			elseif self.yoshitounge or self.yoshispitting then
-				if animationstate == "jumping" then
+				if animationstate == "jumping" or animationstate == "floating" then --(floating: a raccoon or tanooki wag)
 					self.yoshiquad = yoshiquad[self.yoshi.color][1+frameoffset]
 				else
 					self.yoshiquad = yoshiquad[self.yoshi.color][7+frameoffset]
@@ -3872,7 +3877,7 @@ function mario:setquad(anim, s)
 				self.yoshiquad = yoshiquad[self.yoshi.color][2+frameoffset]
 			elseif animationstate == "sliding" then
 				self.yoshiquad = yoshiquad[self.yoshi.color][3+frameoffset]
-			elseif animationstate == "jumping" then
+			elseif animationstate == "jumping" or animationstate == "floating" then --(floating: a raccoon or tanooki wag keeps yoshi jumping)
 				self.yoshiquad = yoshiquad[self.yoshi.color][6+frameoffset]
 			elseif animationstate == "climbing" then
 				self.yoshiquad = yoshiquad[self.yoshi.color][6+frameoffset]

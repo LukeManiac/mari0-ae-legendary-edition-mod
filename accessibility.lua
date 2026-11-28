@@ -405,6 +405,7 @@ end
 
 --the player just landed: a remembered jump happens next frame (see accessibility_playerupdate)
 function accessibility_landed(p)
+	p.a11ypitbounced = nil --pit rescue can catch them again
 	if p.a11yjumpbuffer then
 		if accessibility.jumpbuffer and love.timer.getTime() - p.a11yjumpbuffer <= JUMPBUFFER_TIME then
 			p.a11ypendingjump = true
@@ -530,20 +531,36 @@ function accessibility_runpressed(i)
 	end
 end
 
---pit rescue: a player falling out of the level goes back to the last solid ground they stood on, and it counts as a
---hit (a small player just blinks). Returns true when it caught them
+--pit rescue: a player whose feet reach the bottom of the level bounces back up out of the pit, as high as bouncing off
+--an enemy while holding jump, and it counts as a hit (a small player just blinks). Only once: falling into a pit again
+--before landing on something is a death, as usual. Returns true when it caught them
 function accessibility_pitrescue(p)
 	if not accessibility.pitrescue or editormode or minigameplaying or autoscrolling or levelfinished or p.dead then
 		return false
 	end
-	if bigmario or p.gravitydir ~= "down" or not safehere(p.a11ysafe) then
+	if bigmario or p.gravitydir ~= "down" or p.a11ypitbounced then
 		return false
 	end
-	local safe = p.a11ysafe
-	p.x = safe.x - p.width/2
-	p.y = safe.y - p.height
-	p.speedx, p.speedy = 0, 0
-	p.a11yairtime = 0
+	p.a11ypitbounced = true --(until they land again, see accessibility_landed)
+	p.y = math.min(p.y, mapheight - p.height) --feet on the bottom of the level, never below it
+
+	--the same bounce as stomping an enemy with jump held (mario:stompenemy)
+	local grav = p.gravity or yacceleration
+	local bouncespeed = math.sqrt(2*grav*bounceheight)
+	if mariomakerphysics and (not portalphysics) then
+		bouncespeed = math.sqrt(2*grav*bounceheighthigh)
+	end
+	p.speedy = -bouncespeed
+	--like a stomp: still holding jump keeps the jump going (letting go ends it the usual way)
+	if jumpkey(p.playernumber) then
+		p.jumping = true
+	else
+		p.jumping = false
+	end
+	p.falling = true
+	p.landed = false
+	p.animationstate = "jumping"
+	p:setquad()
 	p.a11yjumpbuffer = nil
 
 	if p.invincible or p.starred then
@@ -557,9 +574,6 @@ function accessibility_pitrescue(p)
 		p.invincible = true
 		p.animationtimer = invincibletime - invincibletime2
 		p.animation = "invincible"
-	end
-	if players == 1 then
-		camerasnap(nil, nil, true)
 	end
 	return true
 end

@@ -422,6 +422,14 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
   * If you never reach Toad (stuck behind something, for example), his lines don't show, but the time left still goes into the score once the castle end sound is over and `aftercastleendtime` has passed, and the next course loads, the same as before.
   * If you never reach the princess, her lines start once the castle end sound is over, so the ending always goes on.
 
+* **Pit rescue** (accessibility) now bounces you back up out of the pit instead of putting you back on the last solid ground you stood on.
+  * It happens as soon as the bottom of your hitbox reaches the bottom of the level, instead of once you've fallen all the way out of it.
+  * You bounce as high as bouncing off an enemy while holding jump, for the physics the mappack uses. Holding jump keeps the jump going and letting go ends it, like a stomp.
+  * It still counts as a hit, the same as before: a powered-up player drops one size (or loses their shoe, helmet or Yoshi), a small player just blinks, and a player who can't be hurt is only bounced.
+  * It only catches you once: falling into a pit again before you land on something is a death, as usual. Bouncing off an enemy doesn't count as landing.
+* Bunny ears stay on their idle frame while you're crouched on the ground.
+* Wagging your tail as Raccoon or Tanooki Mario while riding Yoshi keeps Yoshi in his jumping pose, instead of switching him to his standing pose. This goes for his tongue pose too.
+
 #### 🐛 Wiggler
 
 * Wigglers now resist fire: fireballs bounce off the head and every piece of the body with the block hit sound, the same as dry Goombas.

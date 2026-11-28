@@ -4357,7 +4357,9 @@ function drawplayer_draw(i, x, y, r, pad, drop)
 			local shownsize = v.shownsize and v:shownsize() or v.size
 			if (shownsize == 11 or (shownsize == v.size and v.fireenemy and v.fireenemy.bunnyears)) then
 				local frame = 1
-				if v.float then
+				if v.ducking and v.falling == false and not v.jumping then
+					frame = 1 --crouched on the ground: the ears stay on their idle frame
+				elseif v.float then
 					frame = (math.floor(v.floattimer*20-1)%2)+1
 				elseif v.animationstate == "running" and v.runframe == 3 then
 					frame = 2
