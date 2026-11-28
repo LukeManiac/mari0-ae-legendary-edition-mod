@@ -418,6 +418,10 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
 
 * With `modernsizechangeanimation`, a player with a Starman who changes size keeps flashing in the star's colours like before, but the colour they're on stays the same until the animation is over. The blinking keeps time, so it carries on from the same colour afterwards instead of jumping ahead. This works with `dontfreezeonsizechange` too. For anyone working with the player code: `mario:modernsizeplaying()` says whether a modern size change animation is playing on the player.
 
+* At the end of a castle, Toad's or the princess's first line now shows as soon as you reach them, instead of 3.2 seconds after you start walking. Every line after it keeps the same gap after the first one as before, and so does pressing a button to finish the game.
+  * If you never reach Toad (stuck behind something, for example), his lines don't show, but the time left still goes into the score once the castle end sound is over and `aftercastleendtime` has passed, and the next course loads, the same as before.
+  * If you never reach the princess, her lines start once the castle end sound is over, so the ending always goes on.
+
 #### 🐛 Wiggler
 
 * Wigglers now resist fire: fireballs bounce off the head and every piece of the body with the block hit sound, the same as dry Goombas.

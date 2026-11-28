@@ -1797,13 +1797,27 @@ function mario:update(dt)
 			self:setquad()
 			self.speedx = 0
 		end
+		if (not self.axereachedtime) and self.x >= mapwidth - 8 then
+			self.axereachedtime = self.animationtimer --reached toad or the princess: the first line shows straight away
+		end
+
+		--the lines show from when the player reached toad or the princess, each one as long after the first as before.
+		--first: the first line's old time, so line times keep their gaps
+		local function linedue(time, first)
+			if not self.axereachedtime then
+				return false
+			end
+			local at = self.axereachedtime + (time - first)
+			return self.animationtimer - dt < at and self.animationtimer >= at
+		end
 
 		if levelfinishedmisc2 == 1 then
-			if self.animationtimer - dt < castleanimationtextfirstline and self.animationtimer >= castleanimationtextfirstline then
+			--toad: a player who never gets to him gets no lines, but the time still goes into the score below
+			if linedue(castleanimationtextfirstline, castleanimationtextfirstline) then
 				levelfinishedmisc = 1
 			end
 
-			if self.animationtimer - dt < castleanimationtextsecondline and self.animationtimer >= castleanimationtextsecondline then
+			if linedue(castleanimationtextsecondline, castleanimationtextfirstline) then
 				levelfinishedmisc = 2
 			end
 
@@ -1837,30 +1851,37 @@ function mario:update(dt)
 				end
 			end
 		else
-			if self.animationtimer - dt < endanimationtextfirstline and self.animationtimer >= endanimationtextfirstline then
+			--the princess: the ending only goes on after her lines, so a player who never gets to her
+			--gets them once the castle end sound is over
+			if (not self.axereachedtime) and not self.axecastlesound:isPlaying() then
+				self.axereachedtime = self.animationtimer
+			end
+
+			local first = endanimationtextfirstline
+			if linedue(endanimationtextfirstline, first) then
 				levelfinishedmisc = 1
 			end
 
-			if self.animationtimer - dt < endanimationtextsecondline and self.animationtimer >= endanimationtextsecondline then
+			if linedue(endanimationtextsecondline, first) then
 				levelfinishedmisc = 2
 				stopmusic()
 				love.audio.stop()
 				music:play("princessmusic")
 			end
 
-			if self.animationtimer - dt < endanimationtextthirdline and self.animationtimer >= endanimationtextthirdline then
+			if linedue(endanimationtextthirdline, first) then
 				levelfinishedmisc = 3
 			end
 
-			if self.animationtimer - dt < endanimationtextfourthline and self.animationtimer >= endanimationtextfourthline then
+			if linedue(endanimationtextfourthline, first) then
 				levelfinishedmisc = 4
 			end
 
-			if self.animationtimer - dt < endanimationtextfifthline and self.animationtimer >= endanimationtextfifthline then
+			if linedue(endanimationtextfifthline, first) then
 				levelfinishedmisc = 5
 			end
 
-			if self.animationtimer - dt < endanimationend and self.animationtimer >= endanimationend then
+			if linedue(endanimationend, first) then
 				endpressbutton = true
 			end
 		end
@@ -9757,6 +9778,7 @@ function mario:axestartcastle()
 	self.pointingangle = -math.pi/2
 	self.axeaftercastletimer = 0
 	self.axescorering = false
+	self.axereachedtime = nil --when the player got to toad or the princess (their lines start then)
 
 	stopmusic()
 	love.audio.stop()

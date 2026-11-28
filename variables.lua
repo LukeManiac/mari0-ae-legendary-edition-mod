@@ -259,7 +259,7 @@ goombashoejumpdelay = 1 --how long it stays on the floor
 
 wigglerspeed = 2
 wigglerspeedangry = 4
-wigglerdeathjumpforce = 15 --a dying wiggler's head jumps straight up this fast (speedy -15, speedx 0), then falls with shotgravity, and its body follows its path
+wigglerdeathjumpforce = 10 --a dying wiggler's head jumps straight up this fast (speedy -10, speedx 0), then falls with shotgravity, and its body follows its path
 
 thwompattackspeed = 15
 thwompwait = 1
@@ -885,8 +885,8 @@ castleanimationbridgedisappeardelay = 0.06 --delay between each bridge block dis
 castleanimationmariomove = 1.07 --time when mario starts moving after bowser starts falling and is also unfrozen. music also starts playing at this point
 castleanimationcameraaccelerate = 1.83 -- time when camera starts moving faster than mario, relative to start of his move
 castleanimationmariostop = 2.3 -- when mario stops next to toad, relative to start of his move
-castleanimationtextfirstline = 3.2 -- when camera stops and first line of text appears, relative to the start of his move
-castleanimationtextsecondline = 5.3 --second line appears
+castleanimationtextfirstline = 3.2 --toad's first line now shows as soon as the player reaches him; the other lines keep their gap after this one
+castleanimationtextsecondline = 5.3 --second line appears (5.3 - 3.2 seconds after the first)
 castleanimationnextlevel = 9.47 -- no longer used: the next level loads once the time bonus is counted (see aftercastleendtime)
 beforebridgebreaktime = 0.5 --everything in the game freezes for this long after the axe is grabbed, then the bridge starts breaking
 beforeenemyfalltime = 1 --after the bridge is gone, the enemies face the player for this long before they're made to fall
@@ -898,7 +898,7 @@ aftercastleendtime = 2 --delay from the castleend sound finishing to the scoreri
 -- first bowser takes 5 fireflower hits and dies as goomba
 -- when fireflower killing boss, axe doesn't make bridge disappear
 
-endanimationtextfirstline = 3.2 -- when camera stops and first line of text appears, relative to the start of his move
+endanimationtextfirstline = 3.2 --the princess's first line now shows as soon as the player reaches her (or when the castleend sound is over, if they never do); the other lines and endanimationend keep their gap after this one
 endanimationtextsecondline = 7.4 --second line appears
 endanimationtextthirdline = 8.4 --third line appears
 endanimationtextfourthline = 9.4 --fourth line appears
