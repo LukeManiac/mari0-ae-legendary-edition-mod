@@ -267,7 +267,7 @@ function fireball:hitstuff(a, b, hitdir)
 		end
 		return
 	end
-	if self.t == "fireball" and (a == "tile" or a == "bulletbill" or a == "portalwall" or a == "spring" or a == "bigbill" or a == "kingbill" or a == "barrel" or a == "angrysun" or a == "springgreen" or a == "thwomp" or a == "fishbone" or a == "drybones" or a == "muncher" or (a == "bigkoopa" and b.t == "bigbeetle") or a == "meteor" or (a == "goomba" and (b.t == "drygoomba" or b.t == "spiketop")) or (a == "downplant" and b.t == "dryplant") or a == "parabeetle" or a == "boo" or a == "torpedoted" or (a == "plant" and b.t == "dryplant") or a == "chainchomp" or a == "buttonblock" or a == "flipblock" or a == "frozencoin" or a == "snakeblock" or a == "spikeball") then
+	if self.t == "fireball" and (a == "tile" or a == "bulletbill" or a == "portalwall" or a == "spring" or a == "bigbill" or a == "kingbill" or a == "barrel" or a == "angrysun" or a == "springgreen" or a == "thwomp" or a == "fishbone" or a == "drybones" or a == "muncher" or (a == "bigkoopa" and b.t == "bigbeetle") or a == "meteor" or (a == "goomba" and (b.t == "drygoomba" or b.t == "spiketop" or b.t == "wiggler" or b.t == "wigglerchild")) or (a == "downplant" and b.t == "dryplant") or a == "parabeetle" or a == "boo" or a == "torpedoted" or (a == "plant" and b.t == "dryplant") or a == "chainchomp" or a == "buttonblock" or a == "flipblock" or a == "frozencoin" or a == "snakeblock" or a == "spikeball") then
 		self:explode()
 		playsound(blockhitsound)
 		

@@ -299,11 +299,24 @@ function goomba:update(dt)
 		return self.deathtimer > goombadeathtime
 		
 	elseif self.shot then
+		--a dying wiggler's body is moved along the head's path by the head (wigglerupdatetrail),
+		--unless the head is gone: then it carries on falling by itself
+		if self.trailfollow then
+			if self.parent and not self.parent.delete then
+				return false
+			end
+			self.trailfollow = false
+			self.speedx, self.speedy = self.trailspeedx or 0, self.trailspeedy or 0
+		end
 		self.speedy = self.speedy + shotgravity*dt
-		
+
 		self.x = self.x+self.speedx*dt
 		self.y = self.y+self.speedy*dt
-		
+
+		if self.wigglertrail then
+			self:wigglerupdatetrail(dt)
+		end
+
 		return false
 		
 	elseif breakoutmode then
@@ -840,7 +853,119 @@ function goomba:stomp(x, b)--hehe goomba stomp
 	end
 end
 
+--wiggler death: the head jumps straight up and falls, and its body follows the path the head takes, the way it follows
+--the head while it walks. The path starts out through the body itself (tail first), so every piece starts where it is,
+--and each piece stays as far behind the head along the path as it was when the wiggler died
+function goomba:wigglerstarttrail()
+	local points = {}
+	local s = 0
+	local lastx, lasty
+	local pieces = {}
+	for i = 4, 1, -1 do
+		local c = self.child[i]
+		if c then
+			table.insert(pieces, c)
+		end
+	end
+	table.insert(pieces, self)
+	for _, v in ipairs(pieces) do
+		local px, py = v.x+v.width/2, v.y+v.height/2
+		if lastx then
+			s = s + math.sqrt((px-lastx)^2 + (py-lasty)^2)
+		end
+		table.insert(points, {x = px, y = py, s = s})
+		v.trails = s --(for the children: how far along the path it starts)
+		lastx, lasty = px, py
+	end
+	self.wigglertrail = {points = points, length = s}
+	for i = 1, 4 do
+		local c = self.child[i]
+		if c then
+			c.trailbehind = s - c.trails --how far behind the head it stays along the path
+			c.trailfollow = true
+			c.trails = nil
+		end
+	end
+	self.trails = nil
+end
+
+--a point on the path, s along it from its start
+local function wigglertrailpoint(points, s)
+	if s <= points[1].s then
+		return points[1].x, points[1].y
+	end
+	for i = #points, 2, -1 do
+		local a, b = points[i-1], points[i]
+		if s >= a.s then
+			local f = 0
+			if b.s > a.s then
+				f = math.min(1, (s-a.s)/(b.s-a.s))
+			end
+			return a.x+(b.x-a.x)*f, a.y+(b.y-a.y)*f
+		end
+	end
+	return points[#points].x, points[#points].y
+end
+
+--the head moved: add where it is to the path, and put every piece of its body where it is along it
+function goomba:wigglerupdatetrail(dt)
+	local trail = self.wigglertrail
+	local points = trail.points
+	local hx, hy = self.x+self.width/2, self.y+self.height/2
+	local last = points[#points]
+	local d = math.sqrt((hx-last.x)^2 + (hy-last.y)^2)
+	if d > 0 then
+		trail.length = trail.length + d
+		table.insert(points, {x = hx, y = hy, s = trail.length})
+	end
+	local furthest = 0
+	for i = 1, 4 do
+		local c = self.child[i]
+		if c and c.trailfollow and not c.delete then
+			local px, py = wigglertrailpoint(points, trail.length - c.trailbehind)
+			local nx, ny = px-c.width/2, py-c.height/2
+			if dt > 0 then
+				--kept up to date so a piece can carry on falling by itself if the head is removed first
+				--(not in speedx, which would spin it with mario maker physics and drop shadows on)
+				c.trailspeedx, c.trailspeedy = (nx-c.x)/dt, (ny-c.y)/dt
+			end
+			c.x, c.y = nx, ny
+			furthest = math.max(furthest, c.trailbehind)
+		end
+	end
+	--points further back than the last piece are never needed again
+	while #points > 2 and points[2].s < trail.length - furthest - 1 do
+		table.remove(points, 1)
+	end
+end
+
 function goomba:shotted(dir) --fireball, star, turtle
+	--a piece of a wiggler's body dies with the rest of it, following the head
+	if self.t == "wigglerchild" and self.parent and not self.parent.shot and not self.parent.delete then
+		self.parent:shotted(dir)
+		return
+	end
+	if self.t == "wiggler" then
+		playsound(shotsound)
+		self.shot = true
+		self.direction = dir or "right"
+		self.active = false
+		self.gravity = shotgravity
+		self.speedx = 0
+		self.speedy = -wigglerdeathjumpforce
+		for i = 1, 4 do
+			local c = self.child[i]
+			if c and not c.shot then
+				c.shot = true
+				c.direction = self.direction
+				c.active = false
+				c.gravity = shotgravity
+				c.speedx, c.speedy = 0, 0
+			end
+		end
+		self:wigglerstarttrail()
+		return
+	end
 	playsound(shotsound)
 	self.shot = true
 	self.speedy = -shotjumpforce
@@ -861,16 +986,6 @@ function goomba:shotted(dir) --fireball, star, turtle
 			obj.animationdirection = self.animationdirection
 			obj.heel = self.heel
 			table.insert(objects["mushroom"], obj)
-		end
-	elseif self.t == "wiggler" then
-		for i = 1, 4 do
-			if self.child[i] and not self.child[i].shot then
-				self.child[i]:shotted()
-			end
-		end
-	elseif self.t == "wigglerchild" then
-		if self.parent and not self.parent.shot then
-			self.parent:shotted()
 		end
 	end
 end

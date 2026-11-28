@@ -416,6 +416,14 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
 
 ### ✨ Improvements
 
+#### 🐛 Wiggler
+
+* Wigglers now resist fire: fireballs bounce off the head and every piece of the body with the block hit sound, the same as dry Goombas.
+* A new death animation. When a Wiggler dies (a Starman, a shell, a hammer and so on), its head jumps straight up, without moving sideways, at `wigglerdeathjumpforce` (10, in `variables.lua`), then falls with the usual gravity for killed enemies (`shotgravity`).
+  * Its body follows the head the way it does while it walks: every piece follows the exact path the head takes, 10/16 of a tile behind the piece in front, so the body slides in behind the head, goes up after it and comes back down after it.
+  * Hitting any piece of the body kills the whole Wiggler this way. Before, every piece flew off on its own.
+  * If the head falls out of the course first, the rest of the body carries on falling by itself at the speed it had.
+  * For anyone working with the enemy code: `goomba:wigglerstarttrail()` starts the path from where the body is, and `goomba:wigglerupdatetrail(dt)` adds where the head is to it and moves the body along it.
 * With `mariomakerblockphysics`, a ? block (or a brick with something in it) now only turns into a used block once its bounce is over: after it has grown and shrunk back to its normal size, the same moment the item comes out. Before, it turned into a used block as soon as it was hit, so it grew and shrank already used.
   * While any block bounces, hitting it again is ignored completely, without even the bump sound, until its bounce is over. This goes for blocks that can be hit again and again too, like blocks with many coins and bricks, so a used block-to-be can't give a second item either.
   * Hidden blocks still show straight away when they're hit, and broken bricks still break straight away. Note blocks don't change, like before.
