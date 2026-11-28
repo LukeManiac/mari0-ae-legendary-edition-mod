@@ -554,11 +554,9 @@ function accessibility_pitrescue(p)
 	--the same bounce as stomping an enemy with jump held in mario maker physics (mario:stompbounce), for every physics
 	local grav = p.gravity or yacceleration
 	p.speedy = -math.sqrt(2*grav*bounceheighthigh)
+	--always the jump-held bounce, held or not: only letting go of jump during it cuts it (see accessibility_pitjumpcut)
 	p.jumping = true
-	p.a11ypitrising = true --(letting go of jump cuts the bounce, see accessibility_pitjumpcut)
-	if not jumpkey(p.playernumber) then
-		accessibility_pitjumpcut(p) --already let go: the lower bounce straight away
-	end
+	p.a11ypitrising = true
 	p.falling = true
 	p.landed = false
 	p.animationstate = "jumping"
@@ -566,6 +564,13 @@ function accessibility_pitrescue(p)
 	p.a11yjumpbuffer = nil
 	--no hit: the player keeps their form (and their shoe, helmet or Yoshi)
 	return true
+end
+
+--pit rescue: bouncing off an enemy, a spring, a note block or a faith plate lets pit rescue catch the player again, like
+--landing does. The new bounce isn't the pit bounce, so letting go of jump no longer cuts it
+function accessibility_pitreset(p)
+	p.a11ypitbounced = nil
+	p.a11ypitrising = nil
 end
 
 --pit rescue: letting go of jump while the bounce is still going up cuts it to the bounce of stomping an enemy without

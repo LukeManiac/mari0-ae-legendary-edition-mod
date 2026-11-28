@@ -425,9 +425,9 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
 * **Pit rescue** (accessibility) now bounces you back up out of the pit instead of putting you back on the last solid ground you stood on.
   * It happens as soon as the bottom of your hitbox reaches the bottom of the level, instead of once you've fallen all the way out of it.
   * You bounce as high as bouncing off an enemy while holding jump in Mario Maker physics, whatever physics the mappack uses.
-  * Letting go of jump while you're still going up cuts the bounce down to the speed of bouncing off an enemy without holding jump in Mario Maker physics (`bounceheightmaker`, 1.25 tiles), like a stomp. Before, letting go only switched you back to normal gravity, which barely slowed down a bounce that fast. If you aren't holding jump when you reach the pit, you get the lower bounce straight away.
+  * Letting go of jump while you're still going up cuts the bounce down to the speed of bouncing off an enemy without holding jump in Mario Maker physics (`bounceheightmaker`, 1.25 tiles), like a stomp. Before, letting go only switched you back to normal gravity, which barely slowed down a bounce that fast. You always get the full bounce, whether or not you're holding jump when you reach the pit: only letting go during it makes it lower.
   * It no longer counts as a hit: you keep your form, along with your shoe, helmet or Yoshi, and you don't blink. Before, a powered-up player dropped one size and a small player blinked.
-  * It only catches you once: falling into a pit again before you land on something is a death, as usual. Bouncing off an enemy doesn't count as landing.
+  * It only catches you once: falling into a pit again before you land on something is a death, as usual. Bouncing off an enemy, a spring, a note block or a faith plate lets it catch you again, the same as landing, and letting go of jump no longer cuts that new bounce.
 * Bunny ears stay on their idle frame while you're crouched on the ground.
 * Wagging your tail as Raccoon or Tanooki Mario while riding Yoshi keeps Yoshi in his jumping pose, instead of switching him to his standing pose. This goes for his tongue pose too.
 

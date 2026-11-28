@@ -2526,6 +2526,7 @@ function mario:update(dt)
 			self.jumping = true
 			self.animationstate = "jumping"
 			self:setquad()
+			accessibility_pitreset(self) --pit rescue can catch them again
 			if noupdate or not self.controlsenabled or not jumpkey(self.playernumber) then
 				self:stopjump()
 			elseif jumpkey(self.playernumber) then
@@ -6206,6 +6207,7 @@ function mario:stompenemy(...)
 	local plane, fly, flaptimer = pspeedbeforestomp(self)
 	local r = stompenemy_(self, ...)
 	self:keeppspeed(plane, fly, flaptimer)
+	accessibility_pitreset(self) --pit rescue can catch them again
 	return r
 end
 
@@ -6214,6 +6216,7 @@ function mario:stompbounce(...)
 	local plane, fly, flaptimer = pspeedbeforestomp(self)
 	local r = stompbounce_(self, ...)
 	self:keeppspeed(plane, fly, flaptimer)
+	accessibility_pitreset(self) --pit rescue can catch them again
 	return r
 end
 
@@ -7668,6 +7671,7 @@ function mario:leavespring()
 	self.falling = true
 	self.spring = false
 	self.mask[19] = false
+	accessibility_pitreset(self) --pit rescue can catch them again
 end
 
 function mario:hitspringgreen(b)
@@ -7698,6 +7702,7 @@ function mario:leavespringgreen()
 	self.falling = true
 	self.springgreen = false
 	self.mask[19] = false
+	accessibility_pitreset(self) --pit rescue can catch them again
 end
 
 function mario:dropvine(dir)
@@ -8310,6 +8315,7 @@ function mario:faithplate(dir)
 	self.animationstate = "jumping"
 	self.falling = true
 	self:setquad()
+	accessibility_pitreset(self) --pit rescue can catch them again
 end
 
 function mario:startfall()
