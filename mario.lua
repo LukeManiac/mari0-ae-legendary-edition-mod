@@ -2261,17 +2261,25 @@ function mario:update(dt)
 		else
 			--coins and collectables use a full tile's height: only rows the hitbox actually overlaps count
 			--tile row y covers y-1 to y, so a ducking player no longer grabs a coin above their head
-			local x = math.floor(self.x+self.width/2)+1
+			--sideways, the column under the player's centre counts, and so does the one beside it if its side is
+			--multihitdist or closer to the centre (the same as hitting a row of blocks)
+			local c = self.x+self.width/2
+			local cx = math.floor(c)+1
 			local top = math.floor(self.y+coinoverlapepsilon)+1
 			local bottom = math.ceil(self.y+self.height-coinoverlapepsilon)
-			for y = top, bottom do
-				if inmap(x, y) then
-					if tilequads[map[x][y][1]].coin then
-						collectcoin(x, y)
-					elseif objects["coin"][tilemap(x, y)] then
-						collectcoinentity(x, y)
-					elseif objects["collectable"][tilemap(x, y)] and not objects["collectable"][tilemap(x, y)].coinblock then
-						getcollectable(x, y)
+			for x = cx-1, cx+1 do
+				local dist = math.max((x-1)-c, c-x, 0) --how far the centre is from the column (it covers x-1 to x)
+				if dist <= multihitdist then
+					for y = top, bottom do
+						if inmap(x, y) then
+							if tilequads[map[x][y][1]].coin then
+								collectcoin(x, y)
+							elseif objects["coin"][tilemap(x, y)] then
+								collectcoinentity(x, y)
+							elseif objects["collectable"][tilemap(x, y)] and not objects["collectable"][tilemap(x, y)].coinblock then
+								getcollectable(x, y)
+							end
+						end
 					end
 				end
 			end
@@ -6906,6 +6914,9 @@ end
 
 --true if the tile can be bonked from below (semisolids only count if their bottom is solid)
 local function solidceilingtile(x, y)
+	if not ismaptile(x, y) then
+		return false
+	end
 	local t = tilequads[map[x][y][1]]
 	if t.collision ~= true then
 		return false
@@ -6916,7 +6927,115 @@ local function solidceilingtile(x, y)
 	return not (t.platform or t.platformleft or t.platformright)
 end
 
+--how far x is from the span from left to right (0 inside it)
+local function distancetospan(x, left, right)
+	if x < left then
+		return left - x
+	elseif x > right then
+		return x - right
+	end
+	return 0
+end
+
+--corner clipping: bonking a block in column x (it covers x-1 to x) while reaching cornerclipdist or less into its side,
+--with nothing solid beside it on that side, slides the player past its corner instead. solidleft and solidright say
+--whether the blocks beside it are solid. Returns "left" or "right" if the player was moved, nil if they bonk it
+function mario:cornerclip(x, solidleft, solidright, ignoreplatforms)
+	if self.ceilmultihitting then
+		return nil --a block hit along with another one never moves the player
+	end
+	local leftin = self.x+self.width-(x-1) --how far the player's right side reaches into the block
+	local rightin = x-self.x --how far the player's left side reaches into the block
+	if leftin <= cornerclipdist and not solidleft then
+		local newx = x-1-self.width
+		if #checkrect(newx, self.y, self.width, self.height, {"exclude", self}, true, ignoreplatforms) == 0 then
+			self.x = newx
+			if self.speedx > 0 then
+				self.speedx = 0
+			end
+			return "left"
+		end
+	elseif rightin <= cornerclipdist and not solidright then
+		local newx = x
+		if #checkrect(newx, self.y, self.width, self.height, {"exclude", self}, true, ignoreplatforms) == 0 then
+			self.x = newx
+			if self.speedx < 0 then
+				self.speedx = 0
+			end
+			return "right"
+		end
+	end
+	return nil
+end
+
+--the tile in column x of row y is hit from below along with another one: spikes and lava hurt, and the block reacts
+local function ceilhitextratile(p, x, y)
+	local t = tilequads[map[x][y][1]]
+	if t:getproperty("spikesdown", x, y) and not (p.invincible or p.starred) then
+		p:die("Enemy (Ceilcollided)")
+	end
+	if t.lava then
+		p:die("lava")
+	end
+	hitblock(x, y, p)
+end
+
+--objects a player can hit a row of with their head at once (built-in enemies, custom enemies and blocks)
+local CEILMULTIHIT_GROUPS = {}
+for _, name in ipairs({"enemy", "flipblock", "buttonblock", "frozencoin", "goomba", "koopa", "plant", "bowser", "cheep",
+	"flyingfish", "lakito", "squid", "hammerbro", "downplant", "bigbill", "cannonball", "kingbill", "sidestepper", "barrel",
+	"icicle", "angrysun", "splunkin", "biggoomba", "bigkoopa", "thwomp", "skewer", "fishbone", "drybones", "meteor",
+	"parabeetle", "ninji", "mole", "bigmole", "bomb", "fireplant", "downfireplant", "torpedoted", "torpedolauncher", "boo",
+	"boomboom", "amp", "fuzzy", "glados", "pokey", "chainchomp", "rockywrench", "koopaling", "magikoopa", "spike", "spikeball",
+	"plantcreeper", "muncher", "plantcreepersegment"}) do
+	CEILMULTIHIT_GROUPS[name] = true
+end
+
+--the player bonked b (of group a) with their head: everything else in the same row (the same bottom) whose sides are
+--multihitdist or closer to the player's centre gets hit too, the same way the physics would hit it
+function mario:ceilmultihit(a, b)
+	local c = self.x+self.width/2
+	local bottom = b.y+b.height
+	self.ceilmultihitting = true
+	for group, list in pairs(objects) do
+		if CEILMULTIHIT_GROUPS[group] then
+			for _, t in pairs(list) do
+				if t ~= b and t.active and not (t.shot or t.dead or t.delete) and t.x and t.width and t.height
+					and math.abs(t.y+t.height-bottom) < 1/64 and distancetospan(c, t.x, t.x+t.width) <= multihitdist
+					and (self.mask == nil or self.mask[t.category] ~= true) and (t.mask == nil or t.mask[self.category] ~= true) then
+					--the same as physics.lua's vercollision when the player moves up into it, without pushing anyone
+					if cancollideside(self, "up", t) and t.floorcollide then
+						if t:floorcollide("player", self) ~= false then
+							if t.postfloorcollide then
+								t:postfloorcollide("player", self)
+							end
+							if t.speedy and t.speedy > 0 then
+								t.speedy = 0
+							end
+						end
+					end
+					if cancollideside(t, "down", self) and not self.dead then
+						self:ceilcollideobject(group, t)
+					end
+				end
+			end
+		end
+	end
+	self.ceilmultihitting = false
+end
+
 function mario:ceilcollide(a, b)
+	local result = self:ceilcollideobject(a, b)
+	--a real bonk on a row of enemies or blocks hits the ones beside it too (tiles do this in ceilcollideobject)
+	if result ~= false and a ~= "tile" and CEILMULTIHIT_GROUPS[a] and not self.ceilmultihitting and not self.dead
+		and self.gravitydir == "down" and self.size ~= 8 and self.size ~= 16 and b.y and b.height then
+		self:ceilmultihit(a, b)
+	end
+	return result
+end
+
+--bonking one object with the player's head (mario:ceilcollide runs it, then hits the rest of a row)
+function mario:ceilcollideobject(a, b)
 	if self:globalcollide(a, b) then
 		return false
 	end
@@ -7091,35 +7210,13 @@ function mario:ceilcollide(a, b)
 	elseif a == "buttonblock" or a == "frozencoin" then
 		--Check if it should bounce the block next to it, or push mario instead
 		if self.gravitydir == "down" and self.size ~= 8 and self.size ~= 16 then
+			--corner clipping: reaching cornerclipdist or less into its side, with nothing solid beside it, slides past it
 			local x, y = b.cox, b.coy
-			if self.x < x-22/16 then
-				--check if block left of it is a better fit
-				if x > 1 and (tilequads[map[x-1][y][1]].collision == true or objects["buttonblock"][tilemap(x-1, y)] or objects["frozencoin"][tilemap(x-1, y)]) then
-					x = x - 1
-				else
-					local col = checkrect(x-28/16, self.y, self.width, self.height, {"exclude", self}, true)
-					if #col == 0 then
-						self.x = x-28/16
-						if self.speedx > 0 then
-							self.speedx = 0
-						end
-						return false
-					end					
-				end
-			elseif self.x > x-6/16 then
-				--check if block right of it is a better fit
-				if x < mapwidth and (tilequads[map[x+1][y][1]].collision == true or objects["buttonblock"][tilemap(x+1, y)] or objects["frozencoin"][tilemap(x+1, y)]) then
-					x = x + 1
-				else
-					local col = checkrect(x, self.y, self.width, self.height, {"exclude", self}, true)
-					if #col == 0 then
-						self.x = x
-						if self.speedx < 0 then
-							self.speedx = 0
-						end
-						return false
-					end	
-				end
+			local function solidbeside(bx)
+				return ismaptile(bx, y) and (tilequads[map[bx][y][1]].collision == true or objects["buttonblock"][tilemap(bx, y)] or objects["frozencoin"][tilemap(bx, y)])
+			end
+			if self:cornerclip(x, solidbeside(x-1), solidbeside(x+1)) then
+				return false
 			end
 		end
 		if a == "frozencoin" then
@@ -7197,43 +7294,32 @@ function mario:ceilcollide(a, b)
 			--Check if it should bounce the block next to it, or push mario instead (Hello, devin hitch!)
 			--(a minigame can react to the push with cornerslide(x, y, player), a sound for example)
 			if self.gravitydir ~= "up" and self.size ~= 8 and self.size ~= 16 and not b.UPSIDEDOWNSLOPE then
-				if self.x < x-22/16 then
-					--check if block left of it is a better fit
-					if x > 1 and solidceilingtile(x-1, y) then
-						x = x - 1
-					else
-						local col = checkrect(x-28/16, self.y, self.width, self.height, {"exclude", self}, true, "ignoreplatforms")
-						if #col == 0 then
-							self.x = x-28/16
-							if self.speedx > 0 then
-								self.speedx = 0
-							end
-							if cornerslide then
-								cornerslide(x, y, self)
-							end
-							return false
-						end					
+				--corner clipping: reaching cornerclipdist or less into its side, with nothing solid beside it, slides past it
+				if self:cornerclip(x, solidceilingtile(x-1, y), solidceilingtile(x+1, y), "ignoreplatforms") then
+					if cornerslide then
+						cornerslide(x, y, self)
 					end
-				elseif self.x > x-6/16 then
-					--check if block right of it is a better fit
-					if x < mapwidth and solidceilingtile(x+1, y) then
-						x = x + 1
-					else
-						local col = checkrect(x, self.y, self.width, self.height, {"exclude", self}, true, "ignoreplatforms")
-						if #col == 0 then
-							self.x = x
-							if self.speedx < 0 then
-								self.speedx = 0
-							end
-							return false
-						end	
-					end
+					return false
+				end
+				--the block under the player's centre is the one that gets hit, if it's solid
+				local cx = math.floor(self.x+self.width/2)+1
+				if cx ~= x and solidceilingtile(cx, y) then
+					x = cx
 				end
 			end
 		end
 
 		if self.gravitydir ~= "up" then
 			hitblock(x, y, self)
+			--a row of blocks: the one beside it gets hit too, if its side is multihitdist or closer to the player's centre
+			if self.size ~= 8 and self.size ~= 16 and not b.UPSIDEDOWNSLOPE and not self.ceilmultihitting then
+				local c = self.x+self.width/2
+				for _, nx in ipairs({x-1, x+1}) do
+					if not self.dead and solidceilingtile(nx, y) and distancetospan(c, nx-1, nx) <= multihitdist then
+						ceilhitextratile(self, nx, y)
+					end
+				end
+			end
 		end
 	elseif (a == "belt") and b:getgel(math.floor(self.x+self.width/2)+1) == 4 then
 		self.gravitydir = "up"
@@ -7801,6 +7887,13 @@ function hitblock(x, y, t, v)
 	
 	local r = map[x][y]
 
+	--mariomakerblockphysics: a block that's still bouncing ignores every hit until its bounce is over, even one that can
+	--be hit again and again (many coins, bricks), and even one on its way to becoming a used block
+	local bouncing = getblockbounce(x, y)
+	if bouncing and blockbouncescales(bouncing) then
+		return
+	end
+
 	if hitsound and onscreenobj(t) then
 		playsound(blockhitsound)
 	end
@@ -7820,6 +7913,7 @@ function hitblock(x, y, t, v)
 	end
 	
 	if tilequads[r[1]].breakable or tilequads[r[1]].coinblock or tilequads[r[1]].noteblock then --Block should bounce!
+		local oldtile = r[1] --(mariomakerblockphysics: put back below until the bounce is over)
 		local blockbouncet = createblockbounce(x, y)
 		if tilequads[r[1]].noteblock and dir == "down" then
 			blockbouncet.timer = -0.000000001
@@ -8017,6 +8111,15 @@ function hitblock(x, y, t, v)
 		
 		if dir == "up" then
 			hitontop(x, y)
+		end
+
+		--mariomakerblockphysics: the block only turns into a used block once it has grown and is back to its normal size
+		--(the end of its bounce, see game_update). Broken blocks and hidden blocks change straight away
+		local newtile = map[x][y][1]
+		if newtile ~= oldtile and newtile ~= 1 and getblockbounce(x, y) == blockbouncet and blockbouncescales(blockbouncet)
+			and not tilequads[oldtile]:getproperty("invisible", x, y) then
+			blockbouncet.pendingtile = newtile
+			map[x][y][1] = oldtile
 		end
 	else
 		if t and t.helmet and t.helmet == "spikey" and tilequads[r[1]].debris and blockdebrisquads[tilequads[r[1]].debris] then

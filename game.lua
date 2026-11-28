@@ -1325,6 +1325,11 @@ function game_update(dt)
 				end
 				if v.timer > blockbouncetime then
 					v.timer = blockbouncetime
+					--mariomakerblockphysics: back to its normal size after growing, so now it becomes a used block
+					if v.pendingtile and inmap(v.x, v.y) and map[v.x][v.y][1] ~= 1 then
+						map[v.x][v.y][1] = v.pendingtile
+					end
+					v.pendingtile = nil
 					if v.content then
 						item(v.content, v.x, v.y, v.content2)
 						if v.sound then --(mariomakerblockphysics: the sprout sound waits for the item, see sproutsound)

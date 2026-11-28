@@ -416,6 +416,10 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
 
 ### ✨ Improvements
 
+* With `mariomakerblockphysics`, a ? block (or a brick with something in it) now only turns into a used block once its bounce is over: after it has grown and shrunk back to its normal size, the same moment the item comes out. Before, it turned into a used block as soon as it was hit, so it grew and shrank already used.
+  * While any block bounces, hitting it again is ignored completely, without even the bump sound, until its bounce is over. This goes for blocks that can be hit again and again too, like blocks with many coins and bricks, so a used block-to-be can't give a second item either.
+  * Hidden blocks still show straight away when they're hit, and broken bricks still break straight away. Note blocks don't change, like before.
+  * Without the nitpick, blocks change as soon as they're hit, like before.
 * The mappack menu's tabs (**local**, **dlc**, **daily challenge** and **minigames**) are now buttons, in the same places and the same sizes as before. They're liquid glass like every other button, lean towards the mouse, and squash and wobble with a jelly when clicked. The open tab is a white pane with black text and a lit rim, like the old selected tab. Clicking a tab still slides to its page, and Left and Right (or A and D) still switch tabs. Clicking the tab that's already open does nothing.
 * For anyone working with the menu code: `MAPPACKTABS` holds each tab's text, position and width, `mappacktab_select(i)` opens tab `i` (0 to 3), and `mappacktabbuttons_draw()`, `mappacktabbuttons_click(x, y, button)` and `mappacktabbuttons_unclick(x, y)` run the buttons.
 * The mouse wheel now scrolls the mappack menu's **local**, **dlc** and **minigames** lists the way a web page scrolls, the same as the Course Maker's lists and long dropdowns. Before, it moved the selection up and down like the arrow keys.
@@ -426,6 +430,27 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
   * The minigames' description and highscores still scroll with the wheel when the mouse is over them, and an open dropdown there still keeps the wheel. The daily challenge page has no list, so the wheel still works like Up and Down there.
   * For anyone working with the menu code: `mappackgui_wheel(button)` scrolls the open page's list, and `gui_wheelduration(distance)` is how long a wheel slide over `distance` game pixels takes.
 * The world selection popup no longer draws worlds the mappack doesn't have (with no `N-1.txt` course) in black. Their spot is left empty, so the other worlds stay where they were. Worlds that exist but haven't been reached are still drawn in dark grey.
+
+#### 🧱 Corner Clipping and Hitting Rows
+
+**Corner clipping**
+
+* Bonking a block with your head while only just reaching under its side slides you past its corner, the same as before. How far is now `cornerclipdist` in `variables.lua` (0.25 of a tile), measured from the block's side to your hitbox's side. Before, it was 6/16 of a tile, worked out for a player exactly 12/16 wide.
+  * Reaching 0.25 or less into the block slides you past it. Reaching 0.4 into it bonks it.
+  * It works the same from both sides: your right side into the block's left side, and the block's right side into your left side.
+  * It only happens when there's nothing solid beside the block on that side, like before. It now works out where to put you from your own width, so characters of any width slide right up to the block's side.
+  * This covers tiles, button blocks and frozen coins.
+* A minigame's `cornerslide(x, y, player)` now runs when you slide past a tile's corner on either side. Before, it only ran on the left.
+
+**Hitting a row**
+
+* Hitting your head on a row of blocks can now hit two at once. The block under your centre is hit, and so is the one beside it if its side is `multihitdist` (0.25 of a tile, in `variables.lua`) or closer to your centre.
+  * With two blocks side by side, standing right under the line between them, or up to 0.25 to either side of it, hits both. Any further from it, and only the one you're under is hit.
+  * The second block reacts the same way as the first: items, coins, bricks breaking, coins on top being collected, and spikes and lava on its bottom.
+* The same goes for a row of enemies and blocks that aren't tiles: built-in enemies, custom enemies, flip blocks, button blocks and frozen coins. Every one of them in the same row (with the same bottom) whose side is within `multihitdist` of your centre gets hit too, the same as if you'd bonked it on its own.
+* Coins and collectables work the same way sideways: the column under your centre counts, and so does the one beside it if its side is within `multihitdist` of your centre.
+* Huge and Mega players work the same as before.
+* For anyone working with the player code: `mario:ceilcollide(a, b)` now runs `mario:ceilcollideobject(a, b)` (what `ceilcollide` used to be), then `mario:ceilmultihit(a, b)` for the rest of a row. `mario:cornerclip(x, solidleft, solidright, ignoreplatforms)` slides the player past a block's corner, and returns which way, or `nil` if they bonk it.
 
 ### 🐛 Bug Fixes
 
