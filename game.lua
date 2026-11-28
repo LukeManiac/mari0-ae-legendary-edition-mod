@@ -914,6 +914,8 @@ function game_update(dt)
 	pausemenuopentimer = math.max(0, math.min(pausemenuopentimer + (dt * (pausemenuopen and 1 or -1)), pausemenuopenduration))
 	--"start over": everyone dies once the pause menu has finished closing (accessibility.lua)
 	accessibility_startoverupdate()
+	--the music comes back once the pause menu has finished closing
+	pausemenu_updatemusic()
 	menuprompttimer = math.max(0, math.min(menuprompttimer + (dt * (menuprompt and 1 or -1)), menupromptduration))
 	desktopprompttimer = math.max(0, math.min(desktopprompttimer + (dt * (desktopprompt and 1 or -1)), desktoppromptduration))
 	suspendprompttimer = math.max(0, math.min(suspendprompttimer + (dt * (suspendprompt and 1 or -1)), suspendpromptduration))
@@ -6330,13 +6332,7 @@ function game_keypressed(key, textinput)
 			--confirm, and the pause key to close it (only once it has finished opening: see the top of game_keypressed)
 			if (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
 				if pausemenuoptions[pausemenuselected] == "resume" then
-					pausemenuopen = false
-					if pausedaudio then
-						love.audio.play(pausedaudio)
-						pausedaudio = nil
-					else
-						playmusic()
-					end
+					pausemenu_close()
 				elseif pausemenuoptions[pausemenuselected] == "save game" then
 					if minigameplaying then
 						--restart the minigame (the pause menu stays up while the screen fades out)
@@ -6367,13 +6363,7 @@ function game_keypressed(key, textinput)
 					pausemenu_buttonactivate() --"accessibility" (the page below), "skip course", "respawn at previous death" or "start over"
 				end
 			elseif isPauseKey(key) then
-				pausemenuopen = false
-				if pausedaudio then
-					love.audio.play(pausedaudio)
-					pausedaudio = nil
-				else
-					playmusic()
-				end
+				pausemenu_close()
 			end
 		end
 
@@ -6561,10 +6551,33 @@ function pausemenu_wraplabel(text, maxchars)
 	return lines
 end
 
+--closes the pause menu (resume, or the pause key). The game stays paused, and the music stays off, until it has
+--finished closing (see pausemenu_updatemusic)
+function pausemenu_close()
+	pausemenuopen = false
+	pausemenuresumemusic = true
+end
+
+--every frame (game_update, after the pause menu's timer): brings the music back once the pause menu has finished
+--closing after pausemenu_close
+function pausemenu_updatemusic()
+	if not pausemenuresumemusic or pausemenuopen or pausemenuopentimer > 0 then
+		return
+	end
+	pausemenuresumemusic = false
+	if pausedaudio then
+		love.audio.play(pausedaudio)
+		pausedaudio = nil
+	else
+		playmusic()
+	end
+end
+
 function pausegame(playpause)
 	if playpause == nil then playpause = true end
 
 	if not pausemenuopen then
+		pausemenuresumemusic = false
 		if not android then
 			pausedaudio = love.audio.pause()
 		end

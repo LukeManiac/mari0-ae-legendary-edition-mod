@@ -467,6 +467,7 @@ For anyone working with the pause menu code:
 #### ⏸️ Pause Menu
 
 * The game stays paused until the pause menu has finished closing. Before, everything started moving again as soon as you closed it, while it was still shrinking away. Animations, animated tiles and screen shake wait for it too.
+* The music waits for it too: it comes back once the pause menu has finished closing, instead of as soon as you pick **resume** or press the pause key. After **start over**, it doesn't come back at all, since everyone dies as soon as the menu has closed.
 * The pause menu only takes input once it has finished opening. Nothing works while it opens or closes: no keys, controller buttons or clicks, including Enter and the pause key. Before, Enter and the pause key worked while it was still opening. Keys pressed while it opens or closes don't reach the game either.
 * The same goes for its prompts (**quit to menu?**, **quit to desktop?**, **save game?** and **save highscore?**): each one only takes input once it has finished opening, and not while it closes.
 * Everything behind the pause menu is now blurred, with the same blur as the glass, before the dark layer goes over it. The blur fades in and out with the menu. It isn't there with **Reduce transparency** (accessibility) or in flat glass quality, the same as the glass itself.
