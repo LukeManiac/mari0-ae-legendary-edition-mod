@@ -4813,18 +4813,42 @@ function drawmultiHUD()
 	end
 end
 
---keeps the enemies that shouldn't be right next to where the players start (checkpointignoreenemies, and custom enemies
---with dontspawnnearcheckpoint) from spawning within 8 tiles sideways and 15 tiles up or down of tile x, y
+--whether the enemy on tile x, y shouldn't be right next to where the players start: built-in enemies in
+--checkpointignoreenemies, and custom enemies with dontspawnnearcheckpoint
+local function keptawayfromstart(x, y)
+	if not (inmap(x, y) and #map[x][y] > 1) then
+		return false
+	end
+	local id = map[x][y][2]
+	if tablecontains(checkpointignoreenemies, entityquads[id].t) then
+		return true
+	end
+	if tablecontains(customenemies, entityquads[id].t) and enemiesdata[id] and enemiesdata[id].dontspawnnearcheckpoint then
+		return true
+	end
+	return false
+end
+
+--a checkpoint: keeps those enemies from spawning within 8 tiles sideways and 15 tiles up or down of tile x, y
 local function clearenemiesnearstart(cx, cy)
 	for y = cy-15, cy+15 do
 		for x = cx-8, cx+8 do
-			if inmap(x, y) and #map[x][y] > 1 then
-				if tablecontains(checkpointignoreenemies, entityquads[map[x][y][2]].t) 
-					or (tablecontains(customenemies, entityquads[map[x][y][2]].t)
-					and enemiesdata[map[x][y][2]] and
-					enemiesdata[map[x][y][2]].dontspawnnearcheckpoint) then
-					table.insert(enemiesspawned, {x, y})
-				end
+			if keptawayfromstart(x, y) then
+				table.insert(enemiesspawned, {x, y})
+			end
+		end
+	end
+end
+
+--respawn where you died: keeps those enemies from spawning on a tile that's within radius tiles of a player's hitbox
+--(x, y, w, h, in game coordinates). Tile tx, ty covers tx-1 to tx sideways and ty-1 to ty up and down, and it counts
+--when it overlaps the hitbox grown by radius on every side (just touching its edge doesn't count, like any hitbox)
+local function clearenemiesnearhitbox(x, y, w, h)
+	local bx, by, bw, bh = x - respawnenemyclearradius, y - respawnenemyclearradius, w + respawnenemyclearradius*2, h + respawnenemyclearradius*2
+	for ty = math.floor(by), math.ceil(by + bh) + 1 do
+		for tx = math.floor(bx), math.ceil(bx + bw) + 1 do
+			if aabb(tx-1, ty-1, 1, 1, bx, by, bw, bh) and keptawayfromstart(tx, ty) then
+				table.insert(enemiesspawned, {tx, ty})
 			end
 		end
 	end
@@ -5232,9 +5256,7 @@ function startlevel(level, reason)
 	if respawnpoint then
 		startx = respawnpoint.x
 		starty = respawnpoint.y
-		--the same enemies a checkpoint keeps away are kept away from here. startx is the middle of the player's feet and
-		--starty their bottom, so the tile they stand in is column floor(startx)+1, row starty (rounded, against float error)
-		clearenemiesnearstart(math.floor(startx)+1, math.floor(starty+0.5))
+		--(the enemies near it are kept away once the players are made, from their hitboxes: see below)
 	end
 
 	--set startx to pipestart
@@ -5332,6 +5354,16 @@ function startlevel(level, reason)
 		end
 	end
 	multiplayerpipeexitdelay = nil
+
+	--respawn where you died: only the enemies a checkpoint keeps away, and only those within respawnenemyclearradius tiles
+	--(variables.lua) of where a player comes back (their hitbox, at the size they come back as), before anything on
+	--screen spawns
+	if respawnpoint then
+		for i = 1, players do
+			local p = objects["player"][i]
+			clearenemiesnearhitbox(p.x, p.y, p.width, p.height)
+		end
+	end
 	
 	splitscreen_reset()
 

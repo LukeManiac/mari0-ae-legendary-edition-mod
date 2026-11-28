@@ -694,6 +694,7 @@ lockeddoorentrywait = 0.5 --how long a player stands still after opening a locke
 cornerclipdist = 0.25 --hitting a block with your head while reaching this far or less into its side (nothing solid beside it) slides you past its corner instead
 multihitdist = 0.25 --hitting your head on a row of blocks or enemies also hits the ones beside the main one whose sides are this close or closer to your centre (coins and collectables too)
 coinoverlapepsilon = 0.0001 --how far a player's hitbox has to reach into a coin or collectable's tile before it counts, so only touching its edge doesn't collect it
+respawnenemyclearradius = 1 --respawn where you died: enemies a checkpoint keeps away (checkpointignoreenemies, dontspawnnearcheckpoint) don't spawn on tiles within this many tiles of a player's hitbox where they come back
 
 growtime = 0.9
 shrinktime = 0.9
