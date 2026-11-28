@@ -1262,9 +1262,13 @@ function mario:update(dt)
 		end
 
 		while self.starblinktimer > lmariostarblinkrate do
-			self.starcolori = self.starcolori + 1
-			if self.starcolori > 4 then
-				self.starcolori = self.starcolori - 4
+			--modernsizechangeanimation: the star colours stay on while the size changes, but don't move on to the next
+			--one until it's over (the blinking keeps time, so it carries on from the same colour afterwards)
+			if not self:modernsizeplaying() then
+				self.starcolori = self.starcolori + 1
+				if self.starcolori > 4 then
+					self.starcolori = self.starcolori - 4
+				end
 			end
 			if self.size ~= 8 and not accessibility_reduceflashing() then --(reduce flashing: a rainbow glow instead, see drawplayer)
 				self.colors = self.characterdata.starcolors[self.starcolori]
@@ -4569,6 +4573,16 @@ function mario:sizerank(size)
 	return 2
 end
 
+--whether a modern size change animation is playing on the player right now: with the freeze (animation "modernsize"),
+--or on its own with dontfreezeonsizechange (a sizefx of kind up, down or suit)
+function mario:modernsizeplaying()
+	if self.animation == "modernsize" then
+		return true
+	end
+	local F = self.sizefx
+	return F ~= nil and (F.kind == "up" or F.kind == "down" or F.kind == "suit")
+end
+
 --whether a change between these sizes gets the modern animation (Mega Mario and classic huge Mario keep their own)
 function mario:usesmodernsize(from, to)
 	if not ModernSizeChangeAnimation or minigameplaying or bigmario or self.characterdata.health then
@@ -4588,10 +4602,19 @@ function mario:sizesnapshot()
 		ducking = self.ducking}
 end
 
+--the colours a Starman is flashing the player through right now, or nil when it isn't (no star, Mega Mario, or reduce
+--flashing's rainbow glow). A size change animation keeps them, the way the classic animations always have
+function mario:starflashcolors()
+	if self.starred and self.size ~= 8 and not accessibility_reduceflashing() and self.characterdata.starcolors then
+		return self.characterdata.starcolors[self.starcolori]
+	end
+	return nil
+end
+
 --shows a snapshot, in the current pose. scaley: the sprite's height, scaled from the bottom of the hitbox
 function mario:applysizesnapshot(s, scaley)
 	self.graphic = s.graphic
-	self.colors = s.colors
+	self.colors = self:starflashcolors() or s.colors --(the snapshot's own colours come back once the star is over)
 	self.basecolors = s.basecolors
 	self.customcolors = s.customcolors
 	self.quadcenterX = s.quadcenterX
@@ -4821,7 +4844,7 @@ function mario:applysizefxlook(look)
 	end
 	if snap then
 		self.graphic = snap.graphic
-		self.colors = snap.colors
+		self.colors = self:starflashcolors() or snap.colors --(a Starman keeps flashing the player through its colours)
 		self.quadcenterX = snap.quadcenterX
 		self.quadcenterY = look.quadcenterY or snap.quadcenterY
 		self.offsetX = snap.offsetX + (self.width - snap.width)*8

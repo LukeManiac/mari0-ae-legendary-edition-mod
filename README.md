@@ -416,6 +416,8 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
 
 ### ✨ Improvements
 
+* With `modernsizechangeanimation`, a player with a Starman who changes size keeps flashing in the star's colours like before, but the colour they're on stays the same until the animation is over. The blinking keeps time, so it carries on from the same colour afterwards instead of jumping ahead. This works with `dontfreezeonsizechange` too. For anyone working with the player code: `mario:modernsizeplaying()` says whether a modern size change animation is playing on the player.
+
 #### 🐛 Wiggler
 
 * Wigglers now resist fire: fireballs bounce off the head and every piece of the body with the block hit sound, the same as dry Goombas.
@@ -462,6 +464,7 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
 
 ### 🐛 Bug Fixes
 
+* With `modernsizechangeanimation`, a player with a Starman now keeps flashing through the star colours while they power up or down, the same as with the classic animations. Before, every part of the animation put the player's normal colours back, so the flashing stopped until it was over. This also covers `dontfreezeonsizechange`. Once the star runs out, the player's own colours (the new ones, or the old ones on the parts that show the old look) come back. Mega Mario and **Reduce flashing** aren't affected.
 * Coins and collectables now have the same height as a regular tile when it comes to collecting them. A player only collects one when their hitbox actually reaches into its tile.
   * Ducking under a coin or collectable no longer collects it. Before, a big player who ducked still collected whatever was in the tile above their head, since the game always checked one tile above the middle of their hitbox.
   * A big player in mid-air no longer collects a coin or collectable in the tile above them that their hitbox doesn't reach, and always collects one in every tile their hitbox does reach. Before, the game only checked a few fixed points, so it could do either.
