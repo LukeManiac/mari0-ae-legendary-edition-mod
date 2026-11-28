@@ -555,7 +555,7 @@ function accessibility_pitrescue(p)
 	local grav = p.gravity or yacceleration
 	playsound(bumperjumpsound)
 	p.speedy = -math.sqrt(2*grav*bounceheighthigh)
-	--always the jump-held bounce, held or not: only letting go of jump during it cuts it (see accessibility_pitjumpcut)
+	--always the jump-held bounce, held or not: letting go of jump during it changes nothing (see accessibility_pitholdsjump)
 	p.jumping = true
 	p.a11ypitrising = true
 	p.falling = true
@@ -568,25 +568,23 @@ function accessibility_pitrescue(p)
 end
 
 --pit rescue: bouncing off an enemy, a spring, a note block or a faith plate lets pit rescue catch the player again, like
---landing does. The new bounce isn't the pit bounce, so letting go of jump no longer cuts it
+--landing does. The new bounce isn't the pit bounce, so letting go of jump works as usual again
 function accessibility_pitreset(p)
 	p.a11ypitbounced = nil
 	p.a11ypitrising = nil
 end
 
---pit rescue: letting go of jump while the bounce is still going up cuts it to the bounce of stomping an enemy without
---holding jump in mario maker physics (bounceheightmaker), and ends the jump. Only once per bounce
-function accessibility_pitjumpcut(p)
+--pit rescue: whether letting go of jump should be ignored right now (the bounce out of the pit is still going up, and
+--it always goes its full height). Once the player stops rising, letting go of jump works as usual
+function accessibility_pitholdsjump(p)
 	if not p.a11ypitrising then
-		return
+		return false
 	end
-	p.a11ypitrising = nil
 	if p.gravitydir ~= "down" or p.speedy >= 0 then
-		return
+		p.a11ypitrising = nil
+		return false
 	end
-	local grav = p.characterdata.yacceleration or yacceleration
-	p.speedy = math.max(p.speedy, -math.sqrt(2*grav*bounceheightmaker))
-	p:stopjump()
+	return true
 end
 
 --respawn where you died: where the next try starts after everyone died, or nil

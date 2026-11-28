@@ -5966,6 +5966,126 @@ function updatespritebatch(camx, camy)
 	queuespritebatchupdate = false
 end
 
+------------------------------------------------------------
+-- player control helpers (keyboard and joystick presses and releases)
+------------------------------------------------------------
+
+--the player controls checked after jump, in order (see game_keypressed, game_keyreleased, game_joystickpressed,
+--game_joystickreleased). Only the first control a key or button matches does anything
+local PLAYERBINDS = {"run", "reload", "use", "left", "right", "up", "down"}
+
+--what each control does to the player when it's pressed
+local PLAYERPRESSACTIONS = {
+	jump = function(player)
+		player:wag()
+		player:jump()
+	end,
+	run = function(player)
+		player:fire()
+	end,
+	reload = function(player)
+		if player.portalgun then
+			local pi = false
+			--only reset portals that can be controlled by player
+			if player.portals == "1 only" then
+				pi = 1
+			elseif player.portals == "2 only" then
+				pi = 2
+			end
+			player:removeportals(pi)
+		end
+	end,
+	use = function(player)
+		player:use()
+	end,
+	left = function(player)
+		player:leftkey()
+	end,
+	right = function(player)
+		player:rightkey()
+	end,
+	up = function(player)
+		player:upkey()
+	end,
+	down = function(player)
+		player:downkey()
+	end,
+}
+
+--a player's control was pressed: tells the player, does what the control does, and tells the animations
+local function player_presscontrol(i, bind)
+	local player = objects["player"][i]
+	player:button(bind)
+	local action = PLAYERPRESSACTIONS[bind]
+	if action then
+		action(player)
+	end
+	animationsystem_buttontrigger(i, bind)
+end
+
+--a player's control was let go: tells the player and the animations, and ends the jump if it was jump
+local function player_releasecontrol(i, bind)
+	local player = objects["player"][i]
+	player:buttonrelease(bind)
+	if bind == "jump" then
+		--jump stays held in some minigames, and during the pit rescue bounce
+		if not minigame_jumpheld(i) and not accessibility_pitholdsjump(player) then
+			player:stopjump()
+		end
+	end
+	animationsystem_buttonreleasetrigger(i, bind)
+end
+
+--a key was pressed: if it's bound to player i's control bind, presses that control.
+--Returns whether the key matched the binding, and whether the press went through
+function player_keypressed(i, bind, key)
+	if not controlbindingmatcheskey(i, bind, key) then
+		return false, false
+	end
+	local pressed = controlinputpress(i, bind, "key", key)
+	if pressed then
+		player_presscontrol(i, bind)
+	end
+	return true, pressed
+end
+
+--a key was let go: if it's bound to player i's control bind, releases that control.
+--Returns true when the key matched the binding (whether or not the control was held)
+function player_keyreleased(i, bind, key)
+	if not controlbindingmatcheskey(i, bind, key) then
+		return false
+	end
+	if controlinputrelease(i, bind) then
+		player_releasecontrol(i, bind)
+	end
+	return true
+end
+
+--a joystick button was pressed: if it's bound to player i's control bind, presses that control. With enabled false,
+--a matching button does nothing. Returns whether the button matched the binding, and whether the press went through
+function player_joystickpressed(i, bind, joystick, button, enabled)
+	if not controlbindingmatchesjoy(i, bind, joystick, button) then
+		return false, false
+	end
+	local pressed = enabled ~= false and controlinputpress(i, bind, "joybutton", joystick, button)
+	if pressed then
+		player_presscontrol(i, bind)
+	end
+	return true, pressed
+end
+
+--a joystick button was let go: if it's bound to player i's control bind, releases that control. With enabled false,
+--a matching button changes nothing (the control stays held). Returns true when the button matched the binding
+function player_joystickreleased(i, bind, joystick, button, enabled)
+	if not controlbindingmatchesjoy(i, bind, joystick, button) then
+		return false
+	end
+	if enabled ~= false and controlinputrelease(i, bind) then
+		player_releasecontrol(i, bind)
+	end
+	return true
+end
+
 function game_keypressed(key, textinput)
 	if minigameplaying and (warpfade or minigame_hardfrozen()) then
 		return --leaving or restarting a minigame, or frozen before its results screen
@@ -6253,71 +6373,15 @@ function game_keypressed(key, textinput)
 			break
 		end
 
-		if controlbindingmatcheskey(i, "jump", key) then
-			local player = objects["player"][i]
-			appliedcontrolpresses.jump = controlinputpress(i, "jump", "key", key)
-			if appliedcontrolpresses.jump then
-				player:button("jump")
-				player:wag()
-				player:jump()
-				animationsystem_buttontrigger(i, "jump")
-			end
-		elseif controlbindingmatcheskey(i, "run", key) then
-			if controlinputpress(i, "run", "key", key) then
-				objects["player"][i]:button("run")
-				objects["player"][i]:fire()
-				animationsystem_buttontrigger(i, "run")
-			end
-		elseif controlbindingmatcheskey(i, "reload", key) then
-			if controlinputpress(i, "reload", "key", key) then
-				objects["player"][i]:button("reload")
-				if objects["player"][i].portalgun then
-					local pi = false
-					--only reset portals that can be controlled by player
-					if objects["player"][i].portals == "1 only" then
-						pi = 1
-					elseif objects["player"][i].portals == "2 only" then
-						pi = 2
-					end
-					objects["player"][i]:removeportals(pi)
+		local matched, pressed = player_keypressed(i, "jump", key)
+		appliedcontrolpresses.jump = pressed
+		if not matched then
+			for _, bind in ipairs(PLAYERBINDS) do
+				matched, pressed = player_keypressed(i, bind, key)
+				if matched then
+					appliedcontrolpresses[bind] = pressed
+					break --only the first matching control, like before
 				end
-				animationsystem_buttontrigger(i, "reload")
-			end
-		elseif controlbindingmatcheskey(i, "use", key) then
-			if controlinputpress(i, "use", "key", key) then
-				objects["player"][i]:button("use")
-				objects["player"][i]:use()
-				animationsystem_buttontrigger(i, "use")
-			end
-		elseif controlbindingmatcheskey(i, "left", key) then
-			local player = objects["player"][i]
-			if controlinputpress(i, "left", "key", key) then
-				player:button("left")
-				player:leftkey()
-				animationsystem_buttontrigger(i, "left")
-			end
-		elseif controlbindingmatcheskey(i, "right", key) then
-			local player = objects["player"][i]
-			if controlinputpress(i, "right", "key", key) then
-				player:button("right")
-				player:rightkey()
-				animationsystem_buttontrigger(i, "right")
-			end
-		elseif controlbindingmatcheskey(i, "up", key) then
-			local player = objects["player"][i]
-			appliedcontrolpresses.up = controlinputpress(i, "up", "key", key)
-			if appliedcontrolpresses.up then
-				player:button("up")
-				player:upkey()
-				animationsystem_buttontrigger(i, "up")
-			end
-		elseif controlbindingmatcheskey(i, "down", key) then
-			local player = objects["player"][i]
-			appliedcontrolpresses.down = controlinputpress(i, "down", "key", key)
-			if appliedcontrolpresses.down then
-				player:button("down")
-				player:downkey()
-				animationsystem_buttontrigger(i, "down")
 			end
 		end
 		
@@ -6558,49 +6622,11 @@ function game_keyreleased(key, unicode)
 		return --frozen before the results screen (see minigame_finish)
 	end
 	for i = 1, players do
-		if controlbindingmatcheskey(i, "jump", key) then
-			local player = objects["player"][i]
-			if controlinputrelease(i, "jump") then
-				player:buttonrelease("jump")
-				if not minigame_jumpheld(i) then --jump stays held in some minigames
-					player:stopjump()
+		if not player_keyreleased(i, "jump", key) then
+			for _, bind in ipairs(PLAYERBINDS) do
+				if player_keyreleased(i, bind, key) then
+					break --only the first matching control, like before
 				end
-				animationsystem_buttonreleasetrigger(i, "jump")
-			end
-		elseif controlbindingmatcheskey(i, "run", key) then
-			if controlinputrelease(i, "run") then
-				objects["player"][i]:buttonrelease("run")
-				animationsystem_buttonreleasetrigger(i, "run")
-			end
-		elseif controlbindingmatcheskey(i, "reload", key) then
-			if controlinputrelease(i, "reload") then
-				objects["player"][i]:buttonrelease("reload")
-				animationsystem_buttonreleasetrigger(i, "reload")
-			end
-		elseif controlbindingmatcheskey(i, "use", key) then
-			if controlinputrelease(i, "use") then
-				objects["player"][i]:buttonrelease("use")
-				animationsystem_buttonreleasetrigger(i, "use")
-			end
-		elseif controlbindingmatcheskey(i, "left", key) then
-			if controlinputrelease(i, "left") then
-				objects["player"][i]:buttonrelease("left")
-				animationsystem_buttonreleasetrigger(i, "left")
-			end
-		elseif controlbindingmatcheskey(i, "right", key) then
-			if controlinputrelease(i, "right") then
-				objects["player"][i]:buttonrelease("right")
-				animationsystem_buttonreleasetrigger(i, "right")
-			end
-		elseif controlbindingmatcheskey(i, "up", key) then
-			if controlinputrelease(i, "up") then
-				objects["player"][i]:buttonrelease("up")
-				animationsystem_buttonreleasetrigger(i, "up")
-			end
-		elseif controlbindingmatcheskey(i, "down", key) then
-			if controlinputrelease(i, "down") then
-				objects["player"][i]:buttonrelease("down")
-				animationsystem_buttonreleasetrigger(i, "down")
 			end
 		end
 		for _, name in ipairs({"portal1", "portal2"}) do
@@ -9731,73 +9757,13 @@ function game_joystickpressed( joystick, button )
 			--allow the mid-powerup midair jump (sizechangejumps) even while the game is frozen (noupdate)
 			local allowcontrols = (not noupdate) or player:sizechangejumps()
 
-			if controlbindingmatchesjoy(i, "jump", joystick, button) then
-				if allowcontrols and controlinputpress(i, "jump", "joybutton", joystick, button) then
-					player:button("jump")
-					player:wag()
-					player:jump()
-					animationsystem_buttontrigger(i, "jump")
-				end
+			if player_joystickpressed(i, "jump", joystick, button, allowcontrols) then
 				return
 			elseif not noupdate then
-				if controlbindingmatchesjoy(i, "run", joystick, button) then
-					if controlinputpress(i, "run", "joybutton", joystick, button) then
-						player:button("run")
-						player:fire()
-						animationsystem_buttontrigger(i, "run")
+				for _, bind in ipairs(PLAYERBINDS) do
+					if player_joystickpressed(i, bind, joystick, button) then
+						return
 					end
-					return
-				elseif controlbindingmatchesjoy(i, "reload", joystick, button) then
-					if controlinputpress(i, "reload", "joybutton", joystick, button) then
-						player:button("reload")
-						if player.portalgun then
-							local pi = false
-							--only reset portals that can be controlled by player
-							if player.portals == "1 only" then
-								pi = 1
-							elseif player.portals == "2 only" then
-								pi = 2
-							end
-							player:removeportals(pi)
-						end
-						animationsystem_buttontrigger(i, "reload")
-					end
-					return
-				elseif controlbindingmatchesjoy(i, "use", joystick, button) then
-					if controlinputpress(i, "use", "joybutton", joystick, button) then
-						player:button("use")
-						player:use()
-						animationsystem_buttontrigger(i, "use")
-					end
-					return
-				elseif controlbindingmatchesjoy(i, "left", joystick, button) then
-					if controlinputpress(i, "left", "joybutton", joystick, button) then
-						player:button("left")
-						player:leftkey()
-						animationsystem_buttontrigger(i, "left")
-					end
-					return
-				elseif controlbindingmatchesjoy(i, "up", joystick, button) then
-					if controlinputpress(i, "up", "joybutton", joystick, button) then
-						player:button("up")
-						player:upkey()
-						animationsystem_buttontrigger(i, "up")
-					end
-					return
-				elseif controlbindingmatchesjoy(i, "down", joystick, button) then
-					if controlinputpress(i, "down", "joybutton", joystick, button) then
-						player:button("down")
-						player:downkey()
-						animationsystem_buttontrigger(i, "down")
-					end
-					return
-				elseif controlbindingmatchesjoy(i, "right", joystick, button) then
-					if controlinputpress(i, "right", "joybutton", joystick, button) then
-						player:button("right")
-						player:rightkey()
-						animationsystem_buttontrigger(i, "right")
-					end
-					return
 				end
 				
 				if controlbindingmatchesjoy(i, "portal1", joystick, button) then
@@ -9832,58 +9798,13 @@ function game_joystickreleased( joystick, button )
 			--allow releasing the mid-powerup midair jump even while the game is frozen (noupdate)
 			local allowcontrols = (not noupdate) or player:sizechangejumps()
 
-			if controlbindingmatchesjoy(i, "jump", joystick, button) then
-				if allowcontrols and controlinputrelease(i, "jump") then
-					player:buttonrelease("jump")
-					if not minigame_jumpheld(i) then --jump stays held in some minigames
-						player:stopjump()
-					end
-					animationsystem_buttonreleasetrigger(i, "jump")
-				end
+			if player_joystickreleased(i, "jump", joystick, button, allowcontrols) then
 				return
 			elseif not noupdate then
-				if controlbindingmatchesjoy(i, "run", joystick, button) then
-					if controlinputrelease(i, "run") then
-						player:buttonrelease("run")
-						animationsystem_buttonreleasetrigger(i, "run")
+				for _, bind in ipairs(PLAYERBINDS) do
+					if player_joystickreleased(i, bind, joystick, button) then
+						return
 					end
-					return
-				elseif controlbindingmatchesjoy(i, "reload", joystick, button) then
-					if controlinputrelease(i, "reload") then
-						player:buttonrelease("reload")
-						animationsystem_buttonreleasetrigger(i, "reload")
-					end
-					return
-				elseif controlbindingmatchesjoy(i, "use", joystick, button) then
-					if controlinputrelease(i, "use") then
-						player:buttonrelease("use")
-						animationsystem_buttonreleasetrigger(i, "use")
-					end
-					return
-				elseif controlbindingmatchesjoy(i, "left", joystick, button) then
-					if controlinputrelease(i, "left") then
-						player:buttonrelease("left")
-						animationsystem_buttonreleasetrigger(i, "left")
-					end
-					return
-				elseif controlbindingmatchesjoy(i, "right", joystick, button) then
-					if controlinputrelease(i, "right") then
-						player:buttonrelease("right")
-						animationsystem_buttonreleasetrigger(i, "right")
-					end
-					return
-				elseif controlbindingmatchesjoy(i, "up", joystick, button) then
-					if controlinputrelease(i, "up") then
-						player:buttonrelease("up")
-						animationsystem_buttonreleasetrigger(i, "up")
-					end
-					return
-				elseif controlbindingmatchesjoy(i, "down", joystick, button) then
-					if controlinputrelease(i, "down") then
-						player:buttonrelease("down")
-						animationsystem_buttonreleasetrigger(i, "down")
-					end
-					return
 				end
 				for _, name in ipairs({"portal1", "portal2"}) do
 					if controlbindingmatchesjoy(i, name, joystick, button) then

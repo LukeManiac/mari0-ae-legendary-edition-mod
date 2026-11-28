@@ -425,9 +425,10 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
 * **Pit rescue** (accessibility) now bounces you back up out of the pit instead of putting you back on the last solid ground you stood on.
   * It happens as soon as the bottom of your hitbox reaches the bottom of the level, instead of once you've fallen all the way out of it.
   * You bounce as high as bouncing off an enemy while holding jump in Mario Maker physics, whatever physics the mappack uses.
-  * Letting go of jump while you're still going up cuts the bounce down to the speed of bouncing off an enemy without holding jump in Mario Maker physics (`bounceheightmaker`, 1.25 tiles), like a stomp. Before, letting go only switched you back to normal gravity, which barely slowed down a bounce that fast. You always get the full bounce, whether or not you're holding jump when you reach the pit: only letting go during it makes it lower.
+  * You always get the full bounce, whether or not you're holding jump. Letting go of jump while you're still going up changes nothing: the bounce doesn't slow down and you don't switch back to normal gravity, so it always reaches its full height. Once you start falling, letting go of jump works as usual again.
   * It no longer counts as a hit: you keep your form, along with your shoe, helmet or Yoshi, and you don't blink. Before, a powered-up player dropped one size and a small player blinked.
-  * It only catches you once: falling into a pit again before you land on something is a death, as usual. Bouncing off an enemy, a spring, a note block or a faith plate lets it catch you again, the same as landing, and letting go of jump no longer cuts that new bounce.
+  * It only catches you once: falling into a pit again before you land on something is a death, as usual. Bouncing off an enemy, a spring, a note block or a faith plate lets it catch you again, the same as landing. That new bounce isn't the pit bounce, so letting go of jump works on it as usual.
+  * For anyone working with the accessibility code: `accessibility_pitholdsjump(p)` says whether letting go of jump should be ignored right now (the pit bounce is still going up). The jump release handlers skip `mario:stopjump()` while it's `true`. It replaces `accessibility_pitjumpcut(p)`, which is gone.
 * Bunny ears stay on their idle frame while you're crouched on the ground.
 * Wagging your tail as Raccoon or Tanooki Mario while riding Yoshi keeps Yoshi in his jumping pose, instead of switching him to his standing pose. This goes for his tongue pose too.
 
@@ -474,6 +475,22 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
 * Coins and collectables work the same way sideways: the column under your centre counts, and so does the one beside it if its side is within `multihitdist` of your centre.
 * Huge and Mega players work the same as before.
 * For anyone working with the player code: `mario:ceilcollide(a, b)` now runs `mario:ceilcollideobject(a, b)` (what `ceilcollide` used to be), then `mario:ceilmultihit(a, b)` for the rest of a row. `mario:cornerclip(x, solidleft, solidright, ignoreplatforms)` slides the player past a block's corner, and returns which way, or `nil` if they bonk it.
+
+#### 🎮 Player Control Helpers
+
+The keyboard and controller handlers in `game.lua` (`game_keypressed`, `game_keyreleased`, `game_joystickpressed` and `game_joystickreleased`) no longer repeat the same block for every control. They go through a few shared helpers instead.
+
+* Every control works the same as before: jump, run, reload, use, left, right, up and down still press and let go the same way, and only the first control a key or button is bound to does anything.
+* Controller presses now check the controls in the same order as everything else: run, reload, use, left, right, up, down. Before, they checked up and down before right. This only matters with one button bound to more than one of them, and it means pressing and letting go of that button now go to the same control.
+* Portal 1 and Portal 2 still work the way they did, outside the helpers.
+
+For anyone working with the input code:
+
+* `player_keypressed(i, bind, key)` presses player `i`'s control `bind` if `key` is bound to it. It returns whether the key matched the binding, and whether the press went through.
+* `player_keyreleased(i, bind, key)` lets go of it, and returns whether the key matched the binding.
+* `player_joystickpressed(i, bind, joystick, button, enabled)` and `player_joystickreleased(i, bind, joystick, button, enabled)` do the same for a controller button. With `enabled` set to `false`, a matching button counts as a match but does nothing. Leaving it out counts as `true`.
+* `PLAYERBINDS` is the list of controls checked after jump, in order. `PLAYERPRESSACTIONS` holds what each control does to the player when it's pressed (jump wags and jumps, run fires, reload takes the portals away, and so on). Change an entry there to change what a control does on both the keyboard and a controller.
+* Letting go of jump still ends the jump, except in minigames that keep jump held and during the pit rescue bounce.
 
 ### 🐛 Bug Fixes
 

@@ -9999,10 +9999,6 @@ function mario:buttonrelease(b)
 	if noupdate or (not self.controlsenabled) then
 		return false
 	end
-	--pit rescue (accessibility): letting go of jump cuts the bounce out of the pit
-	if b == "jump" then
-		accessibility_pitjumpcut(self)
-	end
 	--un-reverse controls for purple gel
 	if self.reversecontrols and (b == "left" or b == "right") then
 		self.reversecontrols = false
