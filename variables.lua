@@ -259,7 +259,7 @@ goombashoejumpdelay = 1 --how long it stays on the floor
 
 wigglerspeed = 2
 wigglerspeedangry = 4
-wigglerdeathjumpforce = 10 --a dying wiggler's head jumps straight up this fast (speedy -10, speedx 0), then falls with shotgravity, and its body follows its path
+wigglerdeathjumpforce = 15 --a dying wiggler's head jumps straight up this fast (speedy -15, speedx 0), then falls with shotgravity, and its body follows its path
 
 thwompattackspeed = 15
 thwompwait = 1
