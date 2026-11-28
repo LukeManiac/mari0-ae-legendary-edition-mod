@@ -406,6 +406,7 @@ end
 --the player just landed: a remembered jump happens next frame (see accessibility_playerupdate)
 function accessibility_landed(p)
 	p.a11ypitbounced = nil --pit rescue can catch them again
+	p.a11ypitrising = nil
 	if p.a11yjumpbuffer then
 		if accessibility.jumpbuffer and love.timer.getTime() - p.a11yjumpbuffer <= JUMPBUFFER_TIME then
 			p.a11ypendingjump = true
@@ -458,6 +459,11 @@ function accessibility_playerupdate(p, dt)
 		return
 	end
 	local n = p.playernumber
+
+	--pit rescue: the bounce is over once the player stops going up (letting go of jump after that changes nothing)
+	if p.a11ypitrising and (p.speedy >= 0 or p.gravitydir ~= "down") then
+		p.a11ypitrising = nil
+	end
 
 	--on the ground, or how long in the air (coyote time)
 	if p.falling == false and not p.jumping then
@@ -532,8 +538,9 @@ function accessibility_runpressed(i)
 end
 
 --pit rescue: a player whose feet reach the bottom of the level bounces back up out of the pit, as high as bouncing off
---an enemy while holding jump, and it counts as a hit (a small player just blinks). Only once: falling into a pit again
---before landing on something is a death, as usual. Returns true when it caught them
+--an enemy while holding jump in mario maker physics, whatever physics the mappack uses. It doesn't hurt them: their
+--form stays the same. Only once: falling into a pit again before landing on something is a death, as usual.
+--Returns true when it caught them
 function accessibility_pitrescue(p)
 	if not accessibility.pitrescue or editormode or minigameplaying or autoscrolling or levelfinished or p.dead then
 		return false
@@ -544,38 +551,36 @@ function accessibility_pitrescue(p)
 	p.a11ypitbounced = true --(until they land again, see accessibility_landed)
 	p.y = math.min(p.y, mapheight - p.height) --feet on the bottom of the level, never below it
 
-	--the same bounce as stomping an enemy with jump held (mario:stompenemy)
+	--the same bounce as stomping an enemy with jump held in mario maker physics (mario:stompbounce), for every physics
 	local grav = p.gravity or yacceleration
-	local bouncespeed = math.sqrt(2*grav*bounceheight)
-	if mariomakerphysics and (not portalphysics) then
-		bouncespeed = math.sqrt(2*grav*bounceheighthigh)
-	end
-	p.speedy = -bouncespeed
-	--like a stomp: still holding jump keeps the jump going (letting go ends it the usual way)
-	if jumpkey(p.playernumber) then
-		p.jumping = true
-	else
-		p.jumping = false
+	p.speedy = -math.sqrt(2*grav*bounceheighthigh)
+	p.jumping = true
+	p.a11ypitrising = true --(letting go of jump cuts the bounce, see accessibility_pitjumpcut)
+	if not jumpkey(p.playernumber) then
+		accessibility_pitjumpcut(p) --already let go: the lower bounce straight away
 	end
 	p.falling = true
 	p.landed = false
 	p.animationstate = "jumping"
 	p:setquad()
 	p.a11yjumpbuffer = nil
-
-	if p.invincible or p.starred then
-		--already can't be hurt: just put back
-	elseif p.characterdata.health and p.health and p.health > 1 then
-		p:die("Enemy (pit rescue)")
-	elseif p.size > 1 and not p.characterdata.health then
-		p:die("Enemy (pit rescue)") --drops a size, or loses a shoe, helmet or Yoshi, like any hit
-	else
-		playsound(shrinksound)
-		p.invincible = true
-		p.animationtimer = invincibletime - invincibletime2
-		p.animation = "invincible"
-	end
+	--no hit: the player keeps their form (and their shoe, helmet or Yoshi)
 	return true
+end
+
+--pit rescue: letting go of jump while the bounce is still going up cuts it to the bounce of stomping an enemy without
+--holding jump in mario maker physics (bounceheightmaker), and ends the jump. Only once per bounce
+function accessibility_pitjumpcut(p)
+	if not p.a11ypitrising then
+		return
+	end
+	p.a11ypitrising = nil
+	if p.gravitydir ~= "down" or p.speedy >= 0 then
+		return
+	end
+	local grav = p.characterdata.yacceleration or yacceleration
+	p.speedy = math.max(p.speedy, -math.sqrt(2*grav*bounceheightmaker))
+	p:stopjump()
 end
 
 --respawn where you died: where the next try starts after everyone died, or nil
