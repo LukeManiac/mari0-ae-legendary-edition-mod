@@ -310,6 +310,7 @@ function mario:init(x, y, i, animation, size, t, properties)
 	self.falling = false
 	self.jumping = false
 	self.starred = false
+	self.starcombo = 1
 	self.dead = false
 	self.vine = false
 	self.fence = false
@@ -1294,6 +1295,7 @@ function mario:update(dt)
 			end
 			
 			self.starred = false
+			self.starcombo = 1 --losing the star starts the star combo over
 			self.startimer = mariostarduration
 		end
 	end
@@ -5873,14 +5875,34 @@ function mario:addstompcombo()
 		addpoints(mariocombo[self.combo], self.x, self.y)
 		self.combo = self.combo + 1
 	else
-		if mariolivecount ~= false then
-			for i = 1, players do
-				mariolives[i] = mariolives[i]+1
-			end
-			respawnplayers()
+		self:combooneup()
+	end
+end
+
+function mario:combooneup()
+	--a combo that ran past its last score gives a 1up for every enemy after that
+	if mariolivecount ~= false then
+		for i = 1, players do
+			mariolives[i] = mariolives[i]+1
 		end
-		table.insert(scrollingscores, scrollingscore:new("1up", self.x, self.y))
-		playsound(oneupsound)
+		respawnplayers()
+	end
+	table.insert(scrollingscores, scrollingscore:new("1up", self.x, self.y))
+	playsound(oneupsound)
+end
+
+function mario:addstarcombo(points)
+	--minigames, and kills that aren't from a star (huge mario, tanooki statue), keep the enemy's own score
+	if minigameplaying or not self.starred then
+		addpoints(points, self.x, self.y)
+		return
+	end
+	--enemies killed during one star: 100, 200, 400, 500, 800, 1000, 2000, 4000, 5000, 8000, then a 1up each
+	if self.starcombo <= #starcombo then
+		addpoints(starcombo[self.starcombo], self.x, self.y)
+		self.starcombo = self.starcombo + 1
+	else
+		self:combooneup()
 	end
 end
 
@@ -7452,7 +7474,7 @@ function mario:starcollide(a, b)
 		if b.resistsstar then
 			return true
 		elseif b:shotted("right", nil, nil, false, true) then
-			addpoints(firepoints[b.t] or 100, self.x, self.y)
+			self:addstarcombo(firepoints[b.t] or 100)
 			return true
 		end
 	elseif (a == "goomba" or a == "koopa" or a == "plant" or a == "bowser" or a == "squid" or a == "cheep" or a == "hammerbro" or a == "lakito" or a == "bulletbill" or a == "flyingfish" or a == "downplant" or a == "bigbill" or a == "cannonball" or (a == "kingbill" and not (levelfinished and not self.controlsenabled)) or a == "sidestepper" or a == "barrel" or a == "icicle" or a == "angrysun"
@@ -7460,7 +7482,7 @@ function mario:starcollide(a, b)
 		and (not b.resistsstar) then
 		b:shotted("right")
 		if a ~= "bowser" then
-			addpoints(firepoints[a], self.x, self.y)
+			self:addstarcombo(firepoints[a])
 		end
 		return true
 	--enemies (and stuff) that don't do shit
@@ -9035,6 +9057,7 @@ function mario:flag()
 		self:setsize(2)
 		self.largeshrink = true
 		self.starred = false
+		self.starcombo = 1 --losing the star starts the star combo over
 		self.startimer = mariostarduration
 	end
 	self.static = false
@@ -9715,6 +9738,7 @@ function mario:star()
 	self.startimer = 0
 	self.starglowtimer = 0
 	self.starred = true
+	self.starcombo = 1 --a new star starts the star combo over
 	music:stop(custommusic)
 	updatemusicpriority()
 end

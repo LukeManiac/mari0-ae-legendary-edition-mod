@@ -57,6 +57,7 @@ boomerangcolor = {{32, 56, 236}, {255, 255, 255}, {252, 152, 56}}
 
 mariocombo = {100, 200, 400, 500, 800, 1000, 2000, 4000, 5000, 8000} --combo scores for bouncing on enemies
 koopacombo = {500, 800, 1000, 2000, 4000, 5000, 8000} --combo scores for series of koopa kills
+starcombo = {100, 200, 400, 500, 800, 1000, 2000, 4000, 5000, 8000} --combo scores for enemies killed with a star, then a 1up each
 --star scores are identical so I'm just gonn be lazy
 firepoints = {	goomba = 100,
 				koopa = 200,

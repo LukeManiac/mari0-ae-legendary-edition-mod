@@ -390,6 +390,19 @@ All notable releases and updates to **Legendary Edition** are documented here.
 
 ## v1.4.1
 
+### 🧩 New Features
+
+#### ⭐ Star Combo
+
+Enemies killed with a Super Star now give a combo, like stomping enemies without landing does, instead of each enemy's own score.
+
+* The first enemy gives 100 points, then 200, 400, 500, 800, 1000, 2000, 4000, 5000 and 8000. Every enemy after that gives a 1up. The scores are `starcombo` in `variables.lua`.
+* The combo starts over at 100 whenever you get a star, including a new one while you still have one, and whenever you lose it: when it runs out, or when a Mega Mushroom wears off.
+* Bowser still gives no points for a star kill, and doesn't move the combo on.
+* This also covers a Mega Mushroom, since it gives you a star. Kills as huge Mario or as a Tanooki statue without a star still give the enemy's own score.
+* Minigames keep the enemy's own score.
+* `mario:addstarcombo(points)` gives the next score of the star combo, or `points` when the kill isn't from a star. `mario:combooneup()` is the 1up both combos give once they run past their last score.
+
 ### 🐛 Bug Fixes
 
 * Coins and collectables now have the same height as a regular tile when it comes to collecting them. A player only collects one when their hitbox actually reaches into its tile.
