@@ -606,11 +606,21 @@ function accessibility_respawnsublevel()
 	return nil
 end
 
---startlevel: where to put the players instead of the start or a checkpoint (and forgets it), or nil
-function accessibility_takerespawn()
+--the level name startlevel loads for a respawn point's course and area ("1-2", or "1-2_3" for a sublevel)
+local function respawnlevelname(point)
+	if point.sub and point.sub ~= 0 then
+		return point.course .. "_" .. tostring(point.sub)
+	end
+	return point.course
+end
+
+--startlevel: where to put the players instead of the start or a checkpoint (and forgets it), or nil. level is the level
+--being loaded, as startlevel names it ("1-2" or "1-2_3"). It's checked instead of mariosublevel, which is still 0 while
+--the level screen loads a sublevel after a death (it's only set once startlevel is done, see levelscreen.lua)
+function accessibility_takerespawn(level)
 	local point = accessibilityrespawn
 	accessibilityrespawn = nil
-	if point and accessibility.respawnwheredied and safehere(point) then
+	if point and accessibility.respawnwheredied and respawnlevelname(point) == tostring(level) then
 		return point
 	end
 	return nil

@@ -4813,6 +4813,23 @@ function drawmultiHUD()
 	end
 end
 
+--keeps the enemies that shouldn't be right next to where the players start (checkpointignoreenemies, and custom enemies
+--with dontspawnnearcheckpoint) from spawning within 8 tiles sideways and 15 tiles up or down of tile x, y
+local function clearenemiesnearstart(cx, cy)
+	for y = cy-15, cy+15 do
+		for x = cx-8, cx+8 do
+			if inmap(x, y) and #map[x][y] > 1 then
+				if tablecontains(checkpointignoreenemies, entityquads[map[x][y][2]].t) 
+					or (tablecontains(customenemies, entityquads[map[x][y][2]].t)
+					and enemiesdata[map[x][y][2]] and
+					enemiesdata[map[x][y][2]].dontspawnnearcheckpoint) then
+					table.insert(enemiesspawned, {x, y})
+				end
+			end
+		end
+	end
+end
+
 function startlevel(level, reason)
 	local enteredfrompipe = pipeentrancepending
 	pipeentrancepending = false
@@ -5182,23 +5199,21 @@ function startlevel(level, reason)
 		animation = "vinestart"
 	end
 	
+	--respawn where you died (accessibility): the last solid ground before everyone died, instead of the start or a checkpoint.
+	--Checked against the level being loaded (level), since mariosublevel isn't right yet when coming back into a sublevel
+	local respawnpoint = accessibility_takerespawn(level)
+	if pipestartx then
+		respawnpoint = nil
+	end
+
 	--set startx to checkpoint
 	if checkpointx and checkcheckpoint then
 		startx = checkpointx
 		starty = checkpointpoints[checkpointx] or mapheight - 2
 		
-		--clear enemies from spawning near
-		for y = starty-15, starty+15 do
-			for x = startx-8, startx+8 do
-				if inmap(x, y) and #map[x][y] > 1 then
-					if tablecontains(checkpointignoreenemies, entityquads[map[x][y][2]].t) 
-						or (tablecontains(customenemies, entityquads[map[x][y][2]].t)
-						and enemiesdata[map[x][y][2]] and
-						enemiesdata[map[x][y][2]].dontspawnnearcheckpoint) then
-						table.insert(enemiesspawned, {x, y})
-					end
-				end
-			end
+		--clear enemies from spawning near (around the respawn point instead, when respawning where you died)
+		if not respawnpoint then
+			clearenemiesnearstart(startx, starty)
 		end
 		
 		--find which i it is
@@ -5214,11 +5229,12 @@ function startlevel(level, reason)
 		end
 	end
 	
-	--respawn where you died (accessibility): the last solid ground before everyone died, instead of the start or a checkpoint
-	local respawnpoint = accessibility_takerespawn()
-	if respawnpoint and not pipestartx then
+	if respawnpoint then
 		startx = respawnpoint.x
 		starty = respawnpoint.y
+		--the same enemies a checkpoint keeps away are kept away from here. startx is the middle of the player's feet and
+		--starty their bottom, so the tile they stand in is column floor(startx)+1, row starty (rounded, against float error)
+		clearenemiesnearstart(math.floor(startx)+1, math.floor(starty+0.5))
 	end
 
 	--set startx to pipestart
