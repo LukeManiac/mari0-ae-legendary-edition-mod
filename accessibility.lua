@@ -615,8 +615,18 @@ function accessibility_resetdeaths()
 	accessibilityrespawn = nil
 end
 
+--true while "start over" is killing the players (see accessibility_startoverupdate)
+accessibilitystartingover = false
+
 --a player died for real: remember where they last stood
 function accessibility_playerdied(p)
+	if accessibilitystartingover then
+		--starting over: back to the start or the checkpoint, not where they paused, and it isn't kept as a death.
+		--"respawn at previous death" goes back to the latest death again
+		accessibilityrespawn = nil
+		accessibilityrespawncursor = nil
+		return
+	end
 	if not deathscount() or not safehere(p.a11ysafe) then
 		return
 	end
@@ -663,8 +673,8 @@ function accessibility_canrespawnprevious()
 end
 
 --fades out of the pause menu and loads the course being played again, in area sub (0: the main area). It isn't a death:
---lives, form, shoes and Yoshi stay, and skip course doesn't count it. before runs just before the course loads
-local function reloadcourse(sub, before)
+--lives, form, shoes and Yoshi stay, and skip course doesn't count it
+local function reloadcourse(sub)
 	sub = tonumber(sub) or 0
 	return startwarpfade(function()
 		pausemenuopen = false
@@ -674,9 +684,6 @@ local function reloadcourse(sub, before)
 		--keep every player's form, like going through a pipe
 		updatesizes()
 		updateplayerproperties()
-		if before then
-			before()
-		end
 		--the same way the level screen loads a course after a death (levelscreen.lua)
 		if sub ~= 0 then
 			actualsublevel = sub
@@ -717,23 +724,50 @@ function accessibility_startoverfromcheckpoint()
 	return checkpointx ~= nil and checkpointx ~= false
 end
 
---"start over" ("start over from checkpoint" once one was reached): loads the course again from its start, or from the
---checkpoint in the checkpoint's area, the same place a death without respawn where you died would. Deaths are still
---remembered, but "respawn at previous death" goes back to the latest one again
+--"start over" is waiting for the pause menu to finish closing (see accessibility_startoverupdate)
+accessibilitystartoverpending = false
+
+--"start over" ("start over from checkpoint" once one was reached): closes the pause menu, and once it has finished
+--closing, every player dies. It's a death like any other (a life is lost, and skip course counts it), so the course
+--starts again from its start, or from the checkpoint in the checkpoint's area. Respawn where you died doesn't apply to
+--it, and it isn't kept as a death (see accessibility_playerdied)
 function accessibility_startover()
 	if not accessibility_canstartover() then
 		return false
 	end
-	local fromcheckpoint = accessibility_startoverfromcheckpoint()
-	local sub = 0
-	if fromcheckpoint and checkpointsublevel then
-		sub = checkpointsublevel
+	accessibilitystartoverpending = true
+	pausemenuopen = false
+	pausedaudio = nil --(the music doesn't come back: everyone dies as soon as the menu has closed)
+	return true
+end
+
+--every frame (game_update, after the pause menu's timer): kills every player once the pause menu has finished closing
+--after "start over". Opening the pause menu again before then calls it off
+function accessibility_startoverupdate()
+	if not accessibilitystartoverpending then
+		return
 	end
-	return reloadcourse(sub, function()
-		accessibilityrespawn = nil --(not where anyone died)
-		accessibilityrespawncursor = nil
-		checkcheckpoint = fromcheckpoint --(startlevel only starts at the checkpoint when this is set, like after a death)
-	end)
+	if pausemenuopen then
+		accessibilitystartoverpending = false --opened again: called off, and the music comes back when it closes
+		pausedaudio = nil
+		return
+	end
+	if pausemenuopentimer > 0 then
+		return --still closing
+	end
+	accessibilitystartoverpending = false
+	if gamestate ~= "game" or levelfinished or everyonedead or warpfade then
+		playmusic() --(nothing to start over any more: the music comes back)
+		return
+	end
+	accessibilitystartingover = true
+	for i = 1, players do
+		local p = objects["player"][i]
+		if p and not p.dead then
+			p:die("killscript")
+		end
+	end
+	accessibilitystartingover = false
 end
 
 --the area to load after everyone died, when respawning where they died (nil: as usual)

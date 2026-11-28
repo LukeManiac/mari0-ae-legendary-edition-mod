@@ -437,28 +437,30 @@ While **Respawn where you died** is on, the pause menu has a **respawn at previo
 
 #### 🔁 Start Over
 
-The pause menu has a **start over** button, which loads the course again from its start.
+The pause menu has a **start over** button, which starts the course again.
 
-* Once you've reached a checkpoint in the course (a checkpoint entity or a checkpoint flag), it says **start over from checkpoint** instead, and loads the course again from that checkpoint, in its area. That's the same place a death would put you back without **Respawn where you died**.
-* It doesn't count as a death: you keep your lives, your form, your shoe, helmet or Yoshi, and **skip course** doesn't count it. The timer starts again, the same as after a death.
-* Deaths are still remembered, but **respawn at previous death** goes back to the latest one again afterwards.
+* Pressing it closes the pause menu, and as soon as it has finished closing, every player dies. The music stays off while it closes.
+* It's a death like any other: you lose a life (a game over if it was your last), you lose your form, and **skip course** counts it. The course then starts again from its start, the same as after any death.
+* Once you've reached a checkpoint in the course (a checkpoint entity or a checkpoint flag), it says **start over from checkpoint** instead, and the course starts again from that checkpoint, in its area.
+* **Respawn where you died** doesn't apply to it, so you never come back where you paused. It isn't kept as a death for **respawn at previous death** either, and that button goes back to the latest death again afterwards.
+* Opening the pause menu again before it has finished closing calls it off, and the music comes back when the menu closes. If the course ends while the menu is closing, nothing happens and the music comes back.
 * It's greyed out, and can't be pressed, once the course is finished, while everyone is dead and while the screen is fading.
 * It isn't shown in the Course Maker, while testing a course from it (that has **stop testing level**), in minigames and the daily challenge (they have **restart**), or online.
 * Its label is translated into every language the game has, in both versions.
 
 **A taller pause box**
 
-* The pause box now takes 87.5% of the screen's height instead of 75% (`PAUSEMENU_HEIGHTFRACTION` in `game.lua`, with `PAUSEMENU_WIDTHFRACTION` for its width, still 75%). It still starts an eighth of the way down, so it grows downwards to the bottom of the screen, and everything in it stays where it was.
-* **accessibility** (or **back**) and **skip course** moved down with the bottom of the box, still 4 pixels above its bottom edge. The accessibility page is taller by the same amount, so it shows more settings at once.
-* Above **skip course** (or above **accessibility** when **skip course** isn't on offer) there's now room for two buttons stacked on top of each other: **respawn at previous death** just above it, then **start over** above that. When **respawn at previous death** isn't shown, **start over** moves down to be just above **skip course**.
-* Each stacked button is centred on the button under the stack, but kept inside the pause box and clear of the left column's text beside it, in every language.
-* With the keyboard, Down from **shader2** goes to the top of the stack. Down goes down through the stack and then to the button it sits above, and Up from that button goes back up through it. Up from the top of the stack goes back to **shader2**. Left and Right still move between **accessibility** and **skip course**. Buttons that are greyed out are skipped.
+* The pause box now takes 87.5% of the screen's height instead of 75% (`PAUSEMENU_HEIGHTFRACTION` in `game.lua`, with `PAUSEMENU_WIDTHFRACTION` for its width, still 75%), and it's centred up and down: 14 pixels from the top and bottom of the screen, instead of 28 from the top. Everything in it moves up with it, so it all stays in the same place inside the box.
+* **accessibility** (or **back**) and **skip course** sit at the bottom of the box, 4 pixels above its bottom edge, side by side in the middle. The accessibility page is taller, so it shows more settings at once.
+* Above them there's now room for two buttons stacked on top of each other: **respawn at previous death** just above the bottom row, then **start over** above that. When **respawn at previous death** isn't shown, **start over** moves down to be just above the bottom row.
+* Every one of these buttons is in the middle of the pause box, in every language. A stacked button would only move right if its label were too long to fit in the middle without running into the left column's text beside it.
+* With the keyboard, Down from **shader2** goes to the top of the stack. Down goes down through the stack and then to the bottom row: back to the button you came up from, or **skip course** if you came down into the stack from **shader2**. Up from either button of the bottom row goes up into the stack, and Up from the top of the stack goes back to **shader2**. Left and Right still move between **accessibility** and **skip course**. Buttons that are greyed out are skipped.
 
 For anyone working with the pause menu code:
 
-* `pausemenu_boxtop()` and `pausemenu_boxbottom()` give the pause box's top and bottom edges in game pixels.
+* `pausemenu_boxtop()` and `pausemenu_boxbottom()` give the pause box's top and bottom edges in game pixels. Everything in the pause menu is still laid out for a box that starts an eighth of the way down (`PAUSERIGHT`, the left column, the accessibility page's `viewporttop`), and `pausemenu_offsety()` is how far it all moves to stay in the centred box. Add it to any new position in the pause menu.
 * The pause menu's buttons are `PAUSEBUTTON_A11Y`, `PAUSEBUTTON_SKIP`, `PAUSEBUTTON_RESPAWN` and `PAUSEBUTTON_STARTOVER` in `pausemenubuttoncol`. `pausemenu_buttonenter()` runs when the keyboard comes down onto the buttons, and `pausemenu_buttonvertical(dir)` moves up and down through the stack.
-* `accessibility_startover()` is what **start over** runs. `accessibility_canstartover()` says whether it can be pressed, `accessibility_startovershown()` and `pausemenu_startovershown()` whether it's shown, and `accessibility_startoverfromcheckpoint()` whether it goes back to a checkpoint.
+* `accessibility_startover()` is what **start over** runs: it closes the pause menu and sets `accessibilitystartoverpending`. `accessibility_startoverupdate()` runs every frame in `game_update`, and kills every player with `die("killscript")` once the menu has finished closing, with `accessibilitystartingover` on while it does, so `accessibility_playerdied` leaves those deaths out. `accessibility_canstartover()` says whether it can be pressed, `accessibility_startovershown()` and `pausemenu_startovershown()` whether it's shown, and `accessibility_startoverfromcheckpoint()` whether it goes back to a checkpoint.
 
 ### ✨ Improvements
 

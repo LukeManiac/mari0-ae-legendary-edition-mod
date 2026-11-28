@@ -901,6 +901,8 @@ function game_update(dt)
 	
 	--pausemenu
 	pausemenuopentimer = math.max(0, math.min(pausemenuopentimer + (dt * (pausemenuopen and 1 or -1)), pausemenuopenduration))
+	--"start over": everyone dies once the pause menu has finished closing (accessibility.lua)
+	accessibility_startoverupdate()
 	menuprompttimer = math.max(0, math.min(menuprompttimer + (dt * (menuprompt and 1 or -1)), menupromptduration))
 	desktopprompttimer = math.max(0, math.min(desktopprompttimer + (dt * (desktopprompt and 1 or -1)), desktoppromptduration))
 	suspendprompttimer = math.max(0, math.min(suspendprompttimer + (dt * (suspendprompt and 1 or -1)), suspendpromptduration))
