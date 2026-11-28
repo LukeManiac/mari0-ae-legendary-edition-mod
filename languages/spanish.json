@@ -304,6 +304,8 @@
 			"infinite time": "tiempo infinito",
 			"skip course": "saltar nivel",
 			"respawn at previous death": "volver a la muerte previa",
+			"start over": "empezar de nuevo",
+			"start over from checkpoint": "volver al punto de control",
 			"skip course after": "saltar nivel tras",
 			"deaths": "muertes",
 			"never skip automatically": "nunca saltar solo",

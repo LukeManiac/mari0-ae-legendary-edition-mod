@@ -293,6 +293,8 @@
 			"infinite time": "sonsuz zaman",
 			"skip course": "bölümü atla",
 			"respawn at previous death": "önceki ölüme dön",
+			"start over": "baştan başla",
+			"start over from checkpoint": "kontrol noktasına dön",
 			"skip course after": "bölümü atla:",
 			"deaths": "ölümden sonra",
 			"never skip automatically": "asla kendiliğinden atlama",

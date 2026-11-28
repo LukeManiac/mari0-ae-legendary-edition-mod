@@ -312,6 +312,20 @@ function registercameraportaltransition()
 	end
 end
 
+--how much of the screen the pause box takes: all of the width but an eighth on each side, and from an eighth of the way
+--down for this much of the height (taller than wide, so the buttons at the bottom get two rows above them)
+PAUSEMENU_WIDTHFRACTION = 0.75
+PAUSEMENU_HEIGHTFRACTION = 0.875
+
+--the pause box's top and bottom edges in game pixels (see game_draw)
+function pausemenu_boxtop()
+	return height*16/8
+end
+
+function pausemenu_boxbottom()
+	return pausemenu_boxtop() + height*16*PAUSEMENU_HEIGHTFRACTION
+end
+
 --the pause menu's right column, top to bottom (game pixels). Every row has its label at labely; a widget
 --either sits under it (widgety) or at the right end of the label's line (scale and letterbox)
 PAUSERIGHT = {
@@ -3488,8 +3502,8 @@ function game_draw()
 	--pause menu
 	if pausemenuopentimer > 0 then
 		bettertimer = ease_in_out_quad(pausemenuopentimer / pausemenuopenduration)
-		pausewidth = winwidth*0.75
-		pauseheight = winheight*0.75
+		pausewidth = winwidth*PAUSEMENU_WIDTHFRACTION
+		pauseheight = winheight*PAUSEMENU_HEIGHTFRACTION
 		pauseradius = get_corner_radius(pausewidth, pauseheight) / 2
 		prevlinewidth = love.graphics.getLineWidth()
 		--black background behind the menu, fades in and out together with the scaling
@@ -6319,7 +6333,7 @@ function game_keypressed(key, textinput)
 				elseif pausemenuselected == pausemenu_rightrow("letterbox") then
 					pausemenu_setletterbox(not letterboxfullscreen)
 				elseif pausemenuselected == pausemenu_a11yrow() then
-					pausemenu_buttonactivate() --"accessibility" (the page below), "skip course" or "respawn at previous death"
+					pausemenu_buttonactivate() --"accessibility" (the page below), "skip course", "respawn at previous death" or "start over"
 				end
 			elseif isPauseKey(key) then
 				pausemenuopen = false
@@ -6336,7 +6350,7 @@ function game_keypressed(key, textinput)
 			local shader1row, shader2row = pausemenu_rightrow("shader1"), pausemenu_rightrow("shader2")
 			if (key == "down" or key == "s") then
 				if pausemenuselected == pausemenu_a11yrow() and pausemenu_buttonvertical(1) then
-					--down from "respawn at previous death" onto "skip course" under it
+					--down through the buttons stacked above "skip course" (or "accessibility")
 				elseif pausemenuselected < pausemenu_a11yrow() then
 					pausemenuselected = pausemenuselected + 1
 					if pausemenuselected == pausemenu_a11yrow() then
@@ -6347,7 +6361,7 @@ function game_keypressed(key, textinput)
 				end
 			elseif (key == "up" or key == "w") then
 				if pausemenuselected == pausemenu_a11yrow() and pausemenu_buttonvertical(-1) then
-					--up from "skip course" onto "respawn at previous death" above it
+					--up from "skip course" (or "accessibility") through the buttons stacked above it
 				elseif pausemenuselected > 1 then
 					pausemenuselected = pausemenuselected - 1
 				end
@@ -6376,7 +6390,7 @@ function game_keypressed(key, textinput)
 				elseif pausemenuselected == pausemenu_rightrow("letterbox") then
 					pausemenu_setletterbox(not letterboxfullscreen)
 				elseif pausemenuselected == pausemenu_a11yrow() then
-					pausemenu_buttonmove(dir) --along the bottom row: "accessibility", and "skip course" (or "respawn at previous death")
+					pausemenu_buttonmove(dir) --along the bottom row: "accessibility" and "skip course"
 				elseif (pausemenuselected == shader1row or pausemenuselected == shader2row) and shaderssupported ~= false then
 					local slot, i = 2, currentshaderi2
 					if pausemenuselected == shader1row then

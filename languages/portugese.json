@@ -293,6 +293,8 @@
 			"infinite time": "tempo infinito",
 			"skip course": "pular fase",
 			"respawn at previous death": "voltar à morte anterior",
+			"start over": "recomeçar",
+			"start over from checkpoint": "recomeçar do checkpoint",
 			"skip course after": "pular fase após",
 			"deaths": "mortes",
 			"never skip automatically": "nunca pular sozinho",

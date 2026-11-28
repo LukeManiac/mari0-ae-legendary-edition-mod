@@ -424,16 +424,41 @@ The game now keeps track of every death in the course you're playing, and the pa
 
 While **Respawn where you died** is on, the pause menu has a **respawn at previous death** button.
 
-* It sits just above **skip course**. When **skip course** isn't on offer, it's next to **accessibility** instead, where **skip course** would be.
+* It sits just above **skip course**, or above **accessibility** when **skip course** isn't on offer (see **Start Over** below for how the buttons stack).
 * The first press takes you back to your last death. If you've just come back at a death (by dying, or with the button), it takes you to the death before that one instead. Press it again to keep going further back.
 * Dying again adds the new death to the end of the list and brings you back there, so the next press goes to the death before it.
 * It's greyed out, and can't be pressed, while there's no earlier death to go back to: before the first death, and once you're back at the first one. It's also greyed out once the course is finished, while everyone is dead and while the screen is fading.
 * Pressing it fades to black and loads the course again in the area of that death, with the players where they stood. It doesn't count as a death: you keep your lives, your form, your shoe, helmet or Yoshi, and **skip course** doesn't count it. Enemies near the spot are kept away, the same as with respawn where you died.
 * It isn't shown in the Course Maker, while testing a course from it, in minigames, in the daily challenge or online.
-* With the keyboard, Down from **shader2** goes to it. Down from it goes to **skip course** under it, and Up from **skip course** goes back up to it. When it's on the bottom row, Left and Right move to it like **skip course**. Enter presses it.
+* With the keyboard, Up and Down move through it with the other stacked buttons (see **Start Over** below). Enter presses it.
 * It's kept clear of the left column's text beside it and inside the pause box, in every language. Its label is translated into every language the game has.
 * For anyone working with the accessibility code: `accessibilitydeaths` holds the deaths, oldest first, each one `{x, y, course, sub, index}`, and `accessibilityrespawncursor` is the index of the death the players last came back at. `accessibility_respawnprevious()` is what the button runs, `accessibility_canrespawnprevious()` says whether it can be pressed and `accessibility_respawnpreviousshown()` whether it's shown. `accessibility_resetdeaths()` forgets every death.
-* The pause menu's bottom buttons are `PAUSEBUTTON_A11Y`, `PAUSEBUTTON_SKIP` and `PAUSEBUTTON_RESPAWN` in `pausemenubuttoncol`. `pausemenu_respawnshown()` says whether the button is on the pause menu. `pausemenu_buttonenter()` runs when the keyboard comes down onto the button row, and `pausemenu_buttonvertical(dir)` moves between **skip course** and the button above it.
+* `pausemenu_respawnshown()` says whether the button is on the pause menu.
+
+#### 🔁 Start Over
+
+The pause menu has a **start over** button, which loads the course again from its start.
+
+* Once you've reached a checkpoint in the course (a checkpoint entity or a checkpoint flag), it says **start over from checkpoint** instead, and loads the course again from that checkpoint, in its area. That's the same place a death would put you back without **Respawn where you died**.
+* It doesn't count as a death: you keep your lives, your form, your shoe, helmet or Yoshi, and **skip course** doesn't count it. The timer starts again, the same as after a death.
+* Deaths are still remembered, but **respawn at previous death** goes back to the latest one again afterwards.
+* It's greyed out, and can't be pressed, once the course is finished, while everyone is dead and while the screen is fading.
+* It isn't shown in the Course Maker, while testing a course from it (that has **stop testing level**), in minigames and the daily challenge (they have **restart**), or online.
+* Its label is translated into every language the game has, in both versions.
+
+**A taller pause box**
+
+* The pause box now takes 87.5% of the screen's height instead of 75% (`PAUSEMENU_HEIGHTFRACTION` in `game.lua`, with `PAUSEMENU_WIDTHFRACTION` for its width, still 75%). It still starts an eighth of the way down, so it grows downwards to the bottom of the screen, and everything in it stays where it was.
+* **accessibility** (or **back**) and **skip course** moved down with the bottom of the box, still 4 pixels above its bottom edge. The accessibility page is taller by the same amount, so it shows more settings at once.
+* Above **skip course** (or above **accessibility** when **skip course** isn't on offer) there's now room for two buttons stacked on top of each other: **respawn at previous death** just above it, then **start over** above that. When **respawn at previous death** isn't shown, **start over** moves down to be just above **skip course**.
+* Each stacked button is centred on the button under the stack, but kept inside the pause box and clear of the left column's text beside it, in every language.
+* With the keyboard, Down from **shader2** goes to the top of the stack. Down goes down through the stack and then to the button it sits above, and Up from that button goes back up through it. Up from the top of the stack goes back to **shader2**. Left and Right still move between **accessibility** and **skip course**. Buttons that are greyed out are skipped.
+
+For anyone working with the pause menu code:
+
+* `pausemenu_boxtop()` and `pausemenu_boxbottom()` give the pause box's top and bottom edges in game pixels.
+* The pause menu's buttons are `PAUSEBUTTON_A11Y`, `PAUSEBUTTON_SKIP`, `PAUSEBUTTON_RESPAWN` and `PAUSEBUTTON_STARTOVER` in `pausemenubuttoncol`. `pausemenu_buttonenter()` runs when the keyboard comes down onto the buttons, and `pausemenu_buttonvertical(dir)` moves up and down through the stack.
+* `accessibility_startover()` is what **start over** runs. `accessibility_canstartover()` says whether it can be pressed, `accessibility_startovershown()` and `pausemenu_startovershown()` whether it's shown, and `accessibility_startoverfromcheckpoint()` whether it goes back to a checkpoint.
 
 ### ✨ Improvements
 
