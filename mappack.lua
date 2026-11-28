@@ -827,4 +827,9 @@ function getmappacklevels()
 		--print("world: ", i, " levels: ", #levelcount, " sublevels: ", unpack(levelcount))
 		table.insert(mappacklevels, levelcount)
 	end
+
+	--every world of every mappack is unlocked for good: this covers mappacks added or downloaded since the game started
+	if unlockallworldspersistently and mappack then
+		unlockmappackworlds(mappackfolder, mappack)
+	end
 end

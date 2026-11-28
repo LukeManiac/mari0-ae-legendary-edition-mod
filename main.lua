@@ -550,6 +550,14 @@ function love.load()
 	loadnitpicks()
 	accessibility_afternitpicks() --the settings that come from nitpicks (smooth camera...) start as them
 
+	--every world of every mappack: the nitpick does what the konami code would, and once it's done (either way),
+	--every mappack is unlocked again every time the game starts, so mappacks added since are unlocked too
+	if UnlockAllWorldsPersistently and not unlockallworldspersistently then
+		unlockallworlds_setpersistent()
+	elseif unlockallworldspersistently and unlockallmappackworlds() > 0 then
+		saveconfig()
+	end
+
 	--the settings came from legendary edition's backup (Mari0 AE saved options.txt last): put them back in options.txt
 	if optionsbackuprestored then
 		optionsbackuprestored = false
@@ -1643,6 +1651,10 @@ function saveconfig()
 	if gamefinished then
 		s = s .. "gamefinished;"
 	end
+
+	if unlockallworldspersistently then
+		s = s .. "unlockallworldspersistently;"
+	end
 	
 	--reached worlds
 	for i, v in pairs(reachedworlds) do
@@ -1840,6 +1852,8 @@ function loadconfig(nodefaultconfig)
 			end
 		elseif s2[1] == "gamefinished" then
 			gamefinished = true
+		elseif s2[1] == "unlockallworldspersistently" then
+			unlockallworldspersistently = true
 		elseif s2[1] == "vsync" then
 			vsync = true
 		elseif s2[1] == "reachedworlds" then
@@ -2003,8 +2017,9 @@ function defaultconfig()
 	savesfolder = "alesans_entities/saves"
 	localnick = false
 	modmappacks = true
-	
+
 	reachedworlds = {}
+	unlockallworldspersistently = false
 end
 
 local function writesuspenddata(path, data)
@@ -2381,6 +2396,63 @@ function konami_unlockworlds()
 	return count
 end
 
+--marks every world of any mappack as reached, without it being the open one: a world exists if it has an N-1.txt
+--returns how many were newly unlocked
+function unlockmappackworlds(folder, name)
+	local items = love.filesystem.getDirectoryItems(folder .. "/" .. name)
+	local exists = {}
+	local last = 0
+	for _, s in ipairs(items) do
+		local w = tonumber(s:match("^(%d+)%-1%.txt$"))
+		if w and w >= 1 and w <= maxworlds then
+			exists[w] = true
+			last = math.max(last, w)
+		end
+	end
+	if last == 0 then
+		return 0
+	end
+	if not reachedworlds[name] then
+		reachedworlds[name] = {}
+	end
+	local worlds = reachedworlds[name]
+	local count = 0
+	for i = 1, last do
+		if exists[i] then
+			if not worlds[i] then
+				count = count + 1
+			end
+			worlds[i] = true
+		elseif worlds[i] == nil then
+			worlds[i] = false --keeps the indexes in order for the save string
+		end
+	end
+	return count
+end
+
+--every world of every mappack in both mappack folders (mounted DLC included), returns how many were newly unlocked
+function unlockallmappackworlds()
+	local count = 0
+	for _, folder in ipairs({"alesans_entities/mappacks", "mappacks"}) do
+		if love.filesystem.getInfo(folder, "directory") then
+			for _, name in ipairs(love.filesystem.getDirectoryItems(folder)) do
+				if love.filesystem.getInfo(folder .. "/" .. name .. "/settings.txt") then
+					count = count + unlockmappackworlds(folder, name)
+				end
+			end
+		end
+	end
+	return count
+end
+
+--konami code in a mappack whose worlds were all unlocked already (or the unlockallworldspersistently nitpick):
+--every world of every mappack, from now on and every time the game starts
+function unlockallworlds_setpersistent()
+	unlockallworldspersistently = true
+	unlockallmappackworlds()
+	saveconfig()
+end
+
 ----------------
 
 function love.keypressed(key, scancode, isrepeat, textinput)
@@ -2475,12 +2547,17 @@ function love.keypressed(key, scancode, isrepeat, textinput)
 					playsound(konamisound)
 				end
 				gamefinished = true
+				local hadmappack = mappack and mappacklevels and #mappacklevels > 0
 				local unlockedworlds = konami_unlockworlds()
 				saveconfig()
 				konamii = 1
 				notice.new("Cheats unlocked!")
 				if unlockedworlds > 0 then
 					notice.new("All worlds unlocked!")
+				elseif hadmappack and not unlockallworldspersistently then
+					--every world here was unlocked already: unlock every world of every mappack, for good
+					unlockallworlds_setpersistent()
+					notice.new("All worlds in all mappacks unlocked!")
 				end
 			end
 		else
@@ -3869,6 +3946,7 @@ function loadnitpicks(localpath)
 	AutomaticBackgroundReload = t.automaticbackgroundreload
 	AutomaticMapReload = t.automaticmapreload
 	AutomaticAnimationReload = t.automaticanimationreload
+	UnlockAllWorldsPersistently = t.unlockallworldspersistently
 
 	if MarioMakerBlockPhysics then
 		mushroomtime = mmmushroomtime

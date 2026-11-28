@@ -1273,7 +1273,8 @@ local nitpickkeys = {
 	"automaticenemyreload",
 	"automaticbackgroundreload",
 	"automaticmapreload",
-	"automaticanimationreload"
+	"automaticanimationreload",
+	"unlockallworldspersistently"
 }
 
 function generatenitpicksfile()

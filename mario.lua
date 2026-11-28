@@ -1299,7 +1299,7 @@ function mario:update(dt)
 			self.startimer = mariostarduration
 		end
 	end
-	
+
 	--animationS
 	if self.pipeexitdelay then
 		self.pipeexitdelay = self.pipeexitdelay - dt

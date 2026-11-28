@@ -381,6 +381,7 @@ A mappack can also have its own `nitpicks.json`, next to its `settings.txt`. Its
 - `automaticbackgroundreload`: The Course Maker decodes custom backgrounds and foregrounds again whenever a map is loaded or tested, like before v1.4.0, so you don't have to press **refresh data** in the backgrounds tab.
 - `automaticanimationreload`: The Course Maker reads every animation again whenever a map is loaded or tested, like before v1.4.0, so you don't have to press the **Animations** tab's arrow button.
 - `automaticmapreload`: The Course Maker reads every map and preview again whenever a map is loaded or tested, or the editor panel is opened, so you don't have to press **refresh data** in the **Maps** tab.
+- `unlockallworldspersistently`: Unlocks every world in every mappack when the game starts, for good, the same as typing the Konami code in a mappack whose worlds are all unlocked already. Only read from the global `nitpicks.json`.
 
 ---
 
@@ -402,6 +403,16 @@ Enemies killed with a Super Star now give a combo, like stomping enemies without
 * This also covers a Mega Mushroom, since it gives you a star. Kills as huge Mario or as a Tanooki statue without a star still give the enemy's own score.
 * Minigames keep the enemy's own score.
 * `mario:addstarcombo(points)` gives the next score of the star combo, or `points` when the kill isn't from a star. `mario:combooneup()` is the 1up both combos give once they run past their last score.
+
+#### 🕹️ Konami Code: Every Mappack
+
+* Typing the Konami code in a mappack whose worlds are all unlocked already now unlocks every world in every mappack, in both mappack folders, along with the cheats. A notice says "All worlds in all mappacks unlocked!".
+* This is kept for good: `unlockallworldspersistently` is added to `options.txt`, and every time the game starts, every world of every mappack is unlocked again. Mappacks added since, and DLC downloaded since, are unlocked too, as soon as they're opened.
+* Only worlds that actually exist (with an `N-1.txt` course) are unlocked, the same as the Konami code in one mappack.
+* The first time in a mappack, the Konami code still only unlocks that mappack's worlds, like before.
+* The `unlockallworldspersistently` nitpick does the same without the Konami code: with it set to `true` in `nitpicks.json`, the game adds `unlockallworldspersistently` to `options.txt` when it starts. It only works in the global `nitpicks.json`, since it's only read at startup. **Generate Nitpicks File** adds it to an existing file.
+* **Reset All Settings** takes it out of `options.txt` again, along with every unlocked world. With the nitpick on, it comes back the next time the game starts.
+* For anyone working with the settings code: `unlockmappackworlds(folder, name)` unlocks every world of one mappack, `unlockallmappackworlds()` does it for every mappack, and `unlockallworlds_setpersistent()` does that and turns `unlockallworldspersistently` on. Each of the first two returns how many worlds were newly unlocked.
 
 ### 🐛 Bug Fixes
 
