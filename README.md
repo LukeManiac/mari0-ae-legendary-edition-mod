@@ -464,6 +464,14 @@ For anyone working with the pause menu code:
 
 ### ✨ Improvements
 
+#### ⏸️ Pause Menu
+
+* The game stays paused until the pause menu has finished closing. Before, everything started moving again as soon as you closed it, while it was still shrinking away. Animations, animated tiles and screen shake wait for it too.
+* The pause menu only takes input once it has finished opening. Nothing works while it opens or closes: no keys, controller buttons or clicks, including Enter and the pause key. Before, Enter and the pause key worked while it was still opening. Keys pressed while it opens or closes don't reach the game either.
+* The same goes for its prompts (**quit to menu?**, **quit to desktop?**, **save game?** and **save highscore?**): each one only takes input once it has finished opening, and not while it closes.
+* Everything behind the pause menu is now blurred, with the same blur as the glass, before the dark layer goes over it. The blur fades in and out with the menu. It isn't there with **Reduce transparency** (accessibility) or in flat glass quality, the same as the glass itself.
+* For anyone working with the pause menu code: `pausemenu_isopen()` says whether the pause menu counts as open (open, or still closing), and `pausemenu_takesinput()` whether it takes input (open and done opening). `pausemenuopen` itself still only says whether it's open or opening. `guiglass.blurbehind(alpha)` blurs everything drawn so far on the screen, and glass drawn after it reads the blurred picture.
+
 * With `modernsizechangeanimation`, a player with a Starman who changes size keeps flashing in the star's colours like before, but the colour they're on stays the same until the animation is over. The blinking keeps time, so it carries on from the same colour afterwards instead of jumping ahead. This works with `dontfreezeonsizechange` too. For anyone working with the player code: `mario:modernsizeplaying()` says whether a modern size change animation is playing on the player.
 
 * At the end of a castle, Toad's or the princess's first line now shows as soon as you reach them, instead of 3.2 seconds after you start walking. Every line after it keeps the same gap after the first one as before, and so does pressing a button to finish the game.

@@ -429,6 +429,47 @@ local function getbackdrop(src)
 	return bd
 end
 
+--blurs everything drawn so far on the current canvas, with the same blur the glass reads, over the whole canvas and faded
+--in by alpha (0-1). For the layer behind something that covers the screen, like the pause menu. Glass drawn after it
+--reads the blurred picture. Returns false when there's no blur to draw: flat quality, no canvas to read yet (its first
+--frame without a resizable window), or reduce transparency (accessibility), which takes the blur away from glass too
+function guiglass.blurbehind(alpha)
+	if supported and not glassshader then
+		guiglass.load()
+	end
+	alpha = alpha or 1
+	if alpha <= 0 or not supported or guiglass.mode() == "flat" then
+		return false
+	end
+	if accessibility and accessibility.reducetransparency then
+		return false
+	end
+	framebackdrop = true --(keeps the frame on a canvas, so there's something to read)
+	local src = backdropsource(love.graphics.getCanvas())
+	if not (src and src.getDimensions) then
+		return false
+	end
+	local bd = backdrops[src]
+	if bd then
+		bd.frame = -1 --blur what's there now, not a copy from earlier in the frame
+	end
+	bd = getbackdrop(src)
+	if not bd then
+		return false
+	end
+	local sw, sh = src:getDimensions()
+	love.graphics.push("all")
+	love.graphics.origin()
+	love.graphics.setScissor()
+	love.graphics.setShader()
+	love.graphics.setBlendMode("alpha")
+	love.graphics.setColor(255, 255, 255, 255*alpha)
+	love.graphics.draw(bd.a, 0, 0, 0, sw/bd.w, sh/bd.h)
+	love.graphics.pop()
+	bd.frame = -1 --glass drawn after this reads the blurred picture, not the copy from before it
+	return true
+end
+
 local function tocolor(c, fallback)
 	c = c or fallback
 	return (c[1] or 0)/255, (c[2] or 0)/255, (c[3] or 0)/255

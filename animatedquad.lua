@@ -137,7 +137,7 @@ function animatedquad:update(dt)
 	if self.triggered then
 		return false
 	end
-	if (not pausemenuopen) and self.delays[self.quadi] then
+	if (not pausemenu_isopen()) and self.delays[self.quadi] then
 		self.timer = self.timer + dt
 		while self.timer > self.delays[self.quadi] do
 			self.timer = self.timer - self.delays[self.quadi]
@@ -165,28 +165,30 @@ function animatedquad:getquad(x, y)
 end
 
 local function getquadprops(self)
-	local list = {"collision",
-	"invisible",
-	"breakable",
-	"coinblock",
-	"coin",
-	"portalable",
-	"platform",
-	"spikesup",
-	"spikesdown",
-	"spikesleft",
-	"spikesright",
-	"grate",
-	"water",
-	"mirror",
-	"foreground",
-	"bridge",
-	"lava",
-	"leftslant",
-	"rightslant",
-	"noteblock",
-	"vine",
-	"ice"}
+	local list = {
+		"collision",
+		"invisible",
+		"breakable",
+		"coinblock",
+		"coin",
+		"portalable",
+		"platform",
+		"spikesup",
+		"spikesdown",
+		"spikesleft",
+		"spikesright",
+		"grate",
+		"water",
+		"mirror",
+		"foreground",
+		"bridge",
+		"lava",
+		"leftslant",
+		"rightslant",
+		"noteblock",
+		"vine",
+		"ice"
+	}
 	local t = {}
 	for i, w in pairs(list) do
 		t[w] = self[w]

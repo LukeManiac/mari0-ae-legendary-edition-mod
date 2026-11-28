@@ -2217,7 +2217,7 @@ function accessibility_mousepressed(x, y, button)
 	if gamestate == "options" and optionstab == ACCESSIBILITY_OPTIONSTAB and optionspage.layout then
 		return wheelpage(optionspage, x, y, button)
 	end
-	if gamestate == "game" and pausemenuopen and pausemenupage == 2 and pausepage.layout then
+	if gamestate == "game" and pausemenu_takesinput() and pausemenupage == 2 and pausepage.layout then
 		return wheelpage(pausepage, x, y, button)
 	end
 	return false

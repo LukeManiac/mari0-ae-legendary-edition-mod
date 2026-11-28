@@ -114,7 +114,7 @@ end
 
 --the game is paused (pause menu) or frozen (size change): key presses and player conditions don't trigger animations
 local function animationsystem_paused()
-	return pausemenuopen or noupdate
+	return pausemenu_isopen() or noupdate
 end
 
 --whether player i is holding button right now

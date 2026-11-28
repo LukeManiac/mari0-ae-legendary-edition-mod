@@ -312,6 +312,17 @@ function registercameraportaltransition()
 	end
 end
 
+--whether the pause menu counts as open: open, or still closing. The game stays paused until it has finished closing
+function pausemenu_isopen()
+	return pausemenuopen or (pausemenuopentimer or 0) > 0
+end
+
+--whether the pause menu takes input: open and done opening (nothing works while it opens or closes). Its prompts each
+--take input only once they're done opening too (see game_keypressed)
+function pausemenu_takesinput()
+	return pausemenuopen and (pausemenuopentimer or 0) >= pausemenuopenduration
+end
+
 --how much of the screen the pause box takes, centred both ways: all of the width but an eighth on each side, and this
 --much of the height (taller than that, so the buttons at the bottom get two rows above them)
 PAUSEMENU_WIDTHFRACTION = 0.75
@@ -1057,7 +1068,7 @@ function game_update(dt)
 		accessibility_pauseremove()
 	end
 
-	if pausemenuopen and not (SERVER or CLIENT) then
+	if pausemenu_isopen() and not (SERVER or CLIENT) then
 		--joystick navigation
 		local s1 = controls[1]["right"]
 		local s2 = controls[1]["left"]
@@ -2066,7 +2077,7 @@ function game_draw()
 		
 		love.graphics.setColor(255, 255, 255, 255)
 		--tremoooor!
-		if earthquake > 0 and not pausemenuopen then
+		if earthquake > 0 and not pausemenu_isopen() then
 			tremorx = (math.random()-.5)*2*earthquake*scale
 			tremory = (math.random()-.5)*2*earthquake*scale
 			tremorx, tremory = accessibility_shake(tremorx, tremory) --accessibility: shake intensity and direction
@@ -3488,7 +3499,7 @@ function game_draw()
 		v:draw()
 	end
 	
-	if earthquake > 0 and not pausemenuopen then
+	if earthquake > 0 and not pausemenu_isopen() then
 		love.graphics.translate(-round(tremorx), -round(tremory))
 	end
 	
@@ -3519,6 +3530,8 @@ function game_draw()
 		pauseheight = winheight*PAUSEMENU_HEIGHTFRACTION
 		pauseradius = get_corner_radius(pausewidth, pauseheight) / 2
 		prevlinewidth = love.graphics.getLineWidth()
+		--everything behind the menu is blurred first, fading in and out together with it (guiglass.lua)
+		guiglass.blurbehind(math.min(math.max(bettertimer, 0), 1))
 		--black background behind the menu, fades in and out together with the scaling
 		love.graphics.setColor(0, 0, 0, math.min(math.max(bettertimer, 0), 1) * 180)
 		love.graphics.rectangle("fill", 0, 0, winwidth, winheight)
@@ -6166,7 +6179,11 @@ function game_keypressed(key, textinput)
 	if minigameplaying and (warpfade or minigame_hardfrozen()) then
 		return --leaving or restarting a minigame, or frozen before its results screen
 	end
-	if pausemenuopen then
+	if pausemenu_isopen() then
+		--the pause menu takes no keys at all while it opens or closes (nothing reaches the game either)
+		if not pausemenu_takesinput() then
+			return
+		end
 		local confirmkey = (key == "return" or key == "enter" or key == "kpenter" or key == " ")
 		--"save highscore?" sits on top of the quit prompt, so it goes first
 		if highscoreprompt or highscoreprompttimer > 0 then
@@ -6200,7 +6217,7 @@ function game_keypressed(key, textinput)
 			end
 			return
 		end
-		if menuprompttimer >= menupromptduration then
+		if menuprompt and menuprompttimer >= menupromptduration then
 			local moved
 			pausemenuselected2, moved = promptnavigate(key, pausemenuselected2, 2)
 			if moved then
@@ -6257,7 +6274,7 @@ function game_keypressed(key, textinput)
 				menuprompt = false
 			end
 			return
-		elseif desktopprompttimer >= desktoppromptduration then
+		elseif desktopprompt and desktopprompttimer >= desktoppromptduration then
 			local moved
 			pausemenuselected2, moved = promptnavigate(key, pausemenuselected2, 2)
 			if moved then
@@ -6277,7 +6294,7 @@ function game_keypressed(key, textinput)
 				desktopprompt = false
 			end
 			return
-		elseif suspendprompttimer >= suspendpromptduration then
+		elseif suspendprompt and suspendprompttimer >= suspendpromptduration then
 			local moved
 			pausemenuselected2, moved = promptnavigate(key, pausemenuselected2, 2)
 			if moved then
@@ -6310,7 +6327,7 @@ function game_keypressed(key, textinput)
 		end
 
 		if menuprompttimer == 0 and desktopprompttimer == 0 and suspendprompttimer == 0 then
-			-- Allow confirm and pause-key close immediately, even while the open animation is still playing
+			--confirm, and the pause key to close it (only once it has finished opening: see the top of game_keypressed)
 			if (key == "return" or key == "enter" or key == "kpenter" or key == " ") then
 				if pausemenuoptions[pausemenuselected] == "resume" then
 					pausemenuopen = false
@@ -6767,7 +6784,7 @@ function game_mousepressed(x, y, button)
 		ignoregui = true --the click belongs to the button, not to any other gui element
 		return
 	end
-	if pausemenuopen then
+	if pausemenu_isopen() then
 		controlspopup_mousepressed(x, y, button)
 		return
 	end
@@ -9805,7 +9822,8 @@ function game_joystickpressed( joystick, button )
 		end
 	end
 
-	if pausemenuopen then
+	if pausemenu_isopen() then
+		--(game_keypressed ignores these while the menu opens or closes)
 		for _, dir in ipairs({"right", "left", "down", "up"}) do
 			if controlbindingmatchesjoy(1, dir, joystick, button) then
 				game_keypressed(dir)
