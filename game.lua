@@ -6580,6 +6580,7 @@ function pausegame(playpause)
 	if not pausemenuopen then
 		pausemenuresumemusic = false
 		if not android then
+			pausesound:stop()
 			pausedaudio = love.audio.pause()
 		end
 
